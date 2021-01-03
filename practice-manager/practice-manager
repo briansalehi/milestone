@@ -1958,6 +1958,7 @@ function find_index_alias {
 	for entry in ${1//./ }
 	do
 		((entry++))
+		entry="${entry%% *}"
 		if [ "$entry" = "0" ]
 		then
 			tput setaf $SEVERITY_HIGH
