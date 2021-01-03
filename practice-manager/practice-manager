@@ -1691,7 +1691,7 @@ function generate_header_section {
 		tput sgr0
 	elif [ -z "$(cat "$header")" ]
 	then
-		tput setaf $SEVERITY_MEDIUM
+		tput setaf $SEVERITY_HIGH
 		echo "empty header: $header" >&2
 		tput sgr0
 	else
