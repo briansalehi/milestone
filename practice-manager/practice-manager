@@ -1960,11 +1960,11 @@ function find_index_alias {
 	local alias_file=
 	local alias=
 	local location=
+	local sourcefile=
 	local entry=
 	for entry in ${1//./ }
 	do
 		((entry++))
-		entry="${entry%% *}"
 		if [ "$entry" = "0" ]
 		then
 			tput setaf $SEVERITY_HIGH
@@ -1975,9 +1975,11 @@ function find_index_alias {
 
 		if [ -z "$location" ]
 		then
-			location="$(sed -n "${entry}p" ".index")"
+			sourcefile="$(sed -n "${entry}p" ".index")"
+			location="${sourcefile%% *}"
 		else
-			location="${location}/$(sed -n "${entry}p" "${location}/.index")"
+			sourcefile="$(sed -n "${entry}p" "${location}/.index")"
+			location="${location}/${sourcefile%% *}"
 		fi
 
 		if [ -d "$location" ]
