@@ -860,6 +860,7 @@ function generate_html_item_with_link {
 	local address="$2"
 	local class="$3"
 	local access_key="$4"
+	local access_direction=
 	local tag=
 	local tag_end="</li>"
 
@@ -874,7 +875,12 @@ function generate_html_item_with_link {
 	then
 		if [ -n "$access_key" ]
 		then
-			tag="${tag}<a accesskey=\"${access_key}\" href=\"/${address#/}\">"
+			case "$access_key" in
+				[fF]|[nN]) access_direction=Forward ;;
+				[bB]|[pP]) access_direction=Backward ;;
+				[tT]) access_direction=Top ;;
+			esac
+			tag="${tag}<a title=\"Press ${access_key} to move ${access_direction}\" accesskey=\"${access_key}\" href=\"/${address#/}\">"
 		else
 			tag="${tag}<a href=\"/${address#/}\">"
 		fi
