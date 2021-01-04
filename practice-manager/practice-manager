@@ -880,7 +880,7 @@ function generate_html_item_with_link {
 				[bB]|[pP]) access_direction=Backward ;;
 				[tT]) access_direction=Top ;;
 			esac
-			tag="${tag}<a title=\"Press ${access_key} to move ${access_direction}\" accesskey=\"${access_key}\" href=\"/${address#/}\">"
+			tag="${tag}<a title=\"Press ALT + SHIFT + ${access_key} to move ${access_direction}\" accesskey=\"${access_key}\" href=\"/${address#/}\">"
 		else
 			tag="${tag}<a href=\"/${address#/}\">"
 		fi
