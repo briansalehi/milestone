@@ -1637,9 +1637,11 @@ function generate_navigation_section {
 	local page=
 	local title=
 	local local_index=
+	local depth=1
 
 	generate_html_ordered_list "$1" begin breadcrumb
-	generate_html_item_with_link "Home" "/" breadcrumb-item
+	generate_html_item_with_link "Home" "/" breadcrumb-item "$depth"
+	((depth++))
 
 	for entry in ${1//\//$'\n'}
 	do
@@ -1660,14 +1662,15 @@ function generate_navigation_section {
 				local_index="${local_index//[^\/]/}"
 				local_index="${#local_index}"
 				page="$(cut -d"." -f1-"$local_index" <<< "$page_index").0.html"
-				generate_html_item_with_link "${title:-"..."}" "$page" breadcrumb-item
+				generate_html_item_with_link "${title:-"..."}" "$page" breadcrumb-item "$depth"
+				((depth++))
 			fi
 		elif [ -f "$hierarchy" ] && [ -f "${hierarchy%.*}.title.txt" ]
 		then
 			title="$(cat "${hierarchy%.*}.title.txt")"
 			generate_html_item "$1" "${title:-"..."}" "breadcrumb-item active"
 		else
-			tput setaf $SEVERITY_MEDIUM
+			tput setaf $SEVERITY_HIGH
 			echo "untitled breadcrumb: ${hierarchy}"
 			tput sgr0
 			generate_html_item "$1" "..." breadcrumb-item
