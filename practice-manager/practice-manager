@@ -1254,11 +1254,10 @@ function compile_source {
 			headers) execution_command+="$headers " ;;
 			page) execution_command+="$page " ;;
 			location) execution_command+="$location " ;;
-			*)
-				tput setaf $SEVERITY_HIGH
-				echo "invalid scheme component: $component" >&2
+			*) execution_command+="$component "
+				tput setaf $SEVERITY_LOW
+				echo "custom compilation scheme component: $component" >&2
 				tput sgr0
-				return 1
 				;;
 		esac
 	done
@@ -1314,10 +1313,9 @@ function compile_source {
 			page) execution_command+="$page " ;;
 			location) execution_command+="$location " ;;
 			*)
-				tput setaf $SEVERITY_HIGH
-				echo "invalid scheme component: $component" >&2
+				tput setaf $SEVERITY_LOW
+				echo "custom linkage scheme component: $component" >&2
 				tput sgr0
-				return 1
 				;;
 		esac
 	done
@@ -1567,10 +1565,9 @@ function run_program {
 			page) running_command+="$page " ;;
 			location) running_command+="$location " ;;
 			*)
-				tput setaf $SEVERITY_HIGH
-				echo "invalid scheme component: $component" >&2
+				tput setaf $SEVERITY_LOW
+				echo "custom running scheme component: $component" >&2
 				tput sgr0
-				return 1
 				;;
 		esac
 	done
