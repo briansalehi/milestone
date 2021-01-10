@@ -1312,7 +1312,7 @@ function compile_source {
 	then
 		if [ "${COMPILABLE:-false}" = "true" ]
 		then
-			if ! $compilation_command 2> "$compilation_error"
+			if ! $compilation_command &> "$compilation_error"
 			then
 				if [ "${GENERATES_COMPILATION_ERROR:-false}" != "true" ]
 				then
@@ -1320,10 +1320,11 @@ function compile_source {
 					echo "compilation error: $1" >&2
 					echo "  command: $compilation_command" >&2
 					tput sgr0
+					return 1
 				fi
 			fi
 
-			if [ -n "$post_compilation_command" ] && ! $post_compilation_command 2>> "$compilation_error"
+			if [ -n "$post_compilation_command" ] && ! $post_compilation_command &>> "$compilation_error"
 			then
 				if [ "${GENERATES_COMPILATION_ERROR:-false}" != "true" ]
 				then
@@ -1331,6 +1332,7 @@ function compile_source {
 					echo "post compilation error: $1" >&2
 					echo "  command: $post_compilation_command" >&2
 					tput sgr0
+					return 1
 				fi
 			fi
 
@@ -1371,6 +1373,7 @@ function compile_source {
 					echo "linkage error for: $1" >&2
 					echo "  command: $linkage_command" >&2
 					tput sgr0
+					return 1
 				fi
 			fi
 
@@ -1568,33 +1571,48 @@ function capture_screenshot {
 	local source="$1"
 	local imagefile="${source%.*}.screenshot.png"
 
-	if [ -f ${source%.*}.bin ] && gnome-screenshot --display :0 --file "$imagefile" --delay 2 --window 2>/dev/null &
+	local binary="${source%.*}"
+	binary="${binary##*/}"
+
+	if [ -f "${source%.*}.bin" ] && ${source%.*}.bin &>/dev/null &
 	then
-		if ${source%.*}.bin 2>/dev/null &
+		local lifetime=0
+		local pid=
+
+		while ! pid=$(pgrep "$binary"); do
+			if [ "$lifetime" -gt 50 ]
+			then
+				tput setaf $SEVERITY_HIGH
+				echo "screenshot session timed out: $source"
+				tput sgr0
+				return 1
+			fi
+			sleep .1
+			((lifetime++))
+		done
+
+		if gnome-screenshot --display :0 --file "$imagefile" --delay 1 --window &>/dev/null
 		then
-			sleep 3
-			local pagename="${source%.*}.bin"
-			local processid="$(pgrep "${pagename##*/}")"
-			if [ -n "$processid" ] && kill "$processid"
+			if kill "$pid" &>/dev/null
 			then
 				tput setaf $SEVERITY_LOW
 				echo "screenshot captured from ${source}"
 				tput sgr0
 			else
 				tput setaf $SEVERITY_HIGH
-				echo "failed to kill process ${processid} after screenshot"
+				echo "failed to kill process after screenshot: $source"
 				tput sgr0
 				rm -f "${source%.*}.screenshot.png"
 			fi
 		else
 			tput setaf $SEVERITY_HIGH
-			echo "failed to run program for screenshot"
+			echo "screenshot tool (gnome-screenshot) failed to run: $source"
 			tput sgr0
 			rm -f "${source%.*}.screenshot.png"
 		fi
 	else
 		tput setaf $SEVERITY_HIGH
-		echo "screenshot tool failed to run"
+		echo "failed to run program for screenshot: $source"
 		tput sgr0
 		rm -f "${source%.*}.screenshot.png"
 	fi
@@ -1641,7 +1659,7 @@ function run_program {
 		then
 			if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
 			then
-				capture_screenshot "$source"
+				capture_screenshot "$source" 2>/dev/null
 			elif [ -f "$input" ]
 			then
 				if ! $running_command < "$input" 2> "$runtime_error" 1> "$output"
