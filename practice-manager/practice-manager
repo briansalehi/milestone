@@ -25,8 +25,11 @@ main_configuration=\
 #GENERATES_COMPILATION_ERROR=false
 
 ## Order of statements in compilation command
-## Available statements: compiler, options, object, source, headers
+## Available statements:
+### compiler, options, object, source, headers, location, binary, page,
+### makefile, stepN optionN, extension-xyz
 #COMPILATION_SCHEME=\"compiler options object source\"
+#POST_COMPILATION_SCHEME=
 
 ## Whether all sources in one line of .index file should appear in linkage
 ## usually other files are headers only and won't need to be linked to source
@@ -56,6 +59,7 @@ main_configuration=\
 #RUNNABLE=true
 #RUNNING_OPTIONS=
 #GENERATES_RUNTIME_ERROR=false
+#CAPTURE_SCREENSHOT=false
 
 ## Order of statements in running command
 ## Available statements: compiler, linker, options, binary, object, headers,
@@ -1158,6 +1162,38 @@ function update_configuration {
 	done
 }
 
+# requires scheme
+# requires page name
+function create_command_scheme {
+	local scheme="$1"
+	local page="$2"
+	local headers="$3"
+	local component
+	command_scheme=
+
+	for component in $scheme
+	do
+		case "$component" in
+			compiler) command_scheme+="$COMPILER " ;;
+			compiler_options) command_scheme+="$COMPILER_OPTIONS " ;;
+			linker) command_scheme+="$LINKER " ;;
+			linker_options) command_scheme+="$LINKER_OPTIONS " ;;
+			running_options) command_scheme+="$RUNNING_OPTIONS " ;;
+			object) command_scheme+="${source%.*}.${OUTPUT_OBJECT:-o} " ;;
+			source) command_scheme+="${source} " ;;
+			binary) command_scheme+="${source%.*}.bin " ;;
+			headers) command_scheme+="$headers " ;;
+			page|pagename|rawname) command_scheme+="${source%.*} " ;;
+			location) command_scheme+="${source%/*} " ;;
+			makefile) local makefile="${source%.*}.make"; command_scheme+="${makefile##*/} " ;;
+			extension-*) command_scheme+="${source%.*}.${component#extenion-} " ;;
+			*) command_scheme+="$component " ;;
+		esac
+	done
+	command_scheme="${command_scheme//  / }"
+	command_scheme="${command_scheme% }"
+}
+
 # requires path to page
 # requires compile/link/run option
 # requires command
@@ -1171,7 +1207,7 @@ function generate_execution_mode {
 	if [ -z "$command" ]
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "execution command not specified: $page"
+		echo "execution command not specified for ${mode}: $page"
 		tput sgr0
 		return 1
 	fi
@@ -1214,7 +1250,6 @@ function compile_source {
 	local output="${1%.*}.output.txt"
 	local compilation_error="${1%.*}.compilation.error.txt"
 	local linkage_error="${1%.*}.linkage.error.txt"
-	local execution_command
 	local output_change_time
 	local source_change_time
 	local component=
@@ -1232,6 +1267,13 @@ function compile_source {
 		headers=
 	fi
 
+	if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
+	then
+		output="${1%.*}.screenshot.png"
+	else
+		output="${1%.*}.output.txt"
+	fi
+
 	source_change_time=$(stat -c "%Y" "$1")
 
 	if [ -f "$output" ]
@@ -1242,39 +1284,35 @@ function compile_source {
 	fi
 
 	# build compilation scheme
-	execution_command=
-	for component in ${COMPILATION_SCHEME:-compiler options object source}
-	do
-		case "$component" in
-			compiler) execution_command+="$COMPILER " ;;
-			options) execution_command+="$COMPILER_OPTIONS " ;;
-			object) execution_command+="$object " ;;
-			source) execution_command+="$source " ;;
-			binary) execution_command+="$binary " ;;
-			headers) execution_command+="$headers " ;;
-			page) execution_command+="$page " ;;
-			location) execution_command+="$location " ;;
-			*) execution_command+="$component "
-				tput setaf $SEVERITY_LOW
-				echo "custom compilation scheme component: $component" >&2
-				tput sgr0
-				;;
-		esac
-	done
-	execution_command="${execution_command//  / }"
-	execution_command="${execution_command% }"
+	create_command_scheme "${COMPILATION_SCHEME/options/compiler_options}" "$source" "$headers"
+	local compilation_command="$command_scheme"
+
+	# build post compilation scheme
+	create_command_scheme "${POST_COMPILATION_SCHEME/optionos/compiler_options}" "$source" "$headers"
+	local post_compilation_command="$command_scheme"
 
 	if ! [ -f "$output" ] || [ "$source_change_time" -gt "$output_change_time" ]
 	then
 		if [ "${COMPILABLE:-false}" = "true" ]
 		then
-			if ! $execution_command 2> "$compilation_error"
+			if ! $compilation_command 2> "$compilation_error"
 			then
 				if [ "${GENERATES_COMPILATION_ERROR:-false}" != "true" ]
 				then
 					tput setaf $SEVERITY_HIGH
 					echo "compilation error: $1" >&2
-					echo "  command: $execution_command" >&2
+					echo "  command: $compilation_command" >&2
+					tput sgr0
+				fi
+			fi
+
+			if [ -n "$post_compilation_command" ] && ! $post_compilation_command 2>> "$compilation_error"
+			then
+				if [ "${GENERATES_COMPILATION_ERROR:-false}" != "true" ]
+				then
+					tput setaf $SEVERITY_HIGH
+					echo "post compilation error: $1" >&2
+					echo "  command: $post_compilation_command" >&2
 					tput sgr0
 				fi
 			fi
@@ -1295,45 +1333,26 @@ function compile_source {
 
 	if [ "${COMPILABLE:-false}" = "true" ]
 	then
-		execution_command="${execution_command//$location\//}"
-		generate_execution_mode "$1" compile "$execution_command" "$syntax"
+		compilation_command="${compilation_command//$location\//}"
+		generate_execution_mode "$1" compile "$compilation_command" "$syntax"
 	fi
 
 	# build linkage scheme
-	execution_command=
-	for component in ${LINKAGE_SCHEME:-linker options binary object headers}
-	do
-		case "$component" in
-			linker) execution_command+="$LINKER " ;;
-			options) execution_command+="$LINKER_OPTIONS " ;;
-			object) execution_command+="$object " ;;
-			binary) execution_command+="$binary " ;;
-			headers) execution_command+="$headers " ;;
-			source) execution_command+="$source " ;;
-			page) execution_command+="$page " ;;
-			location) execution_command+="$location " ;;
-			*)
-				tput setaf $SEVERITY_LOW
-				echo "custom linkage scheme component: $component" >&2
-				tput sgr0
-				;;
-		esac
-	done
-	execution_command="${execution_command//  / }"
-	execution_command="${execution_command% }"
+	create_command_scheme "${LINKAGE_SCHEME/options/linker_options}" "$source" "$headers"
+	local linkage_command="$command_scheme"
 
 	if [ "${LINKABLE:-false}" = "true" ] && ! [ -f "$output" ]\
 	   	|| [ "$source_change_time" -gt "$output_change_time" ]
 	then
 		if [ "${LINKABLE:-false}" = "true" ] && [ -n "$LINKER" ]
 		then
-			if ! $execution_command 2> "$linkage_error"
+			if ! $linkage_command 2> "$linkage_error"
 			then
 				if [ "${GENERATES_LINKAGE_ERROR:-false}" != "true" ]
 				then
 					tput setaf $SEVERITY_HIGH
 					echo "linkage error for: $1" >&2
-					echo "  command: $execution_command" >&2
+					echo "  command: $linkage_command" >&2
 					tput sgr0
 				fi
 			fi
@@ -1353,8 +1372,8 @@ function compile_source {
 
 	if [ "${LINKABLE:-false}" = "true" ]
 	then
-		execution_command="${execution_command//$location\//}"
-		generate_execution_mode "$1" link "$execution_command" "$syntax"
+		linkage_command="${linkage_command//$location\//}"
+		generate_execution_mode "$1" link "$linkage_command" "$syntax"
 	fi
 }
 
@@ -1527,6 +1546,41 @@ function process_kill {
 	kill -SIGTERM "$1"
 }
 
+# requires source file
+function capture_screenshot {
+	local source="$1"
+	if [ -f ${source%.*}.bin ] && gnome-screenshot --display :0 --file "${source%.*}.screenshot.png" --delay 2 --window 2>/dev/null &
+	then
+		if ${source%.*}.bin 2>/dev/null &
+		then
+			sleep 3
+			local pagename="${source%.*}.bin"
+			local processid="$(pgrep "${pagename##*/}")"
+			if [ -n "$processid" ] && kill "$processid"
+			then
+				tput setaf $SEVERITY_LOW
+				echo "screenshot captured from ${source}"
+				tput sgr0
+			else
+				tput setaf $SEVERITY_HIGH
+				echo "failed to kill process ${processid} after screenshot"
+				tput sgr0
+				rm -f "${source%.*}.screenshot.png"
+			fi
+		else
+			tput setaf $SEVERITY_HIGH
+			echo "failed to run program for screenshot"
+			tput sgr0
+			rm -f "${source%.*}.screenshot.png"
+		fi
+	else
+		tput setaf $SEVERITY_HIGH
+		echo "screenshot tool failed to run"
+		tput sgr0
+		rm -f "${source%.*}.screenshot.png"
+	fi
+}
+
 # requires path to page
 function run_program {
 	local source="$1"
@@ -1534,8 +1588,8 @@ function run_program {
 	local object="${1%.*}.${OUTPUT_OBJECT#.}"
 	local headers="$@"
 	headers="${headers/$1 }"
-	local output="${1%.*}.output.txt"
-	local runtime_error="${1%.*}.runtime.error.txt"
+	local output=
+
 	local location="${1%/*}"
 	local component=
 	local source_change_time=
@@ -1543,6 +1597,14 @@ function run_program {
 
 	source_change_time=$(stat -c "%Y" "$1")
 
+	if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
+	then
+		output="${1%.*}.screenshot.png"
+	else
+		output="${1%.*}.output.txt"
+	fi
+
+	local runtime_error="${1%.*}.runtime.error.txt"
 	if [ -f "$output" ]
 	then
 		output_change_time=$(stat -c "%Y" "$output")
@@ -1550,35 +1612,24 @@ function run_program {
 		output_change_time=0
 	fi
 
+	if [ "$source_change_time" -le "$output_change_time" ]
+	then
+		OUTPUT=
+	fi
+
 	# build running scheme
-	local running_command=
-	for component in ${RUNNING_SCHEME:-binary options}
-	do
-		case "$component" in
-			compiler) running_command+="$COMPILER " ;;
-			linker) running_command+="$LINKER " ;;
-			options) running_command+="$RUNNING_OPTIONS " ;;
-			object) running_command+="$object " ;;
-			source) running_command+="$source " ;;
-			binary) running_command+="$binary " ;;
-			headers) running_command+="$headers " ;;
-			page) running_command+="$page " ;;
-			location) running_command+="$location " ;;
-			*)
-				tput setaf $SEVERITY_LOW
-				echo "custom running scheme component: $component" >&2
-				tput sgr0
-				;;
-		esac
-	done
-	running_command="${running_command//  / }"
-	running_command="${running_command% }"
+	create_command_scheme "${RUNNING_SCHEME/options/running_options}" "$source" "$headers"
+	local running_command="$command_scheme"
 
 	if [ "${RUNNABLE:-false}" = "true" ]
 	then
-		if [ "${OUTPUT:-false}" = "true" ] && [ "$source_change_time" -gt "$output_change_time" ]
+		if [ "${OUTPUT:-false}" = "true" ]
 		then
-			if [ -f "$input" ]
+			if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
+			then
+				OUTPUT=false
+				capture_screenshot "$source"
+			elif [ -f "$input" ]
 			then
 				if ! $running_command < "$input" 2> "$runtime_error" 1> "$output"
 				then
@@ -2310,6 +2361,9 @@ function generate_page {
 
 		generate_html_body "$1" end
 	generate_html_section "$1" end
+	tput setaf $SEVERITY_LOW
+	echo "page generated: $1"
+	tput sgr0
 	index=
 }
 
@@ -3065,7 +3119,7 @@ function analyze_paramters {
 
 if [ -f ./.config ] && [ ./.index ]
 then
-	validation_check=202012271813
+	validation_check=202101101133
 	source ./.config
 	if [ "${VALIDATION_ID:-0}" -lt "$validation_check" ]
 	then
