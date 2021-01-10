@@ -955,6 +955,23 @@ function generate_list_group_item {
 EOF
 }
 
+function generate_html_image {
+	local source="$1"
+	local image="${source%.*}.screenshot.png"
+	local image_alias="${page_alias}.screenshot.png"
+
+	if [ -f "$image" ]
+	then
+		cp "$image" "./html-files${image_alias#./html-files}"
+		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${source##*/} Screenshot\">" >> "./html-files/${index}.html"
+	else
+		echo "<b>Image Not Found</b>" >> "./html-files/${index}.html"
+		tput setaf $SEVERITY_HIGH
+		echo "image not found: $source"
+		tput sgr0
+	fi
+}
+
 # required functions for managing practice pages
 ###############################################################################
 
@@ -1549,7 +1566,9 @@ function process_kill {
 # requires source file
 function capture_screenshot {
 	local source="$1"
-	if [ -f ${source%.*}.bin ] && gnome-screenshot --display :0 --file "${source%.*}.screenshot.png" --delay 2 --window 2>/dev/null &
+	local imagefile="${source%.*}.screenshot.png"
+
+	if [ -f ${source%.*}.bin ] && gnome-screenshot --display :0 --file "$imagefile" --delay 2 --window 2>/dev/null &
 	then
 		if ${source%.*}.bin 2>/dev/null &
 		then
@@ -1612,22 +1631,16 @@ function run_program {
 		output_change_time=0
 	fi
 
-	if [ "$source_change_time" -le "$output_change_time" ]
-	then
-		OUTPUT=
-	fi
-
 	# build running scheme
 	create_command_scheme "${RUNNING_SCHEME/options/running_options}" "$source" "$headers"
 	local running_command="$command_scheme"
 
 	if [ "${RUNNABLE:-false}" = "true" ]
 	then
-		if [ "${OUTPUT:-false}" = "true" ]
+		if [ "${OUTPUT:-false}" = "true" ] && [ "$source_change_time" -gt "$output_change_time" ]
 		then
 			if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
 			then
-				OUTPUT=false
 				capture_screenshot "$source"
 			elif [ -f "$input" ]
 			then
@@ -1804,7 +1817,7 @@ function generate_source_section {
 function generate_output_section {
 	local page="${1%.*}"
 	local binary="$page.bin"
-	local output="$page.output.txt"
+	local output="${page}.output.txt"
 	local compilation_error="$page.compilation.error.txt"
 	local linkage_error="$page.linkage.error.txt"
 	local runtime_error="$page.runtime.error.txt"
@@ -1837,12 +1850,16 @@ function generate_output_section {
 
 	if [ "${OUTPUT:-false}" = "true" ]
 	then
-		if [ -f "$output" ]
+		if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
+		then
+			generate_html_header "$1" 3 Output
+			generate_html_image "$1"
+		elif [ -f "$output" ]
 		then
 			if [ "$(wc -w < "$output")" -gt 0 ]
 			then
 				generate_html_header "$1" 3 Output
-				generate_html_code begin language-bash
+				generate_html_code begin language-txt
 
 				while read -r line
 				do
