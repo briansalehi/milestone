@@ -955,7 +955,37 @@ function generate_list_group_item {
 EOF
 }
 
+# requires source
+# requires image name
+# optional line number to set image
 function generate_html_image {
+	local source="$1"
+	local location="${source%/*}"
+	local image="$2"
+	local image_alias="${page_alias%/*}/${image}"
+	local linenumber="$3"
+	local alt="${image%.*}"
+
+	if [ -f "${location}/${image}" ]
+	then
+		cp "${location}/${image}" "./html-files${image_alias#./html-files}"
+		if [ -n "$linenumber" ]
+		then
+			sed -i "${linenumber}a <img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${alt//-/ }\">" "./html-files/${index}.html"
+		else
+			echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${alt//-/ }\">" >> "./html-files/${index}.html"
+		fi
+	else
+		echo "<b>Image Not Found</b>" >> "./html-files/${index}.html"
+		tput setaf $SEVERITY_HIGH
+		echo "image not found: $source"
+		tput sgr0
+		return 1
+	fi
+}
+
+# requires source
+function generate_html_screenshot {
 	local source="$1"
 	local image="${source%.*}.screenshot.png"
 	local image_alias="${page_alias}.screenshot.png"
@@ -965,10 +995,11 @@ function generate_html_image {
 		cp "$image" "./html-files${image_alias#./html-files}"
 		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${source##*/} Screenshot\">" >> "./html-files/${index}.html"
 	else
-		echo "<b>Image Not Found</b>" >> "./html-files/${index}.html"
+		echo "<b>Screenshot Not Found</b>" >> "./html-files/${index}.html"
 		tput setaf $SEVERITY_HIGH
 		echo "image not found: $source"
 		tput sgr0
+		return 1
 	fi
 }
 
@@ -1872,7 +1903,7 @@ function generate_output_section {
 		then
 			generate_html_header "$1" 3 Output
 			generate_page_name "${1%.*}.png"
-			generate_html_image "$1"
+			generate_html_screenshot "$1"
 		elif [ -f "$output" ]
 		then
 			if [ "$(wc -w < "$output")" -gt 0 ]
@@ -2019,13 +2050,21 @@ function generate_comment_section {
 	else
 		generate_html_div "$1" begin comment-style
 		OLD_IFS="$IFS"
-		local line
 		while read -r line
 		do
-			line="$(echo "$line" | sed -e 's/\([\.,!?;:]\)$/\1<br \/>/' -e 's/^$/<br \/>/')"
-			echo -e "   $line" >> "./html-files/${index}.html"
+			echo "$line" | sed -e 's/\([\.,!?;:]\)$/\1<br \/>/' -e 's/^$/<br \/>/' >> "./html-files/${index}.html"
 		done < "$comment"
 		IFS="$OLD_IFS"
+
+		for match in $(grep -n "^\!\[.*\]$" "./html-files/${index}.html")
+		do
+			local linenumber="${match%%:*}"
+			local image="${match#*[}"
+			image="${image%]*}"
+
+			generate_html_image "$1" "$image" "$linenumber"
+			sed -i "${linenumber}d" "./html-files/${index}.html"
+		done
 		generate_html_div "$1" end
 	fi
 }
