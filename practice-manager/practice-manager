@@ -2413,7 +2413,7 @@ function generate_page {
 			reference) REFERENE=true; continue ;;
 			comment) COMMENT=true; generate_comment_section "$1" ;;
 			source) SOURCE=true; generate_source_section $@ ;;
-			execution) EXECUTION=true; continue ;;
+			execution) EXECUTABLE=true; continue ;;
 			output) OUTPUT=true; generate_output_section $@ ;;
 			compilation_error) ERROR=true; continue ;;
 			linkage_error) ERROR=true; continue ;;
@@ -2464,7 +2464,7 @@ function generate_chapter {
 			reference) REFERENCE=true; continue ;;
 			comment) COMMENT=true; generate_comment_section "$1" ;;
 			source) SOURCE=true; continue ;;
-			execution) EXECUTION=true; continue ;;
+			execution) EXECUTABLE=true; continue ;;
 			output) OUTPUT=true; continue ;;
 			input) INPUT=true; continue ;;
 			error) ERROR=true; continue ;;
