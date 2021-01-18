@@ -11,9 +11,10 @@ main_configuration=\
 ### verilog vhdl vim wasm
 #SYNTAX=
 
-## Whether source can be executed either as compiled source or interpretable
-## Set to false for text files
-#EXECUTABLE=true
+## Design pages as you want
+### navigation title reference comment source execution input output error pagination
+#PAGE_TEMPLATE=\"navigation title reference comment source execution input output error pagination\"
+#CHAPTER_TEMPLATE=\"navigation title reference comment pagination toc\"
 
 ## Whether source should be compiled
 ## Set false for scripting languages
@@ -85,10 +86,6 @@ main_configuration=\
 ## Specify the hardness of this chapter
 ## This feature will be used in Milestone technical courses and tutorials
 #TECHNICAL_LEVEL=
-
-## Design pages as you want
-#PAGE_TEMPLATE=\"navigation title reference comment source execution input output error pagination\"
-#CHAPTER_TEMPLATE=\"navigation title reference comment pagination toc\"
 
 ## DO NOT EDIT!
 #VALIDATION_ID=0"
@@ -3194,7 +3191,7 @@ function analyze_paramters {
 
 if [ -f ./.config ] && [ ./.index ]
 then
-	validation_check=202101101133
+	validation_check=202101180930
 	source ./.config
 	if [ "${VALIDATION_ID:-0}" -lt "$validation_check" ]
 	then
