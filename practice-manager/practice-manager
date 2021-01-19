@@ -3012,6 +3012,7 @@ function move_files {
 				return 1
 			# destination doesn't exist, move page to destination
 			else
+			echo "moving page to: $destination"
 				move_page "$source" "$destination"
 			fi
 		fi
@@ -3021,6 +3022,7 @@ function move_files {
 		# destination directory must exist
 		if [ -d "${destination}" ]
 		then
+			echo "moving page to: $destination"
 			move_page "$source" "$destination"
 		else
 			tput setaf $SEVERITY_HIGH
