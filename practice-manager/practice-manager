@@ -2784,9 +2784,9 @@ function move_page {
 		echo "    $1"
 		echo "to"
 		echo "    $2"
-	elif [ -d "$destination" ] && [ -f "${source%/}/.index" ]
+	elif [ -d "$destination" ] && [ -f "${source%/*}/.index" ]
 	then
-		if mv "${source%.*}*" "$destination"
+		if mv ${source%.*}.* "$destination"
 		then
 			sed -i "/^${source##*/}$/d" "${source%/*}/.index"
 			join_page "${destination%/}/${source##*/}"
