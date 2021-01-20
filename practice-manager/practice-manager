@@ -991,7 +991,6 @@ function generate_html_screenshot {
 	then
 		cp "$image" "./html-files${image_alias#./html-files}"
 		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${source##*/} Screenshot\">" >> "./html-files/${index}.html"
-		echo "<b>Screenshot Not Found</b>" >> "./html-files/${index}.html"
 		tput setaf $SEVERITY_LOW
 		echo "screenshot linked: $page_alias"
 		tput sgr0
