@@ -2054,7 +2054,7 @@ function generate_comment_section {
 		OLD_IFS="$IFS"
 		while read -r line
 		do
-			echo "$line" | sed -e 's/\([\.,!?;:]\)$/\1<br \/>/' -e 's/^$/<br \/>/' >> "./html-files/${index}.html"
+			echo "$line" | sed -e 's/\([\.!?;:]\)$/\1<br \/>/' -e 's/^$/<br \/>/' >> "./html-files/${index}.html"
 		done < "$comment"
 		IFS="$OLD_IFS"
 
