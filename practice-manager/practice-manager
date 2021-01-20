@@ -2582,12 +2582,11 @@ function generate_manuals {
 	if expand_list "$1"
 	then
 		generate_index_page
+	fi
 
-		# include bootstrap
-		if [ -f "bootstrap.min.css" ] && [ -f "bootstrap.min.js" ]
-		then
-			cp bootstrap.min.* html-files/
-		fi
+	if [ -d icons ]
+	then
+		cp -r icons html-files
 	fi
 }
 
