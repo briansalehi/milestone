@@ -12,9 +12,9 @@ main_configuration=\
 #SYNTAX=
 
 ## Design pages as you want
-### navigation title reference comment source execution input output error pagination
-#PAGE_TEMPLATE=\"navigation title reference comment source execution input output error pagination\"
-#CHAPTER_TEMPLATE=\"navigation title reference comment pagination toc\"
+### navigation title comment reference source execution input output error pagination
+#PAGE_TEMPLATE=\"navigation title comment reference source execution input output error pagination\"
+#CHAPTER_TEMPLATE=\"navigation title comment reference pagination toc\"
 
 ## Whether source should be compiled
 ## Set false for scripting languages
@@ -78,10 +78,6 @@ main_configuration=\
 #TERMINATE=false
 #TERMINATION_SIGNAL=SIGTERM
 #RUNTIME=3
-
-## Whether comments should be verified by .reference.txt files or not.
-## This feature will be used in the future
-#REFERENCE_VALIDITY=true
 
 ## Specify the hardness of this chapter
 ## This feature will be used in Milestone technical courses and tutorials
@@ -150,12 +146,9 @@ EOF
 	fi
 }
 
-# requires path to page
-# requires begin/end as second parameter
+# optional side begin/end
 function generate_html_head {
-	local page="${1%.*}"
-	page="${page##*/}"
-	local side="${2:-begin}"
+	local side="${1:-begin}"
 	local title=
 
 	if [ -f "${1%.*}.title.txt" ]
@@ -188,14 +181,11 @@ EOF
 	fi
 }
 
-# requires path to page
 # requires header size
 # requires title
 function generate_html_header {
-	local page="${1%.*}"
-	page="${page##*/}"
-	local size="${2:-1}"
-	local title="${3:-header}"
+	local size="${1:-1}"
+	local title="${2:-header}"
 
 	echo "<h${size}>$title</h${size}>" >> "./html-files/${index}.html"
 }
@@ -214,13 +204,11 @@ function generate_html_header_with_link {
 	echo "<h${size}><a href="$link">$title</a></h${size}>" >> "./html-files/${index}.html"
 }
 
-# requires path to page
-# optional style names [multiple names allowed]
+# opptional side (begin/end)
+# optinonal style names [multiple names allowed]
 function generate_html_style {
-	local page="${1%.*}"
-	page="${page##*/}"
-	local side="${2:-begin}"
-	local style="$3"
+	local side="${1:-begin}"
+	local style="$2"
 
 	if [ -z "$style" ]
 	then
@@ -607,12 +595,9 @@ EOF
 	esac
 }
 
-# requires path to page
-# requires begin/end as second parameter
+# optional begin/end
 function generate_html_body {
-	local page="${1%.*}"
-	page="${page##*/}"
-	local side="${2:-begin}"
+	local side="${1:-begin}"
 	
 	if [ "$side" = "begin" ]
 	then
@@ -696,7 +681,6 @@ function generate_html_break {
 	echo "<br />" >> "./html-files/${index}.html"
 }
 
-# requires path to page
 function generate_html_breaker {
 	echo "<hr />" >> "./html-files/${index}.html"
 }
@@ -739,15 +723,13 @@ function generate_html_text {
 	echo "${tag}${text}</p>" >> "./html-files/${index}.html"
 }
 
-# requires path to page
 # optional begin/end
 # optional css class
 # optional css style
 function generate_html_list {
-	local page="$1"
-	local side="${2:-begin}"
-	local class="$3"
-	local style="$4"
+	local side="${1:-begin}"
+	local class="$2"
+	local style="$3"
 	local tag=
 
 	if [ "$side" = "begin" ]
@@ -829,14 +811,12 @@ function generate_html_nav {
 	fi
 }
 
-# requires path to page
 # required text
 # optional class
 # optional multiple attributes
 function generate_html_item {
-	local page="$1"
-	local text="$2"
-	local class="$3"
+	local text="$1"
+	local class="$2"
 	local tag=
 	local tag_end="</li>"
 
@@ -1260,7 +1240,7 @@ function generate_execution_mode {
 		return 1
 	fi
 
-	generate_html_header "$1" 4 "${mode}"
+	generate_html_header 4 "${mode}"
 	generate_html_code begin command-line language-bash "data-user=\"${syntax}\" data-host=\"milestone\""
 	echo "$command" >> "./html-files/${index}.html"
 	generate_html_code end
@@ -1287,7 +1267,8 @@ function compile_source {
 		syntax="${1##*.}"
 	fi
 
-	generate_html_header "$1" 3 "Execution"
+	generate_html_breaker
+	generate_html_header 3 "Execution"
 
 	local binary="${1%.*}.bin"
 	OUTPUT_OBJECT="${OUTPUT_OBJECT:-o}"
@@ -1736,6 +1717,31 @@ function run_program {
 ###############################################################################
 
 # requires path to page
+function generate_reference_section {
+	local reference="${1%.*}.reference.txt"
+
+	if ! [ -f "$reference" ] || [ "$(wc -w < "$reference")" -eq 0 ]
+	then
+		tput setaf "$SEVERITY_HIGH"
+		echo "reference not specified: $1" >&2
+		tput sgr0
+		return 1
+	fi
+
+	generate_html_breaker
+	generate_html_header 3 "References"
+	generate_html_list begin list-group
+
+	local line
+	while read -r line
+	do
+		generate_html_item "$line" list-group-item
+	done < "$reference"
+
+	generate_html_list end
+}
+
+# requires path to page
 function generate_navigation_section {
 	local hierarchy=
 	local entry=
@@ -1773,12 +1779,12 @@ function generate_navigation_section {
 		elif [ -f "$hierarchy" ] && [ -f "${hierarchy%.*}.title.txt" ]
 		then
 			title="$(cat "${hierarchy%.*}.title.txt")"
-			generate_html_item "$1" "${title:-"..."}" "breadcrumb-item active"
+			generate_html_item "${title:-"..."}" "breadcrumb-item active"
 		else
 			tput setaf $SEVERITY_HIGH
 			echo "untitled breadcrumb: ${hierarchy}"
 			tput sgr0
-			generate_html_item "$1" "..." breadcrumb-item
+			generate_html_item "..." breadcrumb-item
 		fi
 	done
 
@@ -1810,7 +1816,7 @@ function generate_header_section {
 		tput sgr0
 	else
 		title="$(cat "$header")"
-		generate_html_header "$1" 2 "$title"
+		generate_html_header 2 "$title"
 	fi
 }
 
@@ -1829,8 +1835,8 @@ function generate_source_section {
 		return 1
 	fi
 
-	generate_html_breaker "$1"
-	generate_html_header "$1" 3 "Source"
+	generate_html_breaker
+	generate_html_header 3 "Source"
 	while [ $# -gt 0 ]
 	do
 		generate_page_name "${1}"
@@ -1886,7 +1892,8 @@ function generate_output_section {
 
 	if [ "${INPUT:-false}" = "true" ] && [ -f "$input" ]
 	then
-		generate_html_header "$1" 3 Input
+		generate_html_breaker
+		generate_html_header 3 Input
 		generate_html_code begin language-bash
 
 		while read -r line
@@ -1901,7 +1908,8 @@ function generate_output_section {
 	then
 		if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
 		then
-			generate_html_header "$1" 3 Output
+			generate_html_breaker
+			generate_html_header 3 Output
 			generate_page_name "${1%.*}.png"
 			find_index_alias "$page_index"
 			generate_html_screenshot "$1"
@@ -1909,7 +1917,8 @@ function generate_output_section {
 		then
 			if [ "$(wc -w < "$output")" -gt 0 ]
 			then
-				generate_html_header "$1" 3 Output
+				generate_html_breaker
+				generate_html_header 3 Output
 				generate_html_code begin language-txt
 
 				while read -r line
@@ -1938,7 +1947,8 @@ function generate_output_section {
 	then
 		if [ -f "$compilation_error" ] || [ -f "$linkage_error" ] || [ -f "$runtime_error" ]
 		then
-			generate_html_header "$1" 3 Output
+			generate_html_breaker
+			generate_html_header 3 Output
 		fi
 	fi
 
@@ -1948,7 +1958,8 @@ function generate_output_section {
 		then
 			if [ "$(wc -w < "$compilation_error")" -gt 0 ]
 			then
-				generate_html_header "$1" 3 Error
+				generate_html_breaker
+				generate_html_header 3 Error
 				generate_html_code begin language-bash
 
 				while read -r line
@@ -1976,7 +1987,8 @@ function generate_output_section {
 		then
 			if [ "$(wc -w < "$linkage_error")" -gt 0 ]
 			then
-				generate_html_header "$1" 3 Error
+				generate_html_breaker
+				generate_html_header 3 Error
 				generate_html_code begin language-bash
 
 				while read -r line
@@ -2004,7 +2016,8 @@ function generate_output_section {
 		then
 			if [ "$(wc -w < "$runtime_error")" -gt 0 ]
 			then
-				generate_html_header "$1" 3 Error
+				generate_html_breaker
+				generate_html_header 3 Error
 				generate_html_code begin language-bash
 
 				while read -r line
@@ -2166,7 +2179,7 @@ function generate_quick_access_section {
 		next_index="$page_index"
 	fi
 
-	generate_html_list "$1" begin pager
+	generate_html_list begin pager
 
 	find_index_alias "${previous_index:-0}"
 
@@ -2196,7 +2209,7 @@ function generate_quick_access_section {
 		generate_html_item_with_link "$button" "#" "next disabled"
 	fi
 
-	generate_html_list "$1" end
+	generate_html_list end
 }
 
 function generate_table_of_content {
@@ -2222,8 +2235,8 @@ function generate_table_of_content {
 					heading="false"
 					#title="$(cat "${hierarchy}/${entry%.*}.title.txt")"
 					#generate_html_header_with_link "$1" 3 "$title" "${page_index}.html"
-					generate_html_breaker "$1"
-					generate_html_header "$1" 3 "Table of Content"
+					generate_html_breaker
+					generate_html_header 3 "Table of Content"
 					generate_list_group_root "$1" begin
 				else
 					badge=0
@@ -2368,13 +2381,13 @@ function generate_index_page {
 	update_configuration "$page"
 	generate_html_section "$page" begin
 
-		generate_html_head "$page" begin
-			generate_html_style "$page" begin
-			generate_html_style "$page" begin nested-list
-			generate_html_style "$page" end
-		generate_html_head "$page" end
+		generate_html_head begin
+			generate_html_style begin
+			generate_html_style begin nested-list
+			generate_html_style end
+		generate_html_head end
 
-		generate_html_body "$page" begin
+		generate_html_body begin
 
 			generate_html_header_with_link "$page" 2 "Notebooks" "0.html"
 			generate_table_of_content "./.index" "true" "2"
@@ -2385,7 +2398,7 @@ function generate_index_page {
 			generate_html_script nested-list
 			generate_html_script darkmode
 
-		generate_html_body "$page" end
+		generate_html_body end
 
 	generate_html_section "$page" end
 }
@@ -2402,12 +2415,13 @@ function generate_page {
 
 	generate_html_section "$1" begin
 
-		generate_html_head "$1" begin
-			generate_html_style "$1" begin
-			generate_html_style "$1" end
-		generate_html_head "$1" end
+		generate_html_head begin
+			generate_html_style begin
+			generate_html_style begin nested-list
+			generate_html_style end
+		generate_html_head end
 
-		generate_html_body "$1" begin
+		generate_html_body begin
 
 	local section=
 	for section in $PAGE_TEMPLATE
@@ -2415,16 +2429,16 @@ function generate_page {
 		case "$section" in
 			navigation) NAVIGATION=true; generate_navigation_section "$1" ;;
 			title) TITLE=true; generate_header_section "$1" ;;
-			reference) REFERENE=true; continue ;;
+			reference) generate_reference_section "$1" ;;
 			comment) COMMENT=true; generate_comment_section "$1" ;;
 			source) SOURCE=true; generate_source_section $@ ;;
-			execution) EXECUTABLE=true; continue ;;
+			execution) EXECUTABLE=true ;;
 			output) OUTPUT=true; generate_output_section $@ ;;
-			compilation_error) ERROR=true; continue ;;
-			linkage_error) ERROR=true; continue ;;
-			runtime_error) ERROR=true; continue ;;
-			input) INPUT=true; continue ;;
-			error) ERROR=true; continue ;;
+			compilation_error) ERROR=true ;;
+			linkage_error) ERROR=true ;;
+			runtime_error) ERROR=true ;;
+			input) INPUT=true ;;
+			error) ERROR=true ;;
 			pagination) PAGINATION=true; generate_quick_access_section "$1" ;;
 			*) tput setaf $SEVERITY_HIGH; echo "invalid section name \`$section\`"; tput sgr0; continue ;;
 		esac
@@ -2436,7 +2450,7 @@ function generate_page {
 			generate_html_script nested-list
 			generate_html_script darkmode
 
-		generate_html_body "$1" end
+		generate_html_body end
 	generate_html_section "$1" end
 	tput setaf $SEVERITY_LOW
 	echo "page generated: $1"
@@ -2452,13 +2466,13 @@ function generate_chapter {
 	update_configuration "$1"
 
 	generate_html_section "$1" begin
-		generate_html_head "$1" begin
-			generate_html_style "$1" begin
-			generate_html_style "$page" begin nested-list
-			generate_html_style "$1" end
-		generate_html_head "$1" end
+		generate_html_head begin
+			generate_html_style begin
+			generate_html_style begin nested-list
+			generate_html_style end
+		generate_html_head end
 
-		generate_html_body "$1" begin
+		generate_html_body begin
 
 	local section=
 	for section in $CHAPTER_TEMPLATE
@@ -2466,19 +2480,19 @@ function generate_chapter {
 		case "$section" in
 			navigation) NAVIGATION=true; generate_navigation_section "$1" ;;
 			title) TITLE=true; generate_header_section "$1" ;;
-			reference) REFERENCE=true; continue ;;
+			reference) generate_reference_section "$1" ;;
 			comment) COMMENT=true; generate_comment_section "$1" ;;
-			source) SOURCE=true; continue ;;
-			execution) EXECUTABLE=true; continue ;;
-			output) OUTPUT=true; continue ;;
-			input) INPUT=true; continue ;;
-			error) ERROR=true; continue ;;
+			source) SOURCE=true ;;
+			execution) EXECUTABLE=true ;;
+			output) OUTPUT=true ;;
+			input) INPUT=true ;;
+			error) ERROR=true ;;
 			pagination) PAGINATION=true; generate_quick_access_section "$1" ;;
 			toc) TABLE_OF_CONTENT=true;
 				generate_table_of_content "${1%/*}/.index" "true" "2"
 				generate_list_group_root "${1%/*}/.index" end
 				;;
-			*) tput setaf $SEVERITY_HIGH; echo "invalid section name \`$section\`"; tput sgr0; continue ;;
+			*) tput setaf $SEVERITY_HIGH; echo "invalid section name \`$section\`"; tput sgr0 ;;
 		esac
 	done
 
@@ -2488,7 +2502,7 @@ function generate_chapter {
 			generate_html_script nested-list
 			generate_html_script darkmode
 
-		generate_html_body "$1" end
+		generate_html_body end
 	generate_html_section "$1" end
 	index=
 }
@@ -3198,7 +3212,7 @@ function analyze_paramters {
 
 if [ -f ./.config ] && [ ./.index ]
 then
-	validation_check=202101180930
+	validation_check=202101202003
 	source ./.config
 	if [ "${VALIDATION_ID:-0}" -lt "$validation_check" ]
 	then
