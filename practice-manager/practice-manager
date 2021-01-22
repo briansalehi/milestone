@@ -146,9 +146,10 @@ EOF
 	fi
 }
 
+# required source
 # optional side begin/end
 function generate_html_head {
-	local side="${1:-begin}"
+	local side="${2:-begin}"
 	local title=
 
 	if [ -f "${1%.*}.title.txt" ]
@@ -2381,7 +2382,7 @@ function generate_index_page {
 	update_configuration "$page"
 	generate_html_section "$page" begin
 
-		generate_html_head begin
+		generate_html_head "$page" begin
 			generate_html_style begin
 			generate_html_style begin nested-list
 			generate_html_style end
@@ -2415,7 +2416,7 @@ function generate_page {
 
 	generate_html_section "$1" begin
 
-		generate_html_head begin
+		generate_html_head "$1" begin
 			generate_html_style begin
 			generate_html_style begin nested-list
 			generate_html_style end
@@ -2466,7 +2467,7 @@ function generate_chapter {
 	update_configuration "$1"
 
 	generate_html_section "$1" begin
-		generate_html_head begin
+		generate_html_head "$1" begin
 			generate_html_style begin
 			generate_html_style begin nested-list
 			generate_html_style end
