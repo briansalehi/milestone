@@ -1140,7 +1140,7 @@ function validate_configuration {
 
 	if ! [ -f "$1" ]
 	then
-		tput setaf $SEVERITY_MEDIUM
+		tput setaf $SEVERITY_HIGH
 		echo "unindexed directory: $directory/" >&2
 		tput sgr0
 		return 1
@@ -2054,12 +2054,12 @@ function generate_comment_section {
 
 	if ! [ -f "$comment" ]
 	then
-		tput setaf $SEVERITY_MEDIUM
+		tput setaf $SEVERITY_HIGH
 		echo "comment not found: $comment" >&2
 		tput sgr0
 	elif [ -z "$(cat "$comment")" ]
 	then
-		tput setaf $SEVERITY_MEDIUM
+		tput setaf $SEVERITY_HIGH
 		echo "empty comment: $comment" >&2
 		tput sgr0
 	else
@@ -2355,7 +2355,7 @@ function generate_alias {
 				alias="${alias}/index"
 			fi
 		else
-			tput setaf $SEVERITY_MEDIUM
+			tput setaf $SEVERITY_HIGH
 			echo "alias not found: ${path}"
 			tput sgr0
 			return 1
@@ -2366,7 +2366,7 @@ function generate_alias {
 
 	if ! ln -s "html-files/$index" "$alias"
 	then
-		tput setaf $SEVERITY_MEDIUM
+		tput setaf $SEVERITY_HIGH
 		echo "failed to create link for alias: $path"
 		echo "  target: $target"
 		echo "  alias: $alias"
