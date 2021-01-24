@@ -2384,7 +2384,7 @@ function generate_index_page {
 
 		generate_html_head "$page" begin
 			generate_html_style begin
-			generate_html_style begin nested-list
+			generate_html_style nested-list
 			generate_html_style end
 		generate_html_head end
 
@@ -2418,7 +2418,7 @@ function generate_page {
 
 		generate_html_head "$1" begin
 			generate_html_style begin
-			generate_html_style begin nested-list
+			generate_html_style nested-list
 			generate_html_style end
 		generate_html_head end
 
@@ -2469,7 +2469,7 @@ function generate_chapter {
 	generate_html_section "$1" begin
 		generate_html_head "$1" begin
 			generate_html_style begin
-			generate_html_style begin nested-list
+			generate_html_style nested-list
 			generate_html_style end
 		generate_html_head end
 
