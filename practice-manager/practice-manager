@@ -149,36 +149,29 @@ EOF
 # required source
 # optional side begin/end
 function generate_html_head {
-	local side="${2:-begin}"
+	local side="${1:-begin}"
+	local page="$2"
 	local title=
 
-	if [ -f "${1%.*}.title.txt" ]
-	then
-		title="$(cat "${1%.*}.title.txt")"
-	fi
-	
 	if [ "$side" = "begin" ]
 	then
+		if [ -f "${page%.*}.title.txt" ]
+		then
+			title="$(cat "${page%.*}.title.txt")"
+		else
+			tput setaf $SEVERITY_MEDIUM
+			echo "title substituted: $page" >&2
+			tput sgr0
+		fi
+	
 		cat << EOF >> "./html-files/${index}.html"
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<!-- bootstrap -->
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
-<!-- prims plugin styles -->
-<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/autolinker/prism-autolinker.min.css" rel="stylesheet">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/command-line/prism-command-line.min.css" rel="stylesheet">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/toolbar/prism-toolbar.min.css" rel="stylesheet">
-<!-- ajax -->
-<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/themes/prism-tomorrow.min.css'>
-
 <title>${title:-"Milestone Practices"}</title>
 EOF
 	else
-		cat << EOF >> "./html-files/${index}.html"
-</head>
-EOF
+		echo "</head>" >> "./html-files/${index}.html"
 	fi
 }
 
@@ -205,412 +198,106 @@ function generate_html_header_with_link {
 	echo "<h${size}><a href="$link">$title</a></h${size}>" >> "./html-files/${index}.html"
 }
 
-# opptional side (begin/end)
-# optinonal style names [multiple names allowed]
+# requires begin/end
 function generate_html_style {
-	local side="${1:-begin}"
-	local style="$2"
-
-	if [ -z "$style" ]
-	then
-		if [ "$side" = "begin" ]
-		then
-			echo "<style>" >> "./html-files/${index}.html"
-
-			cat << 'EOF' >> "./html-files/${index}.html"
-a,
-a:hover,
-a:focus {
-	text-decoration: none;
-}
-
-.pager .top {
-	float: center;
-}
-
-.dark-mode {
-	background-color: black;
-	color: #aaaaaa;
-}
-
-.dark-mode a {
-	color: royalblue;
-}
-
-.dark-mode .page-link {
-	color: #bdc0c4;
-	background-color: #212529;
-	border: 1px solid #616161;
-}
-
-.dark-mode .page-link .disabled li > a {
-	color: #bdc0c4;
-	background-color: #212529;
-	border: 1px solid #616161;
-}
-
-.dark-mode .pager li > a,
-.dark-mode .pager li > span {
-	color: #bdc0c4;
-	background-color: #212529;
-	border: 1px solid #616161;
-}
-
-.dark-mode .pager li > a:hover,
-.dark-mode .pager li > a:focus,
-.dark-mode .pager li > span:hover {
-	background-color: #555555;
-	color: #bdc0c4;
-}
-
-.dark-mode .pager .disabled a,
-.dark-mode .pager .disabled a:hover,
-.dark-mode .pager .disabled a:focus {
-	color: #6c757d;
-	background-color: #212529;
-	border: 1px solid #616161;
-}
-
-.dark-mode .breadcrumb {
-	background-color: #212529;
-}
-
-.dark-mode .breadcrumb a {
-	color: #bdc0c4;
-}
-
-.dark-mode .breadcrumb a:hover,
-.dark-mode .breadcrumb a:focus {
-	text-decoration: none;
-	color: #777777;
-}
-
-.breadcrumb a,
-.breadcrumb a:hover,
-.breadcrumb a:focus {
-	text-decoration: none;
-}
-
-/* prism overrides */
-div.code-toolbar>.toolbar a,
-div.code-toolbar>.toolbar button,
-div.code-toolbar>.toolbar span {
-	margin-left: 0.7rem;
-}
-
-pre {
-	margin-bottom: 1.3rem !important;
-}
-
-.breadcrumb-item+.breadcrumb-item::before {
-	content: '> ';
-}
-
-EOF
-		elif [ "$side" = "end" ]
-		then
-			echo "</style>" >> "./html-files/${index}.html"
-		fi
-	else
-		case "$style" in
-			nested-list)
-				cat << EOF >> "./html-files/${index}.html"
-.just-padding {
-  padding: 15px;
-}
-
-a.list-group-item:focus,
-a.list-group-item:hover,
-button.list-group-item:focus,
-button.list-group-item:hover {
-	color: #555;
-	text-decoration: none;
-	background-color: #dfdfdf;
-}
-
-.group-child {
-	background-color: #f0f0f0;
-}
-
-.dark-mode .list-group-item {
-	background-color: #212529;
-	color: #aaaaaa;
-}
-
-.dark-mode .group-child {
-	background-color: #3a3a3a;
-}
-
-.dark-mode a.list-group-item:focus,
-.dark-mode a.list-group-item:hover,
-.dark-mode button.list-group-item:focus,
-.dark-mode button.list-group-item:hover {
-	background-color: #555555;
-	color: #bdc0c4;
-}
-
-.list-group.list-group-root {
-  padding: 0;
-  overflow: hidden;
-}
-
-.list-group.list-group-root .list-group {
-  margin-bottom: 0;
-}
-
-.list-group.list-group-root .list-group-item {
-  border-radius: 0;
-  border-width: 1px 0 0 0;
-}
-
-.list-group.list-group-root > .list-group-item:first-child {
-  border-top-width: 0;
-}
-
-.list-group.list-group-root > .list-group > .list-group-item {
-  padding-left: 30px;
-}
-
-.list-group.list-group-root > .list-group > .list-group > .list-group-item {
-  padding-left: 45px;
-}
-
-.list-group-item .glyphicon {
-  margin-right: 5px;
-}
-EOF
-				;;
-			*)
-				;;
-		esac
-	fi
-}
-
-# requires script name
-function generate_html_script {
 	case "$1" in
-			nested-list)
-				cat << 'EOF' >> "./html-files/${index}.html"
-<script>
-$(function() {
-  $('.list-group-item').on('click', function() {
-    $('.glyphicon', this)
-      .toggleClass('glyphicon-chevron-right')
-      .toggleClass('glyphicon-chevron-down');
-  });
-});
-</script>
-EOF
+		begin)
+			echo "<style>" >> "./html-files/${index}.html"
 			;;
-		cdn)
-	cat << EOF >> "./html-files/${index}.html"
-<!-- jquery -->
-<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
-<!-- bootstrap -->
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous"></script>
-<!-- prism js -->
-<script src='https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/prism.min.js'></script>
-<!-- prism languages -->
-EOF
-			;;
-		syntax)
-			case "${SYNTAX:-}" in
-			c)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-c.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			cpp|cxx|cplusplus)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-c.min.js"></script>' >> "./html-files/${index}.html"
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-cpp.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			asm6502|asm|s|assembly)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-asm6502.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			java)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-java.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			python|py)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-python.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			aspnet)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-aspnet.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			csharp|cs|dotnet)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-csharp.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			cmake)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-cmake.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			django|jinja|jinja2)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-django.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			dns-zone-file|dns-zone)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-dns-zone.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			docker|dockerfile)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-docker.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			go)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-go.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			hcl)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-hcl.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			ignore|gitignore|hgignore|npmignore)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-ignore.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			javadoc)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-javadoc.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			json)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-json.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			json5)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-json5.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			kotlin|kt|kts)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-kotlin.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			atex|tex|context)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-latex.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			makefile)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-makefile.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			md|markdown)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-markdown.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			octave|matlab)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-matlab.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			mongodb)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-mongodb.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			nasm)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-nasm.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			nginx)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-nginx.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			objectivec|objc)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-objectivec.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			opencl)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-opencl.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			perl)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-perl.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			php)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-php.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			phpdoc)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-phpdoc.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			plsql)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-plsql.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			powershell)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-powershell.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			processing)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-processing.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			prolog)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-prolog.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			qml)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-qml.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			r)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-r.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			regex)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-regex.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			ruby|rb)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-ruby.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			rust)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-rust.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			scala)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-scala.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			sql)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-sql.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			swift)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-swift.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			typescript|ts)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-typescript.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			verilog)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-verilog.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			vhdl)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-vhdl.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			vim)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-vim.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			wasm)
-				echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-wasm.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-			esac
-
-			echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/components/prism-bash.min.js"></script>' >> "./html-files/${index}.html"
-			;;
-		darkmode)
-			cat << 'EOF' >> "./html-files/${index}.html"
-<script>
-function darkmode(manual) {
-	const hours = new Date().getHours();
-	const isNight = !(hours > 6 && hours < 20);
-	var bodystyle = document.body;
-	if (isNight || manual) {
-		bodystyle.classList.add("dark-mode");
-	} else {
-		bodystyle.classList.remove("dark-mode");
-	}
-}
-darkmode();
-</script>
-EOF
-			;;
-		prism)
-			cat << EOF >> "./html-files/${index}.html"
-<!-- prism plugins -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/toolbar/prism-toolbar.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/autolinker/prism-autolinker.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/command-line/prism-command-line.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/normalize-whitespace/prism-normalize-whitespace.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/remove-initial-line-feed/prism-remove-initial-line-feed.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/show-language/prism-show-language.min.js"></script>
-EOF
+		end)
+			echo "</style>" >> "./html-files/${index}.html"
 			;;
 		*)
+			tput setaf $SEVERITY_HIGH
+			echo "html style tag missed!" >&2
+			tput sgr0
+			return 1
 			;;
 	esac
 }
 
-# optional begin/end
-function generate_html_body {
-	local side="${1:-begin}"
-	
-	if [ "$side" = "begin" ]
-	then
-		cat << EOF >> "./html-files/${index}.html"
-<body class="container">
-EOF
-		return
-	elif [ "$side" == "end" ]
-	then
-		echo "</body>" >> "./html-files/${index}.html"
-	fi
+# requires css file
+function load_css {
+	local style="$1"
+	local base=milestone-properties/css
 
+	if [ -f "$base/$style" ]
+	then
+		cat "$base/$style" >> "./html-files/${index}.html"
+	else
+		tput setaf $SEVERITY_HIGH
+		echo "CSS file does not exist: $style" >&2
+		tput sgr0
+		return 1
+	fi
+}
+
+# requires begin/end
+function generate_html_script {
+	case "$1" in
+		begin)
+			echo "<script>" >> "./html-files/${index}.html"
+			;;
+		end)
+			echo "</script>" >> "./html-files/${index}.html"
+			;;
+		*)
+			tput setaf $SEVERITY_HIGH
+			echo "Missing html script tag!" >&2
+			tput sgr0
+			return 1
+			;;
+	esac
+}
+
+# requires script file
+function load_javascript {
+	local script="$1"
+	local base=milestone-properties/js
+
+	if [ -f $base/$script ]
+	then
+		cat $base/$script >> "./html-files/${index}.html"
+	else
+		tput setaf $SEVERITY_HIGH
+		echo "Script file not found: $script" >&2
+		tput sgr0
+		return 1
+	fi
+}
+
+# requires syntax file
+function load_syntax_highlighting {
+	local page="$1"
+	local syntax="${2:-$SYNTAX.html}"
+	local base=milestone-properties/js/syntax
+
+	if [ -z "$syntax" ]
+	then
+		tput setaf $SEVERITY_HIGH
+		echo "Syntax not specified: $page" >&2
+		tput sgr0
+		return 1
+	elif [ -f $base/$syntax ]
+	then
+		cat $base/$syntax >> "./html-files/${index}.html"
+	else
+		tput setaf $SEVERITY_HIGH
+		echo "Syntax file ${syntax} does not exist: $page" >&2
+		tput sgr0
+	fi
+}
+
+# requires begin/end
+function generate_html_body {
+	case $1 in
+		begin)
+			echo "<body class=\"container\">" >> "./html-files/${index}.html"
+			;;
+		end)
+			echo "</body>" >> "./html-files/${index}.html"
+			;;
+	esac
 }
 
 # optional begin/end
@@ -1723,7 +1410,7 @@ function generate_reference_section {
 
 	if ! [ -f "$reference" ] || [ "$(wc -w < "$reference")" -eq 0 ]
 	then
-		tput setaf "$SEVERITY_HIGH"
+		tput setaf "$SEVERITY_MEDIUM"
 		echo "reference not specified: $1" >&2
 		tput sgr0
 		return 1
@@ -1807,12 +1494,12 @@ function generate_header_section {
 
 	if ! [ -f "$header" ]
 	then
-		tput setaf $SEVERITY_HIGH
+		tput setaf $SEVERITY_MEDIUM
 		echo "header not found: $header" >&2
 		tput sgr0
 	elif [ -z "$(cat "$header")" ]
 	then
-		tput setaf $SEVERITY_HIGH
+		tput setaf $SEVERITY_MEDIUM
 		echo "empty header: $header" >&2
 		tput sgr0
 	else
@@ -2054,12 +1741,12 @@ function generate_comment_section {
 
 	if ! [ -f "$comment" ]
 	then
-		tput setaf $SEVERITY_HIGH
+		tput setaf $SEVERITY_MEDIUM
 		echo "comment not found: $comment" >&2
 		tput sgr0
 	elif [ -z "$(cat "$comment")" ]
 	then
-		tput setaf $SEVERITY_HIGH
+		tput setaf $SEVERITY_MEDIUM
 		echo "empty comment: $comment" >&2
 		tput sgr0
 	else
@@ -2355,7 +2042,7 @@ function generate_alias {
 				alias="${alias}/index"
 			fi
 		else
-			tput setaf $SEVERITY_HIGH
+			tput setaf $SEVERITY_MEDIUM
 			echo "alias not found: ${path}"
 			tput sgr0
 			return 1
@@ -2382,9 +2069,18 @@ function generate_index_page {
 	update_configuration "$page"
 	generate_html_section "$page" begin
 
-		generate_html_head "$page" begin
+		generate_html_head begin "$page"
+			load_css ajax.html
+			load_css bootstrap.html
+			load_css prism.html
+
 			generate_html_style begin
-			generate_html_style nested-list
+			load_css general.css
+			load_css darkmode.css
+			load_css breadcrumb.css
+			load_css list-group.css
+			load_css pager.css
+			load_css prism-overrides.css
 			generate_html_style end
 		generate_html_head end
 
@@ -2394,10 +2090,16 @@ function generate_index_page {
 			generate_table_of_content "./.index" "true" "2"
 			generate_list_group_root "$page" end
 
-			generate_html_script cdn
-			generate_html_script prism
-			generate_html_script nested-list
-			generate_html_script darkmode
+			load_javascript jquery.html
+			load_javascript bootstrap.html
+			load_javascript prism.html
+
+			load_syntax_highlighting "$page" bash.html
+
+			generate_html_script begin
+			load_javascript darkmode.js
+			load_javascript list-group.js
+			generate_html_script end
 
 		generate_html_body end
 
@@ -2417,8 +2119,17 @@ function generate_page {
 	generate_html_section "$1" begin
 
 		generate_html_head "$1" begin
+			load_css ajax.html
+			load_css bootstrap.html
+			load_css prism.html
+
 			generate_html_style begin
-			generate_html_style nested-list
+			load_css general.css
+			load_css darkmode.css
+			load_css breadcrumb.css
+			load_css list-group.css
+			load_css pager.css
+			load_css prism-overrides.css
 			generate_html_style end
 		generate_html_head end
 
@@ -2445,11 +2156,20 @@ function generate_page {
 		esac
 	done
 
-			generate_html_script cdn
-			generate_html_script syntax
-			generate_html_script prism
-			generate_html_script nested-list
-			generate_html_script darkmode
+			load_javascript jquery.html
+			load_javascript bootstrap.html
+			load_javascript prism.html
+
+			load_syntax_highlighting "$1"
+			if [ "$SYNTAX" != "bash" ]
+			then
+				load_syntax_highlighting "$1" bash.html
+			fi
+
+			generate_html_script begin
+			load_javascript darkmode.js
+			load_javascript list-group.js
+			generate_html_script end
 
 		generate_html_body end
 	generate_html_section "$1" end
@@ -2468,8 +2188,17 @@ function generate_chapter {
 
 	generate_html_section "$1" begin
 		generate_html_head "$1" begin
+			load_css ajax.html
+			load_css bootstrap.html
+			load_css prism.html
+
 			generate_html_style begin
-			generate_html_style nested-list
+			load_css general.css
+			load_css darkmode.css
+			load_css breadcrumb.css
+			load_css list-group.css
+			load_css pager.css
+			load_css prism-overrides.css
 			generate_html_style end
 		generate_html_head end
 
@@ -2497,11 +2226,16 @@ function generate_chapter {
 		esac
 	done
 
-			generate_html_script cdn
-			generate_html_script syntax
-			generate_html_script prism
-			generate_html_script nested-list
-			generate_html_script darkmode
+			load_javascript jquery.html
+			load_javascript bootstrap.html
+			load_javascript prism.html
+
+			load_syntax_highlighting "$1" bash.html
+
+			generate_html_script begin
+			load_javascript darkmode.js
+			load_javascript list-group.js
+			generate_html_script end
 
 		generate_html_body end
 	generate_html_section "$1" end
@@ -2587,7 +2321,7 @@ function generate_manuals {
 
 	if [ -d icons ]
 	then
-		cp -r icons html-files
+		cp -r icons html-files/
 	fi
 }
 
