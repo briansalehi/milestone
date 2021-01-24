@@ -929,7 +929,7 @@ function generate_execution_mode {
 	fi
 
 	generate_html_header 4 "${mode}"
-	generate_html_code begin command-line language-bash "data-user=\"${syntax}\" data-host=\"milestone\""
+	generate_html_code begin command-line language-bash #"data-user=\"${syntax}\" data-host=\"milestone\""
 	echo "$command" >> "./html-files/${index}.html"
 	generate_html_code end
 }
@@ -2118,7 +2118,7 @@ function generate_page {
 
 	generate_html_section "$1" begin
 
-		generate_html_head "$1" begin
+		generate_html_head begin "$1"
 			load_css ajax.html
 			load_css bootstrap.html
 			load_css prism.html
@@ -2187,7 +2187,7 @@ function generate_chapter {
 	update_configuration "$1"
 
 	generate_html_section "$1" begin
-		generate_html_head "$1" begin
+		generate_html_head begin "$1"
 			load_css ajax.html
 			load_css bootstrap.html
 			load_css prism.html
