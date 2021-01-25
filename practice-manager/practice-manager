@@ -177,11 +177,12 @@ EOF
 
 # requires header size
 # requires title
+# optional id
 function generate_html_header {
 	local size="${1:-1}"
 	local title="${2:-header}"
 
-	echo "<h${size}>$title</h${size}>" >> "./html-files/${index}.html"
+	echo "<h${size} id=\"${title// /-}\">${title}</h${size}>" >> "./html-files/${index}.html"
 }
 
 # requires path to page
