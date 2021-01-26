@@ -316,11 +316,12 @@ function generate_html_body {
 # optional attributes
 function generate_html_code {
 	local side="${1:-begin}"
-	local pre_class="$2"
-	local code_class="$3"
+	local code_class="$2"
+	local pre_class="$3"
 	shift 3
 	local attributes="$@"
 	local code_tag
+	local pre_tag
 
 	if [ -n "$code_class" ]
 	then
@@ -329,10 +330,17 @@ function generate_html_code {
 		code_tag="<code>"
 	fi
 
+	if [ -n "$pre_class" ]
+	then
+		pre_tag="<pre class=\"$pre_class\" $attributes>"
+	else
+		pre_tag="<pre>"
+	fi
+
 	if [ "$side" = "begin" ]
 	then
 		cat << EOF >> "./html-files/${index}.html"
-<pre class="${pre_class}" $attributes>
+${pre_tag}
 ${code_tag}
 EOF
 	else
@@ -1547,7 +1555,7 @@ function generate_source_section {
 			syntax="${1##*.}"
 		fi
 
-		generate_html_code begin line-numbers "language-${syntax}"
+		generate_html_code begin "language-${syntax}" line-numbers
 		OLD_IFS="$IFS"
 		IFS=
 		local line
