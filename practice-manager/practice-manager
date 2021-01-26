@@ -177,10 +177,9 @@ EOF
 
 # requires header size
 # requires title
-# optional id
 function generate_html_header {
 	local size="${1:-1}"
-	local title="${2:-header}"
+	local title="${2:-Untitled Notebook}"
 
 	cat << EOF >> "./html-files/${index}.html"
 <h${size}>
@@ -190,6 +189,7 @@ function generate_html_header {
 </path>
 </svg>
 ${title}
+</a>
 </h${size}>
 EOF
 }
