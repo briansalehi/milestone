@@ -279,23 +279,21 @@ function load_javascript {
 # requires syntax file
 function load_syntax_highlighting {
 	local page="$1"
-	local syntax="${2:-$SYNTAX.html}"
+	local syntax="${2:-$SYNTAX}"
 	local base=milestone-properties/js/syntax
 
-	if [ -z "$syntax" ]
-	then
-		tput setaf $SEVERITY_HIGH
-		echo "Syntax not specified: $page" >&2
-		tput sgr0
-		return 1
-	elif [ -f $base/$syntax ]
-	then
-		cat $base/$syntax >> "./html-files/${index}.html"
-	else
-		tput setaf $SEVERITY_HIGH
-		echo "Syntax file ${syntax} does not exist: $page" >&2
-		tput sgr0
-	fi
+	local language
+	for language in $syntax
+	do
+		if [ -f $base/$language.html ]
+		then
+			cat $base/$language.html >> "./html-files/${index}.html"
+		else
+			tput setaf $SEVERITY_HIGH
+			echo "Syntax file ${language}.html does not exist: $page" >&2
+			tput sgr0
+		fi
+	done
 }
 
 # requires begin/end
@@ -931,12 +929,10 @@ function create_command_scheme {
 # requires path to page
 # requires compile/link/run option
 # requires command
-# optional syntax
 function generate_execution_mode {
 	local page="${1}"
 	local mode="${2:-compile}"
 	local command="${3}"
-	local syntax="${4:-practices}"
 
 	if [ -z "$command" ]
 	then
@@ -963,14 +959,6 @@ function compile_source {
 	if [ "${EXECUTABLE:-false}" != "true" ]
 	then
 		return 1
-	fi
-
-	local syntax=
-	if [ -n "$SYNTAX" ]
-	then
-		syntax="$SYNTAX"
-	else
-		syntax="${1##*.}"
 	fi
 
 	generate_html_breaker
@@ -1071,7 +1059,7 @@ function compile_source {
 	if [ "${COMPILABLE:-false}" = "true" ]
 	then
 		compilation_command="${compilation_command//$location\//}"
-		generate_execution_mode "$1" compile "$compilation_command" "$syntax"
+		generate_execution_mode "$1" compile "$compilation_command"
 	fi
 
 	# build linkage scheme
@@ -1111,7 +1099,7 @@ function compile_source {
 	if [ "${LINKABLE:-false}" = "true" ]
 	then
 		linkage_command="${linkage_command//$location\//}"
-		generate_execution_mode "$1" link "$linkage_command" "$syntax"
+		generate_execution_mode "$1" link "$linkage_command"
 	fi
 }
 
@@ -2967,7 +2955,7 @@ function analyze_paramters {
 
 if [ -f ./.config ] && [ ./.index ]
 then
-	validation_check=202101202003
+	validation_check=202101272322
 	source ./.config
 	if [ "${VALIDATION_ID:-0}" -lt "$validation_check" ]
 	then
