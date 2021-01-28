@@ -2101,7 +2101,7 @@ function generate_index_page {
 			load_javascript bootstrap.html
 			load_javascript prism.html
 
-			load_syntax_highlighting "$page" bash.html
+			load_syntax_highlighting "$page" bash
 
 			generate_html_script begin
 			load_javascript darkmode.js
@@ -2171,7 +2171,7 @@ function generate_page {
 			load_syntax_highlighting "$1"
 			if [ "$SYNTAX" != "bash" ]
 			then
-				load_syntax_highlighting "$1" bash.html
+				load_syntax_highlighting "$1" bash
 			fi
 
 			generate_html_script begin
@@ -2239,7 +2239,7 @@ function generate_chapter {
 			load_javascript bootstrap.html
 			load_javascript prism.html
 
-			load_syntax_highlighting "$1" bash.html
+			load_syntax_highlighting "$1" bash
 
 			generate_html_script begin
 			load_javascript darkmode.js
