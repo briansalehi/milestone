@@ -126,52 +126,53 @@ SEVERITY_HIGH=1
 # html line generators
 ###############################################################################
 
-# requires path to page
-# requires begin/end as second parameter
+# requires begin/end as first parameter
 function generate_html_section {
-	local page="${1%.*}"
-	page="${page##*/}"
-	local side="${2:-begin}"
-	
-	if [ "$side" = "begin" ]
+	if [ "$1" == "begin" ]
 	then
-		cat << EOF >> "./html-files/${index}.html"
-<!DOCTYPE html>
-<html lang="en">
-EOF
+		echo "<!DOCTYPE html>" >&3
+		echo "<html lang=\"en\">" >&3
+	elif [ "$1" == "end" ]
+	then
+		echo "</html>" >&3
 	else
-		cat << EOF >> "./html-files/${index}.html"
-</html>
-EOF
+		tput setaf $SEVERITY_HIGH
+		echo "Invalid html section parameter: $1" >&2
+		tput sgr0
 	fi
 }
 
+# required begin/end
 # required source
-# optional side begin/end
 function generate_html_head {
-	local side="${1:-begin}"
-	local page="$2"
-	local title=
+	local title="${2%.*}.title.txt"
+	local content
 
-	if [ "$side" = "begin" ]
+	if [ "$1" == "begin" ]
 	then
-		if [ -f "${page%.*}.title.txt" ]
+		if [ -f "$title" ]
 		then
-			title="$(cat "${page%.*}.title.txt")"
+			content="$(cat "$title")"
 		else
 			tput setaf $SEVERITY_MEDIUM
-			echo "title substituted: $page" >&2
+			echo "Default title occupied: $title" >&2
 			tput sgr0
 		fi
 	
-		cat << EOF >> "./html-files/${index}.html"
+		cat << EOF >&3
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>${title:-"Milestone Practices"}</title>
+<title>${content:-"Notebook"}</title>
 EOF
+	elif [ "$1" == "end" ]
+	then
+		echo "</head>" >&3
 	else
-		echo "</head>" >> "./html-files/${index}.html"
+		tput setaf $SEVERITY_HIGH
+		echo "Invalid html head parameter: $1" >&2
+		tput sgr0
+		return 1
 	fi
 }
 
@@ -181,7 +182,7 @@ function generate_html_header {
 	local size="${1:-1}"
 	local title="${2:-Untitled Notebook}"
 
-	cat << EOF >> "./html-files/${index}.html"
+	cat << EOF >&3
 <h${size}>
 <a id="${title// /-}" class="anchor" aria-hidden="true" href="#${title// /-}">
 ${title}
@@ -205,21 +206,21 @@ function generate_html_header_with_link {
 	local title="${3:-header}"
 	local link="${4:-#}"
 
-	echo "<h${size}><a href="$link">$title</a></h${size}>" >> "./html-files/${index}.html"
+	echo "<h${size}><a href="$link">$title</a></h${size}>" >&3
 }
 
 # requires begin/end
 function generate_html_style {
 	case "$1" in
 		begin)
-			echo "<style>" >> "./html-files/${index}.html"
+			echo "<style>" >&3
 			;;
 		end)
-			echo "</style>" >> "./html-files/${index}.html"
+			echo "</style>" >&3
 			;;
 		*)
 			tput setaf $SEVERITY_HIGH
-			echo "html style tag missed!" >&2
+			echo "Invalid html style parameter: $1" >&2
 			tput sgr0
 			return 1
 			;;
@@ -229,14 +230,14 @@ function generate_html_style {
 # requires css file
 function load_css {
 	local style="$1"
-	local base=milestone-properties/css
+	local base="milestone-properties/css"
 
 	if [ -f "$base/$style" ]
 	then
-		cat "$base/$style" >> "./html-files/${index}.html"
+		cat "$base/$style" >&3
 	else
 		tput setaf $SEVERITY_HIGH
-		echo "CSS file does not exist: $style" >&2
+		echo "CSS file does not exist: $base/$style" >&2
 		tput sgr0
 		return 1
 	fi
@@ -246,10 +247,10 @@ function load_css {
 function generate_html_script {
 	case "$1" in
 		begin)
-			echo "<script>" >> "./html-files/${index}.html"
+			echo "<script>" >&3
 			;;
 		end)
-			echo "</script>" >> "./html-files/${index}.html"
+			echo "</script>" >&3
 			;;
 		*)
 			tput setaf $SEVERITY_HIGH
@@ -267,7 +268,7 @@ function load_javascript {
 
 	if [ -f $base/$script ]
 	then
-		cat $base/$script >> "./html-files/${index}.html"
+		cat $base/$script >&3
 	else
 		tput setaf $SEVERITY_HIGH
 		echo "Script file not found: $script" >&2
@@ -287,7 +288,7 @@ function load_syntax_highlighting {
 	do
 		if [ -f $base/$language.html ]
 		then
-			cat $base/$language.html >> "./html-files/${index}.html"
+			cat $base/$language.html >&3
 		else
 			tput setaf $SEVERITY_HIGH
 			echo "Syntax file ${language}.html does not exist: $page" >&2
@@ -300,10 +301,16 @@ function load_syntax_highlighting {
 function generate_html_body {
 	case $1 in
 		begin)
-			echo "<body class=\"container\">" >> "./html-files/${index}.html"
+			echo "<body class=\"container\">" >&3
 			;;
 		end)
-			echo "</body>" >> "./html-files/${index}.html"
+			echo "</body>" >&3
+			;;
+		*)
+			tput setaf $SEVERITY_HIGH
+			echo "Invalid html body parameter: $1" >&2
+			tput sgr0
+			return 1
 			;;
 	esac
 }
@@ -337,12 +344,12 @@ function generate_html_code {
 
 	if [ "$side" = "begin" ]
 	then
-		cat << EOF >> "./html-files/${index}.html"
+		cat << EOF >&3
 ${pre_tag}
 ${code_tag}
 EOF
 	else
-		cat << EOF >> "./html-files/${index}.html"
+		cat << EOF >&3
 </code>
 </pre>
 EOF
@@ -370,11 +377,11 @@ function generate_html_div {
 
 	if [ "$side" = "begin" ]
 	then
-		cat << EOF >> "./html-files/${index}.html"
+		cat << EOF >&3
 ${div_tag}
 EOF
 	else
-		cat << EOF >> "./html-files/${index}.html"
+		cat << EOF >&3
 </div>
 EOF
 	fi
@@ -382,11 +389,11 @@ EOF
 
 # requires path to page
 function generate_html_break {
-	echo "<br />" >> "./html-files/${index}.html"
+	echo "<br />" >&3
 }
 
 function generate_html_breaker {
-	echo "<hr />" >> "./html-files/${index}.html"
+	echo "<hr />" >&3
 }
 
 # requires path to page
@@ -402,9 +409,9 @@ function generate_html_link {
 
 	if [ -n "$class" ]
 	then
-		echo "<a class=\"${class}\" href=\"$link\">$title</a>" >> "./html-files/${index}.html"
+		echo "<a class=\"${class}\" href=\"$link\">$title</a>" >&3
 	else
-		echo "<a href=\"$link\">$title</a>" >> "./html-files/${index}.html"
+		echo "<a href=\"$link\">$title</a>" >&3
 	fi
 }
 
@@ -424,7 +431,7 @@ function generate_html_text {
 		tag="<p>"
 	fi
 
-	echo "${tag}${text}</p>" >> "./html-files/${index}.html"
+	echo "${tag}${text}</p>" >&3
 }
 
 # optional begin/end
@@ -450,10 +457,10 @@ function generate_html_list {
 			tag="<ul>"
 		fi
 
-		echo "${tag}${text}" >> "./html-files/${index}.html"
+		echo "${tag}${text}" >&3
 	elif [ "$side" = "end" ]
 	then
-		echo "</ul>" >> "./html-files/${index}.html"
+		echo "</ul>" >&3
 	fi
 }
 
@@ -482,10 +489,10 @@ function generate_html_ordered_list {
 			tag="<ol>"
 		fi
 
-		echo "${tag}${text}" >> "./html-files/${index}.html"
+		echo "${tag}${text}" >&3
 	elif [ "$side" = "end" ]
 	then
-		echo "</ol>" >> "./html-files/${index}.html"
+		echo "</ol>" >&3
 	fi
 }
 
@@ -508,10 +515,10 @@ function generate_html_nav {
 			tag="<nav>"
 		fi
 
-		echo "${tag}${text}" >> "./html-files/${index}.html"
+		echo "${tag}${text}" >&3
 	elif [ "$side" = "end" ]
 	then
-		echo "</nav>" >> "./html-files/${index}.html"
+		echo "</nav>" >&3
 	fi
 }
 
@@ -532,7 +539,7 @@ function generate_html_item {
 		tag="<li>"
 	fi
 
-	echo "${tag}${text}${tag_end}" >> "./html-files/${index}.html"
+	echo "${tag}${text}${tag_end}" >&3
 }
 
 # requires path to page
@@ -569,7 +576,7 @@ function generate_html_item_with_link {
 		tag_end="</li>"
 	fi
 
-	echo "${tag}${text}${tag_end}" >> "./html-files/${index}.html"
+	echo "${tag}${text}${tag_end}" >&3
 }
 
 # requires path to page
@@ -600,7 +607,7 @@ function generate_list_group_collapse_item {
 	local title="${2}"
 	local badge_counter="${3}"
 
-	cat << EOF >> "./html-files/${index}.html"
+	cat << EOF >&3
 <a href="#${link}" class="list-group-item" data-toggle="collapse">
 	<i class="glyphicon glyphicon-chevron-right"></i>${title}
 	<span class="badge badge-primary badge-pill">${badge_counter}</span>
@@ -628,7 +635,7 @@ function generate_list_group_item {
 		badge_counter="<span class=\"badge badge-primary badge-pill\">${4}</span>"
 	fi
 
-	cat << EOF >> "./html-files/${index}.html"
+	cat << EOF >&3
 <a href="/${link#/}" class="${classes}">
 	${title}
 	${badge_counter}
@@ -638,28 +645,21 @@ EOF
 
 # requires source
 # requires image name
-# optional line number to set image
 function generate_html_image {
 	local source="$1"
 	local location="${source%/*}"
 	local image="$2"
 	local image_alias="${page_alias%/*}/${image}"
-	local linenumber="$3"
 	local alt="${image%.*}"
 
 	if [ -f "${location}/${image}" ]
 	then
 		cp "${location}/${image}" "./html-files${image_alias#./html-files}"
-		if [ -n "$linenumber" ]
-		then
-			sed -i "${linenumber}a <img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${alt//-/ }\">" "./html-files/${index}.html"
-		else
-			echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${alt//-/ }\">" >> "./html-files/${index}.html"
-		fi
+		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${alt//-/ }\">" >&3
 	else
-		echo "<b>Image Not Found</b>" >> "./html-files/${index}.html"
+		echo "<b>Image Not Found</b>" >&3
 		tput setaf $SEVERITY_HIGH
-		echo "image not found: $source"
+		echo "Image not found: $source"
 		tput sgr0
 		return 1
 	fi
@@ -674,12 +674,12 @@ function generate_html_screenshot {
 	if [ -f "$image" ]
 	then
 		cp "$image" "./html-files${image_alias#./html-files}"
-		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${source##*/} Screenshot\">" >> "./html-files/${index}.html"
+		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${source##*/} Screenshot\">" >&3
 		tput setaf $SEVERITY_LOW
 		echo "screenshot linked: $page_alias"
 		tput sgr0
 	else
-		echo "<b>Screenshot Not Found</b>" >> "./html-files/${index}.html"
+		echo "<b>Screenshot Not Found</b>" >&3
 		tput setaf $SEVERITY_HIGH
 		echo "image not found: $source"
 		tput sgr0
@@ -944,7 +944,7 @@ function generate_execution_mode {
 
 	generate_html_header 4 "${mode}"
 	generate_html_code begin language-bash
-	echo "$command" >> "./html-files/${index}.html"
+	echo "$command" >&3
 	generate_html_code end
 }
 
@@ -1488,7 +1488,7 @@ function generate_navigation_section {
 function generate_index_section {
 	local tag="<h1>"
 
-	echo -n "  ${tag}${index%.0}. " >> "./html-files/${index}.html"
+	echo -n "  ${tag}${index%.0}. " >&3
 }
 
 # requires path to page
@@ -1519,7 +1519,7 @@ function generate_page_name {
 	local tag="<cite>"
 	local tag_end="</cite>"
 
-	echo "  ${tag}${1##*/}${tag_end}" >> "./html-files/${index}.html"
+	echo "  ${tag}${1##*/}${tag_end}" >&3
 }
 
 # requires path to page
@@ -1554,7 +1554,7 @@ function generate_source_section {
 			line="${line//\'/&apos;}"
 			line="${line//</&lt;}"
 			line="${line//>/&gt;}"
-			echo "    $line" >> "./html-files/${index}.html"
+			echo "    $line" >&3
 		done < "$1"
 		IFS="$OLD_IFS"
 		generate_html_code end
@@ -1592,7 +1592,7 @@ function generate_output_section {
 
 		while read -r line
 		do
-			echo "$line" >> "./html-files/${index}.html"
+			echo "$line" >&3
 		done < "$input"
 
 		generate_html_code end
@@ -1617,7 +1617,7 @@ function generate_output_section {
 
 				while read -r line
 				do
-					echo "$line" >> "./html-files/${index}.html"
+					echo "$line" >&3
 				done < "$output"
 
 				if [ "$(wc -l < "$output")" -eq 0 ]
@@ -1658,7 +1658,7 @@ function generate_output_section {
 
 				while read -r line
 				do
-					echo "$line" >> "./html-files/${index}.html"
+					echo "$line" >&3
 				done < "$compilation_error"
 
 				if [ "$(wc -l < "$compilation_error")" -eq 0 ]
@@ -1687,7 +1687,7 @@ function generate_output_section {
 
 				while read -r line
 				do
-					echo "$line" >> "./html-files/${index}.html"
+					echo "$line" >&3
 				done < "$linkage_error"
 
 				if [ "$(wc -l < "$linkage_error")" -eq 0 ]
@@ -1716,7 +1716,7 @@ function generate_output_section {
 
 				while read -r line
 				do
-					echo "$line" >> "./html-files/${index}.html"
+					echo "$line" >&3
 				done < "$runtime_error"
 
 				if [ "$(wc -l < "$runtime_error")" -eq 0 ]
@@ -1760,25 +1760,22 @@ function generate_comment_section {
 		OLD_IFS="$IFS"
 		while read -r line
 		do
-			echo "$line" | sed -e 's/\([\.!?;:]\)$/\1<br \/>/' -e 's/^$/<br \/>/' >> "./html-files/${index}.html"
+			if grep -q "^\!\[.*\]$" <<< "$line"
+			then
+				find_index_alias "$page_index"
+				generate_html_image "$1" "${line//[\!\[\]]/}"
+			else
+				echo "$line" | sed -e 's/\([\.!?;:]\)$/\1<br \/>/' -e 's/^$/<br \/>/' >&3
+			fi
 		done < "$comment"
 		IFS="$OLD_IFS"
 
-		for match in $(grep -n "^\!\[.*\]$" "./html-files/${index}.html")
-		do
-			local linenumber="${match%%:*}"
-			local image="${match#*[}"
-			image="${image%]*}"
-
-			find_index_alias "$page_index"
-			generate_html_image "$1" "$image" "$linenumber"
-			sed -i "${linenumber}d" "./html-files/${index}.html"
-		done
 		generate_html_div "$1" end
 	fi
 }
 
 # requires index
+# sets page_alias
 function find_index_alias {
 	page_alias=
 
@@ -2070,11 +2067,11 @@ function generate_alias {
 
 function generate_index_page {
 	local page="./html-files/index.html"
+	exec 3> "$page"
 	index=index
 
 	update_configuration "$page"
-	generate_html_section "$page" begin
-
+	generate_html_section begin
 		generate_html_head begin "$page"
 			load_css ajax.html
 			load_css bootstrap.html
@@ -2092,7 +2089,6 @@ function generate_index_page {
 		generate_html_head end
 
 		generate_html_body begin
-
 			generate_html_header_with_link "$page" 2 "Notebooks" "0.html"
 			generate_table_of_content "./.index" "true" "2"
 			generate_list_group_root "$page" end
@@ -2107,10 +2103,8 @@ function generate_index_page {
 			load_javascript darkmode.js
 			load_javascript list-group.js
 			generate_html_script end
-
 		generate_html_body end
-
-	generate_html_section "$page" end
+	generate_html_section end
 }
 
 # functions to start the script working
@@ -2119,11 +2113,13 @@ function generate_index_page {
 # requires path to page
 function generate_page {
 	index_page "$1"
+	exec 3> "./html-files/${page_index}.html"
+
 	index="$page_index"
 	generate_alias "$1" "${index}.html"
 	update_configuration "$1"
 
-	generate_html_section "$1" begin
+	generate_html_section begin
 
 		generate_html_head begin "$1"
 			load_css ajax.html
@@ -2180,7 +2176,7 @@ function generate_page {
 			generate_html_script end
 
 		generate_html_body end
-	generate_html_section "$1" end
+	generate_html_section end
 	tput setaf $SEVERITY_LOW
 	echo "page generated: $1"
 	tput sgr0
@@ -2190,11 +2186,13 @@ function generate_page {
 # requires absolute path to page
 function generate_chapter {
 	index_page "$1"
+	exec 3> "./html-files/${page_index}.html"
+
 	index="$page_index"
 	generate_alias "${1%README.md}" "${index}.html"
 	update_configuration "$1"
 
-	generate_html_section "$1" begin
+	generate_html_section begin
 		generate_html_head begin "$1"
 			load_css ajax.html
 			load_css bootstrap.html
@@ -2247,7 +2245,7 @@ function generate_chapter {
 			generate_html_script end
 
 		generate_html_body end
-	generate_html_section "$1" end
+	generate_html_section end
 	index=
 }
 
