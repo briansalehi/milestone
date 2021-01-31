@@ -870,7 +870,7 @@ function validate_configuration {
 	done < "$1"
 }
 
-# requires absolute path to source to configure corresponding variables
+# requires path to source to configure corresponding variables
 function update_configuration {
 	local directory
 	local config
@@ -911,7 +911,7 @@ function create_command_scheme {
 			linker) command_scheme+="$LINKER " ;;
 			linker_options) command_scheme+="$LINKER_OPTIONS " ;;
 			running_options) command_scheme+="$RUNNING_OPTIONS " ;;
-			object) command_scheme+="${source%.*}.${OUTPUT_OBJECT:-o} " ;;
+			object) command_scheme+="${source%.*}${OUTPUT_OBJECT:-.o} " ;;
 			source) command_scheme+="${source} " ;;
 			binary) command_scheme+="${source%.*}.bin " ;;
 			headers) command_scheme+="$headers " ;;
@@ -956,19 +956,14 @@ function compile_source {
 	page="${page##*/}"
 	local location="${1%/*}"
 
-	if [ "${EXECUTABLE:-false}" != "true" ]
-	then
-		return 1
-	fi
+	update_configuration "$source"
 
-	generate_html_breaker
-	generate_html_header 3 "Execution"
+#	generate_html_breaker
+#	generate_html_header 3 "Execution"
 
 	local binary="${1%.*}.bin"
 	OUTPUT_OBJECT="${OUTPUT_OBJECT:-o}"
 	local object="${1%.*}.${OUTPUT_OBJECT#.}"
-	local headers="$@"
-	headers="${headers/$1 }"
 	local includes=
 	local output="${1%.*}.output.txt"
 	local compilation_error="${1%.*}.compilation.error.txt"
@@ -977,10 +972,13 @@ function compile_source {
 	local source_change_time
 	local component=
 
+	# retrieve headers
+	local headers="$(sed -n "/^${source##*/}/s/${source##*/}\s//p" < "${source%/*}/.index")"
+
 	if [ "${COMPILABLE:-false}" = "true" ] && [ -z "$COMPILER" ]
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "compiler not specified for: $1" >&2
+		echo "Compiler not specified for: $1" >&2
 		tput sgr0
 		return 1
 	fi
@@ -1011,38 +1009,63 @@ function compile_source {
 	local compilation_command="$command_scheme"
 
 	# build post compilation scheme
-	create_command_scheme "${POST_COMPILATION_SCHEME/optionos/compiler_options}" "$source" "$headers"
+	create_command_scheme "${POST_COMPILATION_SCHEME/options/compiler_options}" "$source" "$headers"
 	local post_compilation_command="$command_scheme"
 
-	if ! [ -f "$output" ] || [ "$source_change_time" -gt "$output_change_time" ]
+	if ! [ -f "$output" ] \
+		|| [ "$source_change_time" -gt "$output_change_time" ] \
+		|| [ "${FORCE_COMPILE:-false}" == "true" ]
 	then
 		if [ "${COMPILABLE:-false}" = "true" ]
 		then
-			if ! $compilation_command &> "$compilation_error"
+			echo "$compilation_command" >&2
+
+			if [ "${GENERATES_COMPILATION_ERROR:-false}" == "true" ]
+			then
+				local compilation_output=/dev/null
+			else
+				local compilation_output="$compilation_error"
+			fi
+
+			if ! $compilation_command &> "$compilation_output"
 			then
 				if [ "${GENERATES_COMPILATION_ERROR:-false}" != "true" ]
 				then
 					tput setaf $SEVERITY_HIGH
-					echo "compilation error: $1" >&2
-					echo "  command: $compilation_command" >&2
+					echo "Compilation error: $1" >&2
+					echo "    Command: $compilation_command" >&2
+					echo "    Reason: $compilation_error" >&2
 					tput sgr0
 					return 1
 				fi
 			fi
 
-			if [ -n "$post_compilation_command" ] && ! $post_compilation_command &>> "$compilation_error"
+			if [ -n "$post_compilation_command" ]
 			then
-				if [ "${GENERATES_COMPILATION_ERROR:-false}" != "true" ]
+				echo "$post_compilation_command" >&2
+
+				if [ "${GENERATES_COMPILATION_ERROR:-false}" == "true" ]
 				then
-					tput setaf $SEVERITY_HIGH
-					echo "post compilation error: $1" >&2
-					echo "  command: $post_compilation_command" >&2
-					tput sgr0
-					return 1
+					local compilation_output=/dev/null
+				else
+					local compilation_output="$compilation_error"
+				fi
+
+				if ! $post_compilation_command &>> "$compilation_output"
+				then
+					if [ "${GENERATES_COMPILATION_ERROR:-false}" != "true" ]
+					then
+						tput setaf $SEVERITY_HIGH
+						echo "Post compilation error: $1" >&2
+						echo "    Command: $post_compilation_command" >&2
+						echo "    Reason: $compilation_error" >&2
+						tput sgr0
+						return 1
+					fi
 				fi
 			fi
 
-			if [ "${GENERATES_COMPILATION_ERROR:-false}" != "true" ] || [ "$(wc -w < "$compilation_error")" -eq 0 ]
+			if [ -f "$compilation_error" ] && [ "$(wc -w < "$compilation_error")" -eq 0 ]
 			then
 				rm "$compilation_error"
 			fi
@@ -1054,12 +1077,16 @@ function compile_source {
 			fi
 			ln -s "$PWD/${1/\.\//}" "${binary}"
 		fi
+	else
+		tput setaf $SEVERITY_LOW
+		echo "source already compiled: $1" >&2
+		tput sgr0
 	fi
 
 	if [ "${COMPILABLE:-false}" = "true" ]
 	then
 		compilation_command="${compilation_command//$location\//}"
-		generate_execution_mode "$1" compile "$compilation_command"
+#		generate_execution_mode "$1" compile "$compilation_command"
 	fi
 
 	# build linkage scheme
@@ -1071,26 +1098,28 @@ function compile_source {
 	then
 		if [ "${LINKABLE:-false}" = "true" ] && [ -n "$LINKER" ]
 		then
+			echo "$linkage_command" >&2
 			if ! $linkage_command 2> "$linkage_error"
 			then
 				if [ "${GENERATES_LINKAGE_ERROR:-false}" != "true" ]
 				then
 					tput setaf $SEVERITY_HIGH
-					echo "linkage error for: $1" >&2
-					echo "  command: $linkage_command" >&2
+					echo "Linkage error for: $1" >&2
+					echo "    Command: $linkage_command" >&2
+					echo "    Reason: $linkage_error" >&2
 					tput sgr0
 					return 1
 				fi
 			fi
 
-			if [ "${GENERATES_LINKAGE_ERROR:-false}" != "true" ] || [ "$(wc -w < "$linkage_error")" -eq 0 ]
+			if [ "$(wc -w < "$linkage_error")" -eq 0 ]
 			then
 				rm "$linkage_error"
 			fi
 		elif [ "${LINKABLE:-false}" = "true" ] && [ -z "$LINKER" ]
 		then
 			tput setaf $SEVERITY_HIGH
-			echo "linker not specified for: $1" >&2
+			echo "Linker not specified for: $1" >&2
 			tput sgr0
 			return 1
 		fi
@@ -1099,7 +1128,7 @@ function compile_source {
 	if [ "${LINKABLE:-false}" = "true" ]
 	then
 		linkage_command="${linkage_command//$location\//}"
-		generate_execution_mode "$1" link "$linkage_command"
+#		generate_execution_mode "$1" link "$linkage_command"
 	fi
 }
 
@@ -1338,6 +1367,8 @@ function run_program {
 	local source_change_time=
 	local output_change_time=
 
+	update_configuration "$source"
+
 	source_change_time=$(stat -c "%Y" "$1")
 
 	if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
@@ -1359,29 +1390,71 @@ function run_program {
 	create_command_scheme "${RUNNING_SCHEME/options/running_options}" "$source" "$headers"
 	local running_command="$command_scheme"
 
-	if [ "${RUNNABLE:-false}" = "true" ]
+	if [ "$source_change_time" -gt "$output_change_time" ] \
+		|| [ "${FORCE_COMPILE:-false}" == "true" ]
 	then
-		if [ "${OUTPUT:-false}" = "true" ] && [ "$source_change_time" -gt "$output_change_time" ]
+		if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
 		then
-			if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
+			capture_screenshot "$source" 2>/dev/null
+		elif [ -f "$input" ]
+		then
+			echo "$running_command" >&2
+
+			if [ "${GENERATES_RUNTIME_ERROR:-false}" == "true" ]
 			then
-				capture_screenshot "$source" 2>/dev/null
-			elif [ -f "$input" ]
-			then
+				if ! $running_command < "$input" &> "$output"
+				then
+					if [ "${GENERATES_RUNTIME_ERROR:-false}" != "true" ]
+					then
+						tput setaf $SEVERITY_HIGH
+						echo "Running program failed: $source" >&2
+						echo "    Command: $running_command" >&2
+						echo "    Reason: $runtime_error" >&2
+						tput sgr0
+					fi
+				fi
+			else
 				if ! $running_command < "$input" 2> "$runtime_error" 1> "$output"
 				then
 					if [ "${GENERATES_RUNTIME_ERROR:-false}" != "true" ]
 					then
 						tput setaf $SEVERITY_HIGH
-						echo "running program failed: $source" >&2
-						echo "  command: $running_command" >&2
+						echo "Running program failed: $source" >&2
+						echo "    Command: $running_command" >&2
+						echo "    Reason: $runtime_error" >&2
 						tput sgr0
 					fi
 				fi
-				# remove empty or unwanted error files
-				if [ "${GENERATES_RUNTIME_ERROR:-false}" != "true" ] || [ "$(wc -w < "$runtime_error")" -eq 0 ]
+			fi
+
+			# remove empty or unwanted error files
+			if [ "$(wc -w < "$runtime_error")" -eq 0 ]
+			then
+				rm "$runtime_error"
+			fi
+
+			# move standard error output to output file when no errors expected
+			if [ -f "$runtime_error" ] \
+			   && [ "${GENERATES_RUNTIME_ERROR:-false}" != "true" ]
+			then
+				cat "$runtime_error" >> "$output"
+				rm "$runtime_error"
+			fi
+		else
+			echo "$running_command" >&2
+
+			if [ "${GENERATES_RUNTIME_ERROR:-false}" == "true" ]
+			then
+				if ! $running_command &> "$output"
 				then
-					rm "$runtime_error"
+					if [ "${GENERATES_RUNTIME_ERROR:-false}" != "true" ]
+					then
+						tput setaf $SEVERITY_HIGH
+						echo "Running program failed: $source" >&2
+						echo "    Command: $running_command" >&2
+						echo "    Reason: $runtime_error" >&2
+						tput sgr0
+					fi
 				fi
 			else
 				if ! $running_command 2> "$runtime_error" 1> "$output"
@@ -1389,22 +1462,24 @@ function run_program {
 					if [ "${GENERATES_RUNTIME_ERROR:-false}" != "true" ]
 					then
 						tput setaf $SEVERITY_HIGH
-						echo "running program failed: $source" >&2
-						echo "  command: $running_command" >&2
+						echo "Running program failed: $source" >&2
+						echo "    Command: $running_command" >&2
+						echo "    Reason: $runtime_error" >&2
 						tput sgr0
 					fi
 				fi
-				# remove empty or unwanted error files
-				if [ "${GENERATES_RUNTIME_ERROR:-false}" != "true" ] || [ "$(wc -w < "$runtime_error")" -eq 0 ]
-				then
-					rm "$runtime_error"
-				fi
+			fi
+
+			# remove empty or unwanted error files
+			if [ -f "$runtime_error" ] && [ "$(wc -w < "$runtime_error")" -eq 0 ]
+			then
+				rm "$runtime_error"
 			fi
 		fi
-
-		running_command="${running_command//$location\//./}"
-		generate_execution_mode "$1" run "$running_command" "$SYNTAX"
 	fi
+
+	running_command="${running_command//$location\//./}"
+#	generate_execution_mode "$1" run "$running_command" "$SYNTAX"
 }
 
 # functions to generate html pages
@@ -1573,16 +1648,6 @@ function generate_output_section {
 	local input="$page.input.txt"
 	page="${page##*/}"
 	local line
-
-	if ! compile_source $@
-	then
-		return 1
-	fi
-
-	if ! run_program "$1" $@
-	then
-		return 1
-	fi
 
 	if [ "${INPUT:-false}" = "true" ] && [ -f "$input" ]
 	then
@@ -2678,20 +2743,6 @@ function swap_chapter {
 	fi
 }
 
-function remove_outputs {
-	local directory=
-
-	find -type f -name ".index" -exec sh -c '
-		directory="{}"
-		while read -r entry
-		do
-			if [ -f "${directory%/*}/${entry% *}" ]
-			then
-				touch "${directory%/*}/${entry% *}"
-			fi
-		done < "$directory"' \;
-}
-
 # requires path to page or chapter
 function remove_files {
 	if [ -f "./${1#\.\/}" ]
@@ -2859,7 +2910,7 @@ function analyze_path {
 
 	# if does not have extension and exists and indexed: check all files within
 	if [ -z "$extension" ] && [ -d "$path" ] && [ -f "${path%/*}/.index" ]\
-		&& [ "$(grep -c "^${path##*/}$" "${path%/*}/.index")" -eq 1 ]
+		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 1 ]
 	then
 		validate_chapter "$path"
 		if [ "$peek" = "true" ]
@@ -2868,7 +2919,7 @@ function analyze_path {
 		fi
 	# if does not have extension and exists but not indexed: check and join
 	elif [ -z "$extension" ] && [ -d "$path" ] && [ -f "${path%/*}/.index" ]\
-		&& [ "$(grep -c "^${path##*/}$" "${path%/*}/.index")" -eq 0 ]
+		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 0 ]
 	then
 		join_chapter "$path"
 	# if does not have extension and does not exist: create chapter
@@ -2877,12 +2928,21 @@ function analyze_path {
 		add_chapter "$path"
 	# if has extension and exists and indexed: check all files with it
 	elif [ -n "$extension" ] && [ -f "$path" ] && [ -f "${path%/*}/.index" ]\
-		&& [ "$(grep -c "^${path##*/}$" "${path%/*}/.index")" -eq 1 ]
+		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 1 ]
 	then
 		validate_page "$path"
+		if ! compile_source "$path"
+		then
+			return 1
+		fi
+
+		if ! run_program "$path"
+		then
+			return 1
+		fi
 	# if has extension and exists but is not indexed: check and join practice
 	elif [ -n "$extension" ] && [ -f "$path" ] && [ -f "${path%/*}/.index" ]\
-		&& [ "$(grep -c "^${path##*/}$" "${path%/*}/.index")" -eq 0 ]
+		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 0 ]
 	then
 		join_page "$path"
 	# if has extension but does not exist, create practice page
@@ -2924,7 +2984,7 @@ function analyze_paramters {
 			hierarchy+="/$entry"
 
 			# peek index of chapter if nothing happens
-			if [ "${hierarchy}" = "./${1%/}" ]
+			if [ "${hierarchy}" == "./${1%/}" ]
 			then
 				peek=true
 			else
@@ -2934,7 +2994,7 @@ function analyze_paramters {
 			if ! analyze_path "${hierarchy/$PWD/}" "$peek"
 			then
 				tput setaf $SEVERITY_HIGH
-				echo "analyzing path failed: $path" >&2
+				echo "Analyzing path failed: $path" >&2
 				tput sgr0
 			fi
 		done
@@ -2942,7 +3002,7 @@ function analyze_paramters {
 		if ! move_files "./${1#\.\/}" "./${2#\.\/}"
 		then
 			tput setaf $SEVERITY_HIGH
-			echo "operation failed: $source" >&2
+			echo "Operation failed: $source" >&2
 			tput sgr0
 		fi
 	fi
@@ -2981,20 +3041,27 @@ then
 	# Everything starts here
 	generate_manuals "./.index"
 else
-	case "$1" in
-		-h|--help) usage ;;
-		-r|--remove) remove_files "${2%/}" ;;
-		-o|--reorder) reorder_index "${2%/}" ;;
-		-f|--force-compile) remove_outputs; generate_manuals "./.index" ;;
-		*)
-			if [ "${1:0:1}" = "-" ]
-			then
-				usage
-			else
-				if ! analyze_paramters "$1" "$2"
+	while [ $# -gt 0 ]
+	do
+		case "$1" in
+			-h|--help) usage; break ;;
+			-r|--remove) remove_files "${2%/}"; shift ;;
+			-o|--reorder) reorder_index "${2%/}"; shift ;;
+			-f|--force-compile) FORCE_COMPILE=true ;;
+			*)
+				if [ "${1:0:1}" = "-" ]
 				then
-					exit 1
+					usage
+					break
+				else
+					if ! analyze_paramters "$1" "$2"
+					then
+						exit 1
+					fi
+					shift
 				fi
-			fi ;;
-	esac
+				;;
+		esac
+		shift
+	done
 fi
