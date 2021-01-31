@@ -1019,7 +1019,15 @@ function compile_source {
 		if [ "${COMPILABLE:-false}" = "true" ]
 		then
 			echo "$compilation_command" >&2
-			if ! $compilation_command 2> "$compilation_error" 1> "$output"
+
+			if [ "${GENERATES_COMPILATION_ERROR:-false}" == "true" ]
+			then
+				local compilation_output=/dev/null
+			else
+				local compilation_output="$compilation_error"
+			fi
+
+			if ! $compilation_command &> "$compilation_output"
 			then
 				if [ "${GENERATES_COMPILATION_ERROR:-false}" != "true" ]
 				then
@@ -1035,7 +1043,15 @@ function compile_source {
 			if [ -n "$post_compilation_command" ]
 			then
 				echo "$post_compilation_command" >&2
-				if ! $post_compilation_command &>> "$compilation_error"
+
+				if [ "${GENERATES_COMPILATION_ERROR:-false}" == "true" ]
+				then
+					local compilation_output=/dev/null
+				else
+					local compilation_output="$compilation_error"
+				fi
+
+				if ! $post_compilation_command &>> "$compilation_output"
 				then
 					if [ "${GENERATES_COMPILATION_ERROR:-false}" != "true" ]
 					then
@@ -1049,7 +1065,7 @@ function compile_source {
 				fi
 			fi
 
-			if [ "$(wc -w < "$compilation_error")" -eq 0 ]
+			if [ -f "$compilation_error" ] && [ "$(wc -w < "$compilation_error")" -eq 0 ]
 			then
 				rm "$compilation_error"
 			fi
