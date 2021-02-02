@@ -95,31 +95,27 @@ function usage {
 	tput sgr0
 	echo
 	tput setaf 7
-	echo "  $ practice-manager <path>"
+	echo " $ practice-manager [-f,--force] [-r,--remove] [-o,--reorder] <path>"
 	tput sgr0
-	echo "                        Create a chapter/page, or just peek inside"
+	echo "                       Create chapter/page, or build page,"
+	echo "                       Only one option should be given at a time,"
+	echo "   -f                  Force compile, regenerates all output files,"
+	echo "   -r                  Remove page or chapter,"
+	echo "   -o                  Reorder index of page or chapter."
 	echo
 	tput setaf 7
-	echo "  $ practice-manager <source> <destination>"
+	echo " $ practice-manager <source> <destination>"
 	tput sgr0
-	echo "                        Move a chapter/page"
+	echo "                       Move or rename chapter/page similar to mv(1)."
 	echo
 	tput setaf 7
-	echo "  $ practice-manager"
+	echo " $ practice-manager"
 	tput sgr0
-	echo "                        Generate html-files, no option required"
-	echo
-	tput setaf $SEVERITY_HIGH
-	echo "Options:"
-	tput sgr0
-	echo
-	echo "  -r <path/to/file>     Remove page or chapter"
-	echo "  -o <path/to/file>     Reorder index of page or chapter"
-	echo "  -f                    Force compile, regenerates all output files"
+	echo "                       Generate html-files when no options given."
 	echo
 }
 
-SEVERITY_LOW=4
+SEVERITY_LOW=6
 SEVERITY_MEDIUM=3
 SEVERITY_HIGH=1
 
@@ -2732,11 +2728,17 @@ function swap_chapter {
 
 # requires path to page or chapter
 function remove_files {
-	if [ -f "./${1#\.\/}" ]
+	if [ -f "$1" ]
 	then
-		remove_page "./${1#\.\/}"
+		remove_page "$1"
+	elif [ -d "$1" ]
+	then
+		remove_chapter "$1"
 	else
-		remove_chapter "./${1#\.\/}"
+		tput setaf $SEVERITY_HIGH
+		echo "Destination does not exist: $1" >&2
+		tput sgr0
+		return 1
 	fi
 }
 
@@ -2918,14 +2920,31 @@ function analyze_path {
 		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 1 ]
 	then
 		validate_page "$path"
-		if ! compile_source "$path"
-		then
-			return 1
-		fi
+		update_configuration "$path"
+		local executable=false
+		local section
+		for section in $PAGE_TEMPLATE
+		do
+			case "$section" in
+				execution) executable=true
+			esac
+		done
 
-		if ! run_program "$path"
+		if [ "$executable" == "true" ]
 		then
-			return 1
+			if ! compile_source "$path"
+			then
+				return 1
+			fi
+
+			if ! run_program "$path"
+			then
+				return 1
+			fi
+		else
+			tput setaf $SEVERITY_LOW
+			echo "Source not flagged as executable: $path" >&2
+			tput sgr0
 		fi
 	# if has extension and exists but is not indexed: check and join practice
 	elif [ -n "$extension" ] && [ -f "$path" ] && [ -f "${path%/*}/.index" ]\
@@ -3031,24 +3050,27 @@ else
 	while [ $# -gt 0 ]
 	do
 		case "$1" in
-			-h|--help) usage; break ;;
-			-r|--remove) remove_files "${2%/}"; shift ;;
-			-o|--reorder) reorder_index "${2%/}"; shift ;;
-			-f|--force-compile) FORCE_COMPILE=true ;;
-			*)
-				if [ "${1:0:1}" = "-" ]
+			-r|--remove) remove_files "${2%/}"; break ;;
+			-o|--reorder) reorder_index "${2%/}"; break ;;
+			-f|--force) FORCE_COMPILE=true ;;
+			-h|--help|-*) usage; break ;;
+			*) ANALYZE_OPTION=true
+				ANALYZE_SOURCE="$1"
+				if [ -n "$2" ] && [ "${2:0:1}" != "-" ]
 				then
-					usage
-					break
-				else
-					if ! analyze_paramters "$1" "$2"
-					then
-						exit 1
-					fi
+					ANALYZE_DESTINATION="$2"
 					shift
 				fi
 				;;
 		esac
 		shift
 	done
+fi
+
+if [ "${ANALYZE_OPTION:-false}" == "true" ]
+then
+	if ! analyze_paramters "${ANALYZE_SOURCE:-}" "${ANALYZE_DESTINATION:-}"
+	then
+		exit 1
+	fi
 fi
