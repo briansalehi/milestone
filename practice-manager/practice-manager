@@ -301,7 +301,7 @@ function load_syntax_highlighting {
 function generate_html_body {
 	case $1 in
 		begin)
-			echo "<body class=\"container\">" >&3
+			echo "<body class=\"container dark-mode\">" >&3
 			;;
 		end)
 			echo "</body>" >&3
@@ -2148,6 +2148,10 @@ function generate_index_page {
 			generate_table_of_content "./.index" "true" "2"
 			generate_list_group_root "$page" end
 
+			generate_html_script begin
+			load_javascript darkmode.js
+			generate_html_script end
+
 			load_javascript jquery.html
 			load_javascript bootstrap.html
 			load_javascript prism.html
@@ -2155,7 +2159,6 @@ function generate_index_page {
 			load_syntax_highlighting "$page" bash
 
 			generate_html_script begin
-			load_javascript darkmode.js
 			load_javascript list-group.js
 			generate_html_script end
 		generate_html_body end
@@ -2211,6 +2214,9 @@ function generate_page {
 			*) tput setaf $SEVERITY_HIGH; echo "invalid section name \`$section\`"; tput sgr0; continue ;;
 		esac
 	done
+			generate_html_script begin
+			load_javascript darkmode.js
+			generate_html_script end
 
 			load_javascript jquery.html
 			load_javascript bootstrap.html
@@ -2223,10 +2229,8 @@ function generate_page {
 			fi
 
 			generate_html_script begin
-			load_javascript darkmode.js
 			load_javascript list-group.js
 			generate_html_script end
-
 		generate_html_body end
 	generate_html_section end
 	tput setaf $SEVERITY_LOW
@@ -2279,6 +2283,9 @@ function generate_chapter {
 			*) tput setaf $SEVERITY_HIGH; echo "invalid section name \`$section\`"; tput sgr0 ;;
 		esac
 	done
+			generate_html_script begin
+			load_javascript darkmode.js
+			generate_html_script end
 
 			load_javascript jquery.html
 			load_javascript bootstrap.html
@@ -2287,10 +2294,8 @@ function generate_chapter {
 			load_syntax_highlighting "$1" bash
 
 			generate_html_script begin
-			load_javascript darkmode.js
 			load_javascript list-group.js
 			generate_html_script end
-
 		generate_html_body end
 	generate_html_section end
 	index=
