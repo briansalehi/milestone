@@ -810,11 +810,6 @@ function validate_chapter {
 
 		if [ "$extension" = "config" ]
 		then
-			# configuration for readme file
-			echo "EXECUTABLE=false" > "$page"
-			echo "SOURCE=false" >> "$page"
-			echo "INPUT=false" >> "$page"
-			echo "OUTPUT=false" >> "$page"
 			# update configuration of readme
 			regenerate_configuration "$page"
 		elif ! [ -f "$page" ]
@@ -958,9 +953,6 @@ function compile_source {
 
 	update_configuration "$source"
 
-#	generate_html_breaker
-#	generate_html_header 3 "Execution"
-
 	local binary="${1%.*}.bin"
 	OUTPUT_OBJECT="${OUTPUT_OBJECT:-o}"
 	local object="${1%.*}.${OUTPUT_OBJECT#.}"
@@ -1083,12 +1075,6 @@ function compile_source {
 		tput sgr0
 	fi
 
-	if [ "${COMPILABLE:-false}" = "true" ]
-	then
-		compilation_command="${compilation_command//$location\//}"
-#		generate_execution_mode "$1" compile "$compilation_command"
-	fi
-
 	# build linkage scheme
 	create_command_scheme "${LINKAGE_SCHEME/options/linker_options}" "$source" "$headers"
 	local linkage_command="$command_scheme"
@@ -1123,12 +1109,6 @@ function compile_source {
 			tput sgr0
 			return 1
 		fi
-	fi
-
-	if [ "${LINKABLE:-false}" = "true" ]
-	then
-		linkage_command="${linkage_command//$location\//}"
-#		generate_execution_mode "$1" link "$linkage_command"
 	fi
 }
 
@@ -1477,13 +1457,45 @@ function run_program {
 			fi
 		fi
 	fi
-
-	running_command="${running_command//$location\//./}"
-#	generate_execution_mode "$1" run "$running_command" "$SYNTAX"
 }
 
 # functions to generate html pages
 ###############################################################################
+
+# requires source and header
+function generate_execution_section {
+	local source="$1"
+	local location="${1%/*}"
+	shift
+	local headers="$@"
+
+	generate_html_breaker
+	generate_html_header 3 "Execution"
+
+	if [ "${COMPILABLE:-false}" == "true" ]
+	then
+		create_command_scheme "${COMPILATION_SCHEME/options/compiler_options}" "$source" "$headers"
+		generate_execution_mode "$source" compile "${command_scheme//$location\//./}"
+
+		if [ -n "$POST_COMPILATION_SCHEME" ]
+		then
+			create_command_scheme "${POST_COMPILATION_SCHEME/options/compiler_options}" "$source" "$headers"
+			generate_execution_mode "$source" "clean up" "${command_scheme//$location\//./}"
+		fi
+	fi
+
+	if [ "${LINKABLE:-false}" == "true" ]
+	then
+		create_command_scheme "${LINKAGE_SCHEME/options/linker_options}" "$source" "$headers"
+		generate_execution_mode "$source" link "${command_scheme//$location\//./}"
+	fi
+
+	if [ "${RUNNABLE:-false}" == "true" ]
+	then
+		create_command_scheme "${RUNNING_SCHEME/options/running_options}" "$source" "$headers"
+		generate_execution_mode "$source" run "${command_scheme//$location\//./}"
+	fi
+}
 
 # requires path to page
 function generate_reference_section {
@@ -1599,11 +1611,6 @@ function generate_page_name {
 
 # requires path to page
 function generate_source_section {
-	if [ "${SOURCE:-false}" != "true" ]
-	then
-		return 1
-	fi
-
 	generate_html_breaker
 	generate_html_header 3 "Source"
 	while [ $# -gt 0 ]
@@ -1637,69 +1644,14 @@ function generate_source_section {
 	done
 }
 
-# requires absolute path to page
-function generate_output_section {
+# requires path to page
+function generate_error_section {
 	local page="${1%.*}"
-	local binary="$page.bin"
-	local output="${page}.output.txt"
 	local compilation_error="$page.compilation.error.txt"
 	local linkage_error="$page.linkage.error.txt"
 	local runtime_error="$page.runtime.error.txt"
-	local input="$page.input.txt"
 	page="${page##*/}"
-	local line
 
-	if [ "${INPUT:-false}" = "true" ] && [ -f "$input" ]
-	then
-		generate_html_breaker
-		generate_html_header 3 Input
-		generate_html_code begin language-bash
-
-		while read -r line
-		do
-			echo "$line" >&3
-		done < "$input"
-
-		generate_html_code end
-	fi
-
-	if [ "${OUTPUT:-false}" = "true" ]
-	then
-		if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
-		then
-			generate_html_breaker
-			generate_html_header 3 Output
-			generate_page_name "${1%.*}.png"
-			find_index_alias "$page_index"
-			generate_html_screenshot "$1"
-		elif [ -f "$output" ]
-		then
-			if [ "$(wc -w < "$output")" -gt 0 ]
-			then
-				generate_html_breaker
-				generate_html_header 3 Output
-				generate_html_code begin language-txt
-
-				while read -r line
-				do
-					echo "$line" >&3
-				done < "$output"
-
-				if [ "$(wc -l < "$output")" -eq 0 ]
-				then
-					echo >> "$output"
-				fi
-
-				generate_html_code end
-			fi
-		else
-			tput setaf $SEVERITY_HIGH
-			echo "output file not found: $output" >&2
-			tput sgr0
-		fi
-	fi
-
-	local generates_error="false"
 	if [ "${GENERATES_COMPILATION_ERROR:-false}" = "true" ] || \
 		[ "${GENERATES_LINKAGE_ERROR:-false}" = "true" ] || \
 		[ "${GENERATES_RUNTIME_ERROR:-false}" = "true" ]
@@ -1711,101 +1663,139 @@ function generate_output_section {
 		fi
 	fi
 
-	if [ "${ERROR:-false}" = "true" ] && [ "${GENERATES_COMPILATION_ERROR:-false}" = "true" ]
+	if [ "${GENERATES_COMPILATION_ERROR:-false}" = "true" ]
 	then
-		if [ -f "$compilation_error" ]
+		if [ -f "$compilation_error" ] && [ "$(wc -w < "$compilation_error")" -gt 0 ]
 		then
-			if [ "$(wc -w < "$compilation_error")" -gt 0 ]
+			generate_html_breaker
+			generate_html_header 3 Error
+			generate_html_code begin language-bash
+
+			local line
+			while read -r line
+			do
+				echo "$line" >&3
+			done < "$compilation_error"
+
+			if [ "$(wc -l < "$compilation_error")" -eq 0 ]
 			then
-				generate_html_breaker
-				generate_html_header 3 Error
-				generate_html_code begin language-bash
-
-				while read -r line
-				do
-					echo "$line" >&3
-				done < "$compilation_error"
-
-				if [ "$(wc -l < "$compilation_error")" -eq 0 ]
-				then
-					echo >> "$compilation_error"
-				fi
-
-				generate_html_code end
+				echo >> "$compilation_error"
 			fi
-		else
-			tput setaf $SEVERITY_HIGH
-			echo "compilation error file wanted but not found: $compilation_error" >&2
-			tput sgr0
+
+			generate_html_code end
 		fi
 	fi
 
-	if [ "${ERROR:-false}" = "true" ] && [ "${GENERATES_LINKAGE_ERROR:-false}" = "true" ]
+	if [ "${GENERATES_LINKAGE_ERROR:-false}" = "true" ]
 	then
-		if [ -f "$linkage_error" ]
+		if [ -f "$linkage_error" ] && [ "$(wc -w < "$linkage_error")" -gt 0 ]
 		then
-			if [ "$(wc -w < "$linkage_error")" -gt 0 ]
+			generate_html_breaker
+			generate_html_header 3 Error
+			generate_html_code begin language-bash
+
+			local line
+			while read -r line
+			do
+				echo "$line" >&3
+			done < "$linkage_error"
+
+			if [ "$(wc -l < "$linkage_error")" -eq 0 ]
 			then
-				generate_html_breaker
-				generate_html_header 3 Error
-				generate_html_code begin language-bash
-
-				while read -r line
-				do
-					echo "$line" >&3
-				done < "$linkage_error"
-
-				if [ "$(wc -l < "$linkage_error")" -eq 0 ]
-				then
-					echo >> "$linkage_error"
-				fi
-
-				generate_html_code end
+				echo >> "$linkage_error"
 			fi
-		else
-			tput setaf $SEVERITY_HIGH
-			echo "linkage error file wanted but not found: $linkage_error" >&2
-			tput sgr0
+
+			generate_html_code end
 		fi
 	fi
 
-	if [ "${ERROR:-false}" = "true" ] && [ "${GENERATES_RUNTIME_ERROR:-false}" = "true" ]
+	if [ "${GENERATES_RUNTIME_ERROR:-false}" = "true" ]
 	then
-		if [ -f "$runtime_error" ]
+		if [ -f "$runtime_error" ] && [ "$(wc -w < "$runtime_error")" -gt 0 ]
 		then
-			if [ "$(wc -w < "$runtime_error")" -gt 0 ]
+			generate_html_breaker
+			generate_html_header 3 Error
+			generate_html_code begin language-bash
+
+			local line
+			while read -r line
+			do
+				echo "$line" >&3
+			done < "$runtime_error"
+
+			if [ "$(wc -l < "$runtime_error")" -eq 0 ]
 			then
-				generate_html_breaker
-				generate_html_header 3 Error
-				generate_html_code begin language-bash
-
-				while read -r line
-				do
-					echo "$line" >&3
-				done < "$runtime_error"
-
-				if [ "$(wc -l < "$runtime_error")" -eq 0 ]
-				then
-					echo >> "$runtime_error"
-				fi
-
-				generate_html_code end
+				echo >> "$runtime_error"
 			fi
-		else
-			tput setaf $SEVERITY_HIGH
-			echo "runtime error file wanted but not found: $runtime error" >&2
-			tput sgr0
+
+			generate_html_code end
 		fi
+	fi
+}
+
+# requires path to page
+function generate_input_section {
+	local input="${1%.*}.input.txt"
+
+	if [ -f "$input" ]
+	then
+		generate_html_breaker
+		generate_html_header 3 Input
+		generate_html_code begin language-bash
+
+		local line
+		while read -r line
+		do
+			echo "$line" >&3
+		done < "$input"
+
+		generate_html_code end
+	fi
+}
+
+# requires path to page
+function generate_output_section {
+	local page="${1%.*}"
+	local output="${page}.output.txt"
+	page="${page##*/}"
+
+	if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
+	then
+		generate_html_breaker
+		generate_html_header 3 Output
+		generate_page_name "${page}.png"
+		find_index_alias "$page_index"
+		generate_html_screenshot "$1"
+	elif [ -f "$output" ]
+	then
+		if [ "$(wc -w < "$output")" -gt 0 ]
+		then
+			generate_html_breaker
+			generate_html_header 3 Output
+			generate_html_code begin language-txt
+
+			local line
+			while read -r line
+			do
+				echo "$line" >&3
+			done < "$output"
+
+			if [ "$(wc -l < "$output")" -eq 0 ]
+			then
+				echo >> "$output"
+			fi
+
+			generate_html_code end
+		fi
+	else
+		tput setaf $SEVERITY_HIGH
+		echo "Output file not found: $output" >&2
+		tput sgr0
 	fi
 }
 
 # requires absolute path to page
 function generate_comment_section {
-	if [ "$COMMENT" != "true" ]
-	then
-		return 1
-	fi
-
 	local page="${1%.*}"
 	local comment="$page.comment.txt"
 	page="${page##*/}"
@@ -2208,19 +2198,16 @@ function generate_page {
 	for section in $PAGE_TEMPLATE
 	do
 		case "$section" in
-			navigation) NAVIGATION=true; generate_navigation_section "$1" ;;
-			title) TITLE=true; generate_header_section "$1" ;;
+			navigation) generate_navigation_section "$1" ;;
+			title) generate_header_section "$1" ;;
 			reference) generate_reference_section "$1" ;;
-			comment) COMMENT=true; generate_comment_section "$1" ;;
-			source) SOURCE=true; generate_source_section $@ ;;
-			execution) EXECUTABLE=true ;;
-			output) OUTPUT=true; generate_output_section $@ ;;
-			compilation_error) ERROR=true ;;
-			linkage_error) ERROR=true ;;
-			runtime_error) ERROR=true ;;
-			input) INPUT=true ;;
-			error) ERROR=true ;;
-			pagination) PAGINATION=true; generate_quick_access_section "$1" ;;
+			comment) generate_comment_section "$1" ;;
+			source) generate_source_section $@ ;;
+			execution) generate_execution_section $@ ;;
+			output) generate_output_section $@ ;;
+			input) generate_input_section ;;
+			error) generate_error_section ;;
+			pagination) generate_quick_access_section "$1" ;;
 			*) tput setaf $SEVERITY_HIGH; echo "invalid section name \`$section\`"; tput sgr0; continue ;;
 		esac
 	done
@@ -2280,18 +2267,13 @@ function generate_chapter {
 	for section in $CHAPTER_TEMPLATE
 	do
 		case "$section" in
-			navigation) NAVIGATION=true; generate_navigation_section "$1" ;;
-			title) TITLE=true; generate_header_section "$1" ;;
+			navigation) generate_navigation_section "$1" ;;
+			title) generate_header_section "$1" ;;
 			reference) generate_reference_section "$1" ;;
-			comment) COMMENT=true; generate_comment_section "$1" ;;
-			source) SOURCE=true ;;
-			execution) EXECUTABLE=true ;;
-			output) OUTPUT=true ;;
-			input) INPUT=true ;;
-			error) ERROR=true ;;
-			pagination) PAGINATION=true; generate_quick_access_section "$1" ;;
-			toc) TABLE_OF_CONTENT=true;
-				generate_table_of_content "${1%/*}/.index" "true" "2"
+			comment) generate_comment_section "$1" ;;
+			execution) generate_execution_section $! ;;
+			pagination) generate_quick_access_section "$1" ;;
+			toc) generate_table_of_content "${1%/*}/.index" "true" "2"
 				generate_list_group_root "${1%/*}/.index" end
 				;;
 			*) tput setaf $SEVERITY_HIGH; echo "invalid section name \`$section\`"; tput sgr0 ;;
