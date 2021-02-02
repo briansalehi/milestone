@@ -655,7 +655,7 @@ function generate_html_image {
 	if [ -f "${location}/${image}" ]
 	then
 		cp "${location}/${image}" "./html-files${image_alias#./html-files}"
-		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${alt//-/ }\">" >&3
+		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${alt//-/ }\" loading=\"lazy\">" >&3
 	else
 		echo "<b>Image Not Found</b>" >&3
 		tput setaf $SEVERITY_HIGH
