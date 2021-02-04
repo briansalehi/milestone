@@ -12,25 +12,16 @@ main_configuration=\
 #SYNTAX=
 
 ## Design pages as you want
+## Available items:
 ### navigation title comment reference source execution input output error pagination
 #PAGE_TEMPLATE=\"navigation title comment reference source execution input output error pagination\"
 #CHAPTER_TEMPLATE=\"navigation title comment reference pagination toc\"
 
-## Whether source should be compiled
-## Set false for scripting languages
-#COMPILABLE=true
-
-## Program used to interpret or compile the practice file
-#COMPILER=
-#COMPILER_OPTIONS=
-#GENERATES_COMPILATION_ERROR=false
-
-## Order of statements in compilation command
-## Available statements:
-### compiler, options, object, source, headers, location, binary, page,
+## How program should be treated
+## Available items:
+### object, source, headers, location, binary, page,
 ### makefile, stepN optionN, extension-xyz
-#COMPILATION_SCHEME=\"compiler options object source\"
-#POST_COMPILATION_SCHEME=
+#EXECUTION_SCHEME=
 
 ## Whether all sources in one line of .index file should appear in linkage
 ## usually other files are headers only and won't need to be linked to source
@@ -40,32 +31,8 @@ main_configuration=\
 ## Default is set to .o
 #OUTPUT_OBJECT=
 
-## Whether object should be linked after compilation too
-## Defaut is set to true
-## Set false for scripts
-#LINKABLE=true
-
-## Whether linker explicitly specified
-## This is only used for compilable sources
-#LINKER=
-#LINKER_OPTIONS=
-#GENERATES_LINKAGE_ERROR=false
-
-## Order of statements in linkage command
-## Available statements: linker, options, binary, object, headers, source,
-##   location, page
-#LINKAGE_SCHEME=\"linker options binary object headers\"
-
-## Wether generated output can run as an executable
-#RUNNABLE=true
-#RUNNING_OPTIONS=
-#GENERATES_RUNTIME_ERROR=false
+## Some programs are based on GUI, you can capture a screenshot as output
 #CAPTURE_SCREENSHOT=false
-
-## Order of statements in running command
-## Available statements: compiler, linker, options, binary, object, headers,
-##   source, location, page
-#RUNNING_SCHEME=\"binary options\"
 
 ## Whether program should be run in the background
 ## Suitable for servers and services which need to wait for clients to compile
@@ -73,14 +40,9 @@ main_configuration=\
 ## Rationally, servers should be compiled and executed first, then clients
 #RUN_IN_BACKGROUND=false
 
-## Terminate program in RUNTIME seconds after exection
-## Suitable for servers which will not exit after execution
-#TERMINATE=false
-#TERMINATION_SIGNAL=SIGTERM
-#RUNTIME=3
-
-## Specify the hardness of this chapter
+## Specify the technical level of this topic
 ## This feature will be used in Milestone technical courses and tutorials
+## Available items: basic intermediate expert
 #TECHNICAL_LEVEL=
 
 ## DO NOT EDIT!
@@ -752,10 +714,44 @@ function regenerate_configuration {
 				then
 					value="${value%\"} toc\""
 				fi ;;
+			COMPILATION_SCHEME)
+				if [ -n "${COMPILATION_SCHEME:-}" ]
+				then
+					sed -i "/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=\(.*\)/\1=\2;${value//\"/}/" "$1"
+				fi
+				;;
+			POST_COMPILATION_SCHEME)
+				if [ -n "${POST_COMPILATION_SCHEME:-}" ]
+				then
+					sed -i "/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=\(.*\)/\1=\2;${value//\"/}/" "$1"
+				fi
+				;;
+			LINKAGE_SCHEME)
+				if [ -n "${LINKAGE_SCHEME:-}" ]
+				then
+					sed -i "/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=\(.*\)/\1=\2;${value//\"/}/" "$1"
+				fi
+				;;
+			RUNNING_SCHEME)
+				if [ -n "${RUNNING_SCHEME:-}" ]
+				then
+					sed -i "/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=\(.*\)/\1=\2;${value//\"/}/" "$1"
+				fi
+				;;
 		esac
 
 		sed -i "/^#${config}=/s/^#\(${config}\)=.*/\1=${value}/" "$1"
 	done <<< "$target_config"
+
+	if [ "$validation_check" -le "202102032136" ]
+	then
+		sed -i -e '/EXECUTION_SCHEME=/s/=/=\"/' -e '/EXECUTION_SCHEME=/s/$/\"/' -e '/EXECUTION_SCHEME=/s/=";/="/' "$1"
+	fi
+
+	if ! grep -wq '^#EXECUTION_SCHEME=""' "$1"
+	then
+		sed -i "/^#EXECUTION_SCHEME=/s/^#//" "$1"
+	fi
 }
 
 # requires path to page
@@ -889,19 +885,14 @@ function update_configuration {
 # requires page name
 function create_command_scheme {
 	local scheme="$1"
-	local page="$2"
+	local source="$2"
 	local headers="$3"
-	local component
 	command_scheme=
 
+	local component
 	for component in $scheme
 	do
 		case "$component" in
-			compiler) command_scheme+="$COMPILER " ;;
-			compiler_options) command_scheme+="$COMPILER_OPTIONS " ;;
-			linker) command_scheme+="$LINKER " ;;
-			linker_options) command_scheme+="$LINKER_OPTIONS " ;;
-			running_options) command_scheme+="$RUNNING_OPTIONS " ;;
 			object) command_scheme+="${source%.*}${OUTPUT_OBJECT:-.o} " ;;
 			source) command_scheme+="${source} " ;;
 			binary) command_scheme+="${source%.*}.bin " ;;
@@ -910,6 +901,8 @@ function create_command_scheme {
 			location) command_scheme+="${source%/*} " ;;
 			makefile) local makefile="${source%.*}.make"; command_scheme+="${makefile##*/} " ;;
 			extension-*) command_scheme+="${source%.*}.${component#extenion-} " ;;
+			screenshot) GENERATES_SCREENSHOT=true ;;
+			error) GENERATES_EXECUTION_ERROR=true ;;
 			*) command_scheme+="$component " ;;
 		esac
 	done
@@ -918,193 +911,89 @@ function create_command_scheme {
 }
 
 # requires path to page
-# requires compile/link/run option
 # requires command
 function generate_execution_mode {
 	local page="${1}"
-	local mode="${2:-compile}"
-	local command="${3}"
+	local command="${2}"
 
 	if [ -z "$command" ]
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "execution command not specified for ${mode}: $page"
+		echo "execution command not specified: $page"
 		tput sgr0
 		return 1
 	fi
 
-	generate_html_header 4 "${mode}"
 	generate_html_code begin language-bash
 	echo "$command" >&3
 	generate_html_code end
 }
 
-# requires absolute path to source
-# option headers and required files
-function compile_source {
+# requires path to source
+function build_scheme {
 	local source="$1"
-	local page="${1%.*}"
-	page="${page##*/}"
-	local location="${1%/*}"
-
-	update_configuration "$source"
-
-	local binary="${1%.*}.bin"
-	OUTPUT_OBJECT="${OUTPUT_OBJECT:-o}"
-	local object="${1%.*}.${OUTPUT_OBJECT#.}"
-	local includes=
-	local output="${1%.*}.output.txt"
-	local compilation_error="${1%.*}.compilation.error.txt"
-	local linkage_error="${1%.*}.linkage.error.txt"
-	local output_change_time
-	local source_change_time
-	local component=
-
-	# retrieve headers
-	local headers="$(sed -n "/^${source##*/}/s/${source##*/}\s//p" < "${source%/*}/.index")"
-
-	if [ "${COMPILABLE:-false}" = "true" ] && [ -z "$COMPILER" ]
-	then
-		tput setaf $SEVERITY_HIGH
-		echo "Compiler not specified for: $1" >&2
-		tput sgr0
-		return 1
-	fi
+	local scheme="$2"
 
 	if [ "${INCLUDES:-false}" != "true" ]
 	then
-		headers=
+		local headers="$(sed -n "/^${source##*/}/s/${source##*/}\s//p" < "${source%/*}/.index")"
 	fi
 
 	if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
 	then
-		output="${1%.*}.screenshot.png"
+		local output="${source%.*}.screenshot.png"
 	else
-		output="${1%.*}.output.txt"
+		local output="${source%.*}.output.txt"
 	fi
 
-	source_change_time=$(stat -c "%Y" "$1")
-
-	if [ -f "$output" ]
-	then
-		output_change_time=$(stat -c "%Y" "$output")
-	else
-		output_change_time=0
-	fi
+	local source_change_time=$(stat -c "%Y" "$source" 2>/dev/null)
+	local output_change_time=$(stat -c "%Y" "$output" 2>/dev/null)
 
 	# build compilation scheme
-	create_command_scheme "${COMPILATION_SCHEME/options/compiler_options}" "$source" "$headers"
-	local compilation_command="$command_scheme"
-
-	# build post compilation scheme
-	create_command_scheme "${POST_COMPILATION_SCHEME/options/compiler_options}" "$source" "$headers"
-	local post_compilation_command="$command_scheme"
+	create_command_scheme "$scheme" "$source" "$headers"
 
 	if ! [ -f "$output" ] \
-		|| [ "$source_change_time" -gt "$output_change_time" ] \
+		|| [ "${source_change_time:-0}" -gt "${output_change_time:-0}" ] \
 		|| [ "${FORCE_COMPILE:-false}" == "true" ]
 	then
-		if [ "${COMPILABLE:-false}" = "true" ]
+		echo "$command_scheme" >&2
+		local execution_error="${source%.*}.execution.error.txt"
+
+		if [ "${GENERATES_SCREENSHOT:-false}" == "true" ]
 		then
-			echo "$compilation_command" >&2
-
-			if [ "${GENERATES_COMPILATION_ERROR:-false}" == "true" ]
-			then
-				local compilation_output=/dev/null
-			else
-				local compilation_output="$compilation_error"
-			fi
-
-			if ! $compilation_command &> "$compilation_output"
-			then
-				if [ "${GENERATES_COMPILATION_ERROR:-false}" != "true" ]
-				then
-					tput setaf $SEVERITY_HIGH
-					echo "Compilation error: $1" >&2
-					echo "    Command: $compilation_command" >&2
-					echo "    Reason: $compilation_error" >&2
-					tput sgr0
-					return 1
-				fi
-			fi
-
-			if [ -n "$post_compilation_command" ]
-			then
-				echo "$post_compilation_command" >&2
-
-				if [ "${GENERATES_COMPILATION_ERROR:-false}" == "true" ]
-				then
-					local compilation_output=/dev/null
-				else
-					local compilation_output="$compilation_error"
-				fi
-
-				if ! $post_compilation_command &>> "$compilation_output"
-				then
-					if [ "${GENERATES_COMPILATION_ERROR:-false}" != "true" ]
-					then
-						tput setaf $SEVERITY_HIGH
-						echo "Post compilation error: $1" >&2
-						echo "    Command: $post_compilation_command" >&2
-						echo "    Reason: $compilation_error" >&2
-						tput sgr0
-						return 1
-					fi
-				fi
-			fi
-
-			if [ -f "$compilation_error" ] && [ "$(wc -w < "$compilation_error")" -eq 0 ]
-			then
-				rm "$compilation_error"
-			fi
-		elif [ "${LINKABLE:-false}" = "true" ]
+			unset GENERATES_SCREENSHOT
+			capture_screenshot "$source" 2>/dev/null
+		elif [ "${GENERATES_EXECUTION_ERROR:-false}" == "true" ] && ! $command_scheme &> "$output"
 		then
-			if [ -f "$binary" ]
-			then
-				unlink "$binary"
-			fi
-			ln -s "$PWD/${1/\.\//}" "${binary}"
-		fi
-	else
-		tput setaf $SEVERITY_LOW
-		echo "source already compiled: $1" >&2
-		tput sgr0
-	fi
-
-	# build linkage scheme
-	create_command_scheme "${LINKAGE_SCHEME/options/linker_options}" "$source" "$headers"
-	local linkage_command="$command_scheme"
-
-	if [ "${LINKABLE:-false}" = "true" ] && ! [ -f "$output" ]\
-	   	|| [ "$source_change_time" -gt "$output_change_time" ]
-	then
-		if [ "${LINKABLE:-false}" = "true" ] && [ -n "$LINKER" ]
-		then
-			echo "$linkage_command" >&2
-			if ! $linkage_command 2> "$linkage_error"
-			then
-				if [ "${GENERATES_LINKAGE_ERROR:-false}" != "true" ]
-				then
-					tput setaf $SEVERITY_HIGH
-					echo "Linkage error for: $1" >&2
-					echo "    Command: $linkage_command" >&2
-					echo "    Reason: $linkage_error" >&2
-					tput sgr0
-					return 1
-				fi
-			fi
-
-			if [ "$(wc -w < "$linkage_error")" -eq 0 ]
-			then
-				rm "$linkage_error"
-			fi
-		elif [ "${LINKABLE:-false}" = "true" ] && [ -z "$LINKER" ]
+			unnset GENERATES_EXECUTION_ERROR
+			tput setaf $SEVERITY_LOW
+			echo "Intentional execution error: $1" >&2
+			tput sgr0
+			return 1
+		elif ! $command_scheme 1> "$output" 2> "$execution_error"
 		then
 			tput setaf $SEVERITY_HIGH
-			echo "Linker not specified for: $1" >&2
+			echo "Execution error: $1" >&2
+			echo "    Command: $command_scheme" >&2
+			echo "    Reason: $execution_error" >&2
+			tput sgr0
+			return 1
+		else
+			tput setaf $SEVERITY_HIGH
+			echo "Missing execution step: $1" >&2
+			echo "    Command: $command_scheme" >&2
 			tput sgr0
 			return 1
 		fi
+
+		if [ -s "$execution_error" ]
+		then
+			rm "$execution_error"
+		fi
+	else
+		tput setaf $SEVERITY_LOW
+		echo "No changes since last execution: $1" >&2
+		tput sgr0
 	fi
 }
 
@@ -1329,132 +1218,6 @@ function capture_screenshot {
 	fi
 }
 
-# requires path to page
-function run_program {
-	local source="$1"
-	OUTPUT_OBJECT="${OUTPUT_OBJECT:-o}"
-	local object="${1%.*}.${OUTPUT_OBJECT#.}"
-	local headers="$@"
-	headers="${headers/$1 }"
-	local output=
-
-	local location="${1%/*}"
-	local component=
-	local source_change_time=
-	local output_change_time=
-
-	update_configuration "$source"
-
-	source_change_time=$(stat -c "%Y" "$1")
-
-	if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
-	then
-		output="${1%.*}.screenshot.png"
-	else
-		output="${1%.*}.output.txt"
-	fi
-
-	local runtime_error="${1%.*}.runtime.error.txt"
-	if [ -f "$output" ]
-	then
-		output_change_time=$(stat -c "%Y" "$output")
-	else
-		output_change_time=0
-	fi
-
-	# build running scheme
-	create_command_scheme "${RUNNING_SCHEME/options/running_options}" "$source" "$headers"
-	local running_command="$command_scheme"
-
-	if [ "$source_change_time" -gt "$output_change_time" ] \
-		|| [ "${FORCE_COMPILE:-false}" == "true" ]
-	then
-		if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
-		then
-			capture_screenshot "$source" 2>/dev/null
-		elif [ -f "$input" ]
-		then
-			echo "$running_command" >&2
-
-			if [ "${GENERATES_RUNTIME_ERROR:-false}" == "true" ]
-			then
-				if ! $running_command < "$input" &> "$output"
-				then
-					if [ "${GENERATES_RUNTIME_ERROR:-false}" != "true" ]
-					then
-						tput setaf $SEVERITY_HIGH
-						echo "Running program failed: $source" >&2
-						echo "    Command: $running_command" >&2
-						echo "    Reason: $runtime_error" >&2
-						tput sgr0
-					fi
-				fi
-			else
-				if ! $running_command < "$input" 2> "$runtime_error" 1> "$output"
-				then
-					if [ "${GENERATES_RUNTIME_ERROR:-false}" != "true" ]
-					then
-						tput setaf $SEVERITY_HIGH
-						echo "Running program failed: $source" >&2
-						echo "    Command: $running_command" >&2
-						echo "    Reason: $runtime_error" >&2
-						tput sgr0
-					fi
-				fi
-			fi
-
-			# remove empty or unwanted error files
-			if [ "$(wc -w < "$runtime_error")" -eq 0 ]
-			then
-				rm "$runtime_error"
-			fi
-
-			# move standard error output to output file when no errors expected
-			if [ -f "$runtime_error" ] \
-			   && [ "${GENERATES_RUNTIME_ERROR:-false}" != "true" ]
-			then
-				cat "$runtime_error" >> "$output"
-				rm "$runtime_error"
-			fi
-		else
-			echo "$running_command" >&2
-
-			if [ "${GENERATES_RUNTIME_ERROR:-false}" == "true" ]
-			then
-				if ! $running_command &> "$output"
-				then
-					if [ "${GENERATES_RUNTIME_ERROR:-false}" != "true" ]
-					then
-						tput setaf $SEVERITY_HIGH
-						echo "Running program failed: $source" >&2
-						echo "    Command: $running_command" >&2
-						echo "    Reason: $runtime_error" >&2
-						tput sgr0
-					fi
-				fi
-			else
-				if ! $running_command 2> "$runtime_error" 1> "$output"
-				then
-					if [ "${GENERATES_RUNTIME_ERROR:-false}" != "true" ]
-					then
-						tput setaf $SEVERITY_HIGH
-						echo "Running program failed: $source" >&2
-						echo "    Command: $running_command" >&2
-						echo "    Reason: $runtime_error" >&2
-						tput sgr0
-					fi
-				fi
-			fi
-
-			# remove empty or unwanted error files
-			if [ -f "$runtime_error" ] && [ "$(wc -w < "$runtime_error")" -eq 0 ]
-			then
-				rm "$runtime_error"
-			fi
-		fi
-	fi
-}
-
 # functions to generate html pages
 ###############################################################################
 
@@ -1468,39 +1231,22 @@ function generate_execution_section {
 	generate_html_breaker
 	generate_html_header 3 "Execution"
 
-	if [ "${COMPILABLE:-false}" == "true" ]
-	then
-		create_command_scheme "${COMPILATION_SCHEME/options/compiler_options}" "$source" "$headers"
-		generate_execution_mode "$source" compile "${command_scheme//$location\//./}"
-
-		if [ -n "$POST_COMPILATION_SCHEME" ]
-		then
-			create_command_scheme "${POST_COMPILATION_SCHEME/options/compiler_options}" "$source" "$headers"
-			generate_execution_mode "$source" "clean up" "${command_scheme//$location\//./}"
-		fi
-	fi
-
-	if [ "${LINKABLE:-false}" == "true" ]
-	then
-		create_command_scheme "${LINKAGE_SCHEME/options/linker_options}" "$source" "$headers"
-		generate_execution_mode "$source" link "${command_scheme//$location\//./}"
-	fi
-
-	if [ "${RUNNABLE:-false}" == "true" ]
-	then
-		create_command_scheme "${RUNNING_SCHEME/options/running_options}" "$source" "$headers"
-		generate_execution_mode "$source" run "${command_scheme//$location\//./}"
-	fi
+	local scheme
+	while read -r scheme
+	do
+		create_command_scheme "$scheme" "$source" "$headers"
+		generate_execution_mode "$source" "${command_scheme//$location\//./}"
+	done <<< "${EXECUTION_SCHEME//;/$'\n'}"
 }
 
 # requires path to page
 function generate_reference_section {
 	local reference="${1%.*}.reference.txt"
 
-	if ! [ -f "$reference" ] || [ "$(wc -w < "$reference")" -eq 0 ]
+	if ! [ -s "$reference" ]
 	then
 		tput setaf "$SEVERITY_MEDIUM"
-		echo "reference not specified: $1" >&2
+		echo "Reference not specified: $1" >&2
 		tput sgr0
 		return 1
 	fi
@@ -1642,90 +1388,17 @@ function generate_source_section {
 
 # requires path to page
 function generate_error_section {
-	local page="${1%.*}"
-	local compilation_error="$page.compilation.error.txt"
-	local linkage_error="$page.linkage.error.txt"
-	local runtime_error="$page.runtime.error.txt"
-	page="${page##*/}"
+	local execution_error="${1%.*}.execution.error.txt"
 
-	if [ "${GENERATES_COMPILATION_ERROR:-false}" = "true" ] || \
-		[ "${GENERATES_LINKAGE_ERROR:-false}" = "true" ] || \
-		[ "${GENERATES_RUNTIME_ERROR:-false}" = "true" ]
+	if [ -s "$execution_error" ]
 	then
-		if [ -f "$compilation_error" ] || [ -f "$linkage_error" ] || [ -f "$runtime_error" ]
-		then
-			generate_html_breaker
-			generate_html_header 3 Output
-		fi
-	fi
+		generate_html_breaker
+		generate_html_header 3 Error
+		generate_html_code begin language-bash
 
-	if [ "${GENERATES_COMPILATION_ERROR:-false}" = "true" ]
-	then
-		if [ -f "$compilation_error" ] && [ "$(wc -w < "$compilation_error")" -gt 0 ]
-		then
-			generate_html_breaker
-			generate_html_header 3 Error
-			generate_html_code begin language-bash
+		cat "$execution_error" >&3
 
-			local line
-			while read -r line
-			do
-				echo "$line" >&3
-			done < "$compilation_error"
-
-			if [ "$(wc -l < "$compilation_error")" -eq 0 ]
-			then
-				echo >> "$compilation_error"
-			fi
-
-			generate_html_code end
-		fi
-	fi
-
-	if [ "${GENERATES_LINKAGE_ERROR:-false}" = "true" ]
-	then
-		if [ -f "$linkage_error" ] && [ "$(wc -w < "$linkage_error")" -gt 0 ]
-		then
-			generate_html_breaker
-			generate_html_header 3 Error
-			generate_html_code begin language-bash
-
-			local line
-			while read -r line
-			do
-				echo "$line" >&3
-			done < "$linkage_error"
-
-			if [ "$(wc -l < "$linkage_error")" -eq 0 ]
-			then
-				echo >> "$linkage_error"
-			fi
-
-			generate_html_code end
-		fi
-	fi
-
-	if [ "${GENERATES_RUNTIME_ERROR:-false}" = "true" ]
-	then
-		if [ -f "$runtime_error" ] && [ "$(wc -w < "$runtime_error")" -gt 0 ]
-		then
-			generate_html_breaker
-			generate_html_header 3 Error
-			generate_html_code begin language-bash
-
-			local line
-			while read -r line
-			do
-				echo "$line" >&3
-			done < "$runtime_error"
-
-			if [ "$(wc -l < "$runtime_error")" -eq 0 ]
-			then
-				echo >> "$runtime_error"
-			fi
-
-			generate_html_code end
-		fi
+		generate_html_code end
 	fi
 }
 
@@ -1755,19 +1428,18 @@ function generate_output_section {
 	local output="${page}.output.txt"
 	page="${page##*/}"
 
+	generate_html_breaker
+	generate_html_header 3 Output
+
 	if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
 	then
-		generate_html_breaker
-		generate_html_header 3 Output
 		generate_page_name "${page}.png"
 		find_index_alias "$page_index"
 		generate_html_screenshot "$1"
 	elif [ -f "$output" ]
 	then
-		if [ "$(wc -w < "$output")" -gt 0 ]
+		if ! [ -s "$output" ]
 		then
-			generate_html_breaker
-			generate_html_header 3 Output
 			generate_html_code begin language-txt
 
 			local line
@@ -2891,6 +2563,29 @@ function list_index {
 	echo
 }
 
+function execute_program {
+	local source="$1"
+
+	update_configuration "$source"
+
+	if grep -qw execution <<< "$PAGE_TEMPLATE"
+	then
+		local scheme
+		while read -r scheme
+		do
+			if ! build_scheme "$source" "$scheme"
+			then
+				return 1
+			fi
+		done <<< "$EXECUTION_SCHEME"
+	else
+		tput setaf $SEVERITY_LOW
+		echo "Source not flagged as executable: $source" >&2
+		tput sgr0
+		return 1
+	fi
+}
+
 # requires relative path
 function analyze_path {
 	local path="${1%/}"
@@ -2920,32 +2615,7 @@ function analyze_path {
 		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 1 ]
 	then
 		validate_page "$path"
-		update_configuration "$path"
-		local executable=false
-		local section
-		for section in $PAGE_TEMPLATE
-		do
-			case "$section" in
-				execution) executable=true
-			esac
-		done
-
-		if [ "$executable" == "true" ]
-		then
-			if ! compile_source "$path"
-			then
-				return 1
-			fi
-
-			if ! run_program "$path"
-			then
-				return 1
-			fi
-		else
-			tput setaf $SEVERITY_LOW
-			echo "Source not flagged as executable: $path" >&2
-			tput sgr0
-		fi
+		execute_program "$path"
 	# if has extension and exists but is not indexed: check and join practice
 	elif [ -n "$extension" ] && [ -f "$path" ] && [ -f "${path%/*}/.index" ]\
 		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 0 ]
@@ -3019,7 +2689,7 @@ function analyze_paramters {
 
 if [ -f ./.config ] && [ ./.index ]
 then
-	validation_check=202101272322
+	validation_check=202102032136
 	source ./.config
 	if [ "${VALIDATION_ID:-0}" -lt "$validation_check" ]
 	then
