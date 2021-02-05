@@ -743,7 +743,7 @@ function regenerate_configuration {
 		sed -i "/^#${config}=/s/^#\(${config}\)=.*/\1=${value}/" "$1"
 	done <<< "$target_config"
 
-	if [ "$validation_check" -le "202102032136" ]
+	if [ "$validation_check" -lt "202102032136" ]
 	then
 		sed -i -e '/EXECUTION_SCHEME=/s/=/=\"/' -e '/EXECUTION_SCHEME=/s/$/\"/' -e '/EXECUTION_SCHEME=/s/=";/="/' "$1"
 	fi
@@ -2670,7 +2670,7 @@ function analyze_paramters {
 			if ! analyze_path "${hierarchy/$PWD/}" "$peek"
 			then
 				tput setaf $SEVERITY_HIGH
-				echo "Analyzing path failed: $path" >&2
+				echo "Operation failed: $source" >&2
 				tput sgr0
 			fi
 		done
