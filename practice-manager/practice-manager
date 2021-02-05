@@ -20,7 +20,7 @@ main_configuration=\
 ## How program should be treated
 ## Available items:
 ### object, source, headers, location, binary, page,
-### makefile, stepN optionN, extension-xyz
+### makefile, stepN optionN, extension-xyz, screenshot, error
 #EXECUTION_SCHEME=
 
 ## Whether all sources in one line of .index file should appear in linkage
@@ -634,12 +634,12 @@ function generate_html_screenshot {
 		cp "$image" "./html-files${image_alias#./html-files}"
 		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${source##*/} Screenshot\">" >&3
 		tput setaf $SEVERITY_LOW
-		echo "screenshot linked: $page_alias"
+		echo "Screenshot linked: $page_alias"
 		tput sgr0
 	else
 		echo "<b>Screenshot Not Found</b>" >&3
 		tput setaf $SEVERITY_HIGH
-		echo "image not found: $source"
+		echo "Image not found: $source"
 		tput sgr0
 		return 1
 	fi
@@ -748,7 +748,7 @@ function regenerate_configuration {
 		sed -i -e '/EXECUTION_SCHEME=/s/=/=\"/' -e '/EXECUTION_SCHEME=/s/$/\"/' -e '/EXECUTION_SCHEME=/s/=";/="/' "$1"
 	fi
 
-	if ! grep -wq '^#EXECUTION_SCHEME=""' "$1"
+	if ! grep -wq '^#EXECUTION_SCHEME=$' "$1"
 	then
 		sed -i "/^#EXECUTION_SCHEME=/s/^#//" "$1"
 	fi
@@ -2689,7 +2689,7 @@ function analyze_paramters {
 
 if [ -f ./.config ] && [ ./.index ]
 then
-	validation_check=202102032136
+	validation_check=202102051426
 	source ./.config
 	if [ "${VALIDATION_ID:-0}" -lt "$validation_check" ]
 	then
