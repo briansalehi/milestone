@@ -674,9 +674,7 @@ function generate_configuration {
 		return 1
 	fi
 
-	cat << EOF > "$page"
-$main_configuration
-EOF
+	echo "$main_configuration" > "$page"
 }
 
 # requires path to config
@@ -684,7 +682,7 @@ function regenerate_configuration {
 	if [ "${1##*.}" != "config" ]
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "invalid configuration to regenerate"
+		echo "Invalid configuration to regenerate: $1" >&2
 		tput sgr0
 		return 1
 	elif ! [ -f "$1" ]
@@ -692,21 +690,22 @@ function regenerate_configuration {
 		touch "$1"
 	fi
 
-	local line=
-	local config=
-	local value=
-	local target_config="$(grep '^[^# ]' "$1")"
+	update_configuration "${1%*/}"
 
+	local target_config="$(grep '^[^# ]' "$1")"
 	generate_configuration "$1"
 
+	# backward compatibility section
+	# if configs name are changed, map their values into new ones
+	local line
+	local config
+	local value
 	while read -r line
 	do
 		config="${line%%=*}" # read configuration name
 		value="${line#*=}" # read configuration value
-		value="${value%%#*}" # ignore inline comments
+		value="${value%%#*}" # ignore inline comments in values
 
-		# backward compatibility section
-		# if configs name are changed, map their values into new ones
 		case "$config" in
 			GENERATES_ERROR) config="GENERATES_RUNTIME_ERROR" ;;
 			LANGUAGE) config="SYNTAX" ;;
@@ -753,6 +752,32 @@ function regenerate_configuration {
 	then
 		sed -i "/^#EXECUTION_SCHEME=/s/^#//" "$1"
 	fi
+
+	# update commented configuration values
+	local line
+	local config
+	local value
+	while read -r line
+	do
+		config="${line%%=*}" # read configuration name
+		config="${config#\#}" # eliminate first # character
+		value="${line#*=}" # read configuration value
+		value="${value%%#*}" # ignore inline comments in values
+
+		case "$config" in
+			SYNTAX) value="\"$SYNTAX\"" ;;
+			EXECUTION_SCHEME) value="\"$EXECUTION_SCHEME\"" ;;
+			PAGE_TEMPLATE) value="\"$PAGE_TEMPLATE\"" ;;
+			CHAPTER_TEMPLATE) value="\"$CHAPTER_TEMPLATE\"" ;;
+			INCLUDES) value="$INCLUDES" ;;
+			OUTPUT_OBJECT) value="$OUTPUT_OBJECT" ;;
+			CAPTURE_SCREENSHOT) value="$CAPTURE_SCREENSHOT" ;;
+			RUN_IN_BACKGROUND) value="$RUN_IN_BACKGROUND" ;;
+			TECHNICAL_LEVEL) value="$TECHNICAL_LEVEL" ;;
+		esac
+
+		sed -i "/^#${config}=/s/^\(#${config}\)=.*/\1=${value}/" "$1"
+	done <<< "$(grep '^#[A-Z]' "$1")"
 }
 
 # requires path to page
@@ -858,7 +883,7 @@ function validate_configuration {
 	done < "$1"
 }
 
-# requires path to source to configure corresponding variables
+# requires path to source
 function update_configuration {
 	local directory
 	local config
@@ -2690,7 +2715,7 @@ function analyze_paramters {
 
 if [ -f ./.config ] && [ ./.index ]
 then
-	validation_check=202102051426
+	validation_check=202102081916
 	source ./.config
 	if [ "${VALIDATION_ID:-0}" -lt "$validation_check" ]
 	then
