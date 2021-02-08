@@ -617,7 +617,8 @@ function generate_html_image {
 	else
 		echo "<b>Image Not Found</b>" >&3
 		tput setaf $SEVERITY_HIGH
-		echo "Image not found: $source"
+		echo "Image not found: $source" >&2
+		echo "    Image: $image" >&2
 		tput sgr0
 		return 1
 	fi
@@ -2577,7 +2578,7 @@ function execute_program {
 			then
 				return 1
 			fi
-		done <<< "$EXECUTION_SCHEME"
+		done <<< "${EXECUTION_SCHEME//;/$'\n'}"
 	else
 		tput setaf $SEVERITY_LOW
 		echo "Source not flagged as executable: $source" >&2
