@@ -2030,12 +2030,15 @@ function expand_list {
 					continue 2
 				fi
 			done
+			validate_page $group
 			generate_page $group
 		elif [ -f "$directory/$line" ] && [ "$line" != "README.md" ]
 		then
+			validate_page "$directory/$line"
 			generate_page "$directory/$line"
 		elif [ -f "$directory/$line" ] && [ "$line" = "README.md" ]
 		then
+			validate_chapter "$directory"
 			generate_chapter "$directory/$line"
 		elif [ -d "$directory/$line" ]
 		then
@@ -2717,7 +2720,13 @@ if [ -f ./.config ] && [ ./.index ]
 then
 	validation_check=202102081916
 	source ./.config
-	if [ "${VALIDATION_ID:-0}" -lt "$validation_check" ]
+	if [ "${VALIDATION_ID:-0}" -eq "0" ]
+	then
+		tput setaf $SEVERITY_HIGH
+		echo "Run in the top practice directory!" >&2
+		tput sgr0
+		exit 1
+	elif [ "${VALIDATION_ID:-0}" -lt "$validation_check" ]
 	then
 		tput setaf $SEVERITY_LOW
 		echo "configuring repository for the latest update..." >&2
