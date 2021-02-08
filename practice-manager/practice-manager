@@ -1012,7 +1012,7 @@ function build_scheme {
 			return 1
 		fi
 
-		if [ -s "$execution_error" ]
+		if ! [ -s "$execution_error" ]
 		then
 			rm "$execution_error"
 		fi
