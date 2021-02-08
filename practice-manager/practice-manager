@@ -1020,6 +1020,7 @@ function build_scheme {
 		tput setaf $SEVERITY_LOW
 		echo "No changes since last execution: $1" >&2
 		tput sgr0
+		return 1
 	fi
 }
 
