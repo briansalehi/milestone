@@ -19,7 +19,7 @@ main_configuration=\
 
 ## How program should be treated
 ## Available items:
-### object, source, headers, location, binary, page,
+### object, source, headers, location, binary, page, input
 ### makefile, stepN optionN, extension-xyz, screenshot, error
 #EXECUTION_SCHEME=
 
@@ -921,6 +921,7 @@ function create_command_scheme {
 		case "$component" in
 			object) command_scheme+="${source%.*}${OUTPUT_OBJECT:-.o} " ;;
 			source) command_scheme+="${source} " ;;
+			input) command_scheme+="< ${source%.*}.input.txt ";;
 			binary) command_scheme+="${source%.*}.bin " ;;
 			headers) command_scheme+="$headers " ;;
 			page|pagename|rawname) command_scheme+="${source%.*} " ;;
@@ -989,32 +990,37 @@ function build_scheme {
 		then
 			unset GENERATES_SCREENSHOT
 			capture_screenshot "$source" 2>/dev/null
-		elif [ "${GENERATES_EXECUTION_ERROR:-false}" == "true" ] && ! $command_scheme &> "$output"
-		then
-			unnset GENERATES_EXECUTION_ERROR
-			tput setaf $SEVERITY_LOW
-			echo "Intentional execution error: $1" >&2
-			tput sgr0
-			return 1
-		elif ! $command_scheme 1> "$output" 2> "$execution_error"
-		then
-			tput setaf $SEVERITY_HIGH
-			echo "Execution error: $1" >&2
-			echo "    Command: $command_scheme" >&2
-			echo "    Reason: $execution_error" >&2
-			tput sgr0
-			return 1
 		else
-			tput setaf $SEVERITY_HIGH
-			echo "Missing execution step: $1" >&2
-			echo "    Command: $command_scheme" >&2
-			tput sgr0
-			return 1
+			if [ "${GENERATES_EXECUTION_ERROR:-false}" == "true" ]
+			then
+				if ! eval "$command_scheme" &> "$output"
+				then
+					unset GENERATES_EXECUTION_ERROR
+					tput setaf $SEVERITY_LOW
+					echo "Intentional execution error: $1" >&2
+					tput sgr0
+				fi
+			else
+				if ! eval "$command_scheme" 1> "$output" 2> "$execution_error"
+				then
+					tput setaf $SEVERITY_HIGH
+					echo "Execution error: $1" >&2
+					echo "    Command: $command_scheme" >&2
+					echo "    Reason: $execution_error" >&2
+					tput sgr0
+					return 1
+				fi
+			fi
 		fi
 
 		if ! [ -s "$execution_error" ]
 		then
 			rm "$execution_error"
+		fi
+
+		if ! [ -s "$output" ]
+		then
+			rm "$output"
 		fi
 	else
 		tput setaf $SEVERITY_LOW
@@ -1210,7 +1216,7 @@ function capture_screenshot {
 			if [ "$lifetime" -gt 50 ]
 			then
 				tput setaf $SEVERITY_HIGH
-				echo "screenshot session timed out: $source"
+				echo "Screenshot session timed out: $source" >&2
 				tput sgr0
 				return 1
 			fi
@@ -1223,25 +1229,28 @@ function capture_screenshot {
 			if kill "$pid" &>/dev/null
 			then
 				tput setaf $SEVERITY_LOW
-				echo "screenshot captured: ${imagefile}"
+				echo "Screenshot captured: ${imagefile}" >&2
 				tput sgr0
 			else
 				tput setaf $SEVERITY_HIGH
-				echo "failed to kill process after screenshot: $source"
+				echo "Failed to kill process after screenshot: $source" >&2
 				tput sgr0
 				rm -f "${source%.*}.screenshot.png"
+				return 1
 			fi
 		else
 			tput setaf $SEVERITY_HIGH
-			echo "screenshot tool (gnome-screenshot) failed to run: $source"
+			echo "Screenshot tool (gnome-screenshot) failed to run: $source" >&2
 			tput sgr0
 			rm -f "${source%.*}.screenshot.png"
+			return 1
 		fi
 	else
 		tput setaf $SEVERITY_HIGH
-		echo "failed to run program for screenshot: $source"
+		echo "Failed to run program for screenshot: $source" >&2
 		tput sgr0
 		rm -f "${source%.*}.screenshot.png"
+		return 1
 	fi
 }
 
