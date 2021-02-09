@@ -1322,7 +1322,7 @@ function generate_reference_section {
 	while read -r line
 	do
 		generate_html_item "$line" list-group-item
-	done < "$reference"
+	done <<< "$(grep -v '^#' $reference)"
 
 	generate_html_list end
 }
