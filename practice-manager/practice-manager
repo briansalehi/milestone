@@ -649,6 +649,32 @@ function generate_html_screenshot {
 # required functions for managing practice pages
 ###############################################################################
 
+# requires path to reference file
+function inherit_references {
+	local temp="$(mktemp)"
+
+	local reference
+	local reference_path
+	local hierarchy="."
+	for reference_path in ${1//\//$'\n'}
+	do
+		hierarchy="${hierarchy}/${reference_path}"
+
+		if [ -d "$hierarchy" ]
+		then
+			reference="${hierarchy}/README.reference.txt"
+			if [ -s "$reference" ]
+			then
+				cat "$reference" >> "$temp"
+			fi
+		fi
+		unset reference_path
+		unset reference
+	done
+	sed -e 's/:.*$/:/' -e 's/^/#/' "$temp" | sort | uniq > "$1"
+	rm -f "$temp"
+}
+
 # requires path to page
 function extract_configuration {
 	if [ -f "${1%.*}.config" ]
@@ -710,7 +736,7 @@ function regenerate_configuration {
 			GENERATES_ERROR) config="GENERATES_RUNTIME_ERROR" ;;
 			LANGUAGE) config="SYNTAX" ;;
 			CHAPTER_TEMPLATE)
-				if [ "$validation_check" == "202012271813" ] && [ "$(grep "toc" <<< "$value")" == "" ]
+				if [ "${validation_check:-0}" == "202012271813" ] && [ "$(grep "toc" <<< "$value")" == "" ]
 				then
 					value="${value%\"} toc\""
 				fi ;;
@@ -743,7 +769,7 @@ function regenerate_configuration {
 		sed -i "/^#${config}=/s/^#\(${config}\)=.*/\1=${value}/" "$1"
 	done <<< "$target_config"
 
-	if [ "$validation_check" -lt "202102032136" ]
+	if [ "${validation_check:-0}" -lt "202102032136" ]
 	then
 		sed -i -e '/EXECUTION_SCHEME=/s/=/=\"/' -e '/EXECUTION_SCHEME=/s/$/\"/' -e '/EXECUTION_SCHEME=/s/=";/="/' "$1"
 	fi
@@ -791,18 +817,23 @@ function validate_page {
 
 		if ! [ -f "$page" ]
 		then
-			if [ "$extension" = "config" ]
-			then
-				generate_configuration "$1"
-				regenerate_configuration "$page"
-			else
-				touch "$page"
-			fi
+			touch "$page"
+
+			case "$extension" in
+				config)
+					generate_configuration "$1"
+					regenerate_configuration "$page"
+					;;
+				reference.txt)
+					inherit_references "$page"
+					;;
+			esac
 		else
-			if [ "$extension" = "config" ]
-			then
-				regenerate_configuration "$page"
-			fi
+			case "$extension" in
+				config)
+					regenerate_configuration "$page"
+					;;
+			esac
 		fi
 	done
 }
@@ -2069,7 +2100,7 @@ function generate_manuals {
 	if ! [ -f "$1" ]
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "not a practice directory" >&2
+		echo "Not a practice directory!" >&2
 		tput sgr0
 		return 1
 	fi
@@ -2155,7 +2186,7 @@ function add_chapter {
 	elif ! [ -d "$location" ]
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "location must be a directory: $location" >&2
+		echo "Location must be a directory: $location" >&2
 		tput sgr0
 		return 1
 	fi
@@ -2165,6 +2196,7 @@ function add_chapter {
 	then
 		generate_configuration "${location}"
 		extract_configuration "${location}"
+		sed -i '/VALIDATION_ID=/s/0/1/' "${location}/.config"
 		echo "README.md" > "${location}/.index"
 		validate_chapter "${location}"
 	fi
@@ -2172,7 +2204,7 @@ function add_chapter {
 
 	mkdir "${location}/${chapter_name}"
 	validate_chapter "${location}/${chapter_name}"
-	echo "chapter created: ${location}/${chapter_name}"
+	echo "Chapter created: ${location}/${chapter_name}"
 }
 
 # requires relative path to practice location
@@ -2180,14 +2212,14 @@ function join_page {
 	# index page
 	echo "${1##*/}" >> "${1%/*}/.index"
 	validate_page "$1"
-	echo "practice joined: $1"
+	echo "Practice joined: $1"
 }
 
 function join_chapter {
 	# index chapter
 	echo "${1##*/}" >> "${1%/*}/.index"
 	validate_chapter "$1"
-	echo "chapter joined: $1"
+	echo "Chapter joined: $1"
 }
 
 # requires path to page
@@ -2199,11 +2231,11 @@ function remove_page {
 	if [ -f "${location}/.index" ]
 	then
 		sed -i "/^${page}.*$/d" "${location}/.index"
-		echo "practice unlinked"
-		echo "you can rejoin this practice again by running \`${0##*/} $1\`"
+		echo "Practice unlinked"
+		echo "You can rejoin this practice again by running \`${0##*/} $1\`"
 	else
 		tput setaf $SEVERITY_HIGH
-		echo "practice page does not exist: ${1/$PWD\//}" >&2
+		echo "Practice page does not exist: ${1/$PWD\//}" >&2
 		tput sgr0
 		return 1
 	fi
@@ -2221,12 +2253,12 @@ function remove_chapter {
 		if [ -f "${location}/.index" ]
 		then
 			sed -i "/^${chapter}$/d" "${location}/.index"
-			echo "chapter unlinked"
-			echo "you can rejoin this chapter later by running \`${0##*/} $1\`"
+			echo "Chapter unlinked"
+			echo "You can rejoin this chapter later by running \`${0##*/} $1\`"
 		fi
 	else
 		tput setaf $SEVERITY_HIGH
-		echo "chapter does not exist: ${1/$PWD\//}" >&2
+		echo "Chapter does not exist: ${1/$PWD\//}" >&2
 		tput sgr0
 		return 1
 	fi
@@ -2243,7 +2275,7 @@ function rename_page {
 	if [ "$source" = "$destination" ] && [ "${1##*.}" != "${2##*.}" ]
 	then
 		mv "$1" "$2"
-		echo "changed page extension from:"
+		echo "Changed page extension from:"
 		echo "    ${1##*.}"
 		echo "to"
 		echo "    ${2##*.}"
@@ -2255,7 +2287,7 @@ function rename_page {
 			mv "$match" "${destination}.${extension}"
 		done
 
-		echo "renamed page from:"
+		echo "Renamed page from:"
 		echo "    $1"
 		echo "to"
 		echo "    $2"
@@ -2271,13 +2303,13 @@ function rename_chapter {
 	if mv "$source" "$destination"
 	then
 		sed -i "s/^${source##*/}$/${destination##*/}/" "${source%/*}/.index"
-		echo "chapter renamed from:"
+		echo "Chapter renamed from:"
 		echo "    $1"
 		echo "to"
 		echo "    $2"
 	else
 		tput setaf $SEVERITY_HIGH
-		echo "failed to rename chapter: $source" >&2
+		echo "Failed to rename chapter: $source" >&2
 		tput sgr0
 		return 1
 	fi
@@ -2300,7 +2332,7 @@ function move_page {
 
 		sed -i "s/^${1##*/}$/${2##*/}/" "${1%/*}/.index"
 		echo "${2##*/}" >> "${2%/*}/.index"
-		echo "page moved from:"
+		echo "Page moved from:"
 		echo "    $1"
 		echo "to"
 		echo "    $2"
@@ -2312,12 +2344,12 @@ function move_page {
 			join_page "${destination%/}/${source##*/}"
 		else
 			tput setaf $SEVERITY_HIGH
-			echo "failed to move source: $source" >&2
+			echo "Failed to move source: $source" >&2
 			tput sgr0
 		fi
 	else
 		tput setaf $SEVERITY_HIGH
-		echo "page not indexed: $source" >&2
+		echo "Page not indexed: $source" >&2
 		tput sgr0
 	fi
 }
@@ -2336,7 +2368,7 @@ function move_chapter {
 	if ! [ -d "$source" ] && [ -d "${destination%/*}" ]
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "source or destination does not exist!" >&2
+		echo "Source or destination does not exist!" >&2
 		tput sgr0
 		return 1
 	fi
@@ -2354,7 +2386,7 @@ function move_chapter {
 			fi
 		else
 			tput setaf $SEVERITY_HIGH
-			echo "failed to move!" >&2
+			echo "Failed to move!" >&2
 			tput sgr0
 		fi
 	else
@@ -2369,7 +2401,7 @@ function move_chapter {
 			fi
 		else
 			tput setaf $SEVERITY_HIGH
-			echo "failed to move!" >&2
+			echo "Failed to move!" >&2
 			tput sgr0
 		fi
 
@@ -2393,13 +2425,13 @@ function swap_page {
 			sed -i "${source_index}i ${2##*/}" "${location}/.index"
 		else
 			tput setaf $SEVERITY_HIGH
-			echo "location not indexed: $location" >&2
+			echo "Location not indexed: $location" >&2
 			tput sgr0
 			return 1
 		fi
 	else
 		tput setaf $SEVERITY_HIGH
-		echo "locations are not equal: $location" >&2
+		echo "Locations are not equal: $location" >&2
 		tput sgr0
 		return 1
 	fi
@@ -2433,8 +2465,9 @@ function swap_chapter {
 		fi
 	else
 		tput setaf $SEVERITY_HIGH
-		echo "source or destination does not exist"
+		echo "Source or destination does not exist" >&2
 		tput sgr0
+		return 1
 	fi
 }
 
@@ -2471,7 +2504,7 @@ function move_files {
 				# destination exists, swap chapter [move for now]
 				if [ -d "$destination" ]
 				then
-					echo "moving chapter"
+					echo "Moving chapter"
 					move_chapter "$source" "$destination"
 				# destination does not exist, rename chapter
 				else
@@ -2482,19 +2515,19 @@ function move_files {
 				# destination exists, move chapter to destination
 				if [ -d "$destination" ]
 				then
-					echo "moving chapter"
+					echo "Moving chapter"
 					move_chapter "$source" "$destination"
 				# destination does not exist, move chapter to destination location and rename source with destination
 				else
-					echo "moving and renaming chapter"
+					echo "Moving and renaming chapter"
 					move_chapter "$source" "$destination"
 				fi
 			fi
 		else
 			tput setaf $SEVERITY_HIGH
-			echo "invalid locations given:" >&2
-			echo "  source: $source" >&2
-			echo "  destination: $destination" >&2
+			echo "Invalid locations given:" >&2
+			echo "    Source: $source" >&2
+			echo "    Destination: $destination" >&2
 			tput sgr0
 			return 1
 		fi
@@ -2507,7 +2540,7 @@ function move_files {
 			# destination exists, swap page
 			if [ -f "$destination" ]
 			then
-				echo "swaping page"
+				echo "Swaping page"
 				swap_page "$source" "$destination"
 			# destination doesn't exist, rename page
 			else
@@ -2519,12 +2552,12 @@ function move_files {
 			if [ -f "$destination" ]
 			then
 				tput setaf $SEVERITY_HIGH
-				echo "destination exists, cannot overwrite." >&2
+				echo "Destination exists, cannot overwrite." >&2
 				tput sgr0
 				return 1
 			# destination doesn't exist, move page to destination
 			else
-			echo "moving page to: $destination"
+			echo "Moving page to: $destination"
 				move_page "$source" "$destination"
 			fi
 		fi
@@ -2534,18 +2567,18 @@ function move_files {
 		# destination directory must exist
 		if [ -d "${destination}" ]
 		then
-			echo "moving page to: $destination"
+			echo "Moving page to: $destination"
 			move_page "$source" "$destination"
 		else
 			tput setaf $SEVERITY_HIGH
-			echo "destination directory does not exist: $destination" >&2
+			echo "Destination directory does not exist: $destination" >&2
 			tput sgr0
 			return 1
 		fi
 	# otherwise error invalid source
 	else
 		tput setaf $SEVERITY_HIGH
-		echo "invalid destination: $destination" >&2
+		echo "Invalid destination: $destination" >&2
 		tput sgr0
 		return 1
 	fi
@@ -2566,7 +2599,7 @@ function reorder_index {
 		index_file="${location%/*}/.index"
 	else
 		tput setaf $SEVERITY_HIGH
-		echo "invalid path: $location" >&2
+		echo "Invalid path: $location" >&2
 		tput sgr0
 		return 1
 	fi
@@ -2584,13 +2617,13 @@ function reorder_index {
 				break
 			else
 				tput setaf $SEVERITY_HIGH
-				echo "invalid number"
+				echo "Invalid number" >&2
 				tput sgr0
 			fi
 		done
 	else
 		tput setaf $SEVERITY_HIGH
-		echo "not indexed: $1" >&2
+		echo "Not indexed: $1" >&2
 		tput sgr0
 		return 1
 	fi
@@ -2683,8 +2716,8 @@ function analyze_paramters {
 			return 0
 		else
 			tput setaf $SEVERITY_HIGH
-			echo "practice directory not initialized yet"
-			echo "run \`${0##*/} --help\`"
+			echo "Practice directory not initialized yet" >&2
+			echo "Run \`${0##*/} --help\`" >&2
 			tput sgr0
 			return 1
 		fi
