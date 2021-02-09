@@ -794,6 +794,7 @@ function validate_page {
 			if [ "$extension" = "config" ]
 			then
 				generate_configuration "$1"
+				regenerate_configuration "$page"
 			else
 				touch "$page"
 			fi
