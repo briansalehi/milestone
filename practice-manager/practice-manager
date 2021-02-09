@@ -671,7 +671,7 @@ function inherit_references {
 		unset reference_path
 		unset reference
 	done
-	sed -e 's/:.*$/:/' -e 's/^/#/' "$temp" | sort | uniq > "$1"
+	sed -e 's/:.*$//' -e 's/$/:/' -e 's/^/#/' "$temp" | sort | uniq > "$1"
 	rm -f "$temp"
 }
 
@@ -1048,11 +1048,6 @@ function build_scheme {
 		if ! [ -s "$execution_error" ]
 		then
 			rm "$execution_error"
-		fi
-
-		if ! [ -s "$output" ]
-		then
-			rm "$output"
 		fi
 	else
 		tput setaf $SEVERITY_LOW
