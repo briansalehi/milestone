@@ -1008,10 +1008,22 @@ function build_scheme {
 	local source_change_time=$(stat -c "%Y" "$source" 2>/dev/null)
 	local output_change_time=$(stat -c "%Y" "$output" 2>/dev/null)
 
+	local output_file_required=false
+	local template
+	if grep -wq 'output' <<< "$PAGE_TEMPLATE"
+	then
+		if ! [ -f "$output" ]
+		then
+			output_file_required=true
+		fi
+	else
+		output_change_time=$source_change_time
+	fi
+
 	# build compilation scheme
 	create_command_scheme "$scheme" "$source" "$headers"
 
-	if ! [ -f "$output" ] \
+	if [ "${output_file_required:-false}" == "true" ] \
 		|| [ "${source_change_time:-0}" -gt "${output_change_time:-0}" ] \
 		|| [ "${FORCE_COMPILE:-false}" == "true" ]
 	then
