@@ -1049,6 +1049,11 @@ function build_scheme {
 		then
 			rm "$execution_error"
 		fi
+
+		if ! [ -s "$output" ]
+		then
+			rm "$output"
+		fi
 	else
 		tput setaf $SEVERITY_LOW
 		echo "No changes since last execution: $1" >&2
