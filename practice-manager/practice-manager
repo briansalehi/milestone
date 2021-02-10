@@ -769,10 +769,12 @@ function regenerate_configuration {
 		sed -i "/^#${config}=/s/^#\(${config}\)=.*/\1=${value}/" "$1"
 	done <<< "$target_config"
 
-	if [ "${validation_check:-0}" -lt "202102032136" ]
-	then
-		sed -i -e '/EXECUTION_SCHEME=/s/=/=\"/' -e '/EXECUTION_SCHEME=/s/$/\"/' -e '/EXECUTION_SCHEME=/s/=";/="/' "$1"
-	fi
+	sed -i \
+		-e '/EXECUTION_SCHEME=/s/=\([^\"]\)/=\"\1/' \
+		-e '/EXECUTION_SCHEME=/s/\([^=\"]\)$/\1\"/' \
+		-e '/EXECUTION_SCHEME=/s/;;/;/g' \
+		-e '/EXECUTION_SCHEME=/s/=";/="/' \
+		"$1"
 
 	if ! grep -wq '^#EXECUTION_SCHEME=$' "$1"
 	then
