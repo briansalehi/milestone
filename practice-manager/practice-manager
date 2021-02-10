@@ -15,6 +15,7 @@ main_configuration=\
 ## Available items:
 ### navigation title comment reference source execution input output error pagination
 #PAGE_TEMPLATE=\"navigation title comment reference source execution input output error pagination\"
+### navigation title comment reference pagination toc
 #CHAPTER_TEMPLATE=\"navigation title comment reference pagination toc\"
 
 ## How program should be treated
@@ -2776,7 +2777,7 @@ function analyze_paramters {
 
 if [ -f ./.config ] && [ ./.index ]
 then
-	validation_check=202102090047
+	validation_check=202102102224
 	source ./.config
 	if [ "${VALIDATION_ID:-0}" -eq "0" ]
 	then
