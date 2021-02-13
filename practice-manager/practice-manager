@@ -30,7 +30,7 @@ main_configuration=\
 
 ## File extensions used in different systems, e.g. .exe
 ### default output object is set to .o
-### default executable extension is unset
+### default executable extension is set to .bin
 #OUTPUT_OBJECT=
 #EXECUTABLE_EXTENSION=
 
@@ -959,7 +959,7 @@ function create_command_scheme {
 			object) command_scheme+="${source%.*}${OUTPUT_OBJECT:-.o} " ;;
 			source) command_scheme+="${source} " ;;
 			input) command_scheme+="< ${source%.*}.input.txt ";;
-			binary) command_scheme+="${source%.*}${EXECUTABLE_EXTENSION:-} " ;;
+			binary) command_scheme+="${source%.*}${EXECUTABLE_EXTENSION:-.bin} " ;;
 			headers) command_scheme+="$headers " ;;
 			page|pagename|rawname) command_scheme+="${source%.*} " ;;
 			location) command_scheme+="${source%/*} " ;;
@@ -1253,15 +1253,15 @@ function capture_screenshot {
 	local source="$1"
 	local imagefile="${source%.*}.screenshot.png"
 
-	local binary="${source%.*}"
-	binary="${binary##*/}"
+	local binary="${source%.*}${EXECUTABLE_EXTENSION:-.bin}"
+	local process="${binary##*/}"
 
-	if [ -f "${source%.*}" ] && ${source%.*} &>/dev/null &
+	if [ -f "$binary" ] && $binary &>/dev/null &
 	then
 		local lifetime=0
 		local pid=
 
-		while ! pid=$(pgrep "$binary"); do
+		while ! pid=$(pgrep "$process"); do
 			if [ "$lifetime" -gt 50 ]
 			then
 				tput setaf $SEVERITY_HIGH
