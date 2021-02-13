@@ -28,9 +28,11 @@ main_configuration=\
 ## usually other files are headers only and won't need to be linked to source
 #INCLUDES=false
 
-## What is the extension of the object which compiler throws?
-## Default is set to .o
+## File extensions used in different systems, e.g. .exe
+### default output object is set to .o
+### default executable extension is unset
 #OUTPUT_OBJECT=
+#EXECUTABLE_EXTENSION=
 
 ## Some programs are based on GUI, you can capture a screenshot as output
 #CAPTURE_SCREENSHOT=false
@@ -957,7 +959,7 @@ function create_command_scheme {
 			object) command_scheme+="${source%.*}${OUTPUT_OBJECT:-.o} " ;;
 			source) command_scheme+="${source} " ;;
 			input) command_scheme+="< ${source%.*}.input.txt ";;
-			binary) command_scheme+="${source%.*}.bin " ;;
+			binary) command_scheme+="${source%.*}${EXECUTABLE_EXTENSION:-} " ;;
 			headers) command_scheme+="$headers " ;;
 			page|pagename|rawname) command_scheme+="${source%.*} " ;;
 			location) command_scheme+="${source%/*} " ;;
@@ -1254,7 +1256,7 @@ function capture_screenshot {
 	local binary="${source%.*}"
 	binary="${binary##*/}"
 
-	if [ -f "${source%.*}.bin" ] && ${source%.*}.bin &>/dev/null &
+	if [ -f "${source%.*}" ] && ${source%.*} &>/dev/null &
 	then
 		local lifetime=0
 		local pid=
@@ -1519,25 +1521,22 @@ function generate_output_section {
 		generate_page_name "${page}.png"
 		find_index_alias "$page_index"
 		generate_html_screenshot "$1"
-	elif [ -f "$output" ]
+	elif [ -s "$output" ]
 	then
-		if ! [ -s "$output" ]
+		generate_html_code begin language-${SYNTAX:-txt}
+
+		local line
+		while read -r line
+		do
+			echo "$line" >&3
+		done < "$output"
+
+		if [ "$(wc -l < "$output")" -eq 0 ]
 		then
-			generate_html_code begin language-txt
-
-			local line
-			while read -r line
-			do
-				echo "$line" >&3
-			done < "$output"
-
-			if [ "$(wc -l < "$output")" -eq 0 ]
-			then
-				echo >> "$output"
-			fi
-
-			generate_html_code end
+			echo >> "$output"
 		fi
+
+		generate_html_code end
 	else
 		tput setaf $SEVERITY_HIGH
 		echo "Output file not found: $output" >&2
@@ -2777,7 +2776,7 @@ function analyze_paramters {
 
 if [ -f ./.config ] && [ ./.index ]
 then
-	validation_check=202102102224
+	validation_check=202102131125
 	source ./.config
 	if [ "${VALIDATION_ID:-0}" -eq "0" ]
 	then
