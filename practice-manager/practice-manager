@@ -1541,6 +1541,7 @@ function generate_output_section {
 		tput setaf $SEVERITY_HIGH
 		echo "Output file not found: $output" >&2
 		tput sgr0
+		return 1
 	fi
 }
 
