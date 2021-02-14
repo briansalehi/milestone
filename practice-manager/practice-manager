@@ -678,6 +678,7 @@ function inherit_references {
 	grep -v '^#' "$temp" | sed -e 's/:.*$//' | sort | uniq > "$sorted"
 	sed 's/:.*$/:/' "$1" >> "$sorted"
 	grep -v -x -f "$1" "$sorted" > "$temp"
+	sed -i 's/^/#/' "$temp"
 	if [ -s "$temp" ]
 	then
 		cat "$temp" "$1" > "$sorted"
