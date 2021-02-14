@@ -655,6 +655,7 @@ function generate_html_screenshot {
 # requires path to reference file
 function inherit_references {
 	local temp="$(mktemp)"
+	local sorted="$(mktemp)"
 
 	local reference
 	local reference_path
@@ -674,8 +675,15 @@ function inherit_references {
 		unset reference_path
 		unset reference
 	done
-	sed -e 's/:.*$//' -e 's/$/:/' -e 's/^/#/' "$temp" | sort | uniq > "$1"
-	rm -f "$temp"
+	grep -v '^#' "$temp" | sed -e 's/:.*$//' | sort | uniq > "$sorted"
+	sed 's/:.*$/:/' "$1" >> "$sorted"
+	grep -v -x -f "$1" "$sorted" > "$temp"
+	if [ -s "$temp" ]
+	then
+		cat "$temp" "$1" > "$sorted"
+		sort "$sorted" > "$1"
+	fi
+	rm -f "$temp" "$sorted"
 }
 
 # requires path to page
@@ -863,24 +871,31 @@ function validate_chapter {
 	do
 		page="${1%/}/README.${extension}"
 
-		if [ "$extension" = "config" ]
-		then
-			# update configuration of readme
-			regenerate_configuration "$page"
-		elif ! [ -f "$page" ]
-		then
-			if [ "$extension" = "md" ]
-			then
-				echo -e "# Milestone Notebooks\n" > "$page"
-				echo -n "This file is automatically created by " >> "$page"
-				echo -n "<b>Practice Manager</b> " >> "$page"
-				echo -n "and is part of the " >> "$page"
-			   	echo -n "<a href=\"https://github.com/briansalehi/milestone.git\">" >> "$page"
-				echo -n "<b>Milestone</b></a> project." >> "$page"
-			else
-				touch "$page"
-			fi
-		fi
+		case "$extension" in
+			config)
+				# update configuration of readme
+				regenerate_configuration "$page"
+				;;
+			reference.txt)
+				inherit_references "$page"
+				;;
+			*)
+				if ! [ -f "$page" ]
+				then
+					if [ "$extension" = "md" ]
+					then
+						echo -e "# Milestone Notebooks\n" > "$page"
+						echo -n "This file is automatically created by " >> "$page"
+						echo -n "<b>Milestone's Notebook Manager</b> " >> "$page"
+						echo -n "and is part of the " >> "$page"
+						echo -n "<a href=\"https://milextone.ir\">" >> "$page"
+						echo -n "<b>Milestone</b></a> project." >> "$page"
+					else
+						touch "$page"
+					fi
+				fi
+				;;
+		esac
 	done
 }
 
@@ -894,7 +909,7 @@ function validate_configuration {
 	if ! [ -f "$1" ]
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "unindexed directory: $directory/" >&2
+		echo "Unindexed directory: $directory/" >&2
 		tput sgr0
 		return 1
 	fi
@@ -914,8 +929,9 @@ function validate_configuration {
 			fi
 		else
 			tput setaf $SEVERITY_HIGH
-			echo "missing entry: $directory/$line" >&2
+			echo "Missing entry: $directory/$line" >&2
 			tput sgr0
+			return 1
 		fi
 	done < "$1"
 }
