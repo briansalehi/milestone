@@ -21,7 +21,7 @@ main_configuration=\
 ## How program should be treated
 ## Available items:
 ### object, source, headers, location, binary, page, input
-### makefile, stepN optionN, extension-xyz, screenshot, error
+### makefile, stepN optionN, extension-xyz, screenshot, error, background
 #EXECUTION_SCHEME=
 
 ## Whether all sources in one line of .index file should appear in linkage
@@ -36,12 +36,6 @@ main_configuration=\
 
 ## Some programs are based on GUI, you can capture a screenshot as output
 #CAPTURE_SCREENSHOT=false
-
-## Whether program should be run in the background
-## Suitable for servers and services which need to wait for clients to compile
-## and respond
-## Rationally, servers should be compiled and executed first, then clients
-#RUN_IN_BACKGROUND=false
 
 ## Specify the technical level of this topic
 ## This feature will be used in Milestone technical courses and tutorials
@@ -812,7 +806,6 @@ function regenerate_configuration {
 			INCLUDES) value="$INCLUDES" ;;
 			OUTPUT_OBJECT) value="$OUTPUT_OBJECT" ;;
 			CAPTURE_SCREENSHOT) value="$CAPTURE_SCREENSHOT" ;;
-			RUN_IN_BACKGROUND) value="$RUN_IN_BACKGROUND" ;;
 			TECHNICAL_LEVEL) value="$TECHNICAL_LEVEL" ;;
 		esac
 
@@ -983,12 +976,18 @@ function create_command_scheme {
 			makefile) local makefile="${source%.*}.make"; command_scheme+="${makefile##*/} " ;;
 			extension-*) command_scheme+="${source%.*}.${component#extenion-} " ;;
 			screenshot) GENERATES_SCREENSHOT=true ;;
+			background) RUN_IN_BACKGROUND=true ;;
 			error) GENERATES_EXECUTION_ERROR=true ;;
 			*) command_scheme+="$component " ;;
 		esac
 	done
 	command_scheme="${command_scheme//  / }"
 	command_scheme="${command_scheme% }"
+
+	if [ "${RUN_IN_BACKGROUND:-false}" == "true" ]
+	then
+		command_scheme="${command_scheme} &"
+	fi
 }
 
 # requires path to page
@@ -1045,6 +1044,8 @@ function build_scheme {
 	# build compilation scheme
 	create_command_scheme "$scheme" "$source" "$headers"
 
+	local process_id=
+
 	if [ "${output_file_required:-false}" == "true" ] \
 		|| [ "${source_change_time:-0}" -gt "${output_change_time:-0}" ] \
 		|| [ "${FORCE_COMPILE:-false}" == "true" ]
@@ -1061,21 +1062,33 @@ function build_scheme {
 			then
 				if ! eval "$command_scheme" &> "$output"
 				then
+					process_id="$?"
 					unset GENERATES_EXECUTION_ERROR
 					tput setaf $SEVERITY_LOW
 					echo "Intentional execution error: $1" >&2
 					tput sgr0
+				else
+					process_id="$?"
 				fi
 			else
 				if ! eval "$command_scheme" 1> "$output" 2> "$execution_error"
 				then
+					process_id="$?"
 					tput setaf $SEVERITY_HIGH
 					echo "Execution error: $1" >&2
 					echo "    Command: $command_scheme" >&2
 					echo "    Reason: $execution_error" >&2
 					tput sgr0
 					return 1
+				else
+					process_id="$?"
 				fi
+			fi
+
+			if [ "${RUN_IN_BACKGROUND:-false}" == "true" ]
+			then
+				# wait for background process to finish in 30 seconds
+				kill_process "$process_id" 30 &
 			fi
 		fi
 
@@ -1260,9 +1273,14 @@ function generate_group_badge {
 
 # requies process id to kill
 # requies seconds to wait before strike
-function process_kill {
+function kill_process {
 	sleep "$2"
-	kill -SIGTERM "$1"
+	set -x
+	if [ "$(ps -ef | awk -v pid=$1 '$2 == pid {print $2}')" == "$1" ]
+	then
+		kill -s STOP "$1"
+	fi
+	set +x
 }
 
 # requires source file
