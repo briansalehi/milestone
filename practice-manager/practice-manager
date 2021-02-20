@@ -1037,12 +1037,28 @@ function build_scheme {
 		else
 			if [ "${GENERATES_EXECUTION_ERROR:-false}" == "true" ]
 			then
+				local quarantine_room
+				quarantine_room="$(mktemp -d)"
+				if [ -z "$quarantine_room" ]
+					tput setaf $SEVERITY_HIGH
+					echo "failed to isolate execution" >&2
+					tput sgr0
+				else
+					local working_directory="$(pwd)"
+					cd "$quarantine_room"
+				fi
+
 				if ! eval "$command_scheme" &> "$output"
 				then
 					unset GENERATES_EXECUTION_ERROR
 					tput setaf $SEVERITY_LOW
 					echo "Intentional execution error: $1" >&2
 					tput sgr0
+				fi
+
+				if [ -n "$quarantine_room" ]
+					cd "$working_directory"
+					rm -d "$quarantine_room"
 				fi
 			else
 				if ! eval "$command_scheme" 1> "$output" 2> "$execution_error"
