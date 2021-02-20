@@ -1,51 +1,33 @@
 #!/usr/bin/env bash
 
 main_configuration=\
-"## Syntax name for syntax highlighting
-## Only specify names supported by prism.js
-## List of supported syntaxes:
-### bash c cpp asm6502 java python aspnet csharp cmake django dns-zone docker
-### go hcl ignore javadoc json json5 kotlin latex makefile markdown matlab
-### mongodb nasm nginx objectivec opencl perl php phpdoc plsql powershell
-### processing prolog qml r regex ruby rust scala sql swift typescript
-### verilog vhdl vim wasm
+"## bash c cpp asm6502 java python aspnet csharp cmake django dns-zone docker
+## go hcl ignore javadoc json json5 kotlin latex makefile markdown matlab
+## mongodb nasm nginx objectivec opencl perl php phpdoc plsql powershell
+## processing prolog qml r regex ruby rust scala sql swift typescript
+## verilog vhdl vim wasm
 #SYNTAX=
 
-## Design pages as you want
-## Available items:
-### navigation title comment reference source execution input output error pagination
+## navigation title comment reference source execution input output error pagination
 #PAGE_TEMPLATE=\"navigation title comment reference source execution input output error pagination\"
-### navigation title comment reference pagination toc
+
+## navigation title comment reference pagination toc
 #CHAPTER_TEMPLATE=\"navigation title comment reference pagination toc\"
 
-## How program should be treated
-## Available items:
-### object, source, headers, location, binary, page, input
-### makefile, stepN optionN, extension-xyz, screenshot, error
+## object, source, headers, location, binary, page, input, makefile, stepN optionN, extension-xyz, screenshot, error
 #EXECUTION_SCHEME=
 
-## Whether all sources in one line of .index file should appear in linkage
-## usually other files are headers only and won't need to be linked to source
-#INCLUDES=false
-
-## File extensions used in different systems, e.g. .exe
-### default output object is set to .o
-### default executable extension is set to .bin
+## default: .o
 #OUTPUT_OBJECT=
+
+## default: .bin
 #EXECUTABLE_EXTENSION=
 
-## Some programs are based on GUI, you can capture a screenshot as output
 #CAPTURE_SCREENSHOT=false
 
-## Whether program should be run in the background
-## Suitable for servers and services which need to wait for clients to compile
-## and respond
-## Rationally, servers should be compiled and executed first, then clients
 #RUN_IN_BACKGROUND=false
 
-## Specify the technical level of this topic
-## This feature will be used in Milestone technical courses and tutorials
-## Available items: basic intermediate expert
+## basic intermediate expert
 #TECHNICAL_LEVEL=
 
 ## DO NOT EDIT!
@@ -809,7 +791,6 @@ function regenerate_configuration {
 			EXECUTION_SCHEME) value="\"$EXECUTION_SCHEME\"" ;;
 			PAGE_TEMPLATE) value="\"$PAGE_TEMPLATE\"" ;;
 			CHAPTER_TEMPLATE) value="\"$CHAPTER_TEMPLATE\"" ;;
-			INCLUDES) value="$INCLUDES" ;;
 			OUTPUT_OBJECT) value="$OUTPUT_OBJECT" ;;
 			CAPTURE_SCREENSHOT) value="$CAPTURE_SCREENSHOT" ;;
 			RUN_IN_BACKGROUND) value="$RUN_IN_BACKGROUND" ;;
@@ -1015,11 +996,6 @@ function build_scheme {
 	local source="$1"
 	local scheme="$2"
 
-	if [ "${INCLUDES:-false}" != "true" ]
-	then
-		local headers="$(sed -n "/^${source##*/}/s/${source##*/}\s//p" < "${source%/*}/.index")"
-	fi
-
 	if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
 	then
 		local output="${source%.*}.screenshot.png"
@@ -1042,8 +1018,10 @@ function build_scheme {
 		output_change_time=$source_change_time
 	fi
 
+	local headers="$(sed -n "/^${source##*/}/s/${source##*/}\s//p" < "${source%/*}/.index")"
+
 	# build compilation scheme
-	create_command_scheme "$scheme" "$source" "$headers"
+	create_command_scheme "$scheme" "$source" "${headers:-}"
 
 	if [ "${output_file_required:-false}" == "true" ] \
 		|| [ "${source_change_time:-0}" -gt "${output_change_time:-0}" ] \
@@ -1336,7 +1314,7 @@ function generate_execution_section {
 	local scheme
 	while read -r scheme
 	do
-		create_command_scheme "$scheme" "$source" "$headers"
+		create_command_scheme "$scheme" "$source" "${headers:-}"
 		generate_execution_mode "$source" "${command_scheme//$location\//./}"
 	done <<< "${EXECUTION_SCHEME//;/$'\n'}"
 }
@@ -2794,7 +2772,7 @@ function analyze_paramters {
 
 if [ -f ./.config ] && [ ./.index ]
 then
-	validation_check=202102131125
+	validation_check=202102202058
 	source ./.config
 	if [ "${VALIDATION_ID:-0}" -eq "0" ]
 	then
