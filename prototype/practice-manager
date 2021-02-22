@@ -1062,13 +1062,13 @@ function build_scheme {
 
 				if ! eval "$command_scheme" &> "$output"
 				then
-					process_id="$?"
+					process_id="$!"
 					unset GENERATES_EXECUTION_ERROR
 					tput setaf $SEVERITY_LOW
 					echo "Intentional execution error: $1" >&2
 					tput sgr0
 				else
-					process_id="$?"
+					process_id="$!"
 				fi
 
 				if [ -d "$quarantine_room" ]
@@ -1081,7 +1081,7 @@ function build_scheme {
 			else
 				if ! eval "$command_scheme" 1> "$output" 2> "$execution_error"
 				then
-					process_id="$?"
+					process_id="$!"
 					tput setaf $SEVERITY_HIGH
 					echo "Execution error: $1" >&2
 					echo "    Command: $command_scheme" >&2
@@ -1089,7 +1089,7 @@ function build_scheme {
 					tput sgr0
 					return 1
 				else
-					process_id="$?"
+					process_id="$!"
 				fi
 			fi
 
@@ -1283,12 +1283,10 @@ function generate_group_badge {
 # requies seconds to wait before strike
 function kill_process {
 	sleep "$2"
-	set -x
 	if [ "$(ps -ef | awk -v pid=$1 '$2 == pid {print $2}')" == "$1" ]
 	then
 		kill -s STOP "$1"
 	fi
-	set +x
 }
 
 # requires source file
