@@ -2192,26 +2192,27 @@ function add_page {
 	if [ -z "$location" ]
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "location not given" >&2
+		echo "Location not given" >&2
 		tput sgr0
 		return 1
 	elif [ -z "$practice_name" ]
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "practice name not given" >&2
+		echo "Practice name not given" >&2
 		tput sgr0
 		return 1
 	elif ! [ -d "$location" ]
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "location must be a directory: $location" >&2
+		echo "Location must be a directory: $location" >&2
 		tput sgr0
 		return 1
-	elif [ $(grep -c "^$practice_name$" "${location}/.index") -gt 0 ]
+	elif [ $(grep -c "^${practice_name%%.*}\..*$" "${location}/.index") -gt 0 ]
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "duplicate practice name: $practice_name" >&2
+		echo "Duplicate practice name: $practice_name" >&2
 		tput sgr0
+		return 1
 	fi
 
 	# index practice in corresponding location
@@ -2267,6 +2268,17 @@ function add_chapter {
 
 # requires relative path to practice location
 function join_page {
+	local location="${1%/*}"
+	local practice_name="${1##*/}"
+
+	if [ $(grep -c "^${practice_name%%.*}\..*$" "${location}/.index") -gt 0 ]
+	then
+		tput setaf $SEVERITY_HIGH
+		echo "Duplicate practice name: $practice_name" >&2
+		tput sgr0
+		return 1
+	fi
+
 	# index page
 	echo "${1##*/}" >> "${1%/*}/.index"
 	validate_page "$1"
