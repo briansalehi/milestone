@@ -966,21 +966,13 @@ function create_command_scheme {
 			makefile) local makefile="${source%.*}.make"; command_scheme+="${makefile##*/} " ;;
 			extension-*) command_scheme+="${source%.*}.${component#extenion-} " ;;
 			screenshot) GENERATES_SCREENSHOT=true ;;
-			background) RUN_IN_BACKGROUND=true
-				command_scheme+="1> ${source%.*}.output.txt "
-				command_scheme+="2> ${source%.*}.execution.error.txt "
-				;;
+			background) RUN_IN_BACKGROUND=true ;;
 			error) GENERATES_EXECUTION_ERROR=true ;;
 			*) command_scheme+="$component " ;;
 		esac
 	done
 	command_scheme="${command_scheme//  / }"
 	command_scheme="${command_scheme% }"
-
-	if [ "${RUN_IN_BACKGROUND:-false}" == "true" ]
-	then
-		command_scheme="${command_scheme} &"
-	fi
 }
 
 # requires path to page
@@ -1063,7 +1055,17 @@ function build_scheme {
 					tput sgr0
 				fi
 
-				if ! eval "$command_scheme" &> "$output"
+				if [ "${RUN_IN_BACKGROUND:-false}" == "true" ]
+				then
+					if ! eval "$command_scheme 1> $output 2> $execution_error" &
+					then
+						process_id="$!"
+						unset GENERATES_EXECUTION_ERROR
+						tput setaf $SEVERITY_LOW
+						echo "Intentional execution error: $1" >&2
+						tput sgr0
+					fi
+				elif ! eval "$command_scheme &> $output"
 				then
 					process_id="$!"
 					unset GENERATES_EXECUTION_ERROR
@@ -1082,7 +1084,19 @@ function build_scheme {
 					unset quarantine_room
 				fi
 			else
-				if ! eval "$command_scheme" 1> "$output" 2> "$execution_error"
+				if [ "${RUN_IN_BACKGROUND:-false}" == "true" ]
+				then
+					if ! eval "$command_scheme 1> $output 2> $execution_error" &
+					then
+						process_id="$!"
+						tput setaf $SEVERITY_HIGH
+						echo "Execution error: $1" >&2
+						echo "    Command: $command_scheme" >&2
+						echo "    Reason: $execution_error" >&2
+						tput sgr0
+						return 1
+					fi
+				elif ! eval "$command_scheme 1> $output 2> $execution_error"
 				then
 					process_id="$!"
 					tput setaf $SEVERITY_HIGH
