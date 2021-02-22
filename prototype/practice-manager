@@ -2725,7 +2725,7 @@ function analyze_path {
 
 	# if does not have extension and exists and indexed: check all files within
 	if [ -z "$extension" ] && [ -d "$path" ] && [ -f "${path%/*}/.index" ]\
-		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 1 ]
+		&& [ "$(grep -c "^${path##*/}$" "${path%/*}/.index")" -eq 1 ]
 	then
 		validate_chapter "$path"
 		if [ "$peek" = "true" ]
@@ -2734,7 +2734,7 @@ function analyze_path {
 		fi
 	# if does not have extension and exists but not indexed: check and join
 	elif [ -z "$extension" ] && [ -d "$path" ] && [ -f "${path%/*}/.index" ]\
-		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 0 ]
+		&& [ "$(grep -c "^${path##*/}$" "${path%/*}/.index")" -eq 0 ]
 	then
 		join_chapter "$path"
 	# if does not have extension and does not exist: create chapter
