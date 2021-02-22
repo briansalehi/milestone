@@ -966,7 +966,10 @@ function create_command_scheme {
 			makefile) local makefile="${source%.*}.make"; command_scheme+="${makefile##*/} " ;;
 			extension-*) command_scheme+="${source%.*}.${component#extenion-} " ;;
 			screenshot) GENERATES_SCREENSHOT=true ;;
-			background) RUN_IN_BACKGROUND=true ;;
+			background) RUN_IN_BACKGROUND=true
+				command_scheme+="1> ${source%.*}.output.txt "
+				command_scheme+="2> ${source%.*}.execution.error.txt "
+				;;
 			error) GENERATES_EXECUTION_ERROR=true ;;
 			*) command_scheme+="$component " ;;
 		esac
@@ -1097,6 +1100,7 @@ function build_scheme {
 			then
 				# wait for background process to finish in 30 seconds
 				kill_process "$process_id" 30 &
+				RUN_IN_BACKGROUND=false
 			fi
 		fi
 
