@@ -2766,19 +2766,19 @@ function analyze_paramters {
 	local source="${1#\.\/}"
 	local destination="$2"
 
-	if [ "$source" = "." ]
+	if [ -f "./.index" ]
 	then
-		if [ -f "./.index" ]
+		if [ "$source" == "." ]
 		then
 			list_index "."
 			return 0
-		else
-			tput setaf $SEVERITY_HIGH
-			echo "Practice directory not initialized yet" >&2
-			echo "Run \`${0##*/} --help\`" >&2
-			tput sgr0
-			return 1
 		fi
+	else
+		tput setaf $SEVERITY_HIGH
+		echo "Practice directory not initialized yet" >&2
+		echo "Run \`${0##*/} --help\`" >&2
+		tput sgr0
+		return 1
 	fi
 
 	if [ -z "$destination" ]
