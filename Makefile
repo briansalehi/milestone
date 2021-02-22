@@ -1,29 +1,26 @@
-.PHONY: all install uninstall link unlink
+GUI = practice-manager-gui
+CLI = practice-manager-cli
+PROGRAM = practice-manager
 
-all: link
+.PHONY: all install uninstall unlink ${PROGRAM}
 
-link:
-	chmod +x practice-manager/practice-manager
-ifeq ($(wildcard ~/.local/bin/),)
-	mkdir -p ~/.local/bin/
-endif
-ifneq ($(wildcard ~/.local/bin/practice-manager),)
-	unlink ~/.local/bin/practice-manager
-endif
-	ln -s $$PWD/practice-manager/practice-manager ~/.local/bin/practice-manager
+all: unlink ${PROGRAM}
 
 unlink:
-ifneq ($(wildcard ~/.local/bin/practice-manager),)
-	unlink ~/.local/bin/practice-manager
-else
-	@echo "nothing to unlink"
+ifneq ($(wildcard ~/.local/bin/${PROGRAM}),)
+	unlink ~/.local/bin/${PROGRAM}
 endif
+
+${PROGRAM}: ./practice-manager/${PROGRAM}
+	chmod +x ./practice-manager/${PROGRAM}
+	@echo "now run \`sudo make install\`"
 
 install:
-ifeq ($(wildcard ~/.local/bin/),)
-	mkdir -p ~/.local/bin/
+ifeq ($(wildcard /usr/share/milestone),)
+	mkdir /usr/share/milestone
 endif
-	cp practice-manager/practice-manager ~/.local/bin/practice-manager
+	cp practice-manager/${PROGRAM} /usr/local/bin/
+	cp -r ./share/* /usr/share/milestone/
 
 uninstall:
-	rm -f ~/.local/bin/practice-manager
+	rm -f /usr/local/bin/${PROGRAM}

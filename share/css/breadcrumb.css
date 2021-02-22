@@ -1,0 +1,23 @@
+.breadcrumb a,
+.breadcrumb a:hover,
+.breadcrumb a:focus {
+	text-decoration: none;
+}
+
+.breadcrumb-item+.breadcrumb-item::before {
+	content: '> ';
+}
+
+.dark-mode .breadcrumb {
+	background-color: #212529;
+}
+
+.dark-mode .breadcrumb a {
+	color: #bdc0c4;
+}
+
+.dark-mode .breadcrumb a:hover,
+.dark-mode .breadcrumb a:focus {
+	text-decoration: none;
+	color: #777777;
+}

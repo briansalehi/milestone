@@ -176,7 +176,7 @@ function generate_html_style {
 # requires css file
 function load_css {
 	local style="$1"
-	local base="milestone-properties/css"
+	local base="/usr/share/milestone/css"
 
 	if [ -f "$base/$style" ]
 	then
@@ -210,7 +210,7 @@ function generate_html_script {
 # requires script file
 function load_javascript {
 	local script="$1"
-	local base=milestone-properties/js
+	local base=/usr/share/milestone/js
 
 	if [ -f $base/$script ]
 	then
@@ -227,7 +227,7 @@ function load_javascript {
 function load_syntax_highlighting {
 	local page="$1"
 	local syntax="${2:-$SYNTAX}"
-	local base=milestone-properties/js/syntax
+	local base=/usr/share/milestone/js/syntax
 
 	local language
 	for language in $syntax
