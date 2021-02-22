@@ -38,7 +38,7 @@ main_configuration=\
 
 # terminates script executaion after call
 function usage {
-	echo "Practice Repository Manager (Milestone)"
+	echo "Notebook Manager (Milestone)"
 	echo
 	tput setaf $SEVERITY_HIGH
 	echo "Usage:"
@@ -176,7 +176,7 @@ function generate_html_style {
 # requires css file
 function load_css {
 	local style="$1"
-	local base="/usr/share/milestone/css"
+	local base=/usr/share/milestone/css
 
 	if [ -f "$base/$style" ]
 	then
@@ -1048,14 +1048,16 @@ function build_scheme {
 			if [ "${GENERATES_EXECUTION_ERROR:-false}" == "true" ]
 			then
 				local quarantine_room
+				local working_directory
 				quarantine_room="$(mktemp -d)"
-				if [ -z "$quarantine_room" ]
+				if [ -d "$quarantine_room" ]
+				then
+					working_directory="$(pwd)"
+					cd "$quarantine_room"
+				else
 					tput setaf $SEVERITY_HIGH
 					echo "failed to isolate execution" >&2
 					tput sgr0
-				else
-					local working_directory="$(pwd)"
-					cd "$quarantine_room"
 				fi
 
 				if ! eval "$command_scheme" &> "$output"
@@ -1069,9 +1071,12 @@ function build_scheme {
 					process_id="$?"
 				fi
 
-				if [ -n "$quarantine_room" ]
+				if [ -d "$quarantine_room" ]
+				then
 					cd "$working_directory"
 					rm -d "$quarantine_room"
+					unset working_directory
+					unset quarantine_room
 				fi
 			else
 				if ! eval "$command_scheme" 1> "$output" 2> "$execution_error"
@@ -2815,7 +2820,7 @@ function analyze_paramters {
 
 if [ -f ./.config ] && [ ./.index ]
 then
-	validation_check=202102202058
+	validation_check=202102221121
 	source ./.config
 	if [ "${VALIDATION_ID:-0}" -eq "0" ]
 	then
