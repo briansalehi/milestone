@@ -637,6 +637,7 @@ function generate_html_screenshot {
 function inherit_references {
 	local temp="$(mktemp)"
 	local sorted="$(mktemp)"
+	local stripped="$(mktemp)"
 
 	local reference
 	local reference_path
@@ -657,15 +658,15 @@ function inherit_references {
 		unset reference
 	done
 	grep -v '^#' "$temp" | sed -e 's/:.*$//' | sort | uniq > "$sorted"
-	sed 's/:.*$/:/' "$1" >> "$sorted"
-	grep -v -x -f "$1" "$sorted" | sort | uniq > "$temp"
+	sed 's/:.*$//' "$1" > "$stripped"
+	grep -v -x -f "$stripped" "$sorted" | sort | uniq > "$temp"
 	sed -i 's/^/#/' "$temp"
 	if [ -s "$temp" ]
 	then
 		cat "$temp" "$1" | sort | uniq > "$sorted"
 		mv "$sorted" "$1"
 	fi
-	rm -f "$temp"
+	rm -f "$temp" "$stripped" "$sorted"
 }
 
 # requires path to page
