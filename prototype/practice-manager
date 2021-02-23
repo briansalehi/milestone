@@ -1635,7 +1635,7 @@ function generate_comment_section {
 				find_index_alias "$page_index"
 				generate_html_image "$1" "${line//[\!\[\]]/}"
 			else
-				echo "$line" | sed -e 's/\([\.!?;:]\)$/\1<br \/>/' -e 's/^$/<br \/>/' >&3
+				echo "$line" >&3
 			fi
 		done < "$comment"
 
