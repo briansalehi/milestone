@@ -638,11 +638,6 @@ function inherit_references {
 	local temp="$(mktemp)"
 	local sorted="$(mktemp)"
 
-	if ! [ -f "$1" ]
-	then
-		touch "$1"
-	fi
-
 	local reference
 	local reference_path
 	local hierarchy="."
@@ -832,6 +827,9 @@ function validate_page {
 				config)
 					regenerate_configuration "$page"
 					;;
+				reference.txt)
+					inherit_references "$page"
+					;;
 			esac
 		fi
 	done
@@ -863,6 +861,10 @@ function validate_chapter {
 				regenerate_configuration "$page"
 				;;
 			reference.txt)
+				if ! [ -f "$page" ]
+				then
+					touch "$page"
+				fi
 				inherit_references "$page"
 				;;
 			*)
