@@ -19,7 +19,7 @@ main_configuration=\
 #EXECUTION_SCHEME=
 
 ## default: .o
-#OUTPUT_OBJECT=
+#OBJECT_EXTENSION=
 
 ## default: .bin
 #EXECUTABLE_EXTENSION=
@@ -733,6 +733,7 @@ function regenerate_configuration {
 		case "$config" in
 			GENERATES_ERROR) config="GENERATES_RUNTIME_ERROR" ;;
 			LANGUAGE) config="SYNTAX" ;;
+			OUTPUT_OBJECT) config="OBJECT_EXTENSION" ;;
 			CHAPTER_TEMPLATE)
 				if [ "${validation_check:-0}" == "202012271813" ] && [ "$(grep "toc" <<< "$value")" == "" ]
 				then
@@ -795,7 +796,7 @@ function regenerate_configuration {
 			EXECUTION_SCHEME) value="\"$EXECUTION_SCHEME\"" ;;
 			PAGE_TEMPLATE) value="\"$PAGE_TEMPLATE\"" ;;
 			CHAPTER_TEMPLATE) value="\"$CHAPTER_TEMPLATE\"" ;;
-			OUTPUT_OBJECT) value="$OUTPUT_OBJECT" ;;
+			OBJECT_EXTENSION) value="$OBJECT_EXTENSION" ;;
 			CAPTURE_SCREENSHOT) value="$CAPTURE_SCREENSHOT" ;;
 			TECHNICAL_LEVEL) value="$TECHNICAL_LEVEL" ;;
 		esac
@@ -957,7 +958,7 @@ function create_command_scheme {
 	for component in $scheme
 	do
 		case "$component" in
-			object) command_scheme+="${source%.*}${OUTPUT_OBJECT:-.o} " ;;
+			object) command_scheme+="${source%.*}${OBJECT_EXTENSION:-.o} " ;;
 			source) command_scheme+="${source} " ;;
 			input) command_scheme+="< ${source%.*}.input.txt ";;
 			binary) command_scheme+="${source%.*}${EXECUTABLE_EXTENSION:-.bin} " ;;
@@ -2849,7 +2850,7 @@ function analyze_paramters {
 
 if [ -f ./.config ] && [ ./.index ]
 then
-	validation_check=202102230959
+	validation_check=202102231248
 	source ./.config
 	if [ "${VALIDATION_ID:-0}" -eq "0" ]
 	then
