@@ -14,8 +14,6 @@ main_configuration=\
 ## navigation title comment reference pagination toc
 #CHAPTER_TEMPLATE=\"navigation title comment reference pagination toc\"
 
-## How program should be treated
-## Available items:
 ### object, source, headers, location, binary, page, input
 ### makefile, stepN optionN, extension-xyz, screenshot, error, background
 #EXECUTION_SCHEME=
@@ -28,9 +26,7 @@ main_configuration=\
 
 #CAPTURE_SCREENSHOT=false
 
-## Specify the technical level of this topic
-## This feature will be used in Milestone technical courses and tutorials
-## Available items: basic intermediate expert
+## basic, intermediate, expert
 #TECHNICAL_LEVEL=
 
 ## DO NOT EDIT!
@@ -2853,7 +2849,7 @@ function analyze_paramters {
 
 if [ -f ./.config ] && [ ./.index ]
 then
-	validation_check=202102221121
+	validation_check=202102230959
 	source ./.config
 	if [ "${VALIDATION_ID:-0}" -eq "0" ]
 	then
