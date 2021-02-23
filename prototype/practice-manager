@@ -642,6 +642,11 @@ function inherit_references {
 	local temp="$(mktemp)"
 	local sorted="$(mktemp)"
 
+	if ! [ -f "$1" ]
+	then
+		touch "$1"
+	fi
+
 	local reference
 	local reference_path
 	local hierarchy="."
