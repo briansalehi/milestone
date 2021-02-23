@@ -1626,9 +1626,9 @@ function generate_comment_section {
 		echo "empty comment: $comment" >&2
 		tput sgr0
 	else
-		generate_html_div "$1" begin comment-style
-		OLD_IFS="$IFS"
-		while read -r line
+		generate_html_div "$1" begin
+
+		while IFS= read -r line
 		do
 			if grep -q "^\!\[.*\]$" <<< "$line"
 			then
@@ -1638,7 +1638,6 @@ function generate_comment_section {
 				echo "$line" | sed -e 's/\([\.!?;:]\)$/\1<br \/>/' -e 's/^$/<br \/>/' >&3
 			fi
 		done < "$comment"
-		IFS="$OLD_IFS"
 
 		generate_html_div "$1" end
 	fi
