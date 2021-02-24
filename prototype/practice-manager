@@ -1035,7 +1035,7 @@ function build_scheme {
 
 	if [ "${output_file_required:-false}" == "true" ] \
 		|| [ "${source_change_time:-0}" -gt "${output_change_time:-0}" ] \
-		|| [ "${FORCE_COMPILE:-false}" == "true" ]
+		|| [ "${FORCE_OPTION:-false}" == "true" ]
 	then
 		echo "$command_scheme" >&2
 		local execution_error="${source%.*}.execution.error.txt"
@@ -2329,6 +2329,11 @@ function remove_page {
 		tput sgr0
 		return 1
 	fi
+
+	if [ "${FORCE_OPTION:-false}" == "true" ]
+	then
+		rm --force "${1%.*}."*
+	fi
 }
 
 # requires path to directory
@@ -2351,6 +2356,11 @@ function remove_chapter {
 		echo "Chapter does not exist: ${1/$PWD\//}" >&2
 		tput sgr0
 		return 1
+	fi
+
+	if [ "${FORCE_OPTION:-false}" == "true" ]
+	then
+		rm --recursive --force "$1"
 	fi
 }
 
@@ -2889,9 +2899,9 @@ else
 	while [ $# -gt 0 ]
 	do
 		case "$1" in
-			-r|--remove) remove_files "${2%/}"; break ;;
-			-o|--reorder) reorder_index "${2%/}"; break ;;
-			-f|--force) FORCE_COMPILE=true ;;
+			-r|--remove) REMOVE_PAGE=true; TARGET_PAGE="${2%/}"; shift ;;
+			-o|--reorder) REORDER_PAGE=true; TARGET_PAGE="${2%/}"; shift ;;
+			-f|--force) FORCE_OPTION=true ;;
 			-h|--help|-*) usage; break ;;
 			*) ANALYZE_OPTION=true
 				ANALYZE_SOURCE="$1"
@@ -2904,6 +2914,32 @@ else
 		esac
 		shift
 	done
+fi
+
+if [ "${REMOVE_PAGE:-false}" == "true" ]
+then
+	if [ -e "$TARGET_PAGE" ]
+	then
+		remove_files "${TARGET_PAGE%/}"
+	else
+		tput setaf $SEVERITY_HIGH
+		echo "page not found: $TARGET_PAGE" >&2
+		tput sgr0
+		return 1
+	fi
+fi
+
+if [ "${REORDER_PAGE:-false}" == "true" ]
+then
+	if [ -e "$TARGET_PAGE" ]
+	then
+		reorder_index "${TARGET_PAGE%/}";
+	else
+		tput setaf $SEVERITY_HIGH
+		echo "page not found: $TARGET_PAGE" >&2
+		tput sgr0
+		return 1
+	fi
 fi
 
 if [ "${ANALYZE_OPTION:-false}" == "true" ]
