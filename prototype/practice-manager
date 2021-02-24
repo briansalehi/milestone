@@ -1923,10 +1923,10 @@ function generate_alias {
 
 	target="${target}${index}" # {../../../}{3.1.1.html}
 
-	if ! ln -s "html-files/$index" "$alias"
+	if ! [ -L "$alias" ] && ! ln -s "html-files/$index" "$alias"
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "failed to create link for alias: $path"
+		echo "Failed to create link for alias: $path"
 		echo "  target: $target"
 		echo "  alias: $alias"
 		tput sgr0
@@ -2173,12 +2173,10 @@ function expand_list {
 }
 
 function prepare_output_directory {
-	if [ -d ./html-files/ ]
+	if ! [ -d ./html-files/ ]
 	then
-		rm -r ./html-files/
+		mkdir ./html-files/
 	fi
-
-	mkdir ./html-files/
 }
 
 # requires full path to first index file to recusrively build document
@@ -2190,6 +2188,11 @@ function generate_manuals {
 		echo "Not a practice directory!" >&2
 		tput sgr0
 		return 1
+	fi
+
+	if [ -d ./html-files/ ]
+	then
+		rm -r ./html-files/
 	fi
 
 	prepare_output_directory
@@ -2796,7 +2799,7 @@ function analyze_path {
 		then
 			prepare_output_directory
 			generate_page "$path"
-			xdg-open ./html-files/*.html
+			xdg-open ./html-files/$page_index.html
 		fi
 	# if has extension and exists but is not indexed: check and join practice
 	elif [ -n "$extension" ] && [ -f "$path" ] && [ -f "${path%/*}/.index" ]\
