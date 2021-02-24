@@ -1392,7 +1392,7 @@ function generate_execution_section {
 function generate_reference_section {
 	local reference="${1%.*}.reference.txt"
 
-	if grep --invert-match '^#' --quiet --count "$reference"
+	if grep '^#' --invert-match --quiet --count "$reference"
 	then
 		tput setaf "$SEVERITY_MEDIUM"
 		echo "No references specified: $reference" >&2
@@ -1408,7 +1408,7 @@ function generate_reference_section {
 	while read -r line
 	do
 		generate_html_item "$line" list-group-item
-	done <<< "$(grep -v '^#' $reference)"
+	done <<< "$(grep '^#' --invert-match $reference)"
 
 	generate_html_list end
 }
@@ -2172,6 +2172,15 @@ function expand_list {
 	done < "$1"
 }
 
+function prepare_output_directory {
+	if [ -d ./html-files/ ]
+	then
+		rm -r ./html-files/
+	fi
+
+	mkdir ./html-files/
+}
+
 # requires full path to first index file to recusrively build document
 # must be called with trailing ./ in first argument
 function generate_manuals {
@@ -2183,12 +2192,7 @@ function generate_manuals {
 		return 1
 	fi
 
-	if [ -d ./html-files/ ]
-	then
-		rm -r ./html-files/
-	fi
-
-	mkdir ./html-files/
+	prepare_output_directory
 
 	if expand_list "$1"
 	then
@@ -2788,7 +2792,12 @@ function analyze_path {
 		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 1 ]
 	then
 		validate_page "$path"
-		execute_program "$path"
+		if execute_program "$path"
+		then
+			prepare_output_directory
+			generate_page "$path"
+			xdg-open ./html-files/*.html
+		fi
 	# if has extension and exists but is not indexed: check and join practice
 	elif [ -n "$extension" ] && [ -f "$path" ] && [ -f "${path%/*}/.index" ]\
 		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 0 ]
