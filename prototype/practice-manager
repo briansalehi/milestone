@@ -1392,10 +1392,10 @@ function generate_execution_section {
 function generate_reference_section {
 	local reference="${1%.*}.reference.txt"
 
-	if ! [ -s "$reference" ]
+	if grep --invert-match '^#' --quiet --count "$reference"
 	then
 		tput setaf "$SEVERITY_MEDIUM"
-		echo "Reference not specified: $1" >&2
+		echo "No references specified: $reference" >&2
 		tput sgr0
 		return 1
 	fi
