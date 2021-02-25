@@ -7,3 +7,8 @@ a:focus {
 pre {
 	margin-bottom: 1.3rem !important;
 }
+
+button.sticky {
+	position: sticky;
+	top: 0;
+}
