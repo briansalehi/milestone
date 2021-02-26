@@ -258,7 +258,7 @@ function generate_html_body {
 }
 
 function generate_html_dark_button {
-	echo "<button class='btn pull-right sticky' onclick='toggle_darkmode()'>&#9728;</button>" >&3
+	echo "<button class='btn pull-right sticky' onclick='toggle_darkmode()' title='ALT + SHIFT + N' accesskey='N'>&#9728;</button>" >&3
 }
 
 # optional begin/end
