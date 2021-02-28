@@ -1963,6 +1963,7 @@ function generate_index_page {
 
 		generate_html_body begin
 			generate_html_header_with_link "$page" 2 "Notebooks" "0.html"
+			generate_html_dark_button
 			generate_table_of_content "./.index" "true" "2"
 			generate_list_group_root "$page" end
 
