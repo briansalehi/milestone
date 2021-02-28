@@ -41,23 +41,23 @@ function usage {
 	tput sgr0
 	echo
 	tput setaf 7
-	echo " $ practice-manager [-f,--force] [-r,--remove] [-o,--reorder] <path>"
+	echo " $ practice-manager [-f,--force] [-r,--remove] [-o,--reorder] [-p,--preview] <path>"
 	tput sgr0
-	echo "                       Create chapter/page, or build page,"
-	echo "                       Only one option should be given at a time,"
-	echo "   -f                  Force compile, regenerates all output files,"
-	echo "   -r                  Remove page or chapter,"
-	echo "   -o                  Reorder index of page or chapter."
+	echo "   <path>              build page"
+	echo "   --force             force operation"
+	echo "   --remove            remove page"
+	echo "   --reorder           reorder page"
+	echo "   --preview           preview page on your default browser"
 	echo
 	tput setaf 7
 	echo " $ practice-manager <source> <destination>"
 	tput sgr0
-	echo "                       Move or rename chapter/page similar to mv(1)."
+	echo "                       move or rename page similar to mv(1)"
 	echo
 	tput setaf 7
 	echo " $ practice-manager"
 	tput sgr0
-	echo "                       Generate html-files when no options given."
+	echo "                       generate html-files when no options given"
 	echo
 }
 
