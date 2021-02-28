@@ -14,7 +14,7 @@ main_configuration=\
 ## navigation title comment reference pagination toc
 #CHAPTER_TEMPLATE=\"navigation title comment reference pagination toc\"
 
-### object, source, headers, location, binary, page, input
+### object, source, headers, location, binary, pagename, rawname, input
 ### makefile, stepN optionN, extension-xyz, screenshot, error, background
 #EXECUTION_SCHEME=
 
@@ -959,7 +959,8 @@ function create_command_scheme {
 			input) command_scheme+="< ${source%.*}.input.txt ";;
 			binary) command_scheme+="${source%.*}${EXECUTABLE_EXTENSION:-.bin} " ;;
 			headers) command_scheme+="$headers " ;;
-			page|pagename|rawname) command_scheme+="${source%.*} " ;;
+			page|pagename) local rawname="${source##*/}"; command_scheme+="${rawname%.*} " ;;
+			rawname) local rawname="${source##*/}"; command_scheme+="${rawname%.*} " ;;
 			location) command_scheme+="${source%/*} " ;;
 			makefile) local makefile="${source%.*}.make"; command_scheme+="${makefile##*/} " ;;
 			extension-*) command_scheme+="${source%.*}.${component#extenion-} " ;;
@@ -2881,7 +2882,7 @@ function analyze_paramters {
 
 if [ -f ./.config ] && [ ./.index ]
 then
-	validation_check=202102231248
+	validation_check=202102281429
 	source ./.config
 	if [ "${VALIDATION_ID:-0}" -eq "0" ]
 	then
