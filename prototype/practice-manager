@@ -974,9 +974,10 @@ function create_command_scheme {
 	local scheme="$1"
 	local source="$2"
 	local headers="$3"
+	local location="${source%/*}"
 	command_scheme=
 
-	headers="$(echo "${headers// /$'\n'}" | sed "s/^/${source%/*}/" | xargs)"
+	headers="$(echo "${headers// /$'\n'}" | sed "s/^/${location//\//\\\/}\//" | xargs)"
 
 	local component
 	for component in $scheme
@@ -987,9 +988,10 @@ function create_command_scheme {
 			input) command_scheme+="< ${source%.*}.input.txt ";;
 			binary) command_scheme+="${source%.*}${EXECUTABLE_EXTENSION:-.bin} " ;;
 			headers) command_scheme+="$headers " ;;
+			rawheaders) command_scheme+="${headers//$location/} " ;;
 			page|pagename) local rawname="${source##*/}"; command_scheme+="${rawname%.*} " ;;
 			rawname) local rawname="${source##*/}"; command_scheme+="${rawname%.*} " ;;
-			location) command_scheme+="${source%/*} " ;;
+			location) command_scheme+="${location} " ;;
 			makefile) command_scheme+="${source%.*}.make " ;;
 			rawmakefile) local makefile="${source%.*}.make"; command_scheme+="${makefile##*/} " ;;
 			extension-*) command_scheme+="${source%.*}.${component#extension-} " ;;
