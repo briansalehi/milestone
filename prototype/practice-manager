@@ -41,13 +41,12 @@ function usage {
 	tput sgr0
 	echo
 	tput setaf 7
-	echo " $ practice-manager [-f,--force] [-r,--remove] [-o,--reorder] [-p,--preview] <path>"
+	echo " $ practice-manager [-f,--force] [-p,--preview] [-r,--remove] [-o,--reorder] <path>"
 	tput sgr0
-	echo "   <path>              build page"
-	echo "   --force             force operation"
-	echo "   --remove            remove page"
-	echo "   --reorder           reorder page"
-	echo "   --preview           preview page on your default browser"
+	echo "   <path>              build page (with --force also regenerate output file)"
+	echo "   --remove <path>     unlink page (with --force also remove files)"
+	echo "   --reorder <path>    reorder page"
+	echo "   --preview <path>    preview page on your default browser"
 	echo
 	tput setaf 7
 	echo " $ practice-manager <source> <destination>"
