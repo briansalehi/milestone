@@ -2790,7 +2790,7 @@ function analyze_path {
 		then
 			prepare_output_directory
 			generate_chapter "${path%/*}/README.md"
-			index_page "$path"
+			index_page "${path%/*}/README.md"
 			xdg-open ./html-files/$page_index.html &>/dev/null &
 		elif [ "$peek" == "true" ]
 		then
