@@ -1116,12 +1116,12 @@ function build_scheme {
 			fi
 		fi
 
-		if ! [ -s "$execution_error" ]
+		if [ -f "$execution_error" ] && ! [ -s "$execution_error" ]
 		then
 			rm "$execution_error"
 		fi
 
-		if ! [ -s "$output" ]
+		if [ -f "$output" ] && ! [ -s "$output" ]
 		then
 			rm "$output"
 		fi
@@ -2800,7 +2800,8 @@ function analyze_path {
 		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 1 ]
 	then
 		validate_page "$path"
-		if execute_program "$path" || [ "${PREVIEW_OPTION:-false}" == "true" ]
+		execute_program "$path"
+		if [ "${PREVIEW_OPTION:-false}" == "true" ]
 		then
 			prepare_output_directory
 			generate_page "$path"
