@@ -1603,7 +1603,6 @@ function generate_output_section {
 
 	if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
 	then
-		generate_page_name "${page}.png"
 		find_index_alias "$page_index"
 		generate_html_screenshot "$1"
 	elif [ -s "$output" ]
