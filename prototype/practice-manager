@@ -588,10 +588,12 @@ function generate_html_image {
 	local image_alias="${page_alias%/*}/${image}"
 	local alt="${image%.*}"
 
+	local error_handler="onerror='this.onerror=null; this.src=\"${image_alias#/}\"'"
+
 	if [ -f "${location}/${image}" ]
 	then
 		cp "${location}/${image}" "./html-files${image_alias#./html-files}"
-		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${alt//-/ }\" loading=\"lazy\">" >&3
+		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${alt//-/ }\" loading=\"lazy\" ${error_handler}>" >&3
 	else
 		echo "<b>Image Not Found</b>" >&3
 		tput setaf $SEVERITY_HIGH
@@ -608,10 +610,12 @@ function generate_html_screenshot {
 	local image="${source%.*}.screenshot.png"
 	local image_alias="${page_alias}.screenshot.png"
 
+	local error_handler="onerror='this.onerror=null; this.src=\"${image_alias#/}\"'"
+
 	if [ -f "$image" ]
 	then
 		cp "$image" "./html-files${image_alias#./html-files}"
-		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${source##*/} Screenshot\">" >&3
+		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${source##*/} Screenshot\" ${error_handler}>" >&3
 		tput setaf $SEVERITY_LOW
 		echo "Screenshot linked: $page_alias"
 		tput sgr0
