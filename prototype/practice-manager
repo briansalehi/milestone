@@ -982,7 +982,7 @@ function create_command_scheme {
 			rawname) local rawname="${source##*/}"; command_scheme+="${rawname%.*} " ;;
 			location) command_scheme+="${source%/*} " ;;
 			makefile) local makefile="${source%.*}.make"; command_scheme+="${makefile##*/} " ;;
-			extension-*) command_scheme+="${source%.*}.${component#extenion-} " ;;
+			extension-*) command_scheme+="${source%.*}.${component#extension-} " ;;
 			screenshot) GENERATES_SCREENSHOT=true ;;
 			background) RUN_IN_BACKGROUND=true ;;
 			error) GENERATES_EXECUTION_ERROR=true ;;
