@@ -472,19 +472,9 @@ function generate_html_nav {
 # optional multiple attributes
 function generate_html_item {
 	local text="$1"
-	local class="$2"
-	local tag=
-	local tag_end="</li>"
+	local class="class='$2'"
 
-	if [ -n "$class " ]
-	then
-		shift 3
-		tag="<li class=\"${class}\" $@>"
-	else
-		tag="<li>"
-	fi
-
-	echo "${tag}${text}${tag_end}" >&3
+	echo "<li $class>${text}</li>" >&3
 }
 
 # requires path to page
