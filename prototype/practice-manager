@@ -708,8 +708,6 @@ function regenerate_configuration {
 	local target_config="$(grep '^[^# ]' "$1")"
 	generate_configuration "$1"
 
-	# backward compatibility section
-	# if configs name are changed, map their values into new ones
 	local line
 	local config
 	local value
@@ -718,15 +716,32 @@ function regenerate_configuration {
 		config="${line%%=*}" # read configuration name
 		value="${line#*=}" # read configuration value
 		value="${value%%#*}" # ignore inline comments in values
+		value="${value//\\/\\\\}" # escape backslash characters
+		value="${value//\//\\\/}" # escape slash characters
 
+		# uncomment enabled configs and set their values
+		sed -i "/^#${config}=/s/^#\(${config}\)=.*/\1=${value}/" "$1"
+
+		# backward compatibility section
+		# if configs name are changed, map their values into new ones
 		case "$config" in
-			GENERATES_ERROR) config="GENERATES_RUNTIME_ERROR" ;;
-			LANGUAGE) config="SYNTAX" ;;
-			OUTPUT_OBJECT) config="OBJECT_EXTENSION" ;;
+			GENERATES_ERROR)
+				config="GENERATES_RUNTIME_ERROR"
+				sed -i "/^${config}=/s/^\(${config}\)=/\1=/" "$1"
+				;;
+			LANGUAGE)
+				config="SYNTAX"
+				sed -i "/^${config}=/s/^\(${config}\)=/\1=/" "$1"
+				;;
+			OUTPUT_OBJECT)
+				config="OBJECT_EXTENSION"
+				sed -i "/^${config}=/s/^\(${config}\)=/\1=/" "$1"
+				;;
 			CHAPTER_TEMPLATE)
 				if [ "${validation_check:-0}" == "202012271813" ] && [ "$(grep "toc" <<< "$value")" == "" ]
 				then
 					value="${value%\"} toc\""
+					sed -i "/^${config}=/s/^\(${config}\)=.*/\1=${value}/" "$1"
 				fi ;;
 			COMPILATION_SCHEME)
 				if [ -n "${COMPILATION_SCHEME:-}" ]
@@ -753,12 +768,10 @@ function regenerate_configuration {
 				fi
 				;;
 		esac
-
-		sed -i "/^#${config}=/s/^#\(${config}\)=.*/\1=${value}/" "$1"
 	done <<< "$target_config"
 
 	sed -i \
-		-e '/EXECUTION_SCHEME=/s/=\([^\"]\)/=\"\1/' \
+		-e '/EXECUTION_SCHEME=/s/EXECUTION_SCHEME=\([^\"]\)/=\"\1/' \
 		-e '/EXECUTION_SCHEME=/s/\([^=\"]\)$/\1\"/' \
 		-e '/EXECUTION_SCHEME=/s/;;/;/g' \
 		-e '/EXECUTION_SCHEME=/s/=";/="/' \
@@ -782,12 +795,18 @@ function regenerate_configuration {
 
 		case "$config" in
 			SYNTAX) value="\"$SYNTAX\"" ;;
-			EXECUTION_SCHEME) value="\"$EXECUTION_SCHEME\"" ;;
 			PAGE_TEMPLATE) value="\"$PAGE_TEMPLATE\"" ;;
 			CHAPTER_TEMPLATE) value="\"$CHAPTER_TEMPLATE\"" ;;
+			EXECUTION_SCHEME)
+				EXECUTION_SCHEME="${EXECUTION_SCHEME//\\/\\\\}" # escape backslash characters
+				EXECUTION_SCHEME="${EXECUTION_SCHEME//\//\\\/}" # escape slash characters
+				value="\"$EXECUTION_SCHEME\"";
+				;;
 			OBJECT_EXTENSION) value="$OBJECT_EXTENSION" ;;
+			EXECUTABLE_EXTENSION) value="$EXECUTABLE_EXTENSION" ;;
 			CAPTURE_SCREENSHOT) value="$CAPTURE_SCREENSHOT" ;;
 			TECHNICAL_LEVEL) value="$TECHNICAL_LEVEL" ;;
+			*) continue ;;
 		esac
 
 		sed -i "/^#${config}=/s/^\(#${config}\)=.*/\1=${value}/" "$1"
