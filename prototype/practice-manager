@@ -1647,8 +1647,6 @@ function generate_comment_section {
 		echo "empty comment: $comment" >&2
 		tput sgr0
 	else
-		generate_html_div "$1" begin
-
 		while IFS= read -r line
 		do
 			if grep -q "^\!\[.*\]$" <<< "$line"
@@ -1659,8 +1657,6 @@ function generate_comment_section {
 				echo "$line" >&3
 			fi
 		done < "$comment"
-
-		generate_html_div "$1" end
 	fi
 }
 
