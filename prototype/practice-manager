@@ -44,10 +44,11 @@ function usage {
 	tput setaf 7
 	echo " $ practice-manager [-f,--force] [-p,--preview] [-r,--remove] [-o,--reorder] <path>"
 	tput sgr0
-	echo "   <path>              build page (with --force also regenerate output file)"
+	echo "   <path>              build all pages (with --force also regenerate output file)"
 	echo "   --remove <path>     unlink page (with --force also remove files)"
 	echo "   --reorder <path>    reorder page"
 	echo "   --preview <path>    preview page on your default browser"
+	echo "   --build <path>      build a specific single page"
 	echo
 	tput setaf 7
 	echo " $ practice-manager <source> <destination>"
@@ -617,12 +618,12 @@ function generate_html_screenshot {
 		cp "$image" "./html-files${image_alias#./html-files}"
 		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${source##*/} Screenshot\" ${error_handler}>" >&3
 		tput setaf $SEVERITY_LOW
-		echo "Screenshot linked: $page_alias"
+		echo "Screenshot linked: $page_alias" >&2
 		tput sgr0
 	else
 		echo "<b>Screenshot Not Found</b>" >&3
 		tput setaf $SEVERITY_HIGH
-		echo "Image not found: $source"
+		echo "Screenshot image not found: $source" >&2
 		tput sgr0
 		return 1
 	fi
@@ -1344,7 +1345,7 @@ function capture_screenshot {
 
 	local binary="${source%.*}${EXECUTABLE_EXTENSION:-.bin}"
 	local process_name="${binary##*/}"
-	process_name="${process_name%\.bin}."
+	process_name="${process_name%\.bin}\."
 
 	if [ -f "$binary" ] && ($binary &>/dev/null &)
 	then
@@ -1370,7 +1371,7 @@ function capture_screenshot {
 
 		if gnome-screenshot --display :0 --file "$imagefile" --delay 1 --window &>/dev/null
 		then
-			if kill "$(pgrep "$process_name")" &>/dev/null
+			if kill "$(pgrep "$process_name" | xargs)" &>/dev/null
 			then
 				tput setaf $SEVERITY_LOW
 				echo "Screenshot captured: ${imagefile}" >&2
@@ -1535,9 +1536,10 @@ function generate_page_name {
 function generate_source_section {
 	generate_html_breaker
 	generate_html_header 3 "Source"
+
 	while [ $# -gt 0 ]
 	do
-		generate_page_name "${1}"
+		generate_page_name "$1"
 
 		local syntax=
 		if [ -n "$SYNTAX" ]
@@ -1548,10 +1550,9 @@ function generate_source_section {
 		fi
 
 		generate_html_code begin "language-${syntax}" line-numbers
-		OLD_IFS="$IFS"
-		IFS=
+
 		local line
-		while read -r line
+		while IFS= read -r line
 		do
 			line="${line//&/&amp;}"
 			line="${line//\"/&quot;}"
@@ -1560,7 +1561,7 @@ function generate_source_section {
 			line="${line//>/&gt;}"
 			echo "    $line" >&3
 		done < "$1"
-		IFS="$OLD_IFS"
+
 		generate_html_code end
 		shift
 	done
@@ -2014,6 +2015,32 @@ function generate_page {
 	index_page "$1"
 	exec 3> "./html-files/${page_index}.html"
 
+	local headers
+	local source_group
+	headers="$(grep "^${1##*/}" "${1%/*}/.index")"
+
+	if [ -n "${headers}" ]
+	then
+		local file
+		local directory="${1%/*}"
+		for file in $headers
+		do
+			if [ -f "${directory}/${file}" ]
+			then
+				source_group+="${directory}/${file} "
+			else
+				tput setaf $SEVERITY_HIGH
+				echo "Missing header: ${directory}/${file}" >&2
+				tput sgr0
+			fi
+		done
+	else
+		tput setaf $SEVERITY_HIGH
+		echo "Source files not found: $1" >&2
+		tput sgr0
+		return 1
+	fi
+
 	index="$page_index"
 	generate_alias "$1" "${index}.html"
 	update_configuration "$1"
@@ -2046,9 +2073,9 @@ function generate_page {
 			title) generate_header_section "$1" ;;
 			reference) generate_reference_section "$1" ;;
 			comment) generate_comment_section "$1" ;;
-			source) generate_source_section $@ ;;
-			execution) generate_execution_section $@ ;;
-			output) generate_output_section $@ ;;
+			source) generate_source_section $source_group ;;
+			execution) generate_execution_section $source_group ;;
+			output) generate_output_section $1 ;;
 			input) generate_input_section ;;
 			error) generate_error_section ;;
 			pagination) generate_quick_access_section "$1" ;;
@@ -2117,7 +2144,7 @@ function generate_chapter {
 			title) generate_header_section "$1" ;;
 			reference) generate_reference_section "$1" ;;
 			comment) generate_comment_section "$1" ;;
-			execution) generate_execution_section $! ;;
+			execution) generate_execution_section $1 ;;
 			pagination) generate_quick_access_section "$1" ;;
 			toc) generate_table_of_content "${1%/*}/.index" "true" "2"
 				generate_list_group_root "${1%/*}/.index" end
@@ -2158,7 +2185,7 @@ function expand_list {
 	if ! [ -f "$1" ]
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "unindexed directory: $directory/" >&2
+		echo "Unindexed directory: $directory/" >&2
 		tput sgr0
 		return 1
 	fi
@@ -2166,25 +2193,7 @@ function expand_list {
 	local line
 	while read -r line
 	do
-		members="${line//[^\ ]/}"
-
-		if [ "${#members}" -gt 0 ]
-		then
-			for file in $line
-			do
-				if [ -f "$directory/$file" ]
-				then
-					group="$group $directory/$file"
-				else
-					tput setaf $SEVERITY_HIGH
-					echo "missing group member: $directory/$file" >&2
-					tput sgr0
-					continue 2
-				fi
-			done
-			validate_page $group
-			generate_page $group
-		elif [ -f "$directory/$line" ] && [ "$line" != "README.md" ]
+		if [ -f "$directory/$line" ] && [ "$line" != "README.md" ]
 		then
 			validate_page "$directory/$line"
 			generate_page "$directory/$line"
@@ -2197,7 +2206,7 @@ function expand_list {
 			expand_list "$directory/$line/.index"
 		else
 			tput setaf $SEVERITY_HIGH
-			echo "missing entry: $directory/$line" >&2
+			echo "Missing entry: $directory/$line" >&2
 			tput sgr0
 		fi
 		group=
@@ -2816,6 +2825,10 @@ function analyze_path {
 			generate_chapter "${path%/*}/README.md"
 			index_page "${path%/*}/README.md"
 			xdg-open ./html-files/$page_index.html &>/dev/null &
+		elif [ "$peek" == "true" ] && [ "${BUILD_OPTION:-false}" == "true" ]
+		then
+			prepare_output_directory
+			generate_chapter "${path%/*}/README.md"
 		elif [ "$peek" == "true" ]
 		then
 			list_index "$path"
@@ -2841,6 +2854,10 @@ function analyze_path {
 			generate_page "$path"
 			index_page "$path"
 			xdg-open ./html-files/$page_index.html &>/dev/null &
+		elif [ "${BUILD_OPTION:-false}" == "true" ]
+		then
+			prepare_output_directory
+			generate_page "$path"
 		fi
 	# if has extension and exists but is not indexed: check and join practice
 	elif [ -n "$extension" ] && [ -f "$path" ] && [ -f "${path%/*}/.index" ]\
@@ -2955,6 +2972,7 @@ else
 			-o|--reorder) REORDER_PAGE=true; TARGET_PAGE="${2%/}"; shift ;;
 			-f|--force) FORCE_OPTION=true ;;
 			-p|--preview) PREVIEW_OPTION=true ;;
+			-b|--build) BUILD_OPTION=true ;;
 			-h|--help|-*) usage; break ;;
 			*) ANALYZE_OPTION=true
 				ANALYZE_SOURCE="$1"
