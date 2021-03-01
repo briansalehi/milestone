@@ -618,7 +618,7 @@ function generate_html_screenshot {
 		cp "$image" "./html-files${image_alias#./html-files}"
 		echo "<img class=\"img-responsive\" src=\"${image_alias}\" alt=\"${source##*/} Screenshot\" ${error_handler}>" >&3
 		tput setaf $SEVERITY_LOW
-		echo "Screenshot linked: $page_alias" >&2
+		echo "Screenshot linked: .$page_alias" >&2
 		tput sgr0
 	else
 		echo "<b>Screenshot Not Found</b>" >&3
@@ -978,8 +978,6 @@ function create_command_scheme {
 	local location="${source%/*}"
 	command_scheme=
 
-	headers="$(echo "${headers// /$'\n'}" | sed "s/^/${location//\//\\\/}\//" | xargs)"
-
 	local component
 	for component in $scheme
 	do
@@ -1028,6 +1026,7 @@ function generate_execution_mode {
 # requires path to source
 function build_scheme {
 	local source="$1"
+	local location="${source%/*}"
 	local scheme="$2"
 
 	if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
@@ -1052,7 +1051,8 @@ function build_scheme {
 		output_change_time=$source_change_time
 	fi
 
-	local headers="$(sed -n "/^${source##*/}/s/${source##*/}\s//p" < "${source%/*}/.index")"
+	local headers="$(sed -n "/^${source##*/}/s/${source##*/}\s//p" "${source%/*}/.index")"
+	headers="$(echo "${headers// /$'\n'}" | sed "s/^/${location//\//\\\/}\//" | xargs)"
 
 	# build compilation scheme
 	create_command_scheme "$scheme" "$source" "${headers:-}"
