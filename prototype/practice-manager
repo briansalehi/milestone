@@ -485,7 +485,7 @@ function generate_html_item {
 # optional access key
 function generate_html_item_with_link {
 	local text="$1"
-	local address="$2"
+	local address="/${2#/}"
 	local class="$3"
 	local access_key="$4"
 	local access_direction=
@@ -499,13 +499,13 @@ function generate_html_item_with_link {
 		tag="<li>"
 	fi
 
-	if [ -n "$address" ]
+	if [ -n "$2" ]
 	then
 		if [ -n "$access_key" ]
 		then
-			tag="${tag}<a title=\"Shortcut: ALT + SHIFT + ${access_key}\" accesskey=\"${access_key}\" href=\"/${address#/}\">"
+			tag="${tag}<a title=\"Shortcut: ALT + SHIFT + ${access_key}\" accesskey=\"${access_key}\" href=\"${address}\">"
 		else
-			tag="${tag}<a href=\"/${address#/}\">"
+			tag="${tag}<a href=\"${address}\">"
 		fi
 		tag_end="</a></li>"
 	else
@@ -1763,16 +1763,16 @@ function generate_quick_access_section {
 
 	find_index_alias "${previous_index:-0}"
 
-	button="previous page"
+	button="Previous Page"
 	if [ -n "$previous_index" ]
 	then
 		previous_index="${previous_index}.html"
 		generate_html_item_with_link "$button" "${page_alias:-$previous_index}" previous "B"
 	else
-		generate_html_item_with_link "$button" "#" "previous disabled"
+		generate_html_item_with_link "$button" "/" "previous disabled" "B"
 	fi
 
-	button="top page"
+	button="Home"
 	if [ -z "$previous_index" ] || [ -z "$next_page" ]
 	then
 		generate_html_item_with_link "$button" "/" top "T"
@@ -1780,13 +1780,13 @@ function generate_quick_access_section {
 
 	find_index_alias "${next_index:-0}"
 
-	button="next page"
+	button="Next Page"
 	if [ -n "$next_index" ]
 	then
 		next_index="${next_index}.html"
 		generate_html_item_with_link "$button" "${page_alias:-$next_index}" next "F"
 	else
-		generate_html_item_with_link "$button" "#" "next disabled"
+		generate_html_item_with_link "$button" "/" "next disabled" "F"
 	fi
 
 	generate_html_list end
