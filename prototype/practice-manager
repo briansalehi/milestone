@@ -1961,7 +1961,7 @@ function generate_index_page {
 
 	update_configuration "$page"
 	generate_html_section begin
-		generate_html_head begin "$page"
+		generate_html_head begin "./README.md"
 			load_css ajax.html
 			load_css bootstrap.html
 			load_css prism.html
@@ -2212,6 +2212,7 @@ function generate_manuals {
 	then
 		tput setaf $SEVERITY_HIGH
 		echo "Not a practice directory!" >&2
+		echo "Run \`${0##*/} --help\` to get help" >&2
 		tput sgr0
 		return 1
 	fi
@@ -2854,21 +2855,6 @@ function analyze_paramters {
 	local source="${1#\.\/}"
 	local destination="$2"
 
-	if [ -f "./.index" ]
-	then
-		if [ "$source" == "." ]
-		then
-			list_index "."
-			return 0
-		fi
-	else
-		tput setaf $SEVERITY_HIGH
-		echo "Practice directory not initialized yet" >&2
-		echo "Run \`${0##*/} --help\`" >&2
-		tput sgr0
-		return 1
-	fi
-
 	if [ -z "$destination" ]
 	then
 		local hierarchy="."
@@ -2906,10 +2892,10 @@ function analyze_paramters {
 # Analyze Options and Paramters
 ###############################################################################
 
-if [ -f ./.config ] && [ ./.index ]
+if [ .index ] && [ -f .config ]
 then
 	validation_check=202102281727
-	source ./.config
+	source .config
 	if [ "${VALIDATION_ID:-0}" -eq "0" ]
 	then
 		tput setaf $SEVERITY_HIGH
@@ -2934,6 +2920,20 @@ then
 		echo "run again to continue"
 		exit 0
 	fi
+fi
+
+# check for directory validity
+if [ -f ".index" ] && [ "$1" == "." ]
+then
+	list_index "."
+	exit 0
+elif ! [ -f ".index" ] && [ -z "$1" ]
+then
+	tput setaf $SEVERITY_HIGH
+	echo "Practice directory not initialized yet!" >&2
+	echo "Run \`${0##*/} --help\` to get help" >&2
+	tput sgr0
+	exit 1
 fi
 
 if [ $# -eq 0 ]
