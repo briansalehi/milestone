@@ -12,3 +12,7 @@ button.sticky {
 	position: sticky;
 	top: 1%;
 }
+
+img {
+	max-width: -moz-available;
+}
