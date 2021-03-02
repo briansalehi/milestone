@@ -2822,13 +2822,13 @@ function analyze_path {
 		if [ "$peek" == "true" ] && [ "${PREVIEW_OPTION:-false}" == "true" ]
 		then
 			prepare_output_directory
-			generate_chapter "${path%/*}/README.md"
-			index_page "${path%/*}/README.md"
+			generate_chapter "${path}/README.md"
+			index_page "${path}/README.md"
 			xdg-open ./html-files/$page_index.html &>/dev/null &
 		elif [ "$peek" == "true" ] && [ "${BUILD_OPTION:-false}" == "true" ]
 		then
 			prepare_output_directory
-			generate_chapter "${path%/*}/README.md"
+			generate_chapter "${path}/README.md"
 		elif [ "$peek" == "true" ]
 		then
 			list_index "$path"
