@@ -656,8 +656,8 @@ function inherit_references {
 		unset reference_path
 		unset reference
 	done
-	grep -v '^#' "$temp" | sed -e 's/:.*$//' | sort | uniq > "$sorted"
-	sed 's/:.*$//' "$1" > "$stripped"
+	grep -v '^#' "$temp" | sed -e 's/::.*//' | sort | uniq > "$sorted"
+	sed 's/::.*//' "$1" > "$stripped"
 	grep -v -x -f "$stripped" "$sorted" | sort | uniq > "$temp"
 	sed -i 's/^/#/' "$temp"
 	if [ -s "$temp" ]
@@ -1439,7 +1439,7 @@ function generate_reference_section {
 	local line
 	while read -r line
 	do
-		generate_html_item "$line" list-group-item
+		generate_html_item "${line//::/:}" list-group-item
 	done <<< "$(grep '^#' --invert-match $reference)"
 
 	generate_html_list end
