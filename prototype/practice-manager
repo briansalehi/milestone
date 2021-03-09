@@ -2401,7 +2401,10 @@ function remove_chapter {
 		then
 			sed -i "/^${chapter}$/d" "${location}/.index"
 			echo "Chapter unlinked"
-			echo "You can rejoin this chapter later by running \`${0##*/} $1\`"
+			if [ "${FORCE_OPTION:-false}" != "true" ]
+			then
+				echo -e "You can rejoin this chapter later by running \e[0;91m\`${0##*/} $1\`\e[0m"
+			fi
 		fi
 	else
 		tput setaf $SEVERITY_HIGH
