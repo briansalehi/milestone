@@ -2994,9 +2994,9 @@ then
 		remove_files "${TARGET_PAGE%/}"
 	else
 		tput setaf $SEVERITY_HIGH
-		echo "page not found: $TARGET_PAGE" >&2
+		echo "Page not found: $TARGET_PAGE" >&2
 		tput sgr0
-		return 1
+		exit 1
 	fi
 fi
 
@@ -3007,9 +3007,9 @@ then
 		reorder_index "${TARGET_PAGE%/}";
 	else
 		tput setaf $SEVERITY_HIGH
-		echo "page not found: $TARGET_PAGE" >&2
+		echo "Page not found: $TARGET_PAGE" >&2
 		tput sgr0
-		return 1
+		exit 1
 	fi
 fi
 
