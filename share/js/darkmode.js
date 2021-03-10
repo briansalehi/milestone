@@ -2,7 +2,6 @@ function darkmode() {
 	var bodystyle = document.body;
 	var icon = document.getElementById('darkmode-icon');
 	const dark = sessionStorage.getItem('darkmode');
-	console.log(dark);
 
 	if (dark === 'true' || dark == 'undefined') {
 		bodystyle.classList.add("dark-mode");
@@ -20,7 +19,6 @@ function toggle_darkmode() {
 	var bodystyle = document.body;
 	var icon = document.getElementById('darkmode-icon');
 	const dark = sessionStorage.getItem('darkmode');
-	console.log(dark);
 
 	if (dark === 'true' || dark == 'undefined') {
 		bodystyle.classList.remove("dark-mode");

@@ -1992,6 +1992,7 @@ function generate_index_page {
 
 			generate_html_script begin
 			load_javascript darkmode.js
+			load_javascript scroll-listener.js
 			generate_html_script end
 
 			load_javascript jquery.html
@@ -2084,6 +2085,7 @@ function generate_page {
 	done
 			generate_html_script begin
 			load_javascript darkmode.js
+			load_javascript scroll-listener.js
 			generate_html_script end
 
 			load_javascript jquery.html
@@ -2154,6 +2156,7 @@ function generate_chapter {
 	done
 			generate_html_script begin
 			load_javascript darkmode.js
+			load_javascript scroll-listener.js
 			generate_html_script end
 
 			load_javascript jquery.html
