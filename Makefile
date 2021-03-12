@@ -13,6 +13,8 @@ endif
 
 ${PROGRAM}: ./prototype/${PROGRAM}
 	chmod +x ./prototype/${PROGRAM}
+	make -C ./prototype/gui/
+	make -C ./prototype/gui/ clean
 	@echo "now run \`sudo make install\`"
 
 install:
@@ -20,6 +22,7 @@ ifeq ($(wildcard /usr/share/milestone),)
 	mkdir /usr/share/milestone
 endif
 	cp prototype/${PROGRAM} /usr/local/bin/
+	cp prototype/gui/${GUI} /usr/local/bin/
 	cp -r ./share/* /usr/share/milestone/
 
 uninstall:

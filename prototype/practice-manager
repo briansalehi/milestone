@@ -42,9 +42,10 @@ function usage {
 	tput sgr0
 	echo
 	tput setaf 7
-	echo " $ practice-manager [-f,--force] [-p,--preview] [-r,--remove] [-o,--reorder] <path>"
+	echo " $ practice-manager [-f,--force] [-p,--preview] [-e,--edit] [-r,--remove] [-o,--reorder] <path>"
 	tput sgr0
 	echo "   <path>              build all pages (with --force also regenerate output file)"
+	echo "   --edit <path>       edit page (with --force also remove files)"
 	echo "   --remove <path>     unlink page (with --force also remove files)"
 	echo "   --reorder <path>    reorder page"
 	echo "   --preview <path>    preview page on your default browser"
@@ -2851,6 +2852,47 @@ function analyze_path {
 	elif [ -z "$extension" ] && ! [ -d "$path" ]
 	then
 		add_chapter "$path"
+	# if has extension and exists and indexed but needs to be edited
+	elif [ -n "$extension" ] && [ -f "$path" ] && [ -f "${path%/*}/.index" ]\
+		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 1 ]\
+		&& [ "${EDIT_OPTION:-false}" == "true" ]
+	then
+		validate_page "$path"
+		practice-manager-gui "$path"
+
+		local response
+		while ! execute_program "$path"
+		do
+			tput setaf $SEVERITY_HIGH
+			echo -n "Build process failed, continue editing (Y/n): " >&2
+			tput sgr0
+
+			response=
+			read response
+			response="${response^^}"
+
+			if [ "${response:-Y}" != "Y" ]
+			then
+				tput setaf $SEVERITY_LOW
+				echo "Editing calcelled" >&2
+				tput sgr0
+				break
+			fi
+
+			if ! practice-manager-gui "$path"; then break; fi
+		done
+
+		if [ "${PREVIEW_OPTION:-false}" == "true" ]
+		then
+			prepare_output_directory
+			generate_page "$path"
+			index_page "$path"
+			xdg-open ./html-files/$page_index.html &>/dev/null &
+		elif [ "${BUILD_OPTION:-false}" == "true" ]
+		then
+			prepare_output_directory
+			generate_page "$path"
+		fi
 	# if has extension and exists and indexed: check all files with it
 	elif [ -n "$extension" ] && [ -f "$path" ] && [ -f "${path%/*}/.index" ]\
 		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 1 ]
@@ -2977,6 +3019,7 @@ else
 	while [ $# -gt 0 ]
 	do
 		case "$1" in
+			-e|--edit) EDIT_OPTION=true ;;
 			-r|--remove) REMOVE_PAGE=true; TARGET_PAGE="${2%/}"; shift ;;
 			-o|--reorder) REORDER_PAGE=true; TARGET_PAGE="${2%/}"; shift ;;
 			-f|--force) FORCE_OPTION=true ;;
