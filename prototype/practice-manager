@@ -753,32 +753,32 @@ function regenerate_configuration {
 			COMPILATION_SCHEME)
 				if [ -n "${COMPILATION_SCHEME:-}" ]
 				then
-					sed -i "/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=\(.*\)/\1=\2;${value//\"/}/" "$1"
+					sed -i "/EXECUTION_SCHEME=/s/=\(.*\)/=\1;${value//\"/}/" "$1"
 				fi
 				;;
 			POST_COMPILATION_SCHEME)
 				if [ -n "${POST_COMPILATION_SCHEME:-}" ]
 				then
-					sed -i "/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=\(.*\)/\1=\2;${value//\"/}/" "$1"
+					sed -i "/EXECUTION_SCHEME=/s/=\(.*\)/=\1;${value//\"/}/" "$1"
 				fi
 				;;
 			LINKAGE_SCHEME)
 				if [ -n "${LINKAGE_SCHEME:-}" ]
 				then
-					sed -i "/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=\(.*\)/\1=\2;${value//\"/}/" "$1"
+					sed -i "/EXECUTION_SCHEME=/s/=\(.*\)/=\1;${value//\"/}/" "$1"
 				fi
 				;;
 			RUNNING_SCHEME)
 				if [ -n "${RUNNING_SCHEME:-}" ]
 				then
-					sed -i "/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=\(.*\)/\1=\2;${value//\"/}/" "$1"
+					sed -i "/EXECUTION_SCHEME=/s/=\(.*\)/=\1;${value//\"/}/" "$1"
 				fi
 				;;
 		esac
 	done <<< "$target_config"
 
 	sed -i \
-		-e '/EXECUTION_SCHEME=/s/EXECUTION_SCHEME=\([^\"]\)/=\"\1/' \
+		-e '/EXECUTION_SCHEME=/s/=\([^\"]\)/=\"\1/' \
 		-e '/EXECUTION_SCHEME=/s/\([^=\"]\)$/\1\"/' \
 		-e '/EXECUTION_SCHEME=/s/;;/;/g' \
 		-e '/EXECUTION_SCHEME=/s/=";/="/' \
