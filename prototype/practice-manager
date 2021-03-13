@@ -733,56 +733,52 @@ function regenerate_configuration {
 		# backward compatibility section
 		# if configs name are changed, map their values into new ones
 		case "$config" in
-			GENERATES_ERROR)
-				config="GENERATES_RUNTIME_ERROR"
-				sed -i "/^${config}=/s/^\(${config}\)=/\1=/" "$1"
-				;;
 			LANGUAGE)
 				config="SYNTAX"
-				sed -i "/^${config}=/s/^\(${config}\)=/\1=/" "$1"
+				sed -i "/${config}=/s/\(${config}\)=.*/\1=${value}/" "$1"
 				;;
 			OUTPUT_OBJECT)
 				config="OBJECT_EXTENSION"
-				sed -i "/^${config}=/s/^\(${config}\)=/\1=/" "$1"
+				sed -i "/${config}=/s/\(${config}\)=.*/\1=${value}/" "$1"
 				;;
 			CHAPTER_TEMPLATE)
 				if [ "${validation_check:-0}" == "202012271813" ] && [ "$(grep "toc" <<< "$value")" == "" ]
 				then
 					value="${value%\"} toc\""
-					sed -i "/^${config}=/s/^\(${config}\)=.*/\1=${value}/" "$1"
+					sed -i "/${config}=/s/\(${config}\)=.*/\1=${value}/" "$1"
 				fi ;;
 			COMPILATION_SCHEME)
 				if [ -n "${COMPILATION_SCHEME:-}" ]
 				then
-					sed -i "/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=\(.*\)/\1=\2;${value//\"/}/" "$1"
+					sed -i "/EXECUTION_SCHEME=/s/=\(.*\)/=\1;${value//\"/}/" "$1"
 				fi
 				;;
 			POST_COMPILATION_SCHEME)
 				if [ -n "${POST_COMPILATION_SCHEME:-}" ]
 				then
-					sed -i "/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=\(.*\)/\1=\2;${value//\"/}/" "$1"
+					sed -i "/EXECUTION_SCHEME=/s/=\(.*\)/=\1;${value//\"/}/" "$1"
 				fi
 				;;
 			LINKAGE_SCHEME)
 				if [ -n "${LINKAGE_SCHEME:-}" ]
 				then
-					sed -i "/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=\(.*\)/\1=\2;${value//\"/}/" "$1"
+					sed -i "/EXECUTION_SCHEME=/s/=\(.*\)/=\1;${value//\"/}/" "$1"
 				fi
 				;;
 			RUNNING_SCHEME)
 				if [ -n "${RUNNING_SCHEME:-}" ]
 				then
-					sed -i "/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=\(.*\)/\1=\2;${value//\"/}/" "$1"
+					sed -i "/EXECUTION_SCHEME=/s/=\(.*\)/=\1;${value//\"/}/" "$1"
 				fi
 				;;
 		esac
 	done <<< "$target_config"
 
 	sed -i \
-		-e '/EXECUTION_SCHEME=/s/EXECUTION_SCHEME=\([^\"]\)/=\"\1/' \
+		-e '/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=\([^\"]\)/\1=\"\2/' \
 		-e '/EXECUTION_SCHEME=/s/\([^=\"]\)$/\1\"/' \
 		-e '/EXECUTION_SCHEME=/s/;;/;/g' \
-		-e '/EXECUTION_SCHEME=/s/=";/="/' \
+		-e '/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=";/\1="/' \
 		"$1"
 
 	if ! grep -wq '^#EXECUTION_SCHEME=$' "$1"
@@ -800,21 +796,22 @@ function regenerate_configuration {
 		config="${config#\#}" # eliminate first # character
 		value="${line#*=}" # read configuration value
 		value="${value%%#*}" # ignore inline comments in values
+		value="${value//\"/}" # remove quotes
 
 		case "$config" in
-			SYNTAX) value="\"$SYNTAX\"" ;;
-			PAGE_TEMPLATE) value="\"$PAGE_TEMPLATE\"" ;;
-			CHAPTER_TEMPLATE) value="\"$CHAPTER_TEMPLATE\"" ;;
+			SYNTAX) value="\"$value\"" ;;
+			PAGE_TEMPLATE) value="\"$value\"" ;;
+			CHAPTER_TEMPLATE) value="\"$value\"" ;;
 			EXECUTION_SCHEME)
-				EXECUTION_SCHEME="${EXECUTION_SCHEME//\\/\\\\}" # escape backslash characters
+				EXECUTION_SCHEME="${value//\\/\\\\}" # escape backslash characters
 				EXECUTION_SCHEME="${EXECUTION_SCHEME//\//\\\/}" # escape slash characters
 				EXECUTION_SCHEME="${EXECUTION_SCHEME//\$/\\\\\$}" # escape dollar characters
 				value="\"$EXECUTION_SCHEME\"";
 				;;
-			OBJECT_EXTENSION) value="$OBJECT_EXTENSION" ;;
-			EXECUTABLE_EXTENSION) value="$EXECUTABLE_EXTENSION" ;;
-			CAPTURE_SCREENSHOT) value="$CAPTURE_SCREENSHOT" ;;
-			TECHNICAL_LEVEL) value="$TECHNICAL_LEVEL" ;;
+			OBJECT_EXTENSION) value="$value" ;;
+			EXECUTABLE_EXTENSION) value="$value" ;;
+			CAPTURE_SCREENSHOT) value="$value" ;;
+			TECHNICAL_LEVEL) value="$value" ;;
 			*) continue ;;
 		esac
 
@@ -1968,6 +1965,7 @@ function generate_index_page {
 	index=index
 
 	update_configuration "$page"
+
 	generate_html_section begin
 		generate_html_head begin "./README.md"
 			load_css ajax.html
@@ -2181,8 +2179,6 @@ function generate_chapter {
 # requires relative path to list
 function expand_list {
 	local directory
-	local members
-	local group
 
 	directory="${1%/*}"
 
@@ -2197,6 +2193,7 @@ function expand_list {
 	local line
 	while read -r line
 	do
+		line="${line%% *}"
 		if [ -f "$directory/$line" ] && [ "$line" != "README.md" ]
 		then
 			validate_page "$directory/$line"
@@ -2213,7 +2210,6 @@ function expand_list {
 			echo "Missing entry: $directory/$line" >&2
 			tput sgr0
 		fi
-		group=
 	done < "$1"
 }
 
@@ -2960,14 +2956,19 @@ then
 		tput setaf $SEVERITY_LOW
 		echo "configuring repository for the latest update..." >&2
 		tput sgr0
+
+		# configure the top config file first
+		regenerate_configuration "./.config"
+		extract_configuration "./.config"
+		sed -i "s/^\(VALIDATION_ID=\)[0-9]*$/\1${validation_check}/" ./.config
+
+		# configure config files in tree
 		if ! validate_configuration "./.index"
 		then
 			echo "configuration failed"
 			exit 1
 		fi
-		regenerate_configuration "./.config"
-		extract_configuration "./.config"
-		sed -i "s/^\(VALIDATION_ID=\)[0-9]*$/\1${validation_check}/" ./.config
+
 		echo
 		echo "configuration complete"
 		echo "run again to continue"
