@@ -4,17 +4,17 @@ PROGRAM = practice-manager
 
 .PHONY: all install uninstall unlink ${PROGRAM}
 
-all: unlink ${PROGRAM} ${GUI}
+all: unlink ./prototype/${PROGRAM} ./prorotype/gui/${GUI}
 
 unlink:
 ifneq ($(wildcard ~/.local/bin/${PROGRAM}),)
 	unlink ~/.local/bin/${PROGRAM}
 endif
 
-${PROGRAM}: ./prototype/${PROGRAM}
+./prototype/${PROGRAM}:
 	chmod +x ./prototype/${PROGRAM}
 
-${GUI}: ./prototype/gui/${GUI}
+./prorotype/gui/${GUI}:
 	make -C ./prototype/gui/
 	@echo "now run \`sudo make install\`"
 
@@ -25,6 +25,9 @@ endif
 	cp prototype/${PROGRAM} /usr/local/bin/
 	cp prototype/gui/${GUI} /usr/local/bin/
 	cp -r ./share/* /usr/share/milestone/
+
+clean: ./prototype/gui/${GUI}
+	make -C ./prototype/gui/ clean
 
 uninstall:
 	rm -f /usr/local/bin/${PROGRAM}
