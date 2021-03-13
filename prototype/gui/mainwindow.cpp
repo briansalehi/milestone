@@ -69,13 +69,53 @@ void MainWindow::setupLayouts()
 
 void MainWindow::loadContent()
 {
-	QFile file("cpp/stl/sequential/vector/initialization.title.txt");
+	if (QCoreApplication::arguments().count() < 2)
+		exit(1);
+
+	QString fileName = QCoreApplication::arguments().at(1);
+	QFile file(fileName);
 	file.open(QFile::ReadOnly | QFile::Text);
-	if (file.isOpen()) {
-		QString content = file.readAll();
+	if (! file.isOpen()) {
+		statusBar()->setStyleSheet("QStatusBar: {color: red}");
+		statusBar()->showMessage("File not found: " + fileName);
+		exit(1);
+	}
+
+	fileName = fileName.remove(QRegExp("\\..*$"));
+
+	QString titleFileName(fileName);
+	titleFileName.append(".title.txt");
+	QFile titleFile(titleFileName);
+	titleFile.open(QFile::ReadOnly | QFile::Text);
+	if (titleFile.isOpen()) {
+		QString content = titleFile.readAll();
 		titleLineEdit->setText(content);
-	} else {
-		statusBar()->setStyleSheet("QStatusBar{color: red}");
-		statusBar()->showMessage("File not found!");
+	}
+
+	QString tagFileName(fileName);
+	tagFileName.append(".alias.txt");
+	QFile tagFile(tagFileName);
+	tagFile.open(QFile::ReadOnly | QFile::Text);
+	if (file.isOpen()) {
+		QString content = tagFile.readAll();
+		tagLineEdit->setText(content);
+	}
+
+	QString referenceFileName(fileName);
+	referenceFileName.append(".reference.txt");
+	QFile referenceFile(referenceFileName);
+	referenceFile.open(QFile::ReadOnly | QFile::Text);
+	if (file.isOpen()) {
+		QString content = referenceFile.readAll();
+		referenceTextEdit->setText(content);
+	}
+
+	QString commentFileName(fileName);
+	commentFileName.append(".comment.txt");
+	QFile commentFile(commentFileName);
+	commentFile.open(QFile::ReadOnly | QFile::Text);
+	if (file.isOpen()) {
+		QString content = commentFile.readAll();
+		commentTextEdit->setText(content);
 	}
 }

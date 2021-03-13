@@ -4,7 +4,7 @@ PROGRAM = practice-manager
 
 .PHONY: all install uninstall unlink ${PROGRAM}
 
-all: unlink ${PROGRAM}
+all: unlink ${PROGRAM} ${GUI}
 
 unlink:
 ifneq ($(wildcard ~/.local/bin/${PROGRAM}),)
@@ -13,9 +13,9 @@ endif
 
 ${PROGRAM}: ./prototype/${PROGRAM}
 	chmod +x ./prototype/${PROGRAM}
+
+${GUI}: ./prototype/gui/${GUI}
 	make -C ./prototype/gui/
-	make -C ./prototype/gui/ clean
-	rm -f ./prototype/gui/*.pro
 	@echo "now run \`sudo make install\`"
 
 install:
