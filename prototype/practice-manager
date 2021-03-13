@@ -2181,8 +2181,6 @@ function generate_chapter {
 # requires relative path to list
 function expand_list {
 	local directory
-	local members
-	local group
 
 	directory="${1%/*}"
 
@@ -2197,6 +2195,7 @@ function expand_list {
 	local line
 	while read -r line
 	do
+		line="${line%% *}"
 		if [ -f "$directory/$line" ] && [ "$line" != "README.md" ]
 		then
 			validate_page "$directory/$line"
@@ -2213,7 +2212,6 @@ function expand_list {
 			echo "Missing entry: $directory/$line" >&2
 			tput sgr0
 		fi
-		group=
 	done < "$1"
 }
 
