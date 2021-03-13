@@ -732,23 +732,19 @@ function regenerate_configuration {
 		# backward compatibility section
 		# if configs name are changed, map their values into new ones
 		case "$config" in
-			GENERATES_ERROR)
-				config="GENERATES_RUNTIME_ERROR"
-				sed -i "/^${config}=/s/^\(${config}\)=/\1=/" "$1"
-				;;
 			LANGUAGE)
 				config="SYNTAX"
-				sed -i "/^${config}=/s/^\(${config}\)=/\1=/" "$1"
+				sed -i "/${config}=/s/\(${config}\)=.*/\1=${value}/" "$1"
 				;;
 			OUTPUT_OBJECT)
 				config="OBJECT_EXTENSION"
-				sed -i "/^${config}=/s/^\(${config}\)=/\1=/" "$1"
+				sed -i "/${config}=/s/\(${config}\)=.*/\1=${value}/" "$1"
 				;;
 			CHAPTER_TEMPLATE)
 				if [ "${validation_check:-0}" == "202012271813" ] && [ "$(grep "toc" <<< "$value")" == "" ]
 				then
 					value="${value%\"} toc\""
-					sed -i "/^${config}=/s/^\(${config}\)=.*/\1=${value}/" "$1"
+					sed -i "/${config}=/s/\(${config}\)=.*/\1=${value}/" "$1"
 				fi ;;
 			COMPILATION_SCHEME)
 				if [ -n "${COMPILATION_SCHEME:-}" ]
@@ -799,21 +795,22 @@ function regenerate_configuration {
 		config="${config#\#}" # eliminate first # character
 		value="${line#*=}" # read configuration value
 		value="${value%%#*}" # ignore inline comments in values
+		value="${value//\"/}" # remove quotes
 
 		case "$config" in
-			SYNTAX) value="\"$SYNTAX\"" ;;
-			PAGE_TEMPLATE) value="\"$PAGE_TEMPLATE\"" ;;
-			CHAPTER_TEMPLATE) value="\"$CHAPTER_TEMPLATE\"" ;;
+			SYNTAX) value="\"$value\"" ;;
+			PAGE_TEMPLATE) value="\"$value\"" ;;
+			CHAPTER_TEMPLATE) value="\"$value\"" ;;
 			EXECUTION_SCHEME)
-				EXECUTION_SCHEME="${EXECUTION_SCHEME//\\/\\\\}" # escape backslash characters
+				EXECUTION_SCHEME="${value//\\/\\\\}" # escape backslash characters
 				EXECUTION_SCHEME="${EXECUTION_SCHEME//\//\\\/}" # escape slash characters
 				EXECUTION_SCHEME="${EXECUTION_SCHEME//\$/\\\\\$}" # escape dollar characters
 				value="\"$EXECUTION_SCHEME\"";
 				;;
-			OBJECT_EXTENSION) value="$OBJECT_EXTENSION" ;;
-			EXECUTABLE_EXTENSION) value="$EXECUTABLE_EXTENSION" ;;
-			CAPTURE_SCREENSHOT) value="$CAPTURE_SCREENSHOT" ;;
-			TECHNICAL_LEVEL) value="$TECHNICAL_LEVEL" ;;
+			OBJECT_EXTENSION) value="$value" ;;
+			EXECUTABLE_EXTENSION) value="$value" ;;
+			CAPTURE_SCREENSHOT) value="$value" ;;
+			TECHNICAL_LEVEL) value="$value" ;;
 			*) continue ;;
 		esac
 
@@ -2938,14 +2935,19 @@ then
 		tput setaf $SEVERITY_LOW
 		echo "configuring repository for the latest update..." >&2
 		tput sgr0
+
+		# configure the top config file first
+		regenerate_configuration "./.config"
+		extract_configuration "./.config"
+		sed -i "s/^\(VALIDATION_ID=\)[0-9]*$/\1${validation_check}/" ./.config
+
+		# configure config files in tree
 		if ! validate_configuration "./.index"
 		then
 			echo "configuration failed"
 			exit 1
 		fi
-		regenerate_configuration "./.config"
-		extract_configuration "./.config"
-		sed -i "s/^\(VALIDATION_ID=\)[0-9]*$/\1${validation_check}/" ./.config
+
 		echo
 		echo "configuration complete"
 		echo "run again to continue"
