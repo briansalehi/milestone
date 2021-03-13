@@ -8,7 +8,7 @@
 #include <QPushButton>
 #include <QFile>
 #include <QMenuBar>
-#include <QStatus>
+#include <QStatusBar>
 #include <QLabel>
 #include <QString>
 #include <QLineEdit>

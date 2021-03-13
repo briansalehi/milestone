@@ -75,6 +75,7 @@ void MainWindow::loadContent()
 		QString content = file.readAll();
 		titleLineEdit->setText(content);
 	} else {
-		statusBar()->
+		statusBar()->setStyleSheet("QStatusBar{color: red}");
+		statusBar()->showMessage("File not found!");
 	}
 }
