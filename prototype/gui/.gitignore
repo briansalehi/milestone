@@ -1,4 +1,3 @@
 .qmake.stash
-*.pro
 moc_*.*
 practice-manager-gui

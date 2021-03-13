@@ -15,6 +15,7 @@ ${PROGRAM}: ./prototype/${PROGRAM}
 	chmod +x ./prototype/${PROGRAM}
 	make -C ./prototype/gui/
 	make -C ./prototype/gui/ clean
+	rm -f ./prototype/gui/*.pro
 	@echo "now run \`sudo make install\`"
 
 install:

@@ -71,6 +71,10 @@ void MainWindow::loadContent()
 {
 	QFile file("cpp/stl/sequential/vector/initialization.title.txt");
 	file.open(QFile::ReadOnly | QFile::Text);
-	QString content = file.readAll();
-	titleLineEdit->setText(content);
+	if (file.isOpen()) {
+		QString content = file.readAll();
+		titleLineEdit->setText(content);
+	} else {
+		statusBar()->
+	}
 }
