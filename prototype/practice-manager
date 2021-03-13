@@ -778,10 +778,10 @@ function regenerate_configuration {
 	done <<< "$target_config"
 
 	sed -i \
-		-e '/EXECUTION_SCHEME=/s/=\([^\"]\)/=\"\1/' \
+		-e '/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=\([^\"]\)/\1=\"\2/' \
 		-e '/EXECUTION_SCHEME=/s/\([^=\"]\)$/\1\"/' \
 		-e '/EXECUTION_SCHEME=/s/;;/;/g' \
-		-e '/EXECUTION_SCHEME=/s/=";/="/' \
+		-e '/EXECUTION_SCHEME=/s/\(EXECUTION_SCHEME\)=";/\1="/' \
 		"$1"
 
 	if ! grep -wq '^#EXECUTION_SCHEME=$' "$1"
@@ -1967,6 +1967,7 @@ function generate_index_page {
 	index=index
 
 	update_configuration "$page"
+
 	generate_html_section begin
 		generate_html_head begin "./README.md"
 			load_css ajax.html
