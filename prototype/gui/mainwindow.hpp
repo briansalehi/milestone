@@ -13,6 +13,7 @@
 #include <QString>
 #include <QLineEdit>
 #include <QTextEdit>
+#include <QTextBrowser>
 
 class MainWindow : public QMainWindow
 {
@@ -31,12 +32,14 @@ private:
 	QLabel* commentLabel;
 	QLabel* referenceLabel;
 	QLabel* tagLabel;
+	QLabel* sourceLabel;
 
 	QLineEdit* titleLineEdit;
 	QLineEdit* tagLineEdit;
 
-	QTextEdit* commentTextEdit;
-	QTextEdit* referenceTextEdit;
+	QTextBrowser* commentTextEdit;
+	QTextBrowser* referenceTextEdit;
+	QTextBrowser* sourceTextEdit;
 
 	QVBoxLayout* centralLayout;
 	QGridLayout* editingLayout;

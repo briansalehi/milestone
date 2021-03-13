@@ -21,6 +21,7 @@ void MainWindow::setupFields()
 	tagLabel = new QLabel("Tag:");
 	referenceLabel = new QLabel("Reference:");
 	commentLabel = new QLabel("Comment:");
+	sourceLabel = new QLabel("Source:");
 
 	titleLineEdit= new QLineEdit;
 	titleLineEdit->setPlaceholderText("Page Title");
@@ -28,11 +29,20 @@ void MainWindow::setupFields()
 	tagLineEdit = new QLineEdit;
 	tagLineEdit->setPlaceholderText("Page Tag");
 
-	commentTextEdit = new QTextEdit;
+	commentTextEdit = new QTextBrowser;
 	commentTextEdit->setPlaceholderText("Page Description");
+	commentTextEdit->setTabStopDistance(20);
+	commentTextEdit->setAcceptRichText(false);
 
-	referenceTextEdit = new QTextEdit;
+	referenceTextEdit = new QTextBrowser;
 	referenceTextEdit->setPlaceholderText("Reference List");
+	referenceTextEdit->setTabChangesFocus(true);
+
+	sourceTextEdit = new QTextBrowser;
+	sourceTextEdit->setPlaceholderText("Source");
+	sourceTextEdit->setTabStopDistance(20);
+	sourceTextEdit->setAcceptRichText(false);
+	sourceTextEdit->setReadOnly(true);
 }
 
 void MainWindow::setupButtons()
@@ -52,6 +62,8 @@ void MainWindow::setupLayouts()
 	editingLayout->addWidget(referenceTextEdit, 2, 1);
 	editingLayout->addWidget(commentLabel, 3, 0);
 	editingLayout->addWidget(commentTextEdit, 3, 1);
+	editingLayout->addWidget(sourceLabel, 4, 0);
+	editingLayout->addWidget(sourceTextEdit, 4, 1);
 
 	buttonsLayout = new QHBoxLayout;
 	buttonsLayout->addStretch();
@@ -75,13 +87,16 @@ void MainWindow::loadContent()
 	QString fileName = QCoreApplication::arguments().at(1);
 	QFile file(fileName);
 	file.open(QFile::ReadOnly | QFile::Text);
-	if (! file.isOpen()) {
-		statusBar()->setStyleSheet("QStatusBar: {color: red}");
+	if (file.isOpen()) {
+		QString content = file.readAll();
+		sourceTextEdit->setPlainText(content);
+	} else {
+		statusBar()->setStyleSheet("QStatusBar{color: red}");
 		statusBar()->showMessage("File not found: " + fileName);
-		exit(1);
+		return;
 	}
 
-	fileName = fileName.remove(QRegExp("\\..*$"));
+	fileName = fileName.remove(QRegExp("\\.[^\\.]*$"));
 
 	QString titleFileName(fileName);
 	titleFileName.append(".title.txt");
@@ -96,7 +111,7 @@ void MainWindow::loadContent()
 	tagFileName.append(".alias.txt");
 	QFile tagFile(tagFileName);
 	tagFile.open(QFile::ReadOnly | QFile::Text);
-	if (file.isOpen()) {
+	if (tagFile.isOpen()) {
 		QString content = tagFile.readAll();
 		tagLineEdit->setText(content);
 	}
@@ -105,17 +120,17 @@ void MainWindow::loadContent()
 	referenceFileName.append(".reference.txt");
 	QFile referenceFile(referenceFileName);
 	referenceFile.open(QFile::ReadOnly | QFile::Text);
-	if (file.isOpen()) {
+	if (referenceFile.isOpen()) {
 		QString content = referenceFile.readAll();
-		referenceTextEdit->setText(content);
+		referenceTextEdit->setPlainText(content);
 	}
 
 	QString commentFileName(fileName);
 	commentFileName.append(".comment.txt");
 	QFile commentFile(commentFileName);
 	commentFile.open(QFile::ReadOnly | QFile::Text);
-	if (file.isOpen()) {
+	if (commentFile.isOpen()) {
 		QString content = commentFile.readAll();
-		commentTextEdit->setText(content);
+		commentTextEdit->setPlainText(content);
 	}
 }

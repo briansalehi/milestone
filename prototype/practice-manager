@@ -2858,29 +2858,8 @@ function analyze_path {
 		&& [ "${EDIT_OPTION:-false}" == "true" ]
 	then
 		validate_page "$path"
-		practice-manager-gui "${path#./}"
-
-		local response
-		while ! execute_program "$path"
-		do
-			tput setaf $SEVERITY_HIGH
-			echo -n "Build process failed, continue editing (Y/n): " >&2
-			tput sgr0
-
-			response=
-			read response
-			response="${response^^}"
-
-			if [ "${response:-Y}" != "Y" ]
-			then
-				tput setaf $SEVERITY_LOW
-				echo "Editing calcelled" >&2
-				tput sgr0
-				break
-			fi
-
-			if ! practice-manager-gui "$path"; then break; fi
-		done
+		practice-manager-gui "$path"
+		execute_program "$path"
 
 		if [ "${PREVIEW_OPTION:-false}" == "true" ]
 		then
