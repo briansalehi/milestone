@@ -3,7 +3,8 @@ function scrollDownListener() {
     "keydown",
     function(event) {
       if (event.key == "j") {
-        window.scrollBy(0, window.screen.height / 4)
+        var screen_height = window.screen.height / 4;
+        window.scrollTo({top: screen_height, behavior: 'smooth'})
       }
     }
   )
@@ -14,7 +15,8 @@ function scrollUpListener() {
     "keydown",
     function(event) {
       if (event.key == "k") {
-        window.scrollBy(0, -(window.screen.height / 4))
+        var screen_height = window.screen.height / 4;
+        window.scrollTo({top: -screen_height, behavior: 'smooth'})
       }
     }
   )
