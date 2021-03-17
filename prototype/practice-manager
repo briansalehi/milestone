@@ -2249,6 +2249,11 @@ function generate_manuals {
 	then
 		cp -r icons html-files/
 	fi
+
+	if [ -d /usr/share/milestone/icons ]
+	then
+		cp /usr/share/milestone/icons/* html-files/
+	fi
 }
 
 # functions for specific options
