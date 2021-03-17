@@ -10,10 +10,10 @@
 	z-index: 1;
 	border-radius: 0px;
 	text-align: center;
+	font-size: 18px;
 }
 
 .dropbtn {
-  padding: 14px;
   font-size: 14px;
   border: none;
 }

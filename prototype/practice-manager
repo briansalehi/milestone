@@ -1996,6 +1996,7 @@ function generate_index_page {
 			load_javascript darkmode.js
 			load_javascript scroll-listener.js
 			load_javascript settings.js
+			load_javascript fontsize.js
 			generate_html_script end
 
 			load_javascript jquery.html
@@ -2091,6 +2092,7 @@ function generate_page {
 			load_javascript darkmode.js
 			load_javascript scroll-listener.js
 			load_javascript settings.js
+			load_javascript fontsize.js
 			generate_html_script end
 
 			load_javascript jquery.html
@@ -2164,6 +2166,7 @@ function generate_chapter {
 			load_javascript darkmode.js
 			load_javascript scroll-listener.js
 			load_javascript settings.js
+			load_javascript fontsize.js
 			generate_html_script end
 
 			load_javascript jquery.html
