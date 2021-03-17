@@ -24,9 +24,11 @@ function toggle_darkmode() {
 		bodystyle.classList.remove("dark-mode");
 		sessionStorage.setItem('darkmode', false);
 		icon.innerHTML = '&#x1F315;';
+		toggle_settings();
 	} else {
 		sessionStorage.setItem('darkmode', true);
 		bodystyle.classList.add("dark-mode");
 		icon.innerHTML = '&#x1F312;';
+		toggle_settings();
 	}
 }

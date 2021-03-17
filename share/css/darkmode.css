@@ -16,6 +16,15 @@
 	background-color: #212529;
 }
 
+.dark-mode .btn:hover {
+	color: #777777;
+}
+
+.dark-mode .dropdown-item {
+	background-color: #3a3a3a !important;
+	color: #aaaaaa;
+}
+
 .dark-mode .group-child {
 	background-color: #3a3a3a !important;
 }
