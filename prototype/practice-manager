@@ -260,7 +260,7 @@ function generate_html_body {
 }
 
 function generate_html_dark_button {
-	echo "<button id='darkmode-icon' class='btn pull-right sticky' onclick='toggle_darkmode()' title='ALT + SHIFT + N' accesskey='N'>&#x1F315;</button>" >&3
+	load_javascript settings.html
 }
 
 # optional begin/end
@@ -1977,6 +1977,7 @@ function generate_index_page {
 			generate_html_style begin
 			load_css general.css
 			load_css darkmode.css
+			load_css settings.css
 			load_css breadcrumb.css
 			load_css list-group.css
 			load_css pager.css
@@ -2057,6 +2058,7 @@ function generate_page {
 			generate_html_style begin
 			load_css general.css
 			load_css darkmode.css
+			load_css settings.css
 			load_css breadcrumb.css
 			load_css list-group.css
 			load_css pager.css
@@ -2129,6 +2131,7 @@ function generate_chapter {
 			generate_html_style begin
 			load_css general.css
 			load_css darkmode.css
+			load_css settings.css
 			load_css breadcrumb.css
 			load_css list-group.css
 			load_css pager.css

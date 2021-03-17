@@ -12,11 +12,6 @@
 	color: #aaaaaa;
 }
 
-.btn {
-	background-color: #f5f5f5;
-	z-index: 1;
-}
-
 .dark-mode .btn {
 	background-color: #212529;
 }
