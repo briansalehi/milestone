@@ -1779,11 +1779,11 @@ function generate_quick_access_section {
 		generate_html_item_with_link "$button" "/" "previous disabled" "B"
 	fi
 
-	button="Home"
-	if [ -z "$previous_index" ] || [ -z "$next_page" ]
-	then
-		generate_html_item_with_link "$button" "/" top "T"
-	fi
+#	button="Home"
+#	if [ -z "$previous_index" ] || [ -z "$next_page" ]
+#	then
+#		generate_html_item_with_link "$button" "/" top "T"
+#	fi
 
 	find_index_alias "${next_index:-0}"
 
