@@ -34,9 +34,8 @@ private:
 	QLabel* tagLabel;
 	QLabel* sourceLabel;
 
-	QLineEdit* titleLineEdit;
-	QLineEdit* tagLineEdit;
-
+	QTextBrowser* titleLineEdit;
+	QTextBrowser* tagLineEdit;
 	QTextBrowser* commentTextEdit;
 	QTextBrowser* referenceTextEdit;
 	QTextBrowser* sourceTextEdit;

@@ -23,26 +23,20 @@ void MainWindow::setupFields()
 	commentLabel = new QLabel("Comment:");
 	sourceLabel = new QLabel("Source:");
 
-	titleLineEdit= new QLineEdit;
+	titleLineEdit= new QTextBrowser;
 	titleLineEdit->setPlaceholderText("Page Title");
 
-	tagLineEdit = new QLineEdit;
+	tagLineEdit = new QTextBrowser;
 	tagLineEdit->setPlaceholderText("Page Tag");
 
 	commentTextEdit = new QTextBrowser;
 	commentTextEdit->setPlaceholderText("Page Description");
-	commentTextEdit->setTabStopDistance(20);
-	commentTextEdit->setAcceptRichText(false);
 
 	referenceTextEdit = new QTextBrowser;
 	referenceTextEdit->setPlaceholderText("Reference List");
-	referenceTextEdit->setTabChangesFocus(true);
 
 	sourceTextEdit = new QTextBrowser;
 	sourceTextEdit->setPlaceholderText("Source");
-	sourceTextEdit->setTabStopDistance(20);
-	sourceTextEdit->setAcceptRichText(false);
-	sourceTextEdit->setReadOnly(true);
 }
 
 void MainWindow::setupButtons()

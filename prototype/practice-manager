@@ -3015,7 +3015,7 @@ else
 	while [ $# -gt 0 ]
 	do
 		case "$1" in
-			-e|--edit) EDIT_OPTION=true ;;
+			-e|--edit|--editor) EDIT_OPTION=true ;;
 			-r|--remove) REMOVE_PAGE=true; TARGET_PAGE="${2%/}"; shift ;;
 			-o|--reorder) REORDER_PAGE=true; TARGET_PAGE="${2%/}"; shift ;;
 			-f|--force) FORCE_OPTION=true ;;
