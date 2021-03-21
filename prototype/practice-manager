@@ -13,16 +13,13 @@ main_configuration=\
 ## navigation title comment reference pagination toc
 #CHAPTER_TEMPLATE=\"navigation title comment reference pagination toc\"
 
-### object, source, headers, location, binary, pagename, rawname, input
-### makefile, rawmakefile, stepN optionN, extension-xyz, error,
-### screenshot, background
+## background binary error extension-xyz headers input location makefile
+## object optionN pagename rawmakefile rawname screenshot source stepN
 #EXECUTION_SCHEME=
 
-## default: .o
-#OBJECT_EXTENSION=
+#OBJECT_EXTENSION=.o
 
-## default: .bin
-#EXECUTABLE_EXTENSION=
+#EXECUTABLE_EXTENSION=.bin
 
 #CAPTURE_SCREENSHOT=false
 
@@ -2958,7 +2955,7 @@ function analyze_paramters {
 
 if [ .index ] && [ -f .config ]
 then
-	validation_check=202103211628
+	validation_check=202103211640
 	source .config
 	if [ "${VALIDATION_ID:-0}" -eq "0" ]
 	then
