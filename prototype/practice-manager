@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 
 main_configuration=\
-"## bash c cpp asm6502 java python aspnet csharp cmake django dns-zone docker
-## go hcl ignore javadoc json json5 kotlin latex makefile markdown matlab
-## mongodb nasm nginx objectivec opencl perl php phpdoc plsql powershell
-## processing prolog qml r regex ruby rust scala sql swift typescript
-## verilog vhdl vim wasm
+"## asm6502 aspnet bash c cmake cpp csharp django dns-zone docker go hcl ignore
+## java javadoc json json5 kotlin latex makefile markdown matlab mongodb nasm
+## nginx objectivec opencl perl php phpdoc plsql powershell processing prolog
+## python qml r regex ruby rust scala sql swift typescript verilog vhdl vim wasm
 #SYNTAX=
 
 ## navigation title comment reference source execution input output error pagination
@@ -2959,7 +2958,7 @@ function analyze_paramters {
 
 if [ .index ] && [ -f .config ]
 then
-	validation_check=202102281727
+	validation_check=202103211628
 	source .config
 	if [ "${VALIDATION_ID:-0}" -eq "0" ]
 	then
