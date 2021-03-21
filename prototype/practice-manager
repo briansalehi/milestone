@@ -2826,6 +2826,38 @@ function execute_program {
 	fi
 }
 
+function post_chapter_analization {
+	local path="$1"
+
+	if [ "${PREVIEW_OPTION:-false}" == "true" ]
+	then
+		prepare_output_directory
+		generate_chapter "$path"
+		index_page "$path"
+		xdg-open ./html-files/$page_index.html &>/dev/null &
+	elif [ "${BUILD_OPTION:-false}" == "true" ]
+	then
+		prepare_output_directory
+		generate_chapter "$path"
+	fi
+}
+
+function post_page_analization {
+	local path="$1"
+
+	if [ "${PREVIEW_OPTION:-false}" == "true" ]
+	then
+		prepare_output_directory
+		generate_page "$path"
+		index_page "$path"
+		xdg-open ./html-files/$page_index.html &>/dev/null &
+	elif [ "${BUILD_OPTION:-false}" == "true" ]
+	then
+		prepare_output_directory
+		generate_page "$path"
+	fi
+}
+
 # requires relative path
 function analyze_path {
 	local path="${1%/}"
@@ -2856,10 +2888,19 @@ function analyze_path {
 		&& [ "$(grep -c "^${path##*/}$" "${path%/*}/.index")" -eq 0 ]
 	then
 		join_chapter "$path"
+		post_chapter_analization "$path"
+	# if does not have extension and does not exist and gui is set: create chapter in gui
+	elif [ -z "$extension" ] && ! [ -d "$path" ]\
+		&& [ "${EDIT_OPTION:-false}" == "true" ]
+	then
+		add_chapter "$path"
+		practice-manager-gui "${path}/README.md"
+		post_chapter_analization "${path}/README.md"
 	# if does not have extension and does not exist: create chapter
 	elif [ -z "$extension" ] && ! [ -d "$path" ]
 	then
 		add_chapter "$path"
+		post_chapter_analization "${path}/README.md"
 	# if has extension and exists and indexed but needs to be edited
 	elif [ -n "$extension" ] && [ -f "$path" ] && [ -f "${path%/*}/.index" ]\
 		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 1 ]\
@@ -2868,44 +2909,33 @@ function analyze_path {
 		validate_page "$path"
 		practice-manager-gui "$path"
 		execute_program "$path"
-
-		if [ "${PREVIEW_OPTION:-false}" == "true" ]
-		then
-			prepare_output_directory
-			generate_page "$path"
-			index_page "$path"
-			xdg-open ./html-files/$page_index.html &>/dev/null &
-		elif [ "${BUILD_OPTION:-false}" == "true" ]
-		then
-			prepare_output_directory
-			generate_page "$path"
-		fi
+		post_page_analization "$path"
 	# if has extension and exists and indexed: check all files with it
 	elif [ -n "$extension" ] && [ -f "$path" ] && [ -f "${path%/*}/.index" ]\
 		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 1 ]
 	then
 		validate_page "$path"
 		execute_program "$path"
-		if [ "${PREVIEW_OPTION:-false}" == "true" ]
-		then
-			prepare_output_directory
-			generate_page "$path"
-			index_page "$path"
-			xdg-open ./html-files/$page_index.html &>/dev/null &
-		elif [ "${BUILD_OPTION:-false}" == "true" ]
-		then
-			prepare_output_directory
-			generate_page "$path"
-		fi
+		post_page_analization "$path"
 	# if has extension and exists but is not indexed: check and join practice
 	elif [ -n "$extension" ] && [ -f "$path" ] && [ -f "${path%/*}/.index" ]\
 		&& [ "$(grep -c "^${path##*/}" "${path%/*}/.index")" -eq 0 ]
 	then
 		join_page "$path"
+		post_page_analization "$path"
+	# if has extension but does not exist and gui is set, create page in gui
+	elif [ -n "$extension" ] && ! [ -f "$path" ]\
+		&& [ "${EDIT_OPTION:-false}" == "true" ]
+	then
+		add_page "$path"
+		practice-manager-gui "$path"
+		execute_program "$path"
+		post_page_analization "$path"
 	# if has extension but does not exist, create practice page
 	elif [ -n "$extension" ] && ! [ -f "$path" ]
 	then
 		add_page "$path"
+		post_page_analization "$path"
 	# otherwise, unhandled error
 	else
 		return 1
@@ -3011,7 +3041,7 @@ else
 	while [ $# -gt 0 ]
 	do
 		case "$1" in
-			-e|--edit|--editor) EDIT_OPTION=true ;;
+			-e|-g|--gui|--edit|--editor) EDIT_OPTION=true ;;
 			-r|--remove) REMOVE_PAGE=true; TARGET_PAGE="${2%/}"; shift ;;
 			-o|--reorder) REORDER_PAGE=true; TARGET_PAGE="${2%/}"; shift ;;
 			-f|--force) FORCE_OPTION=true ;;
