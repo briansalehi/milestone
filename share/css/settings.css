@@ -1,16 +1,16 @@
 .sticky {
 	position: sticky !important;
-	top: 1%;
+	z-index: 1;
+	top: 3%;
 }
 
 .btn {
 	background-color: #f5f5f5;
 	height: 40px;
 	width: 40px;
-	z-index: 1;
-	border-radius: 0px;
-	text-align: center;
-	font-size: 18px;
+	border-radius: 5px;
+	text-align: center !important;
+	font-size: 18px !important;
 }
 
 .dropbtn {
