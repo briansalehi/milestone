@@ -10,7 +10,7 @@ function darkmode() {
 	} else {
 		sessionStorage.setItem('darkmode', false);
 		bodystyle.classList.remove("dark-mode");
-		icon.innerHTML = '&#x2600;';
+		icon.innerHTML = '&#x1F312;';
 	}
 }
 darkmode();
@@ -23,7 +23,7 @@ function toggle_darkmode() {
 	if (dark === 'true' || dark == 'undefined') {
 		bodystyle.classList.remove("dark-mode");
 		sessionStorage.setItem('darkmode', false);
-		icon.innerHTML = '&#x2600;';
+		icon.innerHTML = '&#x1F312;';
 		toggle_settings();
 	} else {
 		sessionStorage.setItem('darkmode', true);
