@@ -2119,7 +2119,7 @@ function generate_page {
 		case "$section" in
 			navigation) generate_navigation_section "$1"; generate_html_dark_button ;;
 			title) generate_header_section "$1" ;;
-			progress) generate_progressbar_seection ;;
+			progress) generate_progressbar_section ;;
 			reference) generate_reference_section "$1" ;;
 			comment) generate_comment_section "$1" ;;
 			source) generate_source_section $source_group ;;
@@ -2195,7 +2195,7 @@ function generate_chapter {
 		case "$section" in
 			navigation) generate_navigation_section "$1"; generate_html_dark_button ;;
 			title) generate_header_section "$1" ;;
-			progress) generate_progressbar_seection ;;
+			progress) generate_progressbar_section ;;
 			reference) generate_reference_section "$1" ;;
 			comment) generate_comment_section "$1" ;;
 			execution) generate_execution_section $1 ;;
