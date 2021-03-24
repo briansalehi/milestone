@@ -7,11 +7,11 @@ main_configuration=\
 ## python qml r regex ruby rust scala sql swift typescript verilog vhdl vim wasm
 #SYNTAX=
 
-## navigation title comment reference source execution input output error pagination
-#PAGE_TEMPLATE=\"navigation title comment reference source execution input output error pagination\"
+## navigation title progress comment reference source execution input output error pagination
+#PAGE_TEMPLATE=\"navigation title progress comment reference source execution input output error pagination\"
 
-## navigation title comment reference pagination toc
-#CHAPTER_TEMPLATE=\"navigation title comment reference pagination toc\"
+## navigation title progress comment reference pagination toc
+#CHAPTER_TEMPLATE=\"navigation title progress comment reference pagination toc\"
 
 ## background binary error extension-xyz headers input location makefile
 ## object optionN pagename rawmakefile rawname screenshot source stepN
@@ -1497,6 +1497,48 @@ function generate_index_section {
 	echo -n "  ${tag}${index%.0}. " >&3
 }
 
+function generate_technical_level {
+	local tag
+	local level
+	local percentage
+	local volume
+	local title
+
+	case "${TECHNICAL_LEVEL:-basic}" in
+		basic|amateur)
+			level="success";
+			percentage=33;
+			volume=1;
+			title="Basic";
+			color="#28a745 !important"
+			;;
+		intermediate|medium)
+			level="warning";
+			percentage=66;
+			volume=2;
+			title="Medium";
+			color="#ffc107 !important"
+			;;
+		expert|hard)
+			level="danger";
+			percentage=100;
+			volume=3;
+			title="Expert";
+			color="#dc3545 !important"
+			;;
+	esac
+
+	tag='<div><span style="float:left;">Hardness:&nbsp;</span>'
+	tag+='<div class="progress" style="width: 100px;">'
+	tag+="<div class=\"progress-bar bg-${level}\" role=\"progressbar\""
+	tag+=" style=\"width: ${percentage}%; background-color: ${color};\""
+	tag+=" aria-valuenow=\"${volume}\""
+	tag+=" aria-valuemin=\"1\" aria-valuemax=\"3\">${title}</div>"
+	tag+='</div></div>'
+
+	echo "$tag" >&3
+}
+
 # requires path to page
 function generate_header_section {
 	local page="${1%.*}"
@@ -1518,6 +1560,10 @@ function generate_header_section {
 		title="$(cat "$header")"
 		generate_html_header 2 "$title"
 	fi
+}
+
+function generate_progressbar_section {
+	generate_technical_level
 }
 
 # requires path to page
@@ -2073,6 +2119,7 @@ function generate_page {
 		case "$section" in
 			navigation) generate_navigation_section "$1"; generate_html_dark_button ;;
 			title) generate_header_section "$1" ;;
+			progress) generate_progressbar_seection ;;
 			reference) generate_reference_section "$1" ;;
 			comment) generate_comment_section "$1" ;;
 			source) generate_source_section $source_group ;;
@@ -2148,6 +2195,7 @@ function generate_chapter {
 		case "$section" in
 			navigation) generate_navigation_section "$1"; generate_html_dark_button ;;
 			title) generate_header_section "$1" ;;
+			progress) generate_progressbar_seection ;;
 			reference) generate_reference_section "$1" ;;
 			comment) generate_comment_section "$1" ;;
 			execution) generate_execution_section $1 ;;
@@ -2985,7 +3033,7 @@ function analyze_paramters {
 
 if [ .index ] && [ -f .config ]
 then
-	validation_check=202103241301
+	validation_check=202103241441
 	source .config
 	if [ "${VALIDATION_ID:-0}" -eq "0" ]
 	then
