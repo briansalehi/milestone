@@ -24,7 +24,7 @@ main_configuration=\
 #CAPTURE_SCREENSHOT=false
 
 ## basic, intermediate, expert
-#TECHNICAL_LEVEL=
+#TECHNICAL_LEVEL=basic
 
 ## DO NOT EDIT!
 #VALIDATION_ID=0"
@@ -2985,7 +2985,7 @@ function analyze_paramters {
 
 if [ .index ] && [ -f .config ]
 then
-	validation_check=202103211640
+	validation_check=202103241301
 	source .config
 	if [ "${VALIDATION_ID:-0}" -eq "0" ]
 	then
