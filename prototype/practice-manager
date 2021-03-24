@@ -1528,7 +1528,7 @@ function generate_technical_level {
 			;;
 	esac
 
-	tag='<div><span style="float:left;">Hardness:&nbsp;</span>'
+	tag='<div><span style="float:left;">Difficulty:&nbsp;</span>'
 	tag+='<div class="progress" style="width: 100px;">'
 	tag+="<div class=\"progress-bar bg-${level}\" role=\"progressbar\""
 	tag+=" style=\"width: ${percentage}%; background-color: ${color};\""

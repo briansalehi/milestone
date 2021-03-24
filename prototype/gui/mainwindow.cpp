@@ -3,7 +3,7 @@
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 {
 	setWindowTitle("Notebook Editor");
-	setWindowIcon(QIcon("notebook.png"));
+	setWindowIcon(QIcon(QPixmap("notebook.png")));
 
 	setupFields();
 	loadContent();
@@ -22,26 +22,29 @@ void MainWindow::setupFields()
 	referenceLabel = new QLabel("Reference:");
 	commentLabel = new QLabel("Comment:");
 	sourceLabel = new QLabel("Source:");
+	difficultyLabel = new QLabel("Difficulty:");
 
-	titleLineEdit= new QTextBrowser;
-	titleLineEdit->setPlaceholderText("Page Title");
+	title= new QLabel("Page Title");
 
-	tagLineEdit = new QTextBrowser;
-	tagLineEdit->setPlaceholderText("Page Tag");
+	tag = new QLabel("Page Tag");
 
-	commentTextEdit = new QTextBrowser;
-	commentTextEdit->setPlaceholderText("Page Description");
+	QStringList difficultyItems({"Basic", "Intermediate", "Expert"});
+	difficulty = new QComboBox;
+	difficulty->addItems(difficultyItems);
 
-	referenceTextEdit = new QTextBrowser;
-	referenceTextEdit->setPlaceholderText("Reference List");
+	comment = new QTextBrowser;
+	comment->setPlaceholderText("Page Description");
 
-	sourceTextEdit = new QTextBrowser;
-	sourceTextEdit->setPlaceholderText("Source");
+	reference = new QTextBrowser;
+	reference->setPlaceholderText("Reference List");
+
+	source = new QTextBrowser;
+	source->setPlaceholderText("Source Sample");
 }
 
 void MainWindow::setupButtons()
 {
-	submitButton = new QPushButton("Submit");
+	submitButton = new QPushButton("Save");
 	cancelButton = new QPushButton("Cancel");
 }
 
@@ -49,15 +52,17 @@ void MainWindow::setupLayouts()
 {
 	editingLayout = new QGridLayout;
 	editingLayout->addWidget(titleLabel, 0, 0);
-	editingLayout->addWidget(titleLineEdit, 0, 1);
+	editingLayout->addWidget(title, 0, 1);
 	editingLayout->addWidget(tagLabel, 1, 0);
-	editingLayout->addWidget(tagLineEdit, 1, 1);
-	editingLayout->addWidget(referenceLabel, 2, 0);
-	editingLayout->addWidget(referenceTextEdit, 2, 1);
-	editingLayout->addWidget(commentLabel, 3, 0);
-	editingLayout->addWidget(commentTextEdit, 3, 1);
-	editingLayout->addWidget(sourceLabel, 4, 0);
-	editingLayout->addWidget(sourceTextEdit, 4, 1);
+	editingLayout->addWidget(tag, 1, 1);
+	editingLayout->addWidget(difficultyLabel, 2, 0);
+	editingLayout->addWidget(difficulty, 2, 1);
+	editingLayout->addWidget(referenceLabel, 3, 0);
+	editingLayout->addWidget(reference, 3, 1);
+	editingLayout->addWidget(commentLabel, 4, 0);
+	editingLayout->addWidget(comment, 4, 1);
+	editingLayout->addWidget(sourceLabel, 5, 0);
+	editingLayout->addWidget(source, 5, 1);
 
 	buttonsLayout = new QHBoxLayout;
 	buttonsLayout->addStretch();
@@ -83,7 +88,8 @@ void MainWindow::loadContent()
 	file.open(QFile::ReadOnly | QFile::Text);
 	if (file.isOpen()) {
 		QString content = file.readAll();
-		sourceTextEdit->setPlainText(content);
+		source->setPlainText(content);
+		file.close();
 	} else {
 		statusBar()->setStyleSheet("QStatusBar{color: red}");
 		statusBar()->showMessage("File not found: " + fileName);
@@ -98,7 +104,8 @@ void MainWindow::loadContent()
 	titleFile.open(QFile::ReadOnly | QFile::Text);
 	if (titleFile.isOpen()) {
 		QString content = titleFile.readAll();
-		titleLineEdit->setText(content);
+		title->setText(content);
+		titleFile.close();
 	}
 
 	QString tagFileName(fileName);
@@ -107,7 +114,18 @@ void MainWindow::loadContent()
 	tagFile.open(QFile::ReadOnly | QFile::Text);
 	if (tagFile.isOpen()) {
 		QString content = tagFile.readAll();
-		tagLineEdit->setText(content);
+		tag->setText(content);
+		tagFile.close();
+	}
+
+	QString difficultyFileName(fileName);
+	difficultyFileName.append(".difficulty.txt");
+	QFile difficultyFile(difficultyFileName);
+	difficultyFile.open(QFile::ReadOnly | QFile::Text);
+	if (difficultyFile.isOpen()) {
+		QString content = difficultyFile.readAll();
+		difficulty->setCurrentIndex(1);
+		difficultyFile.close();
 	}
 
 	QString referenceFileName(fileName);
@@ -116,7 +134,8 @@ void MainWindow::loadContent()
 	referenceFile.open(QFile::ReadOnly | QFile::Text);
 	if (referenceFile.isOpen()) {
 		QString content = referenceFile.readAll();
-		referenceTextEdit->setPlainText(content);
+		reference->setPlainText(content);
+		referenceFile.close();
 	}
 
 	QString commentFileName(fileName);
@@ -125,6 +144,7 @@ void MainWindow::loadContent()
 	commentFile.open(QFile::ReadOnly | QFile::Text);
 	if (commentFile.isOpen()) {
 		QString content = commentFile.readAll();
-		commentTextEdit->setPlainText(content);
+		comment->setPlainText(content);
+		commentFile.close();
 	}
 }

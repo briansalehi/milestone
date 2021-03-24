@@ -14,6 +14,8 @@
 #include <QLineEdit>
 #include <QTextEdit>
 #include <QTextBrowser>
+#include <QComboBox>
+#include <QStringList>
 
 class MainWindow : public QMainWindow
 {
@@ -33,12 +35,14 @@ private:
 	QLabel* referenceLabel;
 	QLabel* tagLabel;
 	QLabel* sourceLabel;
+	QLabel* difficultyLabel;
 
-	QTextBrowser* titleLineEdit;
-	QTextBrowser* tagLineEdit;
-	QTextBrowser* commentTextEdit;
-	QTextBrowser* referenceTextEdit;
-	QTextBrowser* sourceTextEdit;
+	QLabel* title;
+	QLabel* tag;
+	QComboBox* difficulty;
+	QTextBrowser* comment;
+	QTextBrowser* reference;
+	QTextBrowser* source;
 
 	QVBoxLayout* centralLayout;
 	QGridLayout* editingLayout;
