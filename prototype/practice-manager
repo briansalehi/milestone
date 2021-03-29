@@ -7,8 +7,8 @@ main_configuration=\
 ## python qml r regex ruby rust scala sql swift typescript verilog vhdl vim wasm
 #SYNTAX=
 
-## navigation title progress comment reference source execution input output error pagination
-#PAGE_TEMPLATE=\"navigation title progress comment reference source execution input output error pagination\"
+## navigation title progress comment reference source pagination
+#PAGE_TEMPLATE=\"navigation title progress comment reference source pagination\"
 
 ## navigation title progress comment reference pagination toc
 #CHAPTER_TEMPLATE=\"navigation title progress comment reference pagination toc\"
@@ -274,29 +274,25 @@ function generate_html_code {
 
 	if [ -n "$code_class" ]
 	then
-		code_tag="<code class=\"${code_class}\">"
+		code_tag="<code class=\"${code_class:-}\">"
 	else
 		code_tag="<code>"
 	fi
 
 	if [ -n "$pre_class" ]
 	then
-		pre_tag="<pre class=\"$pre_class\" $attributes>"
+		pre_tag="<pre class=\"${pre_class:-}\" $attributes>"
 	else
 		pre_tag="<pre>"
 	fi
 
 	if [ "$side" = "begin" ]
 	then
-		cat << EOF >&3
-${pre_tag}
-${code_tag}
-EOF
+		echo "${pre_tag}" >&3
+		echo "${code_tag}" >&3
 	else
-		cat << EOF >&3
-</code>
-</pre>
-EOF
+		echo "</code>" >&3
+		echo "</pre>" >&3
 	fi
 }
 
@@ -729,6 +725,14 @@ function regenerate_configuration {
 		# backward compatibility section
 		# if configs name are changed, map their values into new ones
 		case "$config" in
+			PAGE_TEMPLATE)
+				value="${value// execution}"
+				value="${value// output}"
+				value="${value// input}"
+				value="${value// error}"
+				PAGE_TEMPLATE="$value"
+				sed -i "/${config}=/s/\(${config}\)=.*/\1=${value}/" "$1"
+				;;
 			LANGUAGE)
 				config="SYNTAX"
 				sed -i "/${config}=/s/\(${config}\)=.*/\1=${value}/" "$1"
@@ -1000,25 +1004,6 @@ function create_command_scheme {
 	command_scheme="${command_scheme% }"
 }
 
-# requires path to page
-# requires command
-function generate_execution_mode {
-	local page="${1}"
-	local command="${2}"
-
-	if [ -z "$command" ]
-	then
-		tput setaf $SEVERITY_HIGH
-		echo "execution command not specified: $page"
-		tput sgr0
-		return 1
-	fi
-
-	generate_html_code begin language-bash
-	echo "$command" >&3
-	generate_html_code end
-}
-
 # requires path to source
 function build_scheme {
 	local source="$1"
@@ -1069,19 +1054,6 @@ function build_scheme {
 		else
 			if [ "${GENERATES_EXECUTION_ERROR:-false}" == "true" ]
 			then
-				local quarantine_room
-				local working_directory
-				quarantine_room="$(mktemp -d)"
-				if [ -d "$quarantine_room" ]
-				then
-					working_directory="$(pwd)"
-					cd "$quarantine_room"
-				else
-					tput setaf $SEVERITY_HIGH
-					echo "failed to isolate execution" >&2
-					tput sgr0
-				fi
-
 				if [ "${RUN_IN_BACKGROUND:-false}" == "true" ]
 				then
 					if ! eval "$command_scheme 1> $output 2> $execution_error" &
@@ -1101,14 +1073,6 @@ function build_scheme {
 					tput sgr0
 				else
 					process_id="$!"
-				fi
-
-				if [ -d "$quarantine_room" ]
-				then
-					cd "$working_directory"
-					rm -d "$quarantine_room"
-					unset working_directory
-					unset quarantine_room
 				fi
 			else
 				if [ "${RUN_IN_BACKGROUND:-false}" == "true" ]
@@ -1405,14 +1369,11 @@ function generate_execution_section {
 	shift
 	local headers="$@"
 
-	generate_html_breaker
-	generate_html_header 3 "Execution"
-
 	local scheme
 	while read -r scheme
 	do
 		create_command_scheme "$scheme" "$source" "${headers:-}"
-		generate_execution_mode "$source" "${command_scheme//$location\//./}"
+		echo "${command_scheme//$location\//./}" >&3
 	done <<< "${EXECUTION_SCHEME//;/$'\n'}"
 }
 
@@ -1576,6 +1537,8 @@ function generate_page_name {
 
 # requires path to page
 function generate_source_section {
+	local argv="$@"
+
 	generate_html_breaker
 	generate_html_header 3 "Source"
 
@@ -1607,6 +1570,9 @@ function generate_source_section {
 		generate_html_code end
 		shift
 	done
+
+	generate_output_section $argv
+	generate_error_section
 }
 
 # requires path to page
@@ -1615,12 +1581,9 @@ function generate_error_section {
 
 	if [ -s "$execution_error" ]
 	then
-		generate_html_breaker
-		generate_html_header 3 Error
+		generate_html_header 4 Error
 		generate_html_code begin language-bash
-
 		cat "$execution_error" >&3
-
 		generate_html_code end
 	fi
 }
@@ -1629,18 +1592,12 @@ function generate_error_section {
 function generate_input_section {
 	local input="${1%.*}.input.txt"
 
-	if [ -f "$input" ]
+	if [ -s "$input" ]
 	then
 		generate_html_breaker
-		generate_html_header 3 Input
+		generate_html_header 4 Input
 		generate_html_code begin language-bash
-
-		local line
-		while read -r line
-		do
-			echo "$line" >&3
-		done < "$input"
-
+		cat "$input" >&3
 		generate_html_code end
 	fi
 }
@@ -1651,34 +1608,36 @@ function generate_output_section {
 	local output="${page}.output.txt"
 	page="${page##*/}"
 
-	generate_html_breaker
-	generate_html_header 3 Output
-
 	if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
 	then
 		find_index_alias "$page_index"
 		generate_html_screenshot "$1"
 	elif [ -s "$output" ]
 	then
-		generate_html_code begin language-${SYNTAX:-txt}
+		generate_html_header 4 "Build and Run"
 
-		local line
-		while read -r line
-		do
-			echo "$line" >&3
-		done < "$output"
+		# mark lines after schemes as output in simulated command-line
+		local scheme_count="${EXECUTION_SCHEME//[^;]/}"
+		scheme_count="${#scheme_count}"
+		scheme_count="$[scheme_count + 2]"
 
+		local output_count="$(wc -l < "$output")"
+		output_count="$[output_count + scheme_count]"
+
+		# commands in command-line
+		generate_html_code begin "" "language-bash command-line" "data-host='milestone'" "data-output='${scheme_count}-${output_count}'"
+		generate_execution_section $@
+
+		# outputs in command-line
+		cat "$output" >&3
+
+		# put new line character when output file does not have one
 		if [ "$(wc -l < "$output")" -eq 0 ]
 		then
 			echo >> "$output"
 		fi
 
 		generate_html_code end
-	else
-		tput setaf $SEVERITY_HIGH
-		echo "Output file not found: $output" >&2
-		tput sgr0
-		return 1
 	fi
 }
 
@@ -2123,10 +2082,6 @@ function generate_page {
 			reference) generate_reference_section "$1" ;;
 			comment) generate_comment_section "$1" ;;
 			source) generate_source_section $source_group ;;
-			execution) generate_execution_section $source_group ;;
-			output) generate_output_section $1 ;;
-			input) generate_input_section ;;
-			error) generate_error_section ;;
 			pagination) generate_quick_access_section "$1" ;;
 			*) tput setaf $SEVERITY_HIGH; echo "invalid section name \`$section\`"; tput sgr0; continue ;;
 		esac
@@ -2198,7 +2153,6 @@ function generate_chapter {
 			progress) generate_progressbar_section ;;
 			reference) generate_reference_section "$1" ;;
 			comment) generate_comment_section "$1" ;;
-			execution) generate_execution_section $1 ;;
 			pagination) generate_quick_access_section "$1" ;;
 			toc) generate_table_of_content "${1%/*}/.index" "true" "2"
 				generate_list_group_root "${1%/*}/.index" end
@@ -2368,7 +2322,7 @@ function add_chapter {
 	elif [ -z "$chapter_name" ]
 	then
 		tput setaf $SEVERITY_HIGH
-		echo "practice name not given" >&2
+		echo "Practice name not given" >&2
 		tput sgr0
 		return 1
 	elif ! [ -d "$location" ]
@@ -3022,7 +2976,7 @@ function analyze_paramters {
 		if ! move_files "./${1#\.\/}" "./${2#\.\/}"
 		then
 			tput setaf $SEVERITY_HIGH
-			echo "Operation failed: $source" >&2
+			echo "Moving pages failed: $source" >&2
 			tput sgr0
 		fi
 	fi
@@ -3033,7 +2987,7 @@ function analyze_paramters {
 
 if [ .index ] && [ -f .config ]
 then
-	validation_check=202103241441
+	validation_check=202103300001
 	source .config
 	if [ "${VALIDATION_ID:-0}" -eq "0" ]
 	then
