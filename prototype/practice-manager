@@ -1022,12 +1022,9 @@ function build_scheme {
 
 	local output_file_required=false
 	local template
-	if grep -wq 'output' <<< "$PAGE_TEMPLATE"
+	if [ -n "$EXECUTION_SCHEME" ] && ! [ -f "$output" ]
 	then
-		if ! [ -f "$output" ]
-		then
-			output_file_required=true
-		fi
+		output_file_required=true
 	else
 		output_change_time=$source_change_time
 	fi
@@ -1547,7 +1544,6 @@ function generate_source_section {
 	local argv="$@"
 
 	generate_html_breaker
-	generate_html_header 3 "Source"
 
 	while [ $# -gt 0 ]
 	do
@@ -1619,29 +1615,35 @@ function generate_output_section {
 	then
 		find_index_alias "$page_index"
 		generate_html_screenshot "$1"
-	elif [ -s "$output" ]
-	then
-		generate_html_header 4 "Build and Run"
+	else
+		generate_page_name "Build and Run"
 
 		# mark lines after schemes as output in simulated command-line
-		local scheme_count="${EXECUTION_SCHEME//[^;]/}"
-		scheme_count="${#scheme_count}"
-		scheme_count="$[scheme_count + 2]"
+		local output_begin="${EXECUTION_SCHEME//[^;]/}"
+		output_begin="${#output_begin}"
+		output_begin="$[output_begin + 2]"
 
-		local output_count="$(wc -l < "$output")"
-		output_count="$[output_count + scheme_count]"
+		local output_end=0
+		if [ -s "$output" ]
+		then
+			output_end="$(wc -l < "$output")"
+			output_end="$[output_end + output_begin]"
+		fi
 
 		# commands in command-line
-		generate_html_code begin "" "language-bash command-line" "data-host='milestone'" "data-output='${scheme_count}-${output_count}'"
+		generate_html_code begin "" "language-bash command-line" "data-host='milestone'" "data-output='${output_begin}-${output_end}'"
 		generate_execution_section $@
 
-		# outputs in command-line
-		cat "$output" >&3
-
-		# put new line character when output file does not have one
-		if [ "$(wc -l < "$output")" -eq 0 ]
+		if [ -s "$output" ]
 		then
-			echo >> "$output"
+			# outputs in command-line
+			cat "$output" >&3
+
+			# put new line character when output file does not have one
+			if [ "$(wc -l < "$output")" -eq 0 ]
+			then
+				echo >> "$output"
+			fi
 		fi
 
 		generate_html_code end
@@ -2817,7 +2819,7 @@ function execute_program {
 
 	update_configuration "$source"
 
-	if grep -qw execution <<< "$PAGE_TEMPLATE"
+	if [ -n "$EXECUTION_SCHEME" ]
 	then
 		local scheme
 		while read -r scheme
