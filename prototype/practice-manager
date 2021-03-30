@@ -1394,9 +1394,16 @@ function generate_reference_section {
 	generate_html_list begin list-group
 
 	local line
+	local refname
+	local page
+	local refline
 	while read -r line
 	do
-		generate_html_item "${line//::/:}" list-group-item
+		refname="${line%::*}"
+		page="${line##*::}"
+		page="${page//$refname/}"
+		refline="${refname}: <span style='color: red'>${page:-no page specified}</span>"
+		generate_html_item "${refline}" list-group-item
 	done <<< "$(grep '^#' --invert-match $reference)"
 
 	generate_html_list end
