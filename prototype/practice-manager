@@ -1025,6 +1025,9 @@ function build_scheme {
 	if [ -n "$EXECUTION_SCHEME" ] && ! [ -f "$output" ]
 	then
 		output_file_required=true
+	elif [ -n "$EXECUTION_SCHEME" ] && [ -f "$output" ] && [ "$source_change_time" -gt "$output_change_time" ]
+	then
+		output_file_required=true
 	else
 		output_change_time=$source_change_time
 	fi
