@@ -1560,7 +1560,13 @@ function generate_source_section {
 			syntax="${1##*.}"
 		fi
 
-		generate_html_code begin "language-${syntax}" line-numbers
+		local highlight=
+		if [ -s "${1%.*}.highlight.txt" ]
+		then
+			highlight="data-line='$(cat "${1%.*}.highlight.txt")'"
+		fi
+
+		generate_html_code begin "language-${syntax}" line-numbers "$highlight"
 
 		local line
 		while IFS= read -r line
