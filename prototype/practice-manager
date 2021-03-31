@@ -1120,7 +1120,7 @@ function build_scheme {
 		fi
 	else
 		tput setaf $SEVERITY_LOW
-		echo "No changes since last execution: $1" >&2
+		echo "No changes in source code since last execution: $1" >&2
 		tput sgr0
 		return 1
 	fi
@@ -2122,7 +2122,7 @@ function generate_page {
 	generate_html_section end
 
 	tput setaf $SEVERITY_LOW
-	echo "page generated: $1"
+	echo "page generated: file://${PWD}/html-files/${page_index}.html"
 	tput sgr0
 	index=
 }
