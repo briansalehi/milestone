@@ -2122,7 +2122,7 @@ function generate_page {
 	generate_html_section end
 
 	tput setaf $SEVERITY_LOW
-	echo "page generated: file://${PWD}/html-files/${page_index}.html"
+	echo "page generated: file://${PWD}/html-files/${index}.html"
 	tput sgr0
 	index=
 }
@@ -2192,7 +2192,7 @@ function generate_chapter {
 	generate_html_section end
 
 	tput setaf $SEVERITY_LOW
-	echo "chapter generated: ${1%/*}/"
+	echo "Chapter generated: file://${PWD}/html-files/${index}.html"
 	tput sgr0
 	index=
 }
