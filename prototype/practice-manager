@@ -3038,12 +3038,7 @@ then
 	fi
 fi
 
-# check for directory validity
-if [ -f ".index" ] && [ "$1" == "." ]
-then
-	list_index "."
-	exit 0
-elif ! [ -f ".index" ] && [ -z "$1" ]
+if ! [ -f ".index" ] && [ -z "$1" ]
 then
 	tput setaf $SEVERITY_HIGH
 	echo "Practice directory not initialized yet!" >&2
@@ -3068,6 +3063,7 @@ else
 			-p|--preview) PREVIEW_OPTION=true ;;
 			-b|--build) BUILD_OPTION=true ;;
 			-h|--help|-*) usage; break ;;
+			.) PEEK_OPTION=true ;;
 			*) ANALYZE_OPTION=true
 				ANALYZE_SOURCE="$1"
 				if [ -n "$2" ] && [ "${2:0:1}" != "-" ]
@@ -3079,6 +3075,25 @@ else
 		esac
 		shift
 	done
+fi
+
+# check for directory validity
+if [ -f ".index" ] && [ "${PEEK_OPTION:-false}" == "true" ]
+then
+	if [ "${PREVIEW_OPTION:-false}" == "true" ]
+	then
+		prepare_output_directory
+		generate_chapter "./README.md"
+		index_page "./README.md"
+		xdg-open ./html-files/index.html &>/dev/null &
+	elif [ "${BUILD_OPTION:-false}" == "true" ]
+	then
+		prepare_output_directory
+		generate_chapter "./README.md"
+	else
+		list_index "."
+	fi
+	exit 0
 fi
 
 if [ "${REMOVE_PAGE:-false}" == "true" ]
