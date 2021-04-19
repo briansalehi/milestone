@@ -1402,7 +1402,12 @@ function generate_reference_section {
 		refname="${line%::*}"
 		page="${line##*::}"
 		page="${page//$refname/}"
-		refline="${refname}: <span style='color: red'>${page:-}</span>"
+		if [ -n "$page" ]
+		then
+			refline="${refname}: <span style='color: red'>${page:-}</span>"
+		else
+			refline="${refname}"
+		fi
 		generate_html_item "${refline}" list-group-item
 	done <<< "$(grep '^#' --invert-match $reference)"
 

@@ -1,49 +1,143 @@
-var minimum_fontsize=1;
-var maximum_fontsize=3;
-var current_fontsize=2;
-var fontsize_growth = "upward";
+var minimum_fontlevel = 1;
+var maximum_fontlevel = 10;
+var current_fontlevel = localStorage.getItem('fontlevel');
+if (current_fontlevel == null) {
+	current_fontlevel = 3;
+}
 
 function zoominLetter() {
-   var p = document.getElementsByTagName('p');
-   for(i=0;i<p.length;i++) {
-      if(p[i].style.fontSize) {
-         var s = parseInt(p[i].style.fontSize.replace("px",""));
-      } else {
-         var s = 16;
-      }
-	   s += 1;
+	if (current_fontlevel < maximum_fontlevel) {
+		current_fontlevel++;
+		localStorage.setItem('fontlevel', current_fontlevel);
 
-      p[i].style.fontSize = s+"px"
-   }
+		var p = document.getElementsByTagName('p');
+		for(i=0;i<p.length;i++) {
+			if(p[i].style.fontSize) {
+				var s = parseInt(p[i].style.fontSize.replace("px",""));
+			} else {
+				var s = 14;
+			}
+			s += 2;
+
+			p[i].style.fontSize = s+"px"
+			localStorage.setItem('fontsize', s);
+		}
+
+		var code = document.getElementsByTagName('code');
+		for(i=0;i<code.length;i++) {
+			if(code[i].style.fontSize) {
+				var s = parseInt(code[i].style.fontSize.replace("px",""));
+			} else {
+				var s = 14;
+			}
+			s += 2;
+
+			code[i].style.fontSize = s+"px"
+		}
+
+		var li = document.getElementsByTagName('li');
+		for(i=0;i<li.length;i++) {
+			if(li[i].style.fontSize) {
+				var s = parseInt(li[i].style.fontSize.replace("px",""));
+			} else {
+				var s = 14;
+			}
+			s += 2;
+
+			li[i].style.fontSize = s+"px"
+		}
+
+		var table = document.getElementsByTagName('table');
+		for(i=0;i<table.length;i++) {
+			if(table[i].style.fontSize) {
+				var s = parseInt(table[i].style.fontSize.replace("px",""));
+			} else {
+				var s = 14;
+			}
+			s += 2;
+
+			table[i].style.fontSize = s+"px"
+		}
+	}
 }
 
 function zoomoutLetter() {
-   var p = document.getElementsByTagName('p');
-   for(i=0;i<p.length;i++) {
-      if(p[i].style.fontSize) {
-         var s = parseInt(p[i].style.fontSize.replace("px",""));
-      } else {
-         var s = 16;
-      }
-	   s -= 1;
+	if (current_fontlevel > minimum_fontlevel) {
+		current_fontlevel--;
+		localStorage.setItem('fontlevel', current_fontlevel);
 
-      p[i].style.fontSize = s+"px"
-   }
-}
+		var p = document.getElementsByTagName('p');
+		for(i=0;i<p.length;i++) {
+			if(p[i].style.fontSize) {
+				var s = parseInt(p[i].style.fontSize.replace("px",""));
+			} else {
+				var s = 14;
+			}
+			s -= 2;
 
-function toggle_font() {
-	if (fontsize_growth == "downward") {
-		zoomoutLetter();
-		--current_fontsize;
-		if (current_fontsize == minimum_fontsize) {
-			fontsize_growth = "upward";
+			p[i].style.fontSize = s+"px"
+			localStorage.setItem('fontsize', s);
 		}
-	} else {
-		zoominLetter();
-		++current_fontsize;
-		if (current_fontsize == maximum_fontsize) {
-			fontsize_growth = "downward";
+
+		var code = document.getElementsByTagName('code');
+		for(i=0;i<code.length;i++) {
+			if(code[i].style.fontSize) {
+				var s = parseInt(code[i].style.fontSize.replace("px",""));
+			} else {
+				var s = 14;
+			}
+			s -= 2;
+
+			code[i].style.fontSize = s+"px"
+			localStorage.setItem('fontsize', s);
+		}
+
+		var li = document.getElementsByTagName('li');
+		for(i=0;i<li.length;i++) {
+			if(li[i].style.fontSize) {
+				var s = parseInt(li[i].style.fontSize.replace("px",""));
+			} else {
+				var s = 14;
+			}
+			s -= 2;
+
+			li[i].style.fontSize = s+"px"
+			localStorage.setItem('fontsize', s);
+		}
+
+		var table = document.getElementsByTagName('table');
+		for(i=0;i<table.length;i++) {
+			if(table[i].style.fontSize) {
+				var s = parseInt(table[i].style.fontSize.replace("px",""));
+			} else {
+				var s = 14;
+			}
+			s -= 2;
+
+			table[i].style.fontSize = s+"px"
+			localStorage.setItem('fontsize', s);
 		}
 	}
-	console.log(current_fontsize);
 }
+
+function restoreFontSize() {
+	var fontsize = localStorage.getItem('fontsize');
+	var p = document.getElementsByTagName('p');
+	var code = document.getElementsByTagName('code');
+	var li = document.getElementsByTagName('li');
+	var table= document.getElementsByTagName('table');
+
+	for(i=0;i<p.length;i++) {
+		p[i].style.fontSize = fontsize+"px"
+	}
+	for(i=0;i<code.length;i++) {
+		code[i].style.fontSize = fontsize+"px"
+	}
+	for(i=0;i<li.length;i++) {
+		li[i].style.fontSize = fontsize+"px"
+	}
+	for(i=0;i<table.length;i++) {
+		table[i].style.fontSize = fontsize+"px"
+	}
+}
+restoreFontSize();
