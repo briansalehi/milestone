@@ -1,256 +1,105 @@
-var minimum_fontlevel = 1;
-var maximum_fontlevel = 12;
-var current_fontlevel = localStorage.getItem('fontlevel');
-if (current_fontlevel == null) {
-	current_fontlevel = 3;
+var min_level  = 1;
+var max_level  = 12;
+var fontlevel  = localStorage.getItem('fontlevel');
+var fontsize   = localStorage.getItem('fontsize');
+var h2fontsize = localStorage.getItem('h2fontsize');
+var h3fontsize = localStorage.getItem('h3fontsize');
+var h4fontsize = localStorage.getItem('h4fontsize');
+
+if (fontlevel  == null) { fontlevel  =  3; }
+if (fontsize   == null) { fontsize   = 14; }
+if (h2fontsize == null) { h2fontsize = 30; }
+if (h3fontsize == null) { h3fontsize = 24; }
+if (h4fontsize == null) { h4fontsize = 18; }
+
+function defaultFontSize() {
+	fontlevel  =  3;
+	fontsize   = 14;
+	h2fontsize = 30;
+	h3fontsize = 24;
+	h4fontsize = 18;
+	localStorage.setItem('fontlevel' , fontlevel );
+	localStorage.setItem('fontsize'  , fontsize  );
+	localStorage.setItem('h2fontsize', h2fontsize);
+	localStorage.setItem('h3fontsize', h3fontsize);
+	localStorage.setItem('h4fontsize', h3fontsize);
+
+	restoreFontSize();
 }
 
 function zoominLetter() {
-	if (current_fontlevel < maximum_fontlevel) {
-		current_fontlevel++;
-		localStorage.setItem('fontlevel', current_fontlevel);
+	if (fontlevel < max_level) {
+		fontlevel++;
+		fontsize += 2;
+		h2fontsize += 2;
+		h3fontsize += 2;
+		h4fontsize += 2;
 
-		var p = document.getElementsByTagName('p');
-		for(i=0;i<p.length;i++) {
-			if(p[i].style.fontSize) {
-				var s = parseInt(p[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 14;
-			}
-			s += 2;
+		localStorage.setItem('fontlevel' , fontlevel );
+		localStorage.setItem('fontsize'  , fontsize  );
+		localStorage.setItem('h2fontsize', h2fontsize);
+		localStorage.setItem('h3fontsize', h3fontsize);
+		localStorage.setItem('h4fontsize', h4fontsize);
 
-			p[i].style.fontSize = s+"px"
-			localStorage.setItem('fontsize', s);
-		}
-
-		var pre = document.getElementsByTagName('pre');
-		for(i=0;i<pre.length;i++) {
-			if(pre[i].style.fontSize) {
-				var s = parseInt(pre[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 14;
-			}
-			s += 2;
-
-			pre[i].style.fontSize = s+"px"
-		}
-
-		var li = document.getElementsByTagName('li');
-		for(i=0;i<li.length;i++) {
-			if(li[i].style.fontSize) {
-				var s = parseInt(li[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 14;
-			}
-			s += 2;
-
-			li[i].style.fontSize = s+"px"
-		}
-
-		var table = document.getElementsByTagName('table');
-		for(i=0;i<table.length;i++) {
-			if(table[i].style.fontSize) {
-				var s = parseInt(table[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 14;
-			}
-			s += 2;
-
-			table[i].style.fontSize = s+"px"
-		}
-
-		var cite = document.getElementsByTagName('cite');
-		for(i=0;i<cite.length;i++) {
-			if(cite[i].style.fontSize) {
-				var s = parseInt(cite[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 14;
-			}
-			s += 2;
-
-			cite[i].style.fontSize = s+"px"
-		}
-
-		var h2 = document.getElementsByTagName('h2');
-		for(i=0;i<h2.length;i++) {
-			if(h2[i].style.fontSize) {
-				var s = parseInt(h2[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 30;
-			}
-			s += 2;
-
-			h2[i].style.fontSize = s+"px"
-			localStorage.setItem('h2-fontsize', s);
-		}
-
-		var h3 = document.getElementsByTagName('h3');
-		for(i=0;i<h3.length;i++) {
-			if(h3[i].style.fontSize) {
-				var s = parseInt(h3[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 24;
-			}
-			s += 2;
-
-			h3[i].style.fontSize = s+"px"
-			localStorage.setItem('h3-fontsize', s);
-		}
-
-		var h4 = document.getElementsByTagName('h4');
-		for(i=0;i<h4.length;i++) {
-			if(h4[i].style.fontSize) {
-				var s = parseInt(h4[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 20;
-			}
-			s += 2;
-
-			h4[i].style.fontSize = s+"px"
-			localStorage.setItem('h4-fontsize', s);
-		}
+		restoreFontSize();
 	}
 }
 
 function zoomoutLetter() {
-	if (current_fontlevel > minimum_fontlevel) {
-		current_fontlevel--;
-		localStorage.setItem('fontlevel', current_fontlevel);
+	if (fontlevel > min_level) {
+		fontlevel--;
+		fontsize -= 2;
+		h2fontsize -= 2;
+		h3fontsize -= 2;
+		h4fontsize -= 2;
 
-		var p = document.getElementsByTagName('p');
-		for(i=0;i<p.length;i++) {
-			if(p[i].style.fontSize) {
-				var s = parseInt(p[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 14;
-			}
-			s -= 2;
+		localStorage.setItem('fontlevel' , fontlevel );
+		localStorage.setItem('fontsize'  , fontsize  );
+		localStorage.setItem('h2fontsize', h2fontsize);
+		localStorage.setItem('h3fontsize', h3fontsize);
+		localStorage.setItem('h4fontsize', h4fontsize);
 
-			p[i].style.fontSize = s+"px"
-			localStorage.setItem('fontsize', s);
-		}
-
-		var pre = document.getElementsByTagName('pre');
-		for(i=0;i<pre.length;i++) {
-			if(pre[i].style.fontSize) {
-				var s = parseInt(pre[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 14;
-			}
-			s -= 2;
-
-			pre[i].style.fontSize = s+"px"
-		}
-
-		var li = document.getElementsByTagName('li');
-		for(i=0;i<li.length;i++) {
-			if(li[i].style.fontSize) {
-				var s = parseInt(li[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 14;
-			}
-			s -= 2;
-
-			li[i].style.fontSize = s+"px"
-		}
-
-		var table = document.getElementsByTagName('table');
-		for(i=0;i<table.length;i++) {
-			if(table[i].style.fontSize) {
-				var s = parseInt(table[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 14;
-			}
-			s -= 2;
-
-			table[i].style.fontSize = s+"px"
-		}
-
-		var cite = document.getElementsByTagName('cite');
-		for(i=0;i<cite.length;i++) {
-			if(cite[i].style.fontSize) {
-				var s = parseInt(cite[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 14;
-			}
-			s -= 2;
-
-			cite[i].style.fontSize = s+"px"
-		}
-
-		var h2 = document.getElementsByTagName('h2');
-		for(i=0;i<h2.length;i++) {
-			if(h2[i].style.fontSize) {
-				var s = parseInt(h2[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 30;
-			}
-			s -= 2;
-
-			h2[i].style.fontSize = s+"px"
-			localStorage.setItem('h2-fontsize', s);
-		}
-
-		var h3 = document.getElementsByTagName('h3');
-		for(i=0;i<h3.length;i++) {
-			if(h3[i].style.fontSize) {
-				var s = parseInt(h3[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 24;
-			}
-			s -= 2;
-
-			h3[i].style.fontSize = s+"px"
-			localStorage.setItem('h3-fontsize', s);
-		}
-
-		var h4 = document.getElementsByTagName('h4');
-		for(i=0;i<h4.length;i++) {
-			if(h4[i].style.fontSize) {
-				var s = parseInt(h4[i].style.fontSize.replace("px",""));
-			} else {
-				var s = 24;
-			}
-			s -= 2;
-
-			h4[i].style.fontSize = s+"px"
-			localStorage.setItem('h4-fontsize', s);
-		}
+		restoreFontSize();
 	}
 }
 
 function restoreFontSize() {
-	var fontsize = localStorage.getItem('fontsize');
-	if (fontsize == null)
-		return;
+	var fontsize   = localStorage.getItem('fontsize');
+	var h2fontsize = localStorage.getItem('h2fontsize');
+	var h3fontsize = localStorage.getItem('h3fontsize');
+	var h4fontsize = localStorage.getItem('h4fontsize');
 
-	var h2fontsize = localStorage.getItem('h2-fontsize');
-	var h3fontsize = localStorage.getItem('h3-fontsize');
-	var h4fontsize = localStorage.getItem('h4-fontsize');
+	var p     = document.getElementsByTagName('p');
+	var pre   = document.getElementsByTagName('pre');
+	var ul    = document.getElementsByTagName('ul');
+	var ol    = document.getElementsByTagName('ol');
+	var table = document.getElementsByTagName('table');
+	var cite  = document.getElementsByTagName('cite');
+	var toc   = document.getElementsByClassName('list-group');
+	var h2    = document.getElementsByTagName('h2');
+	var h3    = document.getElementsByTagName('h3');
+	var h4    = document.getElementsByTagName('h4');
 
-	var p = document.getElementsByTagName('p');
-	var pre = document.getElementsByTagName('pre');
-	var li = document.getElementsByTagName('li');
-	var table= document.getElementsByTagName('table');
-	var cite= document.getElementsByTagName('cite');
-	var h2= document.getElementsByTagName('h2');
-	var h3= document.getElementsByTagName('h3');
-	var h4= document.getElementsByTagName('h4');
-
-	for(i=0;i<p.length;i++) {
-		p[i].style.fontSize = fontsize+"px"
+	for(i=0 ; i<p.length ; i++) {
+		p[i].style.fontSize     = fontsize+"px"
 	}
 	for(i=0;i<pre.length;i++) {
 		pre[i].style.fontSize = fontsize+"px"
 	}
-	for(i=0;i<li.length;i++) {
-		li[i].style.fontSize = fontsize+"px"
+	for(i=0;i<ul.length;i++) {
+		ul[i].style.fontSize = fontsize+"px"
+	}
+	for(i=0;i<ol.length;i++) {
+		ol[i].style.fontSize = fontsize+"px"
 	}
 	for(i=0;i<table.length;i++) {
 		table[i].style.fontSize = fontsize+"px"
 	}
 	for(i=0;i<cite.length;i++) {
 		cite[i].style.fontSize = fontsize+"px"
+	}
+	for(i=0;i<toc.length;i++) {
+		toc[i].style.fontSize = fontsize+"px"
 	}
 	for(i=0;i<h2.length;i++) {
 		h2[i].style.fontSize = h2fontsize+"px"
