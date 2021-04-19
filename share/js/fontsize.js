@@ -25,6 +25,7 @@ function defaultFontSize() {
 	localStorage.setItem('h4fontsize', h3fontsize);
 
 	restoreFontSize();
+	document.getElementById('dropdown-content').style.display = 'none';
 }
 
 function zoominLetter() {
