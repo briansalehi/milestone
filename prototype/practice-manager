@@ -1478,7 +1478,7 @@ function generate_technical_level {
 	local title
 
 	case "${TECHNICAL_LEVEL:-basic}" in
-		basic|amateur)
+		basic|amateur|fundamental)
 			level="success";
 			percentage=33;
 			volume=1;
@@ -1492,7 +1492,7 @@ function generate_technical_level {
 			title="Medium";
 			color="#ffc107 !important"
 			;;
-		expert|hard)
+		expert|hard|advanced)
 			level="danger";
 			percentage=100;
 			volume=3;
@@ -1501,7 +1501,7 @@ function generate_technical_level {
 			;;
 	esac
 
-	tag='<div><span style="float:left;">Difficulty:&nbsp;</span>'
+	tag='<div class="difficulty"><span style="float:left;">Difficulty:&nbsp;</span>'
 	tag+='<div class="progress" style="width: 100px;">'
 	tag+="<div class=\"progress-bar bg-${level}\" role=\"progressbar\""
 	tag+=" style=\"width: ${percentage}%; background-color: ${color};\""

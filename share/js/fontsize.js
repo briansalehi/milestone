@@ -77,6 +77,7 @@ function restoreFontSize() {
 	var table = document.getElementsByTagName('table');
 	var cite  = document.getElementsByTagName('cite');
 	var toc   = document.getElementsByClassName('list-group');
+	var bar   = document.getElementsByClassName('difficulty');
 	var h2    = document.getElementsByTagName('h2');
 	var h3    = document.getElementsByTagName('h3');
 	var h4    = document.getElementsByTagName('h4');
@@ -101,6 +102,9 @@ function restoreFontSize() {
 	}
 	for(i=0;i<toc.length;i++) {
 		toc[i].style.fontSize = fontsize+"px"
+	}
+	for(i=0;i<bar.length;i++) {
+		bar[i].style.fontSize = fontsize+"px"
 	}
 	for(i=0;i<h2.length;i++) {
 		h2[i].style.fontSize = h2fontsize+"px"
