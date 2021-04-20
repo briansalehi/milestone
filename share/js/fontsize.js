@@ -1,16 +1,16 @@
 var min_level  = 1;
 var max_level  = 12;
-var fontlevel  = localStorage.getItem('fontlevel');
-var fontsize   = localStorage.getItem('fontsize');
+var fontlevel  = localStorage.getItem('fontlevel' );
+var fontsize   = localStorage.getItem('fontsize'  );
 var h2fontsize = localStorage.getItem('h2fontsize');
 var h3fontsize = localStorage.getItem('h3fontsize');
 var h4fontsize = localStorage.getItem('h4fontsize');
 
-if (fontlevel  == null) { fontlevel  =  3; }
-if (fontsize   == null) { fontsize   = 14; }
-if (h2fontsize == null) { h2fontsize = 30; }
-if (h3fontsize == null) { h3fontsize = 24; }
-if (h4fontsize == null) { h4fontsize = 18; }
+if (fontlevel  == null) { fontlevel  =  3; localStorage.setItem('fontlevel',  3 ); }
+if (fontsize   == null) { fontsize   = 14; localStorage.setItem('fontsize',   14); }
+if (h2fontsize == null) { h2fontsize = 30; localStorage.setItem('h2fontsize', 30); }
+if (h3fontsize == null) { h3fontsize = 24; localStorage.setItem('h3fontsize', 24); }
+if (h4fontsize == null) { h4fontsize = 18; localStorage.setItem('h4fontsize', 18); }
 
 function defaultFontSize() {
 	fontlevel  =  3;
