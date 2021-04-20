@@ -1,25 +1,29 @@
 var min_level  = 1;
 var max_level  = 12;
-var fontlevel  = localStorage.getItem('fontlevel' );
-var fontsize   = localStorage.getItem('fontsize'  );
-var h2fontsize = localStorage.getItem('h2fontsize');
-var h3fontsize = localStorage.getItem('h3fontsize');
-var h4fontsize = localStorage.getItem('h4fontsize');
+var fontlevel  = parseInt(localStorage.getItem('fontlevel'));
+var fontsize   = parseInt(localStorage.getItem('fontsize'));
+var h1fontsize = parseInt(localStorage.getItem('h1fontsize'));
+var h2fontsize = parseInt(localStorage.getItem('h2fontsize'));
+var h3fontsize = parseInt(localStorage.getItem('h3fontsize'));
+var h4fontsize = parseInt(localStorage.getItem('h4fontsize'));
 
-if (fontlevel  == null) { fontlevel  =  3; localStorage.setItem('fontlevel',  3 ); }
-if (fontsize   == null) { fontsize   = 14; localStorage.setItem('fontsize',   14); }
-if (h2fontsize == null) { h2fontsize = 30; localStorage.setItem('h2fontsize', 30); }
-if (h3fontsize == null) { h3fontsize = 24; localStorage.setItem('h3fontsize', 24); }
-if (h4fontsize == null) { h4fontsize = 18; localStorage.setItem('h4fontsize', 18); }
+if (!fontlevel)  { fontlevel  =  3; localStorage.setItem('fontlevel', 3 ); }
+if (!fontsize)   { fontsize   = 14; localStorage.setItem('fontsize',  14); }
+if (!h1fontsize) { h1fontsize = 32; localStorage.setItem('h1fontsize',32); }
+if (!h2fontsize) { h2fontsize = 24; localStorage.setItem('h2fontsize',24); }
+if (!h3fontsize) { h3fontsize = 18; localStorage.setItem('h3fontsize',18); }
+if (!h4fontsize) { h4fontsize = 16; localStorage.setItem('h4fontsize',16); }
 
 function defaultFontSize() {
 	fontlevel  =  3;
 	fontsize   = 14;
-	h2fontsize = 30;
-	h3fontsize = 24;
-	h4fontsize = 18;
-	localStorage.setItem('fontlevel' , fontlevel );
-	localStorage.setItem('fontsize'  , fontsize  );
+	h1fontsize = 32;
+	h2fontsize = 24;
+	h3fontsize = 18;
+	h4fontsize = 16;
+	localStorage.setItem('fontlevel',  fontlevel );
+	localStorage.setItem('fontsize',   fontsize  );
+	localStorage.setItem('h1fontsize', h1fontsize);
 	localStorage.setItem('h2fontsize', h2fontsize);
 	localStorage.setItem('h3fontsize', h3fontsize);
 	localStorage.setItem('h4fontsize', h3fontsize);
@@ -30,14 +34,16 @@ function defaultFontSize() {
 
 function zoominLetter() {
 	if (fontlevel < max_level) {
-		fontlevel++;
+		fontlevel += 1;
 		fontsize += 2;
+		h1fontsize += 2;
 		h2fontsize += 2;
 		h3fontsize += 2;
 		h4fontsize += 2;
 
-		localStorage.setItem('fontlevel' , fontlevel );
-		localStorage.setItem('fontsize'  , fontsize  );
+		localStorage.setItem('fontlevel', fontlevel);
+		localStorage.setItem('fontsize', fontsize);
+		localStorage.setItem('h1fontsize', h1fontsize);
 		localStorage.setItem('h2fontsize', h2fontsize);
 		localStorage.setItem('h3fontsize', h3fontsize);
 		localStorage.setItem('h4fontsize', h4fontsize);
@@ -48,14 +54,16 @@ function zoominLetter() {
 
 function zoomoutLetter() {
 	if (fontlevel > min_level) {
-		fontlevel--;
+		fontlevel -= 1;
 		fontsize -= 2;
+		h1fontsize -= 2;
 		h2fontsize -= 2;
 		h3fontsize -= 2;
 		h4fontsize -= 2;
 
-		localStorage.setItem('fontlevel' , fontlevel );
-		localStorage.setItem('fontsize'  , fontsize  );
+		localStorage.setItem('fontlevel', fontlevel);
+		localStorage.setItem('fontsize', fontsize);
+		localStorage.setItem('h1fontsize', h1fontsize);
 		localStorage.setItem('h2fontsize', h2fontsize);
 		localStorage.setItem('h3fontsize', h3fontsize);
 		localStorage.setItem('h4fontsize', h4fontsize);
@@ -65,10 +73,11 @@ function zoomoutLetter() {
 }
 
 function restoreFontSize() {
-	var fontsize   = localStorage.getItem('fontsize');
-	var h2fontsize = localStorage.getItem('h2fontsize');
-	var h3fontsize = localStorage.getItem('h3fontsize');
-	var h4fontsize = localStorage.getItem('h4fontsize');
+	fontsize   = parseInt(localStorage.getItem('fontsize'));
+	h1fontsize = parseInt(localStorage.getItem('h1fontsize'));
+	h2fontsize = parseInt(localStorage.getItem('h2fontsize'));
+	h3fontsize = parseInt(localStorage.getItem('h3fontsize'));
+	h4fontsize = parseInt(localStorage.getItem('h4fontsize'));
 
 	var p     = document.getElementsByTagName('p');
 	var pre   = document.getElementsByTagName('pre');
@@ -78,6 +87,7 @@ function restoreFontSize() {
 	var cite  = document.getElementsByTagName('cite');
 	var toc   = document.getElementsByClassName('list-group');
 	var bar   = document.getElementsByClassName('difficulty');
+	var h1    = document.getElementsByTagName('h1');
 	var h2    = document.getElementsByTagName('h2');
 	var h3    = document.getElementsByTagName('h3');
 	var h4    = document.getElementsByTagName('h4');
@@ -105,6 +115,9 @@ function restoreFontSize() {
 	}
 	for(i=0;i<bar.length;i++) {
 		bar[i].style.fontSize = fontsize+"px"
+	}
+	for(i=0;i<h1.length;i++) {
+		h1[i].style.fontSize = h1fontsize+"px"
 	}
 	for(i=0;i<h2.length;i++) {
 		h2[i].style.fontSize = h2fontsize+"px"
