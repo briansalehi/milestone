@@ -1,0 +1,16 @@
+@startuml
+
+rectangle Milestone {
+	usecase (View Notebooks)
+    usecase (Add a Notebook)
+    usecase (Edit a Notebook)
+    usecase (Remove a Notebook)
+    usecase (Extract a Notebook)
+	usecase (Add an Author)
+	usecase (Edit Author Info)
+	usecase (Block an Author)
+	usecase (Remove an Author)
+	usecase (Follow Topic)
+}
+
+@enduml

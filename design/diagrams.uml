@@ -1,0 +1,44 @@
+@startuml
+
+actor :Administrator: as Admin
+actor :User:
+actor :Guest:
+actor :Author:
+actor :Database Author: as DBA
+
+rectangle Milestone {
+	usecase (View Notebooks)
+    usecase (Add a Notebook)
+    usecase (Edit a Notebook)
+    usecase (Remove a Notebook)
+    usecase (Extract a Notebook)
+	usecase (Add an Author)
+	usecase (Edit Author Info)
+	usecase (Block an Author)
+	usecase (Remove an Author)
+	usecase (Follow Topic)
+}
+
+left to right direction
+Guest --> (View Notebooks)
+
+User --> (View Notebooks)
+User --> (Follow Topic)
+
+Author --> (View Notebooks)
+Author --> (Add a Notebook)
+Author --> (Edit a Notebook)
+Author --> (Remove a Notebook)
+Author --> (Extract a Notebook)
+
+Admin --> (View Notebooks)
+Admin --> (Add a Notebook)
+Admin --> (Edit a Notebook)
+Admin --> (Remove a Notebook)
+Admin --> (Extract a Notebook)
+Admin --> (Add an Author)
+Admin --> (Edit Author Info)
+Admin --> (Block an Author)
+Admin --> (Remove an Author)
+
+@enduml

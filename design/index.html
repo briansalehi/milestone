@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+		<title>Notebooks Design</title>
+		<!-- ajax -->
+		<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/themes/prism-tomorrow.min.css'>
+		<!-- bootstrap -->
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+		<!-- prims plugin styles -->
+		<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/autolinker/prism-autolinker.min.css" rel="stylesheet">
+		<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/command-line/prism-command-line.min.css" rel="stylesheet">
+		<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/line-highlight/prism-line-highlight.min.css" rel="stylesheet">
+		<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet">
+		<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/toolbar/prism-toolbar.min.css" rel="stylesheet">
+		<style>
+			.dark-mode {
+				background-color: black;
+				color: #aaaaaa;
+			}
+
+			.dark-mode a {
+				color: royalblue;
+			}
+
+			.dark-mode .btn {
+				background-color: #212529;
+			}
+
+			.dark-mode .btn:hover {
+				color: #777777;
+			}
+
+			img {
+				padding-top: 20px;
+				padding-bottom: 20px;
+				max-width: -moz-available;
+			}
+
+			a,
+			a:hover,
+			a:focus {
+				text-decoration: none;
+			}
+
+			pre {
+				margin-bottom: 1.3rem !important;
+			}
+
+			@media only screen and (min-width:720px) {
+				.img-responsive {
+					max-width: 60%;
+					margin-left: auto;
+					margin-right: auto;
+				}
+			}
+
+			/* prism overrides */
+			div.code-toolbar>.toolbar a,
+			div.code-toolbar>.toolbar button,
+			div.code-toolbar>.toolbar span {
+				margin-left: 0.7rem;
+			}
+			.sticky {
+				position: sticky !important;
+				z-index: 1;
+				top: 3%;
+			}
+
+			.btn {
+				background-color: #f5f5f5;
+				height: 40px;
+				width: 40px;
+				border-radius: 5px;
+				text-align: center !important;
+				font-size: 18px !important;
+			}
+
+			.dropbtn {
+			  font-size: 14px;
+			  border: none;
+			}
+
+			.dropdown {
+			  position: relative;
+			  display: inline-block;
+			}
+
+			.dropdown-content {
+			  display: none;
+			  position: absolute;
+			  background-color: #f1f1f1;
+			  z-index: 1;
+			}
+
+			.dropdown-content a {
+			  color: black;
+			  text-decoration: none;
+			  display: block;
+			}
+		</style>
+	</head>
+	<body class="container">
+		<div class="dropdown pull-right sticky">
+		  <button class="btn btn-secondary dropbtn" onclick="toggle_settings()" style="font-size: 18px;">
+			  &#x2699;
+		  </button>
+		  <div class="dropdown-content" id="dropdown-content">
+			<button id="darkmode-icon" class="btn dropdown-item" onclick="toggle_darkmode()" title="ALT + SHIFT + N" accesskey="N">&#x2600;</button>
+			<button class="btn dropdown-item" onclick="zoominLetter()" title="ALT + SHIFT + I" accesskey="i"><span style="font-size: 10px;">A</span><span style="font-size: 18px;">A</span></button>
+			<button class="btn dropdown-item" onclick="zoomoutLetter()" title="ALT + SHIFT + O" accesskey="o"><span style="font-size: 18px;">A</span><span style="font-size: 10px;">A</span></button>
+			<button class="btn dropdown-item" onclick="defaultFontSize()" title="ALT + SHIFT + D" accesskey="d">&#x21ba;</button>
+		  </div>
+		</div>
+
+		<!-- ********** WRITE YOUR DATA HERE ********** -->
+
+		<!-- ********** END OF DATA ********** -->
+
+		<!-- jquery -->
+		<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+		<!-- bootstrap -->
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous"></script>
+		<!-- prism js -->
+		<script src='https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/prism.min.js'></script>
+		<!-- prism plugins -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/toolbar/prism-toolbar.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/autolinker/prism-autolinker.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/command-line/prism-command-line.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/copy-to-clipboard/prism-copy-to-clipboard.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/line-highlight/prism-line-highlight.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/normalize-whitespace/prism-normalize-whitespace.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/remove-initial-line-feed/prism-remove-initial-line-feed.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.22.0/plugins/show-language/prism-show-language.min.js"></script>
+		<script>
+			function darkmode() {
+				var bodystyle = document.body;
+				var icon = document.getElementById('darkmode-icon');
+				const dark = sessionStorage.getItem('darkmode');
+
+				if (dark === 'true' || dark == 'undefined') {
+					bodystyle.classList.add("dark-mode");
+					sessionStorage.setItem('darkmode', true);
+					icon.innerHTML = '&#x2600;';
+				} else {
+					sessionStorage.setItem('darkmode', false);
+					bodystyle.classList.remove("dark-mode");
+					icon.innerHTML = '&#x263d;';
+				}
+			}
+			darkmode();
+
+			function toggle_darkmode() {
+				var bodystyle = document.body;
+				var icon = document.getElementById('darkmode-icon');
+				const dark = sessionStorage.getItem('darkmode');
+
+				if (dark === 'true' || dark == 'undefined') {
+					bodystyle.classList.remove("dark-mode");
+					sessionStorage.setItem('darkmode', false);
+					icon.innerHTML = '&#x263d;';
+					toggle_settings();
+				} else {
+					sessionStorage.setItem('darkmode', true);
+					bodystyle.classList.add("dark-mode");
+					icon.innerHTML = '&#x2600;';
+					toggle_settings();
+				}
+			}
+			function toggle_settings() {
+				var button_list = document.getElementById('dropdown-content');
+
+				if (button_list.style.display != "none") {
+					button_list.style.display = "none";
+				} else {
+					button_list.style.display = "block";
+				}
+			}
+			toggle_settings();
+
+			var current_position = 0;
+			function scrollDownListener() {
+			  window.addEventListener(
+				"keydown",
+				function(event) {
+				  if (event.key == "j") {
+					var screen_height = window.screen.height / 4;
+					current_position += screen_height;
+					window.scrollTo({top: current_position, behavior: 'smooth'})
+				  }
+				}
+			  )
+			}
+
+			function scrollUpListener() {
+			  window.addEventListener(
+				"keydown",
+				function(event) {
+				  if (event.key == "k") {
+					var screen_height = window.screen.height / 4;
+					current_position -= screen_height;
+					if (current_position < 0) {
+						current_position = 0;
+					}
+					window.scrollTo({top: current_position, behavior: 'smooth'})
+				  }
+				}
+			  )
+			}
+
+			scrollDownListener()
+			scrollUpListener()
+
+			var min_level  = 1;
+			var max_level  = 12;
+			var fontlevel  = parseInt(localStorage.getItem('fontlevel'));
+			var fontsize   = parseInt(localStorage.getItem('fontsize'));
+			var h1fontsize = parseInt(localStorage.getItem('h1fontsize'));
+			var h2fontsize = parseInt(localStorage.getItem('h2fontsize'));
+			var h3fontsize = parseInt(localStorage.getItem('h3fontsize'));
+			var h4fontsize = parseInt(localStorage.getItem('h4fontsize'));
+
+			if (!fontlevel)  { fontlevel  =  3; localStorage.setItem('fontlevel', 3 ); }
+			if (!fontsize)   { fontsize   = 14; localStorage.setItem('fontsize',  14); }
+			if (!h1fontsize) { h1fontsize = 32; localStorage.setItem('h1fontsize',32); }
+			if (!h2fontsize) { h2fontsize = 24; localStorage.setItem('h2fontsize',24); }
+			if (!h3fontsize) { h3fontsize = 18; localStorage.setItem('h3fontsize',18); }
+			if (!h4fontsize) { h4fontsize = 16; localStorage.setItem('h4fontsize',16); }
+
+			function defaultFontSize() {
+				fontlevel  =  3;
+				fontsize   = 14;
+				h1fontsize = 32;
+				h2fontsize = 24;
+				h3fontsize = 18;
+				h4fontsize = 16;
+				localStorage.setItem('fontlevel',  fontlevel );
+				localStorage.setItem('fontsize',   fontsize  );
+				localStorage.setItem('h1fontsize', h1fontsize);
+				localStorage.setItem('h2fontsize', h2fontsize);
+				localStorage.setItem('h3fontsize', h3fontsize);
+				localStorage.setItem('h4fontsize', h3fontsize);
+
+				restoreFontSize();
+				document.getElementById('dropdown-content').style.display = 'none';
+			}
+
+			function zoominLetter() {
+				if (fontlevel < max_level) {
+					fontlevel += 1;
+					fontsize += 2;
+					h1fontsize += 2;
+					h2fontsize += 2;
+					h3fontsize += 2;
+					h4fontsize += 2;
+
+					localStorage.setItem('fontlevel', fontlevel);
+					localStorage.setItem('fontsize', fontsize);
+					localStorage.setItem('h1fontsize', h1fontsize);
+					localStorage.setItem('h2fontsize', h2fontsize);
+					localStorage.setItem('h3fontsize', h3fontsize);
+					localStorage.setItem('h4fontsize', h4fontsize);
+
+					restoreFontSize();
+				}
+			}
+
+			function zoomoutLetter() {
+				if (fontlevel > min_level) {
+					fontlevel -= 1;
+					fontsize -= 2;
+					h1fontsize -= 2;
+					h2fontsize -= 2;
+					h3fontsize -= 2;
+					h4fontsize -= 2;
+
+					localStorage.setItem('fontlevel', fontlevel);
+					localStorage.setItem('fontsize', fontsize);
+					localStorage.setItem('h1fontsize', h1fontsize);
+					localStorage.setItem('h2fontsize', h2fontsize);
+					localStorage.setItem('h3fontsize', h3fontsize);
+					localStorage.setItem('h4fontsize', h4fontsize);
+
+					restoreFontSize();
+				}
+			}
+
+			function restoreFontSize() {
+				fontsize   = parseInt(localStorage.getItem('fontsize'));
+				h1fontsize = parseInt(localStorage.getItem('h1fontsize'));
+				h2fontsize = parseInt(localStorage.getItem('h2fontsize'));
+				h3fontsize = parseInt(localStorage.getItem('h3fontsize'));
+				h4fontsize = parseInt(localStorage.getItem('h4fontsize'));
+
+				var p     = document.getElementsByTagName('p');
+				var pre   = document.getElementsByTagName('pre');
+				var ul    = document.getElementsByTagName('ul');
+				var ol    = document.getElementsByTagName('ol');
+				var table = document.getElementsByTagName('table');
+				var cite  = document.getElementsByTagName('cite');
+				var toc   = document.getElementsByClassName('list-group');
+				var bar   = document.getElementsByClassName('difficulty');
+				var h1    = document.getElementsByTagName('h1');
+				var h2    = document.getElementsByTagName('h2');
+				var h3    = document.getElementsByTagName('h3');
+				var h4    = document.getElementsByTagName('h4');
+
+				for(i=0 ; i<p.length ; i++) {
+					p[i].style.fontSize     = fontsize+"px"
+				}
+				for(i=0;i<pre.length;i++) {
+					pre[i].style.fontSize = fontsize+"px"
+				}
+				for(i=0;i<ul.length;i++) {
+					ul[i].style.fontSize = fontsize+"px"
+				}
+				for(i=0;i<ol.length;i++) {
+					ol[i].style.fontSize = fontsize+"px"
+				}
+				for(i=0;i<table.length;i++) {
+					table[i].style.fontSize = fontsize+"px"
+				}
+				for(i=0;i<cite.length;i++) {
+					cite[i].style.fontSize = fontsize+"px"
+				}
+				for(i=0;i<toc.length;i++) {
+					toc[i].style.fontSize = fontsize+"px"
+				}
+				for(i=0;i<bar.length;i++) {
+					bar[i].style.fontSize = fontsize+"px"
+				}
+				for(i=0;i<h1.length;i++) {
+					h1[i].style.fontSize = h1fontsize+"px"
+				}
+				for(i=0;i<h2.length;i++) {
+					h2[i].style.fontSize = h2fontsize+"px"
+				}
+				for(i=0;i<h3.length;i++) {
+					h3[i].style.fontSize = h3fontsize+"px"
+				}
+				for(i=0;i<h4.length;i++) {
+					h4[i].style.fontSize = h4fontsize+"px"
+				}
+			}
+			restoreFontSize();
+		</script>
+	</body>
+	<footer class="bg-light text-center text-lg-start">
+		<!-- Copyright -->
+		<div class="text-center p-3" style="background-color: rgba(0, 0, 0, 0.2);">
+			<a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a><br /><span xmlns:dct="http://purl.org/dc/terms/" href="http://purl.org/dc/dcmitype/Text" property="dct:title" rel="dct:type">User Manuals</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="https://briansalehi.ir" property="cc:attributionName" rel="cc:attributionURL">Brian Salehi</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>.<br />Based on a work at <a xmlns:dct="http://purl.org/dc/terms/" href="https://github.com/briansalehi/generate-manual" rel="dct:source">https://github.com/briansalehi/generate-manual</a>.
+		</div>
+	</footer>
+</html>

@@ -1,0 +1,20 @@
+@startuml
+
+actor :Author:
+
+rectangle Milestone {
+	usecase (View Notebooks)
+    usecase (Add a Notebook)
+    usecase (Edit a Notebook)
+    usecase (Remove a Notebook)
+    usecase (Extract a Notebook)
+}
+
+left to right direction
+:Author: --> (View Notebooks)
+:Author: --> (Add a Notebook)
+:Author: --> (Edit a Notebook)
+:Author: --> (Remove a Notebook)
+:Author: --> (Extract a Notebook)
+
+@enduml

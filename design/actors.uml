@@ -1,0 +1,9 @@
+@startuml
+
+actor :Administrator: as Admin
+actor :User:
+actor :Guest:
+actor :Author:
+actor :Database Author: as DBA
+
+@enduml

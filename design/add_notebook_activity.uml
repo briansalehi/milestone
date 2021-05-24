@@ -1,0 +1,14 @@
+@startuml
+
+start
+:Request New\nNotebook;
+:Insert Title;
+:Insert Tags;
+:Insert Category;
+:Insert Difficulty;
+:Insert References;
+:Insert Body;
+:Submit Changes;
+stop
+
+@enduml
