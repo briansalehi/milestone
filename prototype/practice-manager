@@ -1007,30 +1007,9 @@ function create_command_scheme {
 # requires path to source
 function build_scheme {
 	local source="$1"
+	local output="$2"
 	local location="${source%/*}"
-	local scheme="$2"
-
-	if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
-	then
-		local output="${source%.*}.screenshot.png"
-	else
-		local output="${source%.*}.output.txt"
-	fi
-
-	local source_change_time=$(stat -c "%Y" "$source" 2>/dev/null)
-	local output_change_time=$(stat -c "%Y" "$output" 2>/dev/null)
-
-	local output_file_required=false
-	local template
-	if [ -n "$EXECUTION_SCHEME" ] && ! [ -f "$output" ]
-	then
-		output_file_required=true
-	elif [ -n "$EXECUTION_SCHEME" ] && [ -f "$output" ] && [ "$source_change_time" -gt "$output_change_time" ]
-	then
-		output_file_required=true
-	else
-		output_change_time=$source_change_time
-	fi
+	local scheme="$3"
 
 	local headers="$(sed -n "/^${source##*/}/s/${source##*/}\s//p" "${source%/*}/.index")"
 	headers="$(echo "${headers// /$'\n'}" | sed "s/^/${location//\//\\\/}\//" | xargs)"
@@ -1040,54 +1019,40 @@ function build_scheme {
 
 	local process_id=
 
-	if [ "${output_file_required:-false}" == "true" ] \
-		|| [ "${source_change_time:-0}" -gt "${output_change_time:-0}" ] \
-		|| [ "${FORCE_OPTION:-false}" == "true" ]
-	then
-		echo "$command_scheme" >&2
-		local execution_error="${source%.*}.execution.error.txt"
+	echo "$command_scheme" >&2
+	local execution_error="${source%.*}.execution.error.txt"
 
-		if [ "${GENERATES_SCREENSHOT:-false}" == "true" ]
+	if [ "${GENERATES_SCREENSHOT:-false}" == "true" ]
+	then
+		unset GENERATES_SCREENSHOT
+		capture_screenshot "$source"
+	else
+		if [ "${GENERATES_EXECUTION_ERROR:-false}" == "true" ]
 		then
-			unset GENERATES_SCREENSHOT
-			capture_screenshot "$source"
-		else
-			if [ "${GENERATES_EXECUTION_ERROR:-false}" == "true" ]
+			if [ "${RUN_IN_BACKGROUND:-false}" == "true" ]
 			then
-				if [ "${RUN_IN_BACKGROUND:-false}" == "true" ]
-				then
-					if ! eval "$command_scheme 1> $output 2> $execution_error" &
-					then
-						process_id="$!"
-						unset GENERATES_EXECUTION_ERROR
-						tput setaf $SEVERITY_LOW
-						echo "Intentional execution error: $1" >&2
-						tput sgr0
-					fi
-				elif ! eval "$command_scheme &> $output"
+				if ! eval "$command_scheme 1> $output 2> $execution_error" &
 				then
 					process_id="$!"
 					unset GENERATES_EXECUTION_ERROR
 					tput setaf $SEVERITY_LOW
 					echo "Intentional execution error: $1" >&2
 					tput sgr0
-				else
-					process_id="$!"
 				fi
+			elif ! eval "$command_scheme &> $output"
+			then
+				process_id="$!"
+				unset GENERATES_EXECUTION_ERROR
+				tput setaf $SEVERITY_LOW
+				echo "Intentional execution error: $1" >&2
+				tput sgr0
 			else
-				if [ "${RUN_IN_BACKGROUND:-false}" == "true" ]
-				then
-					if ! eval "$command_scheme 1> $output 2> $execution_error" &
-					then
-						process_id="$!"
-						tput setaf $SEVERITY_HIGH
-						echo "Execution error: $1" >&2
-						echo "    Command: $command_scheme" >&2
-						echo "    Reason: $execution_error" >&2
-						tput sgr0
-						return 1
-					fi
-				elif ! eval "$command_scheme 1> $output 2> $execution_error"
+				process_id="$!"
+			fi
+		else
+			if [ "${RUN_IN_BACKGROUND:-false}" == "true" ]
+			then
+				if ! eval "$command_scheme 1> $output 2> $execution_error" &
 				then
 					process_id="$!"
 					tput setaf $SEVERITY_HIGH
@@ -1096,33 +1061,37 @@ function build_scheme {
 					echo "    Reason: $execution_error" >&2
 					tput sgr0
 					return 1
-				else
-					process_id="$!"
 				fi
-			fi
-
-			if [ "${RUN_IN_BACKGROUND:-false}" == "true" ]
+			elif ! eval "$command_scheme 1> $output 2> $execution_error"
 			then
-				# wait for background process to finish in 30 seconds
-				kill_process "$process_id" 30 &
-				RUN_IN_BACKGROUND=false
+				process_id="$!"
+				tput setaf $SEVERITY_HIGH
+				echo "Execution error: $1" >&2
+				echo "    Command: $command_scheme" >&2
+				echo "    Reason: $execution_error" >&2
+				tput sgr0
+				return 1
+			else
+				process_id="$!"
 			fi
 		fi
 
-		if [ -f "$execution_error" ] && ! [ -s "$execution_error" ]
+		if [ "${RUN_IN_BACKGROUND:-false}" == "true" ]
 		then
-			rm "$execution_error"
+			# wait for background process to finish in 30 seconds
+			kill_process "$process_id" 30 &
+			RUN_IN_BACKGROUND=false
 		fi
+	fi
 
-		if [ -f "$output" ] && ! [ -s "$output" ]
-		then
-			rm "$output"
-		fi
-	else
-		tput setaf $SEVERITY_LOW
-		echo "No changes in source code since last execution: $1" >&2
-		tput sgr0
-		return 1
+	if [ -f "$execution_error" ] && ! [ -s "$execution_error" ]
+	then
+		rm "$execution_error"
+	fi
+
+	if [ -f "$output" ] && ! [ -s "$output" ]
+	then
+		rm "$output"
 	fi
 }
 
@@ -2833,19 +2802,51 @@ function execute_program {
 
 	update_configuration "$source"
 
-	if [ -n "$EXECUTION_SCHEME" ]
+	if [ -z "$EXECUTION_SCHEME" ]
+	then
+		tput setaf $SEVERITY_LOW
+		echo "Source not flagged as executable: $source" >&2
+		tput sgr0
+		return 1
+	fi
+
+	if [ "${CAPTURE_SCREENSHOT:-false}" == "true" ]
+	then
+		local output="${source%.*}.screenshot.png"
+	else
+		local output="${source%.*}.output.txt"
+	fi
+
+	local source_change_time=$(stat -c "%Y" "$source" 2>/dev/null)
+	local output_change_time=$(stat -c "%Y" "$output" 2>/dev/null)
+
+	local build_required=false
+
+	if [ -n "$EXECUTION_SCHEME" ] && ! [ -f "$output" ]
+	then
+		build_required=true
+	elif [ -n "$EXECUTION_SCHEME" ] && [ -f "$output" ] && [ "$source_change_time" -gt "$output_change_time" ]
+	then
+		build_required=true
+	else
+		build_required=false
+		output_change_time=$source_change_time
+	fi
+
+	if [ "$build_required" == "true" ] || [ "${FORCE_OPTION:-false}" == "true" ]
 	then
 		local scheme
 		while read -r scheme
 		do
-			if ! build_scheme "$source" "$scheme"
+			if ! build_scheme "$source" "$output" "$scheme"
 			then
 				return 1
 			fi
 		done <<< "${EXECUTION_SCHEME//;/$'\n'}"
 	else
 		tput setaf $SEVERITY_LOW
-		echo "Source not flagged as executable: $source" >&2
+		echo "Build not required: $1" >&2
+		echo "Use -f to force build." >&2
 		tput sgr0
 		return 1
 	fi
