@@ -3054,9 +3054,7 @@ fi
 
 if [ $# -eq 0 ]
 then
-	# At least one .index must exist at current directory
-	# Everything starts here
-	generate_manuals "./.index"
+	PEEK_OPTION=true
 else
 	while [ $# -gt 0 ]
 	do
@@ -3066,7 +3064,7 @@ else
 			-o|--reorder) REORDER_PAGE=true; TARGET_PAGE="${2%/}"; shift ;;
 			-f|--force) FORCE_OPTION=true ;;
 			-p|--preview) PREVIEW_OPTION=true ;;
-			-b|--build) BUILD_OPTION=true ;;
+			-b|--build) BUILD_OPTION=true; if [ $# -eq 1 ]; then PEEK_OPTION=true; GENERAL_BUILD=true; fi ;;
 			-h|--help|-*) usage; break ;;
 			.) PEEK_OPTION=true ;;
 			*) ANALYZE_OPTION=true
@@ -3091,6 +3089,9 @@ then
 		generate_chapter "./README.md"
 		index_page "./README.md"
 		xdg-open ./html-files/index.html &>/dev/null &
+	elif [ "${BUILD_OPTION:-false}" == "true" ] && [ "${GENERAL_BUILD:-false}" == "true" ]
+	then
+		generate_manuals "./.index"
 	elif [ "${BUILD_OPTION:-false}" == "true" ]
 	then
 		prepare_output_directory

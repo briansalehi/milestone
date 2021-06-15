@@ -37,7 +37,7 @@ MOVE          = mv -f
 TAR           = tar -cf
 COMPRESS      = gzip -9f
 DISTNAME      = practice-manager-gui1.0.0
-DISTDIR = /home/brian/development/projects/milestone/prototype/gui/.tmp/practice-manager-gui1.0.0
+DISTDIR = /home/brian/development/projects/milestone-prototype/prototype/gui/.tmp/practice-manager-gui1.0.0
 LINK          = g++
 LFLAGS        = -Wl,-O1
 LIBS          = $(SUBLIBS) /usr/lib/libQt5Widgets.so /usr/lib/libQt5Gui.so /usr/lib/libQt5Core.so -lGL -lpthread   
@@ -66,6 +66,7 @@ DIST          = /usr/lib/qt/mkspecs/features/spec_pre.prf \
 		/usr/lib/qt/mkspecs/common/g++-base.conf \
 		/usr/lib/qt/mkspecs/common/g++-unix.conf \
 		/usr/lib/qt/mkspecs/qconfig.pri \
+		/usr/lib/qt/mkspecs/modules/qt_KSyntaxHighlighting.pri \
 		/usr/lib/qt/mkspecs/modules/qt_lib_3danimation.pri \
 		/usr/lib/qt/mkspecs/modules/qt_lib_3danimation_private.pri \
 		/usr/lib/qt/mkspecs/modules/qt_lib_3dcore.pri \
@@ -294,6 +295,7 @@ Makefile: practice-manager-gui.pro /usr/lib/qt/mkspecs/linux-g++/qmake.conf /usr
 		/usr/lib/qt/mkspecs/common/g++-base.conf \
 		/usr/lib/qt/mkspecs/common/g++-unix.conf \
 		/usr/lib/qt/mkspecs/qconfig.pri \
+		/usr/lib/qt/mkspecs/modules/qt_KSyntaxHighlighting.pri \
 		/usr/lib/qt/mkspecs/modules/qt_lib_3danimation.pri \
 		/usr/lib/qt/mkspecs/modules/qt_lib_3danimation_private.pri \
 		/usr/lib/qt/mkspecs/modules/qt_lib_3dcore.pri \
@@ -511,6 +513,7 @@ Makefile: practice-manager-gui.pro /usr/lib/qt/mkspecs/linux-g++/qmake.conf /usr
 /usr/lib/qt/mkspecs/common/g++-base.conf:
 /usr/lib/qt/mkspecs/common/g++-unix.conf:
 /usr/lib/qt/mkspecs/qconfig.pri:
+/usr/lib/qt/mkspecs/modules/qt_KSyntaxHighlighting.pri:
 /usr/lib/qt/mkspecs/modules/qt_lib_3danimation.pri:
 /usr/lib/qt/mkspecs/modules/qt_lib_3danimation_private.pri:
 /usr/lib/qt/mkspecs/modules/qt_lib_3dcore.pri:
@@ -772,7 +775,7 @@ compiler_moc_header_clean:
 moc_mainwindow.cpp: mainwindow.hpp \
 		moc_predefs.h \
 		/usr/bin/moc
-	/usr/bin/moc $(DEFINES) --include /home/brian/development/projects/milestone/prototype/gui/moc_predefs.h -I/usr/lib/qt/mkspecs/linux-g++ -I/home/brian/development/projects/milestone/prototype/gui -I/home/brian/development/projects/milestone/prototype/gui -I/usr/include/qt -I/usr/include/qt/QtWidgets -I/usr/include/qt/QtGui -I/usr/include/qt/QtCore -I/usr/include/c++/10.2.0 -I/usr/include/c++/10.2.0/x86_64-pc-linux-gnu -I/usr/include/c++/10.2.0/backward -I/usr/lib/gcc/x86_64-pc-linux-gnu/10.2.0/include -I/usr/local/include -I/usr/lib/gcc/x86_64-pc-linux-gnu/10.2.0/include-fixed -I/usr/include mainwindow.hpp -o moc_mainwindow.cpp
+	/usr/bin/moc $(DEFINES) --include /home/brian/development/projects/milestone-prototype/prototype/gui/moc_predefs.h -I/usr/lib/qt/mkspecs/linux-g++ -I/home/brian/development/projects/milestone-prototype/prototype/gui -I/home/brian/development/projects/milestone-prototype/prototype/gui -I/usr/include/qt -I/usr/include/qt/QtWidgets -I/usr/include/qt/QtGui -I/usr/include/qt/QtCore -I/usr/include/c++/10.2.0 -I/usr/include/c++/10.2.0/x86_64-pc-linux-gnu -I/usr/include/c++/10.2.0/backward -I/usr/lib/gcc/x86_64-pc-linux-gnu/10.2.0/include -I/usr/local/include -I/usr/lib/gcc/x86_64-pc-linux-gnu/10.2.0/include-fixed -I/usr/include mainwindow.hpp -o moc_mainwindow.cpp
 
 compiler_moc_objc_header_make_all:
 compiler_moc_objc_header_clean:

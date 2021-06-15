@@ -6,7 +6,10 @@ start
 :Insert Tags;
 :Insert Category;
 :Insert Difficulty;
-:Insert References;
+
+repeat :Insert Reference;
+repeat while (More Reference?) is (yes) not (no)
+
 :Insert Body;
 :Submit Changes;
 stop
