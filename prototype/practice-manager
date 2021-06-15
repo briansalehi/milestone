@@ -3064,8 +3064,15 @@ else
 			-o|--reorder) REORDER_PAGE=true; TARGET_PAGE="${2%/}"; shift ;;
 			-f|--force) FORCE_OPTION=true ;;
 			-p|--preview) PREVIEW_OPTION=true ;;
-			-b|--build) BUILD_OPTION=true; if [ $# -eq 1 ]; then PEEK_OPTION=true; GENERAL_BUILD=true; fi ;;
-			-h|--help|-*) usage; break ;;
+			-b|--build) BUILD_OPTION=true
+				# no path given and -b is the first and last option
+				if [ $# -eq 1 ] && [ "${ANALYZE_OPTION:-false}" == "false" ]
+				then
+					PEEK_OPTION=true
+					GENERAL_BUILD=true
+				fi
+				;;
+			-h|--help|-*) usage; exit 1 ;;
 			.) PEEK_OPTION=true ;;
 			*) ANALYZE_OPTION=true
 				ANALYZE_SOURCE="$1"
