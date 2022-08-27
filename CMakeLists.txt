@@ -6,4 +6,4 @@ file(GLOB header_files include/*)
 file(GLOB doc_files docs/*)
 
 add_executable(flashback)
-target_sources(flashback ${source_files})
+target_sources(flashback PRIVATE ${source_files})
