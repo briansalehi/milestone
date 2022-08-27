@@ -11,10 +11,9 @@ help technical readers and learners review topics and domains.
 git clone https://github.com/briansalehi/flashback.git
 cmake -S flashback -B flashback-build \
     -D CMAKE_BUILD_TYPE:STRING=release \
-    -D CMAKE_INSTALL_PATH:PATH=$HOME/.local \
     -D FLASHBACK_DATABASE_PATH:PATH=$HOME/.config/flashback
 cmake --build flashback-build --target all --parallel
-cmake --build flashback-build --target install
+cmake --install flashback-build --prefix $HOME/.local
 ```
 
 ## Usage

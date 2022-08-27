@@ -1,1 +1,8 @@
 /build/
+/html/
+*.swp
+*.~
+*~
+*.o
+*.a
+*.so
