@@ -9,9 +9,7 @@ help technical readers and learners review topics and domains.
 
 ```sh
 git clone https://github.com/briansalehi/flashback.git
-cmake -S flashback -B flashback-build \
-    -D CMAKE_BUILD_TYPE:STRING=release \
-    -D FLASHBACK_DATABASE_PATH:PATH=$HOME/.config/flashback
+cmake -S flashback -B flashback-build -D CMAKE_BUILD_TYPE:STRING=release
 cmake --build flashback-build --target all --parallel
 cmake --install flashback-build --prefix $HOME/.local
 ```
