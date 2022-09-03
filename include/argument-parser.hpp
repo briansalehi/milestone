@@ -16,31 +16,33 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- *  Flashback  Copyright (C) 2022  Brian Salehi (salehibrian@gmail.com)
- *  This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
- *  This is free software, and you are welcome to redistribute it
- *  under certain conditions; type `show c' for details.
- */
+#pragma once
 
-#include <iostream>
-#include <argument-parser.hpp>
+#include <string>
+#include <boost/program_options.hpp>
 
-int main(int argc, char **argv)
-try
+namespace flashback
 {
-    flashback::argument_parser options(argc, argv);
+// namespace aliases
+namespace options = boost::program_options;
 
-    if (options.begin_practice)
-    {
-        std::cout << "beginning practice\n";
-    }
-}
-catch (boost::program_options::error const& exp)
+struct argument_parser
 {
-    std::cerr << exp.what() << std::endl;
-}
-catch (std::exception const& exp)
-{
-    std::cerr << exp.what() << std::endl;
-}
+
+    // member functions
+    explicit argument_parser(int, char**);
+    void parse_options();
+    void verify_options();
+
+    // member variables
+    options::options_description all_options;
+    options::options_description general_options;
+    options::options_description practice_options;
+    options::positional_options_description positional_options;
+    options::command_line_parser command_line_parser;
+    options::variables_map variables_map;
+
+    // option values
+    bool begin_practice = false;
+}; // options
+} // flashback
