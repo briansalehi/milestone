@@ -11,3 +11,5 @@ add_executable(flashback)
 target_sources(flashback PRIVATE ${source_files})
 target_link_libraries(flashback PRIVATE Boost::program_options)
 target_include_directories(flashback PRIVATE include)
+
+install(TARGETS flashback)

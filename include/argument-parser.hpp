@@ -21,6 +21,12 @@
 #include <string>
 #include <boost/program_options.hpp>
 
+constexpr auto copyright {
+R"(Flashback  Copyright (C) 2022  Brian Salehi (salehibrian@gmail.com)
+This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+This is free software, and you are welcome to redistribute it
+under certain conditions; type `show c' for details.)" };
+
 namespace flashback
 {
 // namespace aliases
@@ -30,9 +36,11 @@ struct argument_parser
 {
 
     // member functions
-    explicit argument_parser(int, char**);
+    explicit argument_parser(int, char**, std::string const&);
     void parse_options();
     void verify_options();
+    std::string get_help() const;
+    std::string get_copyright() const;
 
     // member variables
     options::options_description all_options;
@@ -41,8 +49,10 @@ struct argument_parser
     options::positional_options_description positional_options;
     options::command_line_parser command_line_parser;
     options::variables_map variables_map;
+    std::string help_string;
 
     // option values
     bool begin_practice = false;
+    std::string sample_path;
 }; // options
 } // flashback

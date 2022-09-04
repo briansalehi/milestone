@@ -16,24 +16,45 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- *  Flashback  Copyright (C) 2022  Brian Salehi (salehibrian@gmail.com)
- *  This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
- *  This is free software, and you are welcome to redistribute it
- *  under certain conditions; type `show c' for details.
- */
-
+#include <string>
+#include <fstream>
+#include <sstream>
 #include <iostream>
+#include <filesystem>
+
+#include <card.hpp>
 #include <argument-parser.hpp>
 
 int main(int argc, char **argv)
 try
 {
-    flashback::argument_parser options(argc, argv);
+    using namespace std::string_literals;
 
-    if (options.begin_practice)
+    std::string help_string{ "Usage: "s
+        + std::filesystem::path(argv[0]).filename().generic_string()
+        + " [options]\n"s};
+
+    flashback::argument_parser options(argc, argv, help_string);
+
+    if (options.begin_practice && !options.sample_path.empty())
     {
-        std::cout << "beginning practice\n";
+        std::ifstream sample(options.sample_path);
+
+        if (std::stringstream buffer; sample.is_open())
+        {
+            std::string line;
+            while (getline(sample, line))
+            {
+                buffer << line << "\n";
+            }
+
+            flashback::card sample_card(buffer);
+            sample.close();
+        }
+    }
+    else
+    {
+        std::cerr << options.get_help();
     }
 }
 catch (boost::program_options::error const& exp)

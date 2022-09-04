@@ -17,19 +17,23 @@
  */
 
 #include <sstream>
+#include <iostream>
 #include <argument-parser.hpp>
 
 using namespace flashback;
 
-argument_parser::argument_parser(int argc, char **argv)
-    : command_line_parser(argc, argv),
+argument_parser::argument_parser(int argc, char **argv, std::string const& help_string)
+    : help_string{help_string},
+    command_line_parser(argc, argv),
     general_options("Options"),
     practice_options("Practice Options")
 {
     general_options.add_options()
-        ("help,h", "show help message");
+        ("help,h", "show help message")
+        ("copyright,c", "show copyright notice");
 
     practice_options.add_options()
+        ("file,f", options::value<std::string>(), "input file")
         ("reset,r", "start over all practices");
 
     all_options.add(general_options).add(practice_options);
@@ -52,10 +56,33 @@ void argument_parser::verify_options()
 {
     if (variables_map.count("help"))
     {
-        std::ostringstream buffer;
-        buffer << all_options;
-        throw options::error(buffer.str());
+        throw std::invalid_argument(get_help());
+    }
+
+    if (variables_map.count("copyright"))
+    {
+        throw std::invalid_argument(get_copyright());
+    }
+
+    if (variables_map.count("file"))
+    {
+        sample_path = variables_map["file"].as<std::string>();
     }
 
     begin_practice = true;
+}
+
+std::string argument_parser::get_help() const
+{
+    std::ostringstream buffer;
+    buffer << help_string;
+    buffer << all_options;
+    return buffer.str();
+}
+
+std::string argument_parser::get_copyright() const
+{
+    std::ostringstream buffer;
+    buffer << copyright;
+    return buffer.str();
 }
