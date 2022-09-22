@@ -24,43 +24,35 @@ do
     do
         if [ "$line" == "<details>" ]
         then
-            echo -ne "\e[0m"
-            resource_scope=0
-
-            if [ "$body_scope" -eq 1 ]
+            if [ "$resource_scope" -eq 1 ]
             then
                 echo -e "\e[1;33m"'<<< wrap up practice'"\e[0m"
-                echo -e "\e[1;32m"'>>> body begin'"\e[0m"
-            else
-                echo -e "\e[1;32m"'>>> body begin'"\e[0m"
-                body_scope=1
             fi
+
+            resource_scope=0; echo -ne "\e[0m"
+            body_scope=1; echo -e "\e[1;32m"'>>> body begin'"\e[0m"
         elif [ "$line" == "</details>" ]
         then
-            echo -e "\e[1;31m"'<<< body end'"\e[0m"
-            body_scope=0
-            echo -ne "\e[1;34m"
-            resource_scope=1
+            body_scope=0; echo -e "\e[1;31m"'<<< body end'"\e[0m"
+            resource_scope=1; echo -ne "\e[1;34m"
         elif [ "${line:0:9}" == "<summary>" ]
         then
             echo -e "\e[1;36m""${line:9:-10}""\e[0m"
-            read # get rid of next empty line
-        elif [ "${line:0:2}" == "##" ]
+            read -r # get rid of next empty line
+        elif [ "${line:0:3}" == "## " ]
         then
-            echo -ne "\e[0m"
-            resource_scope=0
-
-            if [ "$body_scope" -eq 1 ]
+            if [ "$body_scope" -eq 1 ] || [ "$resource_scope" -eq 1 ]
             then
-                echo -e "\e[1;33m"'<<< wrap up practice'"\e[0m"
-                body_scope=0
+                body_scope=0; echo -e "\e[1;33m"'<<< wrap up practice'"\e[0m"
             fi
+
+            resource_scope=0; echo -ne "\e[0m"
 
             if [ "$chapter_scope" -eq 0 ]
             then
                 chapter="${line#*Chapter }"
-                echo -e "\e[1;37m"">>> beginning of chapter $chapter""\e[0m"
                 chapter_scope=1
+                echo -e "\e[1;37m"">>> beginning of chapter $chapter""\e[0m"
             else
                 echo -e "\e[1;37m""<<< end of chapter $chapter""\e[0m\n"
                 chapter="${line#*Chapter }"
@@ -74,22 +66,20 @@ do
         fi
     done <<< "$(sed "1,${resource_begin}d" "$resource")"
 
-    echo -ne "\e[0m"
-    resource_scope=0
+    if [ "$resource_scope" -eq 1 ]
+    then
+        resource_scope=0; echo -ne "\e[0m"
+    fi
 
     if [ "$body_scope" -eq 1 ]
     then
-        echo -e "\e[1;33m"'<<< wrap up practice'"\e[0m"
-        body_scope=0
+        body_scope=0; echo -e "\e[1;33m"'<<< wrap up practice'"\e[0m"
     fi
 
     if [ "$chapter_scope" -eq 1 ]
     then
-        echo -e "\e[1;37m""<<< end of chapter $chapter""\e[0m"
-        chapter_scope=0
+        chapter_scope=0; echo -e "\e[1;37m""<<< end of chapter $chapter""\e[0m"
     fi
 
     echo -e "\e[1;35m"'<<< resource end'"\e[0m\n"
-    body_scope=0
-    chapter_scope=0
 done
