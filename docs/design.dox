@@ -1,0 +1,157 @@
+///
+/// \page design_page Program Design
+/// \tableofcontents
+///
+/// Design decisions of this program is first written here for convinience and
+/// as a reference.
+/// You should follow through the sections to see all different aspects of the
+/// deign.
+///
+///
+/// \section definitions Program Definitions
+///
+/// An automated trainer which reads markdown files
+/// (maybe a database later?), processes each book, iterates through all
+/// chapters, separates resources containing title, body and reference sections.
+///
+///
+/// \section command_line_design Command Line Interface
+///
+/// Command line interface shall be designed as follows:
+///
+/// * no options given will result in printing help string
+/// * starting to practice requires option **start**.
+/// * **start** option initiates an interactive shell
+/// * pressing Ctrl+C (SIGINT) should stop practices
+///
+///
+///
+///
+///
+///
+///
+///
+/// \Section class_design
+///
+/// Data types this program works on are as follows:
+///
+/// * books
+/// * notes
+/// * storage
+///
+/// So there should be at least two interfaces, one for each.
+///
+/// The book interface should at least have these following core methods:
+///
+/// * Hold information of title, isbn, authors, publication date, publisher, language,
+///   number of pages, number of chapters, stage, and binding information of this book.
+/// * 
+///
+/// A draft of book interface design could be:
+///
+/// @startuml
+/// class book {
+/// }
+/// @enduml
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///
+///

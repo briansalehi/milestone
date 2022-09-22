@@ -1,9 +1,10 @@
 # Flashback
 
-Recollector program for notations, references and practices to
-help technical readers and learners review topics and domains.
+Recollector program to help learners review technical references.
 
 ## Introduction
+
+Flashback can be used to write technical notes in order to frequently refer to them later.
 
 ## Setup
 
@@ -16,18 +17,10 @@ cmake --install flashback-build --prefix $HOME/.local
 
 ## Usage
 
-To start using Flashback, first create a database either by
-long option or its abbreviation:
-
-```sh
-flashback --generate-database
-flashback -g
-```
-
 Then start your session by following command:
 
 ```sh
-flashback
+flashback start
 ```
 
 ## License
