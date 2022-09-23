@@ -41,8 +41,8 @@ do
     # while they do not represent any valid practice.
     resource_begin="$(sed -n '1,/^## /=' "$book" | tail -n2 | head -n1)"
 
-    # print title of the book before print any practice.
-    # this step is not necessary and is only for debugging.
+    # print title of the book before printing any practice.
+    # this step is not necessary in product and is only for debugging.
     echo -e "\e[1;35m>>> $title\e[0m"
 
     # iterate over available practices of this book.

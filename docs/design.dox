@@ -3,61 +3,151 @@
 /// \tableofcontents
 ///
 /// Design decisions of this program is first written here for convinience and
-/// as a reference.
+/// as a reference for future use.\n
 /// You should follow through the sections to see all different aspects of the
 /// deign.
 ///
 ///
+///
 /// \section definitions Program Definitions
 ///
-/// An automated trainer which reads markdown files
-/// (maybe a database later?), processes each book, iterates through all
-/// chapters, separates resources containing title, body and reference sections.
+/// There are several definitions you will encounter while reading the design
+/// decisions of this program.\n
+/// Of many definitions, a few are not used in a programatic sense. Hence,
+/// they will not appear in the code, but they will be used to point to abstract
+/// definitions or real entities but unrelated to the design of program itself.\n
+/// The rest of definitions will be directly used to point out different aspects
+/// of the program.
+///
+/// \subsection session_definition Session
+///
+/// A session is the duration in which user actively interacts with practices.\n
+/// This time span is not necessarily as long as the whole life time of program.
+///
+/// Session represents user activity, and the time spent in each session is recorded.\n
+/// Each session time span is the sum of all the time spent for each
+/// \ref practice_definition during that session.
+///
+/// If program halts during a session without completing at least one practice,
+/// the whole session time recorded shall not be stored and be dropped instead.
+///
+/// Each session record shall be stored in a non-volatile memory in order to be used
+/// for next sessions.
+/// This stored data containing previous session durations
+/// shall be called \ref progress_definition.
+/// 
+/// \subsection progress_definition Progress
+/// 
+/// Progress is all the information gathered from user activity during previous sessions
+/// stored in a non-volatile memory which can be used
+/// when a new session starts.
+///
+/// \subsection practice_definition Practice
+///
+/// Practice is an entity which holds \ref resource_definition information in runtime.\n
+/// This information can be used to represent user the technical information needed for
+/// recollection.
+///
+/// \subsection resource_definition Resource
+///
+/// Resource is an object that contains technical information outside the scope of
+/// the program, and is usually what practices are refering to.
+/// A resource can be a book, website, video, course or any technically valuable piece
+/// of data worth generating practices for it.
+///
+/// \subsection entity_definition Entity
+///
+/// Entity is an object which is out of scope of the program and is usually pointed
+/// to parts of a file being parsed for generation practices or a real physical object
+/// which is used as part of generating contents of this program.
+///
+/// Unless explicitly stated, the word entity will be used in reference of any
+/// object entity named in this documentation.
+///
+/// \subsection book_entity Book Entity
+///
+/// Book is an example of \ref resource_definition which is an \ref entity_definition
+/// holding technical information.
+///
+/// Note that a book entity is different than definition of the \ref book_interface .\n
+/// Anytime a book is refered in this document, the \ref book class implementation is
+/// intended.
+/// Otherwise, anytime the book design is intended, the \ref book_interface design is
+/// explicitly specified.
+/// And to anytime a book entity is intended, the word entity will be used explicitly to
+/// point to the \ref book_entity.
 ///
 ///
-/// \section command_line_design Command Line Interface
+///
+/// \section command_line_design Command Line Interface Design
 ///
 /// Command line interface shall be designed as follows:
 ///
 /// * no options given will result in printing help string
-/// * starting to practice requires option **start**.
-/// * **start** option initiates an interactive shell
-/// * pressing Ctrl+C (SIGINT) should stop practices
+/// * starting to practice requires option `--start`.
+/// * `--start` option initiates an interactive shell
 ///
 ///
 ///
-///
-///
-///
-///
-///
-/// \Section class_design
+/// \section design Design Decisions
 ///
 /// Data types this program works on are as follows:
 ///
-/// * books
-/// * notes
-/// * storage
+/// * practice
+/// * book
+/// * session
+/// * progress
 ///
-/// So there should be at least two interfaces, one for each.
+/// So there should be interfaces for each of them.
 ///
-/// The book interface should at least have these following core methods:
+/// \subsection practice_interface Practice Interface
 ///
-/// * Hold information of title, isbn, authors, publication date, publisher, language,
-///   number of pages, number of chapters, stage, and binding information of this book.
+/// \subsection book_interface Book Interface
+///
+/// \ref book is an abstract class in program which holds information
+/// of a specific real \ref book_entity .\n
+/// A \ref book also holds series of \ref practice objects which is required for
+/// recollection procedure.
+///
+/// A book object should hold following information:
+///
+/// * title
+/// * isbn or asbn
+/// * authors
+/// * publication date
+/// * publisher
+/// * language
+/// * number of pages
+/// * number of chapters
+/// * stage number
+/// * series of \ref practice_interface objects
+/// * \ref book_entity file path
+///
+/// The book interface should at least have following core methods:
+///
+/// * 
+/// * 
 /// * 
 ///
-/// A draft of book interface design could be:
+/// A draft of book interface design could be as follows:
 ///
 /// @startuml
 /// class book {
+///     - title: std::basic_string<CharT>
+///     - isbn: std::basic_sting<CharT>
+///     - authors: std::vector<std::basic_string<CharT>>
+///     - publication_date: std::chrono::time_point
+///     - pages: unsigned int
+///     - chapters: unsigned int
+///     - stage: unsigned int
+///     - entity_path: std::filesystem::path
+///     - practices: std::set<practice>
 /// }
 /// @enduml
 ///
+/// \subsection session_interface Session Interface
 ///
-///
-///
-///
+/// \subsection progress_interface Progress Interface
 ///
 ///
 ///
