@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
-FLASHBACK_STORAGE_PATH="${FLASHBACK_STORAGE_PATH:-$HOME/projects/references/books}"
+FLASHBACK_PRACTICES_PATH="${FLASHBACK_PRACTICES_PATH:-$HOME/projects/references/books}"
+FLASHBACK_STORAGE_PATH="${FLASHBACK_STORAGE_PATH:-$HOME/.cache/flashback}"
+
+[ -d "$FLASHBACK_STORAGE_PATH" ] || mkdir "$FLASHBACK_STORAGE_PATH"
 
 # make a general way for user to stop at any practice.
 trap "stop_shell" SIGINT
@@ -17,14 +20,14 @@ function stop_shell() {
     # also the progress should be saved somewhere for real,
     # until the next time user opens a session to continue practicing.
     echo -ne "\b\b${bold}saving progress at${reset} "
-    echo -ne "${mark}$title${reset} "
-    echo -ne "${bold}chapter${reset} ${mark}${chapter}${reset} "
-    echo -e "${bold}practice${reset} ${mark}${practice}${reset}"
+    echo -ne "${mark}$title${reset} " | tee "$FLASHBACK_STORAGE_PATH/progress"
+    echo -ne "${bold}chapter${reset} ${mark}${chapter}${reset} " | tee -a "$FLASHBACK_STORAGE_PATH/progress"
+    echo -e "${bold}practice${reset} ${mark}${practice}${reset}" | tee -a "$FLASHBACK_STORAGE_PATH/progress"
     exit
 }
 
 # iterate over books and initialize all of their practices in construction.
-for book in "$FLASHBACK_STORAGE_PATH"/*
+for book in "$FLASHBACK_PRACTICES_PATH"/*
 do
     chapter_scope=0
     body_scope=0
