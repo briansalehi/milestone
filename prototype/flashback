@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-STORAGE_PATH="${STORAGE_PATH:-/home/brian/projects/references/books}"
+FLASHBACK_STORAGE_PATH="${FLASHBACK_STORAGE_PATH:-$HOME/projects/references/books}"
 
 # make a general way for user to stop at any practice.
 trap "stop_shell" SIGINT
@@ -24,7 +24,7 @@ function stop_shell() {
 }
 
 # iterate over books and initialize all of their practices in construction.
-for book in "$STORAGE_PATH"/*
+for book in "$FLASHBACK_STORAGE_PATH"/*
 do
     chapter_scope=0
     body_scope=0
