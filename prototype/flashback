@@ -51,7 +51,7 @@ do
     # practices should be ordered based on representing chapter and practice number.
     # practices should be comparable to each other.
     # books should aware of the number of practices they holds.
-    while read -r line
+    while IFS= read -r line
     do
         if [ "$line" == "<details>" ]
         then
