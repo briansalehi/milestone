@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
 FLASHBACK_PRACTICES_PATH="${FLASHBACK_PRACTICES_PATH:-$HOME/projects/references/books}"
-FLASHBACK_STORAGE_PATH="${FLASHBACK_STORAGE_PATH:-$HOME/.cache/flashback}"
+FLASHBACK_PROGRESS_PATH="${FLASHBACK_PROGRESS_PATH:-$HOME/.cache/flashback}"
+RESUMABLE=0
 
-[ -d "$FLASHBACK_STORAGE_PATH" ] || mkdir "$FLASHBACK_STORAGE_PATH"
+[ -d "$FLASHBACK_PROGRESS_PATH" ] || mkdir "$FLASHBACK_PROGRESS_PATH"
 
 # make a general way for user to stop at any practice.
 trap "stop_shell" SIGINT
@@ -20,11 +21,18 @@ function stop_shell() {
     # also the progress should be saved somewhere for real,
     # until the next time user opens a session to continue practicing.
     echo -ne "\b\b${bold}saving progress at${reset} "
-    echo -ne "${mark}$title${reset} " | tee "$FLASHBACK_STORAGE_PATH/progress"
-    echo -ne "${bold}chapter${reset} ${mark}${chapter}${reset} " | tee -a "$FLASHBACK_STORAGE_PATH/progress"
-    echo -e "${bold}practice${reset} ${mark}${practice}${reset}" | tee -a "$FLASHBACK_STORAGE_PATH/progress"
+    echo -ne "${mark}$title${reset} "
+    echo -ne "${bold}chapter${reset} ${mark}${chapter}${reset} "
+    echo -e "${bold}practice${reset} ${mark}${practice}${reset}"
+    echo "$title $chapter $practice" > "$FLASHBACK_PROGRESS_PATH/progress"
     exit
 }
+
+if [ -s "$FLASHBACK_PROGRESS_PATH/progress" ]
+then
+    LATEST_PROGRESS="$(cat "$FLASHBACK_PROGRESS_PATH/progress")"
+    RESUMABLE=1
+fi
 
 # iterate over books and initialize all of their practices in construction.
 for book in "$FLASHBACK_PRACTICES_PATH"/*
@@ -34,6 +42,7 @@ do
     references_scope=0
     chapter=0
     practice=0
+    progress=
 
     # retrieve title and other infomation of the book.
     title="$(sed -n '1s/^# \[\([^)]\+\)\].*/\1/p' "$book")"
@@ -81,7 +90,7 @@ do
                 echo -e "\e[1;33m"'<<< wrap up practice'"\e[0m"
 
                 # wait for user to finish current practice.
-                # only meaningful in this script.
+                # only meaningful in this script and not in production code.
                 # practices should be represented differently in product.
                 # each practice should be controlled with shortcuts
                 read -r < /dev/tty
