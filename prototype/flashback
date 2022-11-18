@@ -4,6 +4,25 @@ FLASHBACK_PRACTICES_PATH="${FLASHBACK_PRACTICES_PATH:-$HOME/projects/references/
 FLASHBACK_PROGRESS_PATH="${FLASHBACK_PROGRESS_PATH:-$HOME/.cache/flashback}"
 RESUMABLE=0
 
+function get_help() {
+    echo "flashback [-h] [-r]"
+    echo
+    echo "options"
+    echo
+    echo " -h,--help            print help menu"
+    echo " -r,--reset           restart progress"
+    echo
+}
+
+while [ $# -gt 0 ]
+do
+    case "$1" in
+        -h|--help) get_help ;;
+        -r|--reset) rm "$FLASHBACK_PROGRESS_PATH/progress" ;;
+    esac
+    shift
+done
+
 [ -d "$FLASHBACK_PROGRESS_PATH" ] || mkdir "$FLASHBACK_PROGRESS_PATH"
 
 # make a general way for user to stop at any practice.
@@ -28,6 +47,34 @@ function stop_shell() {
     exit
 }
 
+function show_time_duration() {
+    local duration="$1"
+    local hours=0
+    local minutes=0
+    local seconds=0
+
+    while [ "$duration" -ne 0 ]
+    do
+        if [ "$duration" -gt 3600 ]
+        then
+            hours="$((hours + 1))"
+            duration="$((duration - 3600))"
+        elif [ "$duration" -gt 60 ]
+        then
+            minutes="$((minutes + 1))"
+            duration="$((duration - 60))"
+        else
+            seconds="$duration"
+            duration=0
+        fi
+    done
+
+    [ "$hours" -gt 0 ]   && echo -n "${hours}h "
+    [ "$minutes" -gt 0 ] && echo -n "${minutes}m "
+    [ "$seconds" -gt 0 ] && echo -n "${seconds}s"
+    echo
+}
+
 if [ -s "$FLASHBACK_PROGRESS_PATH/progress" ]
 then
     LATEST_PROGRESS="$(cat "$FLASHBACK_PROGRESS_PATH/progress")"
@@ -43,6 +90,9 @@ do
     chapter=0
     practice=0
     progress=
+    begin_timepoint=0
+    end_timepoint=0
+    practice_duration=0
 
     # retrieve title and other infomation of the book.
     title="$(sed -n '1s/^# \[\([^)]\+\)\].*/\1/p' "$book")"
@@ -108,11 +158,49 @@ do
 
             if [ "$references_scope" -eq 1 ] && [ "${RESUMABLE:-0}" -eq 0 ]
             then
+                # check if there is a time duration for this practice from
+                # last session, and notify user about the expected end time
+                if [ -f "$FLASHBACK_PROGRESS_PATH/records" ]
+                then
+                    last_duration="$(grep "$progress" "$FLASHBACK_PROGRESS_PATH/records" | cut -d':' -f1)"
+                    if [ "${last_duration:-0}" -gt 0 ]
+                    then
+                        echo -ne "\e[1;30m"">>> expected duration: $(show_time_duration "$last_duration")""\e[0m"
+                    fi
+                fi
+
                 # wait for user to finish current practice.
                 # only meaningful in this script and not in production code.
                 # practices should be represented differently in product.
                 # each practice should be controlled with shortcuts
                 read -r < /dev/tty
+
+                if [ "$begin_timepoint" -gt 0 ] && [ "${RESUMABLE:-0}" -eq 0 ]
+                then
+                    # evaluate how long last practice took to complete and store it
+                    end_timepoint="$(date +%s)"
+                    practice_duration="$((end_timepoint - begin_timepoint))"
+
+                    if [ -f "$FLASHBACK_PROGRESS_PATH/records" ]
+                    then
+                        # find previous practice record and replace it or add new record
+                        record_line="$(grep -n "$progress" "$FLASHBACK_PROGRESS_PATH/records" | cut -d ':' -f 1)"
+                        if [ "${record_line:-0}" -gt 0 ]
+                        then
+                            sed -i "${record_line}d" "$FLASHBACK_PROGRESS_PATH/records"
+                        fi
+                    fi
+
+                    # store previous practice time duration
+                    if [ "$practice_duration" -gt 0 ]
+                    then
+                        echo "$practice_duration:$progress" >> "$FLASHBACK_PROGRESS_PATH/records"
+                    fi
+
+                    begin_timepoint=0
+                    end_timepoint=0
+                    practice_duration=0
+                fi
             fi
 
             clear
@@ -132,6 +220,9 @@ do
             # is opened until the end of the book context scope.
             # book context scope shall not be implemented as it always is open.
             body_scope=1; echo -e "\e[1;32m"'>>> body begin'"\e[0m"
+
+            # start recording practice time
+            [ "${RESUMABLE:-0}" -eq 0 ] && begin_timepoint="$(date +%s)"
         elif [ "$line" == "</details>" ]
         then
             # body context scope shall be closed when ending tag of body hits.
@@ -190,6 +281,10 @@ do
                     # only meaningful in script and not in production code.
                     read -r < /dev/tty
                 fi
+
+                begin_timepoint=0
+                end_timepoint=0
+                practice_duration=0
             fi
 
             # chapter context scope shall begin when it was already closed and
