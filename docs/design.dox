@@ -1,5 +1,6 @@
 ///
 /// \page design_page Program Design
+/// \brief Program Design Decisions
 /// \tableofcontents
 ///
 /// Design decisions of this program is first written here for convinience and
@@ -93,14 +94,39 @@
 ///
 /// Data types this program works on are as follows:
 ///
-/// * practice
-/// * book
-/// * session
-/// * progress
+/// * \ref practice_interface
+/// * \ref topic_interface
+/// * \ref book_interface
+/// * \ref session_interface
+/// * \ref progress_interface
 ///
 /// So there should be interfaces for each of them.
 ///
 /// \subsection practice_interface Practice Interface
+///
+/// A practice is an issue explaining a topic and is the main value of the
+/// flashback program.
+///
+/// Each practice is a question which should be answered by user, and it
+/// already has the answer to help user correct themselves in case of hesitation.
+///
+/// \startuml
+/// abstract class practice {
+/// }
+/// \enduml
+///
+/// \subsection topic_interface Topic Interface
+///
+/// Topics are domain specific subjects which explain one and only one material.
+///
+/// Each topic shall contain a few practices so that during each program session
+/// only one practice can be picked and trained in order to have enough time
+/// for practicing all topics.
+///
+/// \startuml
+/// abstract class topic {
+/// }
+/// \enduml
 ///
 /// \subsection book_interface Book Interface
 ///
@@ -147,10 +173,17 @@
 ///
 /// \subsection session_interface Session Interface
 ///
+/// \startuml
+/// abstract class session {
+/// }
+/// \enduml
+///
 /// \subsection progress_interface Progress Interface
 ///
-///
-///
+/// \startuml
+/// abstract class progress {
+/// }
+/// \enduml
 ///
 ///
 ///
