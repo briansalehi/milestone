@@ -10,7 +10,7 @@
 ///
 ///
 ///
-/// \section definitions Program Definitions
+/// \section definitions Definitions
 ///
 /// There are several definitions you will encounter while reading the design
 /// decisions of this program.\n
@@ -20,28 +20,98 @@
 /// The rest of definitions will be directly used to point out different aspects
 /// of the program.
 ///
+/// - \ref session_definition
+/// - \ref progress_definition
+/// - \ref subject_definition
+/// - \ref topic_definition
+/// - \ref practice_definition
+/// - \ref resource_definition
+/// - \ref entity_definition
+///
 /// \subsection session_definition Session
 ///
-/// A session is the duration in which user actively interacts with practices.\n
-/// This time span is not necessarily as long as the whole life time of program.
+/// A session is the time duration in which user actively interacts with practices.\n
+/// This time span is not necessarily as long as the whole life time of the program itself.
 ///
-/// Session represents user activity, and the time spent in each session is recorded.\n
-/// Each session time span is the sum of all the time spent for each
-/// \ref practice_definition during that session.
+/// @startuml
+/// !theme cyborg
+/// concise "Program" as p
+/// concise "User" as u
+/// robust "Session" as s
 ///
-/// If program halts during a session without completing at least one practice,
-/// the whole session time recorded shall not be stored and be dropped instead.
-///
-/// Each session record shall be stored in a non-volatile memory in order to be used
-/// for next sessions.
-/// This stored data containing previous session durations
-/// shall be called \ref progress_definition.
+/// @p
+/// 0 is Waiting
+/// 5 is Running
+/// 30 is Waiting
 /// 
+/// @u
+/// 0 is Idle
+/// 5 is Practicing
+/// 30 is Idle
+
+/// @s
+/// 0 is Inactive
+/// 5 is Active
+/// 30 is Inactive
+/// 35 is Inactive
+/// @enduml
+///
 /// \subsection progress_definition Progress
 /// 
-/// Progress is all the information gathered from user activity during previous sessions
-/// stored in a non-volatile memory which can be used
-/// when a new session starts.
+/// Progress is all the information gathered from user activity during sessions
+/// stored in a non-volatile memory.\n
+/// Progress can be restored and used later when a new session starts.
+///
+/// \subsection subject_definition Subject
+///
+/// Any practice and resource used in this program is related to a subject matter,
+/// discussing a specific material.\n
+/// Subjects may have many \ref resource_definition and \ref practice_definition to
+/// complete that material.
+///
+/// @startuml
+/// !theme cyborg
+/// left to right direction
+/// map Subject1 {
+///     title => Calculus
+/// }
+/// map Subject2 {
+///     title => Linear Algebra
+/// }
+/// map Subject3 {
+///     title => Statistics
+/// }
+/// Subject1 <--> Subject2
+/// Subject2 <--> Subject3
+/// @enduml
+///
+/// \subsection topic_definition Topic
+///
+/// Each \ref subject_definition consists of related but distinguishable sections,
+/// all together forming that material.\n
+/// Every distinguishable section of a \ref subject_definition will be referred to as
+/// a topic.
+///
+/// Each \ref subject_definition consists of many topics.
+///
+/// @startuml
+/// !theme cyborg
+///
+/// map Subject {
+///     title => Python Programming
+/// }
+///
+/// map Topics {
+///     1 => Classes
+///     2 => Network
+///     3 => JSON
+/// }
+///
+/// Subject   "1" *-- "many" Topics
+/// @enduml
+///
+/// For example, **Python programming language** is a subject,
+/// while **network programming** is one of the topics covered in this subject.
 ///
 /// \subsection practice_definition Practice
 ///
@@ -49,12 +119,109 @@
 /// This information can be used to represent user the technical information needed for
 /// recollection.
 ///
+/// Each \ref topic_definition contains many practices.
+///
+/// @startuml
+/// !theme cyborg
+/// left to right direction
+///
+/// map Subject {
+///     title => Linear Algebra
+/// }
+///
+/// map Topic1 {
+///     title => Vectors
+/// }
+///
+/// map Topic2 {
+///     title => Vector to Scalar Multiplication
+/// }
+///
+/// map Topic3 {
+///     title => Dot Product
+/// }
+///
+/// map Practices1 {
+///     1 => Question
+///     2 => Question
+///     3 => Question
+/// }
+///
+/// map Practices2 {
+///     1 => Question
+///     2 => Question
+///     3 => Question
+/// }
+///
+/// map Practices3 {
+///     1 => Question
+///     2 => Question
+///     3 => Question
+/// }
+///
+/// Subject *-- Topic1
+/// Subject *-- Topic2
+/// Subject *-- Topic3
+/// Topic1 *-- Practices1
+/// Topic2 *-- Practices2
+/// Topic3 *-- Practices3
+/// @enduml
+///
+/// For example, **Linear Algebra** is a subject, while **Matrix Multiplication**
+/// is a topic to be discussed, and this topic may contain many practices in this
+/// program.
+///
 /// \subsection resource_definition Resource
 ///
 /// Resource is an object that contains technical information outside the scope of
 /// the program, and is usually what practices are refering to.
 /// A resource can be a book, website, video, course or any technically valuable piece
 /// of data worth generating practices for it.
+///
+/// Each \ref practice_definition contains many resources.
+///
+/// @startuml
+/// !theme cyborg
+/// left to right direction
+///
+/// map Subject {
+///     title => Linear Algebra
+/// }
+///
+/// map Topic1 {
+/// }
+///
+/// map Topic2 {
+///     title => Matrix Multiplication
+/// }
+///
+/// map Topic3 {
+/// }
+///
+/// map Practice1 {
+/// }
+///
+/// map Practice2 {
+///     Question => Answer
+/// }
+///
+/// map Practice3 {
+/// }
+///
+/// map Resources {
+///     1 => Book: Chapter 1
+///     2 => Book: Chapter 1
+///     3 => Book: Chapter 1
+/// }
+///
+/// Subject *-- Topic1
+/// Subject *-- Topic2
+/// Subject *-- Topic3
+/// Topic2 *-- Practice1
+/// Topic2 *-- Practice2
+/// Topic2 *-- Practice3
+/// Practice2 *-- Resources
+/// @enduml
 ///
 /// \subsection entity_definition Entity
 ///
@@ -84,9 +251,9 @@
 ///
 /// Command line interface shall be designed as follows:
 ///
-/// * no options given will result in printing help string
-/// * starting to practice requires option `--start`.
-/// * `--start` option initiates an interactive shell
+/// - no options given will result in printing help string
+/// - starting to practice requires option `--start`.
+/// - `--start` option initiates an interactive shell
 ///
 ///
 ///
@@ -94,28 +261,50 @@
 ///
 /// Data types this program works on are as follows:
 ///
-/// * \ref practice_interface
-/// * \ref topic_interface
-/// * \ref book_interface
-/// * \ref session_interface
-/// * \ref progress_interface
+/// - \ref session_interface
+/// - \ref progress_interface
+/// - \ref subject_interface
+/// - \ref topic_interface
+/// - \ref practice_interface
+/// - \ref resource_interface
 ///
 /// So there should be interfaces for each of them.
 ///
-/// \subsection practice_interface Practice Interface
+/// \subsection session_interface Session
 ///
-/// A practice is an issue explaining a topic and is the main value of the
-/// flashback program.
+/// Session represents user activity, and the time spent in each session is recorded.\n
+/// Each session time span is the sum of all the time spent for each
+/// \ref practice_definition during that session.
 ///
-/// Each practice is a question which should be answered by user, and it
-/// already has the answer to help user correct themselves in case of hesitation.
+/// If program halts during a session without completing at least one practice,
+/// the whole session time recorded shall not be stored and be dropped instead.
+///
+/// Each session record shall be stored in a non-volatile memory in order to be used
+/// for next sessions.
+/// This stored data containing previous session durations
+/// shall be called \ref progress_interface.
 ///
 /// \startuml
-/// abstract class practice {
+/// abstract class Session {
+///     - practices: std::vector<Practice>
+///     - estimated_time: std::chrono::duration
+///     - elapsed_time: std::chrono::duration
+///     - epoch_time: std::chrono::duration
+///     - current_practice: std::shared_ptr<Practice>
 /// }
 /// \enduml
 ///
-/// \subsection topic_interface Topic Interface
+/// \subsection subject_interface Subject
+///
+/// Subject is the material in which topics and practices will be held.
+///
+/// @startuml
+/// abstract class Subject {
+///     - topics: std::vector<Topic>
+/// }
+/// @enduml
+///
+/// \subsection topic_interface Topic
 ///
 /// Topics are domain specific subjects which explain one and only one material.
 ///
@@ -124,157 +313,54 @@
 /// for practicing all topics.
 ///
 /// \startuml
-/// abstract class topic {
+/// abstract class Topic {
 /// }
 /// \enduml
 ///
-/// \subsection book_interface Book Interface
+/// \subsection practice_interface Practice
+///
+/// A practice is an issue explaining a topic and is the main value of the
+/// flashback program.
+///
+/// Each practice is a question which should be answered by user, and it
+/// already has the answer to help user correct themselves in case of hesitation.
+///
+/// \startuml
+/// abstract class Practice {
+///     - id: long long int
+///     - question: string
+///     - answer: string
+///     - references: std::vector<Reference>
+///     - resources: std::vector<Resource>
+/// }
+/// \enduml
+///
+/// \subsection resource_interface Resource
 ///
 /// \ref book is an abstract class in program which holds information
 /// of a specific real \ref book_entity .\n
 /// A \ref book also holds series of \ref practice objects which is required for
 /// recollection procedure.
 ///
-/// A book object should hold following information:
+/// A resource object should hold following information:
 ///
-/// * title
-/// * isbn or asbn
-/// * authors
-/// * publication date
-/// * publisher
-/// * language
-/// * number of pages
-/// * number of chapters
-/// * stage number
-/// * series of \ref practice_interface objects
-/// * \ref book_entity file path
+/// - title
+/// - number of chapters
 ///
-/// The book interface should at least have following core methods:
-///
-/// * 
-/// * 
-/// * 
-///
-/// A draft of book interface design could be as follows:
+/// The resource interface should at least have following core methods:
 ///
 /// @startuml
-/// class book {
+/// class Resource {
 ///     - title: std::basic_string<CharT>
-///     - isbn: std::basic_sting<CharT>
-///     - authors: std::vector<std::basic_string<CharT>>
-///     - publication_date: std::chrono::time_point
-///     - pages: unsigned int
 ///     - chapters: unsigned int
-///     - stage: unsigned int
 ///     - entity_path: std::filesystem::path
 ///     - practices: std::set<practice>
 /// }
 /// @enduml
 ///
-/// \subsection session_interface Session Interface
-///
-/// \startuml
-/// abstract class session {
-/// }
-/// \enduml
-///
-/// \subsection progress_interface Progress Interface
+/// \subsection progress_interface Progress
 ///
 /// \startuml
 /// abstract class progress {
 /// }
 /// \enduml
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
