@@ -20,15 +20,16 @@
 /// The rest of definitions will be directly used to point out different aspects
 /// of the program.
 ///
+/// \subsection program_lifetime Program Lifetime
+///
+/// There are two definitions in the program lifetime:
+///
 /// - \ref session_definition
 /// - \ref progress_definition
-/// - \ref subject_definition
-/// - \ref topic_definition
-/// - \ref practice_definition
-/// - \ref resource_definition
-/// - \ref entity_definition
 ///
-/// \subsection session_definition Session
+/// These definitions are only related to the program itself.
+///
+/// \subsubsection session_definition Session
 ///
 /// A session is the time duration in which user actively interacts with practices.\n
 /// This time span is not necessarily as long as the whole life time of the program itself.
@@ -56,13 +57,134 @@
 /// 35 is Inactive
 /// @enduml
 ///
-/// \subsection progress_definition Progress
+/// \subsubsection progress_definition Progress
 /// 
 /// Progress is all the information gathered from user activity during sessions
 /// stored in a non-volatile memory.\n
-/// Progress can be restored and used later when a new session starts.
+/// Progress can be restored and used later after a new session starts.
 ///
-/// \subsection subject_definition Subject
+/// @startuml
+/// start
+/// :User interaction;
+/// :Save progress;
+/// end
+/// @enduml
+///
+/// \subsection program_structure Program Structure
+///
+/// The program consists of two components:
+///
+/// - \ref registry_definition
+/// - \ref recollection_definition
+///
+/// Each of these components can be used based on user decision.\n
+/// The definition of these components are as follows:
+///
+/// \subsection registry_definition Registry Component
+///
+/// Registry is a place where user can find resources, and to step through the notes
+/// taken from those resources, in order to review the subject represented by
+/// that resource.\n
+///
+/// @startuml
+/// !theme cyborg
+/// left to right direction
+/// :Client: as c
+/// (Registry Component) as g
+/// (Recollection Component) as r
+/// note "Review previous chapters\nof a book" as n
+/// c --> g
+/// c --> r
+/// g .. n
+/// @enduml
+///
+/// For example, a user might want to find the book *Introduction to Linear Algebra*
+/// authored by *Nathaniel Johnston*, and then review notes of the first 5 chapters
+/// in order to step forward and read the 6th chapter.
+///
+/// The \ref registry_interface consists of two objects:
+///
+/// - \ref resource_definition
+/// - \ref note_definition
+///
+/// \subsubsection resource_definition Resource
+///
+/// Resource is an object that contains technical information outside the scope of
+/// the program, and is usually what practices are refering to.
+/// A resource can be a book, website, video, course or any technically valuable piece
+/// of data worth learning.
+///
+/// Each resource contains many \ref note_definition.
+///
+/// @startuml
+/// !theme cyborg
+/// left to right direction
+///
+/// map Resource {
+///     title => Linear Algebra
+/// }
+///
+/// map Note1 {
+///     text => data
+///     position => chapter 1
+/// }
+///
+/// map Note2 {
+///     text => data
+///     position => chapter 1
+/// }
+///
+/// map Note3 {
+///     text => data
+///     position => chapter 2
+/// }
+///
+/// Resource *-- Note1
+/// Resource *-- Note2
+/// Resource *-- Note3
+/// @enduml
+///
+/// \subsubsection note_definition Note
+///
+/// Notes are text samples taken from resources, and they are strongly
+/// resource dependent.\n
+/// Meaning that notes are predicative texts directly picked from resources, and
+/// only have educational values, but later will be used to create
+/// \ref practice_definition objects in a question and answer form.
+///
+/// \subsection recollection_definition Recollection Component
+///
+/// On the other hand, the \ref recollection_definition is where user can practice
+/// by being asked questions about the topics of a specific subject, and compare their
+/// answers.\n
+/// This is regardless of what resources are available to this subject.
+///
+/// @startuml
+/// !theme cyborg
+/// left to right direction
+/// :Client: as c
+/// (Registry Component) as g
+/// (Recollection Component) as r
+/// note "Practice all the topics\nof a subject at least once" as n
+/// c --> g
+/// c --> r
+/// r .. n
+/// @enduml
+///
+/// For example, a user has already read the book *Introduction to Linear Algebra*,
+/// and wants to practice the subject **Linear Algebra**, disregarding the
+/// book read for it.\n
+/// Here, user enters the \ref recollection_definition, the program lists a series
+/// of questions minimally picked to be practiced on the shortest time duration possible.
+///
+/// The \ref recollection_interface consists of following objects:
+///
+/// - \ref subject_definition
+/// - \ref topic_definition
+/// - \ref practice_definition
+/// - \ref reference_definition
+///
+/// \subsubsection subject_definition Subject
 ///
 /// Any practice and resource used in this program is related to a subject matter,
 /// discussing a specific material.\n
@@ -85,7 +207,7 @@
 /// Subject2 <--> Subject3
 /// @enduml
 ///
-/// \subsection topic_definition Topic
+/// \subsubsection topic_definition Topic
 ///
 /// Each \ref subject_definition consists of related but distinguishable sections,
 /// all together forming that material.\n
@@ -113,7 +235,7 @@
 /// For example, **Python programming language** is a subject,
 /// while **network programming** is one of the topics covered in this subject.
 ///
-/// \subsection practice_definition Practice
+/// \subsubsection practice_definition Practice
 ///
 /// Practice is an entity which holds \ref resource_definition information in runtime.\n
 /// This information can be used to represent user the technical information needed for
@@ -171,91 +293,7 @@
 /// is a topic to be discussed, and this topic may contain many practices in this
 /// program.
 ///
-/// \subsection resource_definition Resource
-///
-/// Resource is an object that contains technical information outside the scope of
-/// the program, and is usually what practices are refering to.
-/// A resource can be a book, website, video, course or any technically valuable piece
-/// of data worth generating practices for it.
-///
-/// Each \ref practice_definition contains many resources.
-///
-/// @startuml
-/// !theme cyborg
-/// left to right direction
-///
-/// map Subject {
-///     title => Linear Algebra
-/// }
-///
-/// map Topic1 {
-/// }
-///
-/// map Topic2 {
-///     title => Matrix Multiplication
-/// }
-///
-/// map Topic3 {
-/// }
-///
-/// map Practice1 {
-/// }
-///
-/// map Practice2 {
-///     Question => Answer
-/// }
-///
-/// map Practice3 {
-/// }
-///
-/// map Resources {
-///     1 => Book: Chapter 1
-///     2 => Book: Chapter 1
-///     3 => Book: Chapter 1
-/// }
-///
-/// Subject *-- Topic1
-/// Subject *-- Topic2
-/// Subject *-- Topic3
-/// Topic2 *-- Practice1
-/// Topic2 *-- Practice2
-/// Topic2 *-- Practice3
-/// Practice2 *-- Resources
-/// @enduml
-///
-/// \subsection entity_definition Entity
-///
-/// Entity is an object which is out of scope of the program and is usually pointed
-/// to parts of a file being parsed for generation practices or a real physical object
-/// which is used as part of generating contents of this program.
-///
-/// Unless explicitly stated, the word entity will be used in reference of any
-/// object entity named in this documentation.
-///
-/// \subsection book_entity Book Entity
-///
-/// Book is an example of \ref resource_definition which is an \ref entity_definition
-/// holding technical information.
-///
-/// Note that a book entity is different than definition of the \ref book_interface .\n
-/// Anytime a book is refered in this document, the \ref book class implementation is
-/// intended.
-/// Otherwise, anytime the book design is intended, the \ref book_interface design is
-/// explicitly specified.
-/// And to anytime a book entity is intended, the word entity will be used explicitly to
-/// point to the \ref book_entity.
-///
-///
-///
-/// \section command_line_design Command Line Interface Design
-///
-/// Command line interface shall be designed as follows:
-///
-/// - no options given will result in printing help string
-/// - starting to practice requires option `--start`.
-/// - `--start` option initiates an interactive shell
-///
-///
+/// \subsubsection reference_definition Reference
 ///
 /// \section design Design Decisions
 ///
@@ -267,6 +305,7 @@
 /// - \ref topic_interface
 /// - \ref practice_interface
 /// - \ref resource_interface
+/// - \ref reference_interface
 ///
 /// So there should be interfaces for each of them.
 ///
@@ -330,7 +369,7 @@
 ///     - id: long long int
 ///     - question: string
 ///     - answer: string
-///     - references: std::vector<Reference>
+///     - references: std::vector<reference>
 ///     - resources: std::vector<Resource>
 /// }
 /// \enduml
@@ -342,19 +381,15 @@
 /// A \ref book also holds series of \ref practice objects which is required for
 /// recollection procedure.
 ///
-/// A resource object should hold following information:
-///
-/// - title
-/// - number of chapters
+/// A resource may be a link, a book, a course, or an article.\n
+/// So resource must be an interface, so that its derivations extend it.
 ///
 /// The resource interface should at least have following core methods:
 ///
 /// @startuml
 /// class Resource {
-///     - title: std::basic_string<CharT>
-///     - chapters: unsigned int
-///     - entity_path: std::filesystem::path
-///     - practices: std::set<practice>
+///     # title(): std::string
+///     # notes(): std::set<note>
 /// }
 /// @enduml
 ///
@@ -364,3 +399,81 @@
 /// abstract class progress {
 /// }
 /// \enduml
+///
+/// \subsection reference_interface Reference
+///
+/// A reference is a pointer to some real entity in which the \ref practice_interface
+/// relates to.\n
+/// References are usually links to \ref resource_interface objects.
+///
+/// @startuml
+/// abstract class reference {
+///     - target: resource
+///     - type: enum{link, resource}
+///     - value: string
+/// }
+/// @enduml
+///
+///
+/// \section command_line_interface Command Line Interface Design
+///
+/// Command line interface shall be designed as follows:
+///
+/// - no options given will result in printing help string
+/// - starting to practice requires option `--start`.
+/// - `--start` option initiates an interactive shell
+///
+///
+/// \section program_flow Program Flow
+///
+/// Program runs in command line at its first stages, so options should be
+/// carefully used to deal with the complexity of the program.\n
+/// 
+/// \see command_line_interface
+///
+/// Program starts by first loading the database.\n
+/// This database is a repository at its first stages, and then it will be moved
+/// into a proper database during development.
+///
+/// User will not be involved into the program execution process, and program
+/// will sort all the user requirements automatically.\n
+/// These requirements include:
+///
+/// - fetch all the practices from database
+/// - sort all practices based on their topics
+/// - pick up practices with shortest overall time span
+/// - estimate the time it takes from user to solve all the practices
+/// - evaluate the time that user takes to solve practices
+/// - save user progress
+/// - exit from program
+///
+/// This activity diagram is a simple flow of the program when user starts practicing.
+///
+/// @startuml
+/// start
+/// :Connect to database;
+/// :Fetch practices;
+/// :Create practice objects;
+/// :Sort practices by topics;
+/// :Estimate session time duration;
+/// while (Topic list) is (next topic)
+///     :Check time duration of practices;
+///     :Pick a practice used long ago;
+///     :Push practice in question queue;
+/// endwhile (empty)
+/// :Start session;
+/// repeat :Ask question;
+///     :Start practice timer;
+///     if (User asks for answer) then
+///         :Show the answer;
+///     endif
+///     :Stop practice timer;
+///     :Record practice time duration;
+///     if (User stops program) then
+///         #pink:exit;
+///         kill
+///     endif
+/// backward :Pop next practice from queue;
+/// repeat while (User continues)
+/// end
+/// @enduml
