@@ -20,48 +20,52 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <exception>
 #include <filesystem>
 
-#include <card.hpp>
 #include <argument-parser.hpp>
+#include <session.hpp>
 
 int main(int argc, char **argv)
-try
 {
-    using namespace std::string_literals;
-
-    std::string help_string{ "Usage: "s
-        + std::filesystem::path(argv[0]).filename().generic_string()
-        + " [options]\n"s};
-
-    flashback::argument_parser options(argc, argv, help_string);
-
-    if (options.begin_practice && !options.sample_path.empty())
+    try
     {
-        std::ifstream sample(options.sample_path);
+        using namespace std::literals::string_literals;
 
-        if (std::stringstream buffer; sample.is_open())
+        std::string program_name{std::filesystem::path(argv[0]).filename()};
+        flashback::argument_parser options(argc, argv, program_name);
+
+        if (options.begin_practice && !options.sample_path.empty())
         {
-            std::string line;
-            while (getline(sample, line))
-            {
-                buffer << line << "\n";
-            }
+            std::ifstream sample(options.sample_path);
 
-            flashback::card sample_card(buffer);
-            sample.close();
+            if (std::stringstream buffer; sample.is_open())
+            {
+                std::string line;
+                while (getline(sample, line))
+                {
+                    buffer << line << "\n";
+                }
+
+                flashback::card sample_card(buffer);
+                sample.close();
+            }
         }
+        else
+        {
+            std::cerr << options.get_help();
+        }
+
+        return 0;
     }
-    else
+    catch (boost::program_options::error const& exp)
     {
-        std::cerr << options.get_help();
+        std::cerr << exp.what() << std::endl;
     }
-}
-catch (boost::program_options::error const& exp)
-{
-    std::cerr << exp.what() << std::endl;
-}
-catch (std::exception const& exp)
-{
-    std::cerr << exp.what() << std::endl;
+    catch (std::exception const& exp)
+    {
+        std::cerr << exp.what() << std::endl;
+    }
+
+    return 1;
 }

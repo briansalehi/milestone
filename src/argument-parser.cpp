@@ -22,8 +22,8 @@
 
 using namespace flashback;
 
-argument_parser::argument_parser(int argc, char **argv, std::string const& help_string)
-    : help_string{help_string},
+argument_parser::argument_parser(int argc, char **argv, std::string const& program_name)
+    : program_name{program_name},
     command_line_parser(argc, argv),
     general_options("Options"),
     practice_options("Practice Options")
@@ -75,7 +75,7 @@ void argument_parser::verify_options()
 std::string argument_parser::get_help() const
 {
     std::ostringstream buffer;
-    buffer << help_string;
+    buffer << "Usage: " << program_name << " [options]\n";
     buffer << all_options;
     return buffer.str();
 }
