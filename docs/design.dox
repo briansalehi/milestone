@@ -306,6 +306,62 @@
 ///
 /// Reference is a link from practice objects into resources.
 ///
+/// @startuml
+/// !theme cyborg
+/// left to right direction
+///
+/// map Subject {
+///     title => Linear Algebra
+/// }
+///
+/// map Topic1 {
+/// }
+///
+/// map Topic2 {
+///     title => Vector to Scalar Multiplication
+/// }
+///
+/// map Topic3 {
+/// }
+///
+/// map Practice1 {
+///     Question => Answer
+/// }
+///
+/// map Practice2 {
+///     Question => Answer
+/// }
+///
+/// map Practice3 {
+///     Question => Answer
+/// }
+///
+/// map Reference1 {
+///     target => Resource
+///     position => Chapter 2
+/// }
+///
+/// map Reference2 {
+///     target => Resource
+///     position => Chapter 2
+/// }
+///
+/// map Reference3 {
+///     target => Resource
+///     position => Chapter 2
+/// }
+///
+/// Subject *-- Topic1
+/// Subject *-- Topic2
+/// Subject *-- Topic3
+/// Topic2 *-- Practice1
+/// Topic2 *-- Practice2
+/// Topic2 *-- Practice3
+/// Practice1 *-- Reference1
+/// Practice2 *-- Reference2
+/// Practice3 *-- Reference3
+/// @enduml
+///
 /// References can either be a website, book, course, or an article.\n
 /// In either case, they should have a generic way of representing what is the
 /// position of that resource which the practice was aimed to be written.
@@ -377,34 +433,73 @@
 /// The resource interface should at least have following core methods:
 ///
 /// @startuml
-/// class Resource {
+/// abstract class Resource {
 ///     # title(): std::string
-///     # notes(): std::set<note>
+///     # notes(): std::set<Note>
+/// }
+///
+/// class Book {
+///     # chapters(): unsigned int
+/// }
+///
+/// class Course {
+///     # duration(): std::chrono::duration
+/// }
+///
+/// Resource <|-- Book
+/// Resource <|-- Course
+/// @enduml
+///
+/// \subsubsection note_interface Note
+///
+/// \ref note_definition objects are simple data objects holding text
+/// values picked directly from their corresponding \ref resource_definition objects.
+///
+/// @startuml
+/// struct Note {
+///     + title: std::string
+///     + description: std::string
+///     + position: std::string
+///     + collected: bool
+///     + operator<(other: Note const&): bool
 /// }
 /// @enduml
+///
+/// Notes hold text from resources, either a resource be a video or a book, the final
+/// conversion of them will be texual notes.
+///
+/// Notes have a flag indicating whether it has collected from \ref registry_definition
+/// to the \ref recollection_definition, because notes are the final product of
+/// \ref registry_definition, and they will be copied into the \ref recollection_definition
+/// and will be modified accordingly so that they turn into question-answer form.
 ///
 /// \subsection recollection_interface Recollection
 ///
 /// \subsubsection subject_interface Subject
 ///
-/// Subject is the material in which topics and practices will be held.
+/// Subject is the material in which \ref topic_interface will be held.
 ///
 /// @startuml
 /// abstract class Subject {
-///     - topics: std::vector<Topic>
+///     # add_topic(topic: Topic): bool
+///     # topics(): std::vector<Topic>
+///     # queue_practices(): std::queue<Practice>
 /// }
 /// @enduml
 ///
 /// \subsubsection topic_interface Topic
 ///
-/// Topics are domain specific subjects which explain one and only one material.
+/// Topics are domain specific entities which explain one and only one
+/// material in a subject.
 ///
-/// Each topic shall contain a few practices so that during each program session
+/// Each topic shall contain a few practices so that during each \ref session_definition,
 /// only one practice can be picked and trained in order to have enough time
-/// for practicing all topics.
+/// practicing all topics.
 ///
 /// \startuml
 /// abstract class Topic {
+///     # add_practice(practice: Practice): bool
+///     # practices(): std::queue<Practice>
 /// }
 /// \enduml
 ///
@@ -418,11 +513,10 @@
 ///
 /// \startuml
 /// abstract class Practice {
-///     - id: long long int
-///     - question: string
-///     - answer: string
-///     - references: std::vector<reference>
-///     - resources: std::vector<Resource>
+///     # question(): std::string
+///     # answer(): std::string
+///     # references(): std::vector<Reference>
+///     # resources(): std::vector<Resource>
 /// }
 /// \enduml
 ///
@@ -433,10 +527,9 @@
 /// References are usually links to \ref resource_interface objects.
 ///
 /// @startuml
-/// abstract class reference {
-///     - target: resource
-///     - type: enum{link, resource}
-///     - value: string
+/// abstract class Reference {
+///     # target(): Resource
+///     # position(): std::string
 /// }
 /// @enduml
 ///
