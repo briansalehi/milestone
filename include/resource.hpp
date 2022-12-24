@@ -1,7 +1,9 @@
 #pragma once
 
+#include <note.hpp>
+
+#include <vector>
 #include <string>
-#include <filesystem>
 
 namespace flashback
 {
@@ -9,23 +11,13 @@ namespace flashback
 class resource
 {
 public:
-    explicit resource(std::string const&, unsigned int, std::filesystem::path);
-    resource(resource const&);
-    resource(resource&&) noexcept;
-    resource& operator=(resource const&);
-    resource& operator=(resource&&) noexcept;
+    virtual std::string title() const = 0;
+    virtual void title(std::string const&) = 0;
+    virtual void title(std::string&&) = 0;
 
-    std::string title() const;
-    void title(std::string const&);
-    void title(std::string&&);
-
-    unsigned int chapters() const;
-    void chapters(
-
-private:
-    std::string _title;
-    unsigned int _chapters;
-    std::filesystem::path _entity_path;
+    virtual std::vector<note> notes() const = 0;
+    virtual bool add_note(note const&) = 0;
+    virtual bool add_note(note&&) noexcept = 0;
 };
 
 } // flashback
