@@ -1,13 +1,13 @@
 ///
 /// \page design_page Program Design
-/// \brief Program Design Decisions
+/// \brief Flashback Program Design Decisions
 /// \tableofcontents
 ///
-/// Design decisions of this program is first written here for convinience and
-/// as a reference for future use.\n
+/// Design decisions of this program is first written here for convinience of
+/// developers who are eager enough to implement this program in other platforms,
+/// languages, or even different implementations, and as a reference for future use.\n
 /// You should follow through the sections to see all different aspects of the
 /// deign.
-///
 ///
 ///
 /// \section definitions Definitions
@@ -65,10 +65,19 @@
 ///
 /// @startuml
 /// start
-/// :User interaction;
+/// :Restore previous progress;
+/// :User interacts;
 /// :Save progress;
 /// end
 /// @enduml
+///
+/// Each time the progress is saved, the session information should be recorded
+/// on non-volatile memory.\n
+/// The information required from each session is:
+///
+/// - How long did the session took to finish?
+/// - How many notes or practices has user done?
+/// - What was the last note or practice that user see?
 ///
 /// \subsection program_structure Program Structure
 ///
@@ -172,10 +181,12 @@
 /// @enduml
 ///
 /// For example, a user has already read the book *Introduction to Linear Algebra*,
-/// and wants to practice the subject **Linear Algebra**, disregarding the
-/// book read for it.\n
+/// and wants to practice the subject **Linear Algebra**, disregarding available
+/// books covering this subject.\n
 /// Here, user enters the \ref recollection_definition, the program lists a series
-/// of questions minimally picked to be practiced on the shortest time duration possible.
+/// of questions, minimally picked to be practiced on the shortest time duration
+/// possible, short enough to give user at least one question for each topic in the
+/// subject.
 ///
 /// The \ref recollection_interface consists of following objects:
 ///
@@ -188,8 +199,6 @@
 ///
 /// Any practice and resource used in this program is related to a subject matter,
 /// discussing a specific material.\n
-/// Subjects may have many \ref resource_definition and \ref practice_definition to
-/// complete that material.
 ///
 /// @startuml
 /// !theme cyborg
@@ -295,21 +304,34 @@
 ///
 /// \subsubsection reference_definition Reference
 ///
+/// Reference is a link from practice objects into resources.
+///
+/// References can either be a website, book, course, or an article.\n
+/// In either case, they should have a generic way of representing what is the
+/// position of that resource which the practice was aimed to be written.
+///
 /// \section design Design Decisions
 ///
-/// Data types this program works on are as follows:
+/// Program lifetime data types are:
 ///
 /// - \ref session_interface
 /// - \ref progress_interface
+///
+/// Registry component of the program consists of:
+///
+/// - \ref resource_interface
+/// - \ref note_interface
+///
+/// Recollection component of the program consists of:
+///
 /// - \ref subject_interface
 /// - \ref topic_interface
 /// - \ref practice_interface
-/// - \ref resource_interface
 /// - \ref reference_interface
 ///
 /// So there should be interfaces for each of them.
 ///
-/// \subsection session_interface Session
+/// \subsubsection session_interface Session
 ///
 /// Session represents user activity, and the time spent in each session is recorded.\n
 /// Each session time span is the sum of all the time spent for each
@@ -333,7 +355,37 @@
 /// }
 /// \enduml
 ///
-/// \subsection subject_interface Subject
+/// \subsubsection progress_interface Progress
+///
+/// \startuml
+/// abstract class progress {
+/// }
+/// \enduml
+///
+/// \subsection registry_interface Registry Component
+///
+/// \subsubsection resource_interface Resource
+///
+/// \ref book is an abstract class in program which holds information
+/// of a specific real \ref book_entity .\n
+/// A \ref book also holds series of \ref practice objects which is required for
+/// recollection procedure.
+///
+/// A resource may be a link, a book, a course, or an article.\n
+/// So resource must be an interface, so that its derivations extend it.
+///
+/// The resource interface should at least have following core methods:
+///
+/// @startuml
+/// class Resource {
+///     # title(): std::string
+///     # notes(): std::set<note>
+/// }
+/// @enduml
+///
+/// \subsection recollection_interface Recollection
+///
+/// \subsubsection subject_interface Subject
 ///
 /// Subject is the material in which topics and practices will be held.
 ///
@@ -343,7 +395,7 @@
 /// }
 /// @enduml
 ///
-/// \subsection topic_interface Topic
+/// \subsubsection topic_interface Topic
 ///
 /// Topics are domain specific subjects which explain one and only one material.
 ///
@@ -371,32 +423,6 @@
 ///     - answer: string
 ///     - references: std::vector<reference>
 ///     - resources: std::vector<Resource>
-/// }
-/// \enduml
-///
-/// \subsection resource_interface Resource
-///
-/// \ref book is an abstract class in program which holds information
-/// of a specific real \ref book_entity .\n
-/// A \ref book also holds series of \ref practice objects which is required for
-/// recollection procedure.
-///
-/// A resource may be a link, a book, a course, or an article.\n
-/// So resource must be an interface, so that its derivations extend it.
-///
-/// The resource interface should at least have following core methods:
-///
-/// @startuml
-/// class Resource {
-///     # title(): std::string
-///     # notes(): std::set<note>
-/// }
-/// @enduml
-///
-/// \subsection progress_interface Progress
-///
-/// \startuml
-/// abstract class progress {
 /// }
 /// \enduml
 ///
