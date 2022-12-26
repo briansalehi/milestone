@@ -459,10 +459,19 @@
 /// struct Note {
 ///     + title: std::string
 ///     + description: std::string
-///     + position: std::string
+///     + position: Position
 ///     + collected: bool
-///     + operator<(other: Note const&): bool
+///     # operator<(other: Note const&): bool
+///     # operator!=(other: Note const&): bool
 /// }
+///
+/// abstract class Position {
+///     # operator<(other: Position const&): bool
+///     # operator!=(other: Position const&): bool
+/// 
+/// }
+///
+/// Note <|-- Position
 /// @enduml
 ///
 /// Notes hold text from resources, either a resource be a video or a book, the final
@@ -472,6 +481,27 @@
 /// to the \ref recollection_definition, because notes are the final product of
 /// \ref registry_definition, and they will be copied into the \ref recollection_definition
 /// and will be modified accordingly so that they turn into question-answer form.
+///
+/// \subsubsection position_interface Position
+///
+/// Positions are resource specific locations where the text was taken from.\n
+/// Positions might locate pages and chapters of a book, or a duration of course.
+///
+/// @startuml
+/// abstract class Position {
+///     # operator<(other: Position const&): bool
+///     # operator!=(other: Position const&): bool
+/// }
+///
+/// class BookPosition {
+/// }
+///
+/// class CoursePosition {
+/// }
+///
+/// Position <|-- BookPosition
+/// Position <|-- CoursePosition
+/// @enduml
 ///
 /// \subsection recollection_interface Recollection
 ///

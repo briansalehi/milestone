@@ -1,6 +1,7 @@
 #pragma once
 
 #include <resource.hpp>
+#include <note.hpp>
 
 #include <vector>
 #include <string>
@@ -8,9 +9,6 @@
 
 namespace flashback
 {
-// forward declaration
-class resource;
-class note;
 
 class book: public resource
 {
