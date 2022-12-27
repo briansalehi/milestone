@@ -29,11 +29,10 @@ argument_parser::argument_parser(int argc, char **argv, std::string const& progr
     practice_options("Practice Options")
 {
     general_options.add_options()
-        ("help,h", "show help message")
-        ("copyright,c", "show copyright notice");
+        ("help,h", "show help message");
 
     practice_options.add_options()
-        ("file,f", options::value<std::string>(), "input file")
+        ("file,f", boost::program_options::value<std::string>(), "input file")
         ("reset,r", "start over all practices");
 
     all_options.add(general_options).add(practice_options);
@@ -46,10 +45,10 @@ argument_parser::argument_parser(int argc, char **argv, std::string const& progr
 
 void argument_parser::parse_options()
 {
-    // throws options::error
+    // throws boost::program_options::error
     auto parsed_options = command_line_parser.run();
-    options::store(parsed_options, variables_map);
-    options::notify(variables_map);
+    boost::program_options::store(parsed_options, variables_map);
+    boost::program_options::notify(variables_map);
 }
 
 void argument_parser::verify_options()
@@ -57,11 +56,6 @@ void argument_parser::verify_options()
     if (variables_map.count("help"))
     {
         throw std::invalid_argument(get_help());
-    }
-
-    if (variables_map.count("copyright"))
-    {
-        throw std::invalid_argument(get_copyright());
     }
 
     if (variables_map.count("file"))
@@ -77,12 +71,5 @@ std::string argument_parser::get_help() const
     std::ostringstream buffer;
     buffer << "Usage: " << program_name << " [options]\n";
     buffer << all_options;
-    return buffer.str();
-}
-
-std::string argument_parser::get_copyright() const
-{
-    std::ostringstream buffer;
-    buffer << copyright;
     return buffer.str();
 }

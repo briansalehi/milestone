@@ -12,7 +12,7 @@ practice::practice(practice const&)
 {
 }
 
-practice::practice(practice&&)
+practice::practice(practice&&) noexcept
 {
 }
 
@@ -21,7 +21,7 @@ practice& practice::operator=(practice const&)
     return *this;
 }
 
-practice& practice::operator=(practice&&)
+practice& practice::operator=(practice&&) noexcept
 {
     return *this;
 }

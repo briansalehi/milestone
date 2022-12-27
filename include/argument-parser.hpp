@@ -43,6 +43,7 @@ struct argument_parser
 
     // option values
     bool begin_practice = false;
+    std::string program_name;
     std::string sample_path;
 };
 } // flashback
