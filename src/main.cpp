@@ -24,7 +24,7 @@
 #include <filesystem>
 
 #include <argument-parser.hpp>
-#include <session.hpp>
+#include <resource-loader.hpp>
 
 int main(int argc, char **argv)
 {
@@ -37,19 +37,8 @@ int main(int argc, char **argv)
 
         if (options.begin_practice && !options.sample_path.empty())
         {
-            std::ifstream sample(options.sample_path);
-
-            if (std::stringstream buffer; sample.is_open())
-            {
-                std::string line;
-                while (getline(sample, line))
-                {
-                    buffer << line << "\n";
-                }
-
-                flashback::card sample_card(buffer);
-                sample.close();
-            }
+            flashback::resource_loader loader{options.sample_path};
+            loader.fetch_content();
         }
         else
         {
