@@ -3,6 +3,10 @@ project(Flashback VERSION 0.1 LANGUAGES CXX)
 
 find_package(Boost COMPONENTS program_options REQUIRED)
 
+set(CXX_STANDARD_REQUIRED ON)
+set(CXX_EXTENSIONS ON)
+set(CXX_STANDARD 20)
+
 file(GLOB source_files src/*)
 file(GLOB header_files include/*)
 file(GLOB doc_files docs/*)
