@@ -1,5 +1,6 @@
 #pragma once
 
+#include <flashback.hpp>
 #include <string>
 
 namespace flashback {

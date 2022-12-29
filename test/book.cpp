@@ -1,6 +1,7 @@
 #include <book.hpp>
 #include <gtest/gtest.h>
 
+#include <memory>
 #include <string>
 
 using namespace std::literals::string_literals;
@@ -67,10 +68,10 @@ TEST(BookTest, AddTitleTest)
 TEST(BookTest, NotesTest)
 {
     flashback::book origin;
-    origin.add_note({"title"s, "description"s, "position"s, false});
+    origin.add_note(std::make_shared<flashback::note>("title"s, "description"s, "position"s, false));
 
     ASSERT_EQ(origin.notes().size(), 1);
-    EXPECT_EQ(origin.notes().back().title, "title"s);
+    EXPECT_EQ(origin.notes().back()->title, "title"s);
 }
 
 TEST(BookTest, ChaptersTest)

@@ -2,6 +2,7 @@
 
 #include <note.hpp>
 
+#include <memory>
 #include <vector>
 #include <string>
 
@@ -15,9 +16,8 @@ public:
     virtual void title(std::string const&) = 0;
     virtual void title(std::string&&) = 0;
 
-    virtual std::vector<note> notes() const = 0;
-    virtual bool add_note(note const&) = 0;
-    virtual bool add_note(note&&) noexcept = 0;
+    virtual std::vector<std::shared_ptr<note>> notes() const = 0;
+    virtual bool add_note(std::shared_ptr<note>) = 0;
 };
 
 } // flashback

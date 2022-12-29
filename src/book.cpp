@@ -73,27 +73,22 @@ void book::title(std::string&& title) noexcept
     _title = std::move(title);
 }
 
-std::vector<note> book::notes() const
+std::vector<std::shared_ptr<note>> book::notes() const
 {
     return _notes;
 }
 
-bool book::add_note(note const& note)
+bool book::add_note(std::shared_ptr<note> note)
 {
-    //bool status;
-    //std::tie(std::ignore, status) = _notes.insert(note);
-    //return status;
-    _notes.push_back(note);
-    return true;
-}
+    bool status = false;
 
-bool book::add_note(note&& note) noexcept
-{
-    //bool status;
-    //std::tie(std::ignore, status) = _notes.insert(std::move(note));
-    //return status;
-    _notes.push_back(std::move(note));
-    return true;
+    if (note)
+    {
+        _notes.push_back(note);
+        status = true;
+    }
+
+    return status;
 }
 
 unsigned int book::chapters() const
