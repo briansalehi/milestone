@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 
         if (options.begin_practice && !options.resources_path.empty())
         {
-            flashback::resource_loader loader{options.resources_path};
+            flashback::loader loader{options.resources_path};
             loader.fetch_content();
         }
         else

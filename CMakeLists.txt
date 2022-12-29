@@ -18,7 +18,7 @@ target_include_directories(flashback PRIVATE include)
 
 enable_testing()
 
-add_executable(practice)
+add_executable(practice EXCLUDE_FROM_ALL)
 target_sources(practice PRIVATE test/practice.cpp src/practice.cpp)
 target_link_libraries(practice PRIVATE gtest)
 target_include_directories(practice PRIVATE include)
