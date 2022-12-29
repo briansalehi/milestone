@@ -1,4 +1,4 @@
-#include <resource-loader.hpp>
+#include <loader.hpp>
 #include <gtest/gtest.hpp>
 
 #include <fstream>
@@ -11,7 +11,7 @@ TEST(ResourceLoaderTest, LoaderTest)
     context << "# Header\n" << "## Chapter 1/10\n" << "Chapter 2/10\n";
     context.close();
 
-    resource_loader library(entities_path);
+    loader library(entities_path);
     EXPECT_EQ(library.entities_path(), entities_path);
     EXPECT_EQ(library.resources().empty(), true);
 }

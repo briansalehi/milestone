@@ -1,35 +1,35 @@
 #include <book.hpp>
-#include <resource-loader.hpp>
+#include <loader.hpp>
 
 using namespace flashback;
 using namespace std::literals::string_literals;
 
-resource_loader::resource_loader(std::filesystem::path const& entities_path):
+loader::loader(std::filesystem::path const& entities_path):
     _entities_path{entities_path}
 {
 }
 
-resource_loader::~resource_loader()
+loader::~loader()
 {
 }
 
-std::filesystem::path resource_loader::entities_path() const
+std::filesystem::path loader::entities_path() const
 {
     return _entities_path;
 }
 
-std::vector<std::shared_ptr<resource>> resource_loader::resources() const
+std::vector<std::shared_ptr<resource>> loader::resources() const
 {
     return _resources;
 }
 
-void resource_loader::fetch_content()
+void loader::fetch_content()
 {
-    for (auto const& entity_path: std::filesystem::directory_iterator{_entities_path})
-        build_resource(entity_path);
+    auto join = [this](auto const& p) { _resources.push_back(build_resource(p)); };
+    std::ranges::for_each(std::filesystem::directory_iterator(_entities_path), join);
 }
 
-std::shared_ptr<resource> resource_loader::build_resource(std::filesystem::path const& entity_path)
+std::shared_ptr<resource> loader::build_resource(std::filesystem::path const& entity_path)
 {
     if (entity_path.extension() != ".md")
         return nullptr;
@@ -39,6 +39,8 @@ std::shared_ptr<resource> resource_loader::build_resource(std::filesystem::path 
 
     if (entity.is_open())
     {
+        _content << entity.get();
+
         std::string line;
         std::getline(entity, line);
 
@@ -46,9 +48,16 @@ std::shared_ptr<resource> resource_loader::build_resource(std::filesystem::path 
         std::smatch results;
 
         if (std::regex_match(line, results, pattern))
+        {
             std::cout << results[1] << std::endl;
+
+            std::string title{results[1]};
+            std::string description{};
+        }
         else
+        {
             std::cerr << "no match for " << line << std::endl;
+        }
     }
 
     entity.close();
