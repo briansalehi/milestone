@@ -24,7 +24,7 @@
 #include <filesystem>
 
 #include <argument-parser.hpp>
-#include <resource-loader.hpp>
+#include <loader.hpp>
 
 int main(int argc, char **argv)
 {
@@ -35,9 +35,9 @@ int main(int argc, char **argv)
         std::string program_name{std::filesystem::path(argv[0]).filename()};
         flashback::argument_parser options(argc, argv, program_name);
 
-        if (options.begin_practice && !options.sample_path.empty())
+        if (options.begin_practice && !options.resources_path.empty())
         {
-            flashback::resource_loader loader{options.sample_path};
+            flashback::resource_loader loader{options.resources_path};
             loader.fetch_content();
         }
         else

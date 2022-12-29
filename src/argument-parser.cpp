@@ -26,14 +26,16 @@ argument_parser::argument_parser(int argc, char **argv, std::string const& progr
     : program_name{program_name},
     command_line_parser(argc, argv),
     general_options("Options"),
-    practice_options("Practice Options")
+    practice_options("Practice Options"),
+    begin_practice{false},
+    quiet{false}
 {
     general_options.add_options()
-        ("help,h", "show help message");
+        ("help,h", "show help message")
+        ("quiet,q", "do not show output");
 
     practice_options.add_options()
-        ("file,f", boost::program_options::value<std::string>(), "input file")
-        ("reset,r", "start over all practices");
+        ("resources,r", boost::program_options::value<std::filesystem::path>(), "resources directory");
 
     all_options.add(general_options).add(practice_options);
 
@@ -58,10 +60,13 @@ void argument_parser::verify_options()
         throw std::invalid_argument(get_help());
     }
 
-    if (variables_map.count("file"))
+    if (variables_map.count("resources"))
     {
-        sample_path = variables_map["file"].as<std::string>();
+        resources_path = variables_map["resources"].as<std::filesystem::path>();
     }
+
+    if (variables_map.count("quiet"))
+        quiet = true;
 
     begin_practice = true;
 }

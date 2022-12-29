@@ -19,10 +19,12 @@
 #pragma once
 
 #include <string>
+#include <filesystem>
 #include <boost/program_options.hpp>
 
 namespace flashback
 {
+
 struct argument_parser
 {
     // methods
@@ -30,7 +32,6 @@ struct argument_parser
     void parse_options();
     void verify_options();
     std::string get_help() const;
-    std::string get_copyright() const;
 
     // members
     boost::program_options::options_description all_options;
@@ -42,8 +43,9 @@ struct argument_parser
     std::string help_string;
 
     // option values
-    bool begin_practice = false;
+    bool begin_practice;
+    bool quiet;
     std::string program_name;
-    std::string sample_path;
+    std::filesystem::path resources_path;
 };
 } // flashback
