@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include <note.hpp>
+#include <flashback/note.hpp>
 
 #include <string>
 

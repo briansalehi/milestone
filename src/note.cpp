@@ -1,4 +1,4 @@
-#include <note.hpp>
+#include <flashback/note.hpp>
 
 using namespace flashback;
 

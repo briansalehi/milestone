@@ -1,7 +1,7 @@
 #pragma once
 
-#include <resource.hpp>
-#include <note.hpp>
+#include <flashback/resource.hpp>
+#include <flashback/note.hpp>
 
 #include <memory>
 #include <vector>

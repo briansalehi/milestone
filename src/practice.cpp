@@ -1,6 +1,6 @@
-#include <practice.hpp>
-#include <reference.hpp>
-#include <resource.hpp>
+#include <flashback/practice.hpp>
+#include <flashback/reference.hpp>
+#include <flashback/resource.hpp>
 
 using namespace flashback;
 

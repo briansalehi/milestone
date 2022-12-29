@@ -1,6 +1,6 @@
 #pragma once
 
-#include <note.hpp>
+#include <flashback/note.hpp>
 
 #include <memory>
 #include <vector>
