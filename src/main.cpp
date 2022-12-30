@@ -23,7 +23,7 @@
 #include <exception>
 #include <filesystem>
 
-#include <flashback/argument-parser.hpp>
+#include <flashback/argument_parser.hpp>
 #include <flashback/loader.hpp>
 
 int main(int argc, char **argv)

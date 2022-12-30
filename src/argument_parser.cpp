@@ -18,7 +18,7 @@
 
 #include <sstream>
 #include <iostream>
-#include <flashback/argument-parser.hpp>
+#include <flashback/argument_parser.hpp>
 
 using namespace flashback;
 
