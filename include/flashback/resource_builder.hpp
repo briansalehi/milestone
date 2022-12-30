@@ -3,7 +3,6 @@
 #include <flashback/resource.hpp>
 
 #include <sstream>
-#include <vector>
 #include <memory>
 
 namespace flashback
@@ -19,14 +18,16 @@ namespace flashback
 class resource_builder
 {
 public:
+    virtual ~resource_builder(){}
+
     virtual void reset() = 0;
     virtual std::shared_ptr<resource> result() const = 0;
 
-    virtual void read_title(std::ostringstream&) = 0;
-    virtual std::vector<std::shared_ptr<note>> read_chapter(std::ostringstream&) = 0;
+    virtual void read_title(std::stringstream&) const = 0;
+    virtual void read_chapter(std::stringstream&) const = 0;
 
 protected:
-    virtual std::shared_ptr<note> read_note(std::ostringstream&) = 0;
+    virtual void read_note(std::stringstream&) const = 0;
 };
 
 } // flashback

@@ -12,6 +12,8 @@ namespace flashback
 class resource
 {
 public:
+    virtual ~resource(){}
+
     virtual std::string title() const = 0;
     virtual void title(std::string const&) = 0;
     virtual void title(std::string&&) = 0;
