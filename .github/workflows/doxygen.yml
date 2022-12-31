@@ -1,0 +1,59 @@
+name: 'Doxygen GitHub Pages Deploy Action'
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: DenverCoder1/doxygen-github-pages-action@v1.2.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: main
+          folder: docs/html
+          config_file: Doxyfile
+
+  #author: 'Brian Salehi'
+  #description: 'Generate html files by Doxygen, then deploy them on Github pages'
+  #branding:
+  #  icon: "upload-cloud"
+  #  color: "purple"
+  #
+  #inputs:
+  #  github_token:
+  #    description: 'token to push the repo'
+  #    required: true
+  #  branch:
+  #    description: 'branch name that docs will be pushed into'
+  #    required: true
+  #    default: 'main'
+  #  folder:
+  #    description: 'documentation directory'
+  #    required: true
+  #    default: "html"
+  #runs:
+  #  using: "composite"
+  #  steps:
+  #    name: Checkout repository
+  #    uses: actions/checkout@v2
+  #    with:
+  #      submodules: false
+  #
+  #    name: Install Doxygen
+  #    run: sudo apt install doxygen -y
+  #    shell: bash
+  #
+  #    name: Create .nojekyll
+  #    run: touch ${{ inputs.folder }}/.nojekyll
+  #    shell: bash
+  #
+  #    name: Deploy to GitHub Pages
+  #    users: JamesIves/github-pages-deploy-action@3.7.1
+  #    with:
+  #      github_token: ${{ inputs.github_token }}
+  #      branch: ${{ inputs.main }}
+  #      folder: ${{ inputs.folder }}
