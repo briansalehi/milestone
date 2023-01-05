@@ -55,7 +55,6 @@ private:
 
 private:
     std::filesystem::path _entities_path;
-    std::ostringstream _content;
     std::vector<std::shared_ptr<resource>> _resources;
 };
 

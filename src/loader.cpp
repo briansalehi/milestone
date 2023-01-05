@@ -1,5 +1,6 @@
 #include <flashback/book.hpp>
 #include <flashback/loader.hpp>
+#include <flashback/markdown_note_builder.hpp>
 
 using namespace flashback;
 using namespace std::literals::string_literals;
@@ -34,33 +35,23 @@ std::shared_ptr<resource> loader::build_resource(std::filesystem::path const& en
     if (entity_path.extension() != ".md")
         return nullptr;
 
-    std::shared_ptr<book> book{};
+    std::stringstream content;
     std::ifstream entity{entity_path, std::ios::in};
 
     if (entity.is_open())
     {
-        _content << entity.get();
-
-        std::string line;
-        std::getline(entity, line);
-
-        std::regex pattern{R"(#\s*\[(.*)\]\(.*\))"s};
-        std::smatch results;
-
-        if (std::regex_match(line, results, pattern))
-        {
-            std::cout << results[1] << std::endl;
-
-            std::string title{results[1]};
-            std::string description{};
-        }
-        else
-        {
-            std::cerr << "no match for " << line << std::endl;
-        }
+        content << entity.get();
+        entity.close();
+    }
+    else
+    {
+        return nullptr;
     }
 
-    entity.close();
+    markdown_resource_builder builder{};
 
-    return book;
+    builder.read_title(content);
+    builder.read_chapters(content);
+
+    return builder.result();
 }

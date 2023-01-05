@@ -6,7 +6,7 @@ namespace flashback {
 
 struct reference
 {
-    enum class type { link, resource };
+    std::string title;
     std::string value;
 };
 

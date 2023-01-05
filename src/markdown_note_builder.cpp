@@ -41,7 +41,7 @@ void markdown_note_builder::read_title(std::stringstream& buffer) const
         while (std::getline(buffer, line))
         {
             if (line == R"(</summary>)"s)
-                buffer.clear();
+                break;
             else
                 title << line;
         }
@@ -62,7 +62,7 @@ void markdown_note_builder::read_description(std::stringstream& buffer) const
     while (std::getline(buffer, line))
     {
         if (line == "</details>")
-            buffer.clear();
+            break;
         else
             body << line;
     }
@@ -70,7 +70,23 @@ void markdown_note_builder::read_description(std::stringstream& buffer) const
     _note->description = body.str();
 }
 
-void markdown_note_builder::read_references(std::stringstream&) const
+void markdown_note_builder::read_references(std::stringstream& buffer) const
 {
+    std::string line;
+
+    while (std::getline(buffer, line))
+    {
+        std::regex pattern{R"(\* \[(.*)\]\((.*)\))"};
+        std::smatch matches{};
+
+        if (std::regex_match(line, matches, pattern))
+        {
+            _note->position.push_back(matches[1]);
+        }
+        else
+        {
+            break;
+        }
+    }
 }
 

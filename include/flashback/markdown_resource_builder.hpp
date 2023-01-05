@@ -2,7 +2,10 @@
 
 #include <flashback/resource_builder.hpp>
 
+#include <iostream>
+#include <memory>
 #include <string>
+#include <regex>
 
 namespace flashback
 {

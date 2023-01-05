@@ -43,7 +43,7 @@ target_include_directories(markdown_note_builder PUBLIC include PRIVATE test)
 add_test(NAME markdown_note_builder_test COMMAND markdown_note_builder)
 
 add_executable(markdown_resource_builder)
-target_sources(markdown_resource_builder PRIVATE test/markdown_resource_builder.cpp PUBLIC src/markdown_resource_builder.cpp src/book.cpp)
+target_sources(markdown_resource_builder PRIVATE test/markdown_resource_builder.cpp PUBLIC src/markdown_resource_builder.cpp src/markdown_note_builder.cpp src/book.cpp)
 target_link_libraries(markdown_resource_builder PRIVATE gtest)
 target_include_directories(markdown_resource_builder PUBLIC include PRIVATE test)
 add_test(NAME markdown_resource_builder_test COMMAND markdown_resource_builder)
