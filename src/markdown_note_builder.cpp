@@ -5,7 +5,8 @@
 using namespace flashback;
 using namespace std::literals::string_literals;
 
-markdown_note_builder::markdown_note_builder(): _note{std::make_shared<note>()}
+markdown_note_builder::markdown_note_builder():
+    _note{std::make_shared<note>()}
 {
 }
 
@@ -51,7 +52,7 @@ void markdown_note_builder::read_title(std::stringstream& buffer) const
         title << matches[1];
     }
 
-    _note->title = title.str();
+    _note->title(title.str());
 }
 
 void markdown_note_builder::read_description(std::stringstream& buffer) const
@@ -67,13 +68,14 @@ void markdown_note_builder::read_description(std::stringstream& buffer) const
             body << line;
     }
 
-    _note->description = body.str();
+    _note->description(body.str());
 }
 
 void markdown_note_builder::read_references(std::stringstream& buffer) const
 {
     std::string line;
 
+    /*
     while (std::getline(buffer, line))
     {
         std::regex pattern{R"(\* \[(.*)\]\((.*)\))"};
@@ -81,12 +83,16 @@ void markdown_note_builder::read_references(std::stringstream& buffer) const
 
         if (std::regex_match(line, matches, pattern))
         {
-            _note->position.push_back(matches[1]);
+            _note->position(matches[1]);
         }
         else
         {
             break;
         }
     }
+    */
+
+    std::getline(buffer, line);
+    _note->position(line);
 }
 

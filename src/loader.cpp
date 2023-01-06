@@ -1,6 +1,6 @@
 #include <flashback/book.hpp>
 #include <flashback/loader.hpp>
-#include <flashback/markdown_note_builder.hpp>
+#include <flashback/markdown_resource_builder.hpp>
 
 using namespace flashback;
 using namespace std::literals::string_literals;

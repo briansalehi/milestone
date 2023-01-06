@@ -18,34 +18,60 @@ target_include_directories(flashback PRIVATE include)
 
 enable_testing()
 
-add_executable(practice EXCLUDE_FROM_ALL)
-target_sources(practice PRIVATE test/practice.cpp PUBLIC src/practice.cpp)
-target_link_libraries(practice PRIVATE gtest)
-target_include_directories(practice PUBLIC include PRIVATE test)
+### libraries ###
+
+add_library(note SHARED src/note.cpp)
+target_include_directories(note PUBLIC include)
+
+add_library(practice SHARED EXCLUDE_FROM_ALL src/practice.cpp)
+target_include_directories(practice PUBLIC include)
+
+add_library(book SHARED src/book.cpp)
+target_link_libraries(book PUBLIC note)
+target_include_directories(book PUBLIC include)
+
+add_library(markdown_note_builder SHARED src/markdown_note_builder.cpp)
+target_link_libraries(markdown_note_builder PUBLIC note)
+target_include_directories(book PUBLIC include)
+
+add_library(markdown_resource_builder SHARED src/markdown_resource_builder.cpp)
+target_link_libraries(markdown_resource_builder PUBLIC note book)
+target_include_directories(markdown_resource_builder PUBLIC include)
+
+
+### test executables ###
+
+add_executable(test_practice EXCLUDE_FROM_ALL)
+target_sources(test_practice PRIVATE test/practice.cpp)
+target_link_libraries(test_practice PRIVATE gtest PUBLIC practice)
+target_include_directories(test_practice PUBLIC include PRIVATE test)
 #add_test(NAME practice_test COMMAND practice)
 
-add_executable(note)
-target_sources(note PRIVATE test/note.cpp PUBLIC src/note.cpp)
-target_link_libraries(note PRIVATE gtest)
-target_include_directories(note PUBLIC include PRIVATE test)
-add_test(NAME note_test COMMAND note)
+add_executable(test_note)
+target_sources(test_note PRIVATE test/note.cpp PUBLIC src/note.cpp)
+target_link_libraries(test_note PRIVATE gtest note)
+target_include_directories(test_note PUBLIC include PRIVATE test)
+add_test(NAME test_note COMMAND test_note)
 
-add_executable(book)
-target_sources(book PRIVATE test/book.cpp PUBLIC src/book.cpp)
-target_link_libraries(book PRIVATE gtest)
-target_include_directories(book PUBLIC include PRIVATE test)
-add_test(NAME book_test COMMAND book)
+add_executable(test_book)
+target_sources(test_book PRIVATE test/book.cpp PUBLIC src/book.cpp)
+target_link_libraries(test_book PRIVATE gtest book)
+target_include_directories(test_book PUBLIC include PRIVATE test)
+add_test(NAME test_book COMMAND test_book)
 
-add_executable(markdown_note_builder)
-target_sources(markdown_note_builder PRIVATE test/markdown_note_builder.cpp PUBLIC src/markdown_note_builder.cpp)
-target_link_libraries(markdown_note_builder PRIVATE gtest)
-target_include_directories(markdown_note_builder PUBLIC include PRIVATE test)
-add_test(NAME markdown_note_builder_test COMMAND markdown_note_builder)
+add_executable(test_markdown_note_builder)
+target_sources(test_markdown_note_builder PRIVATE test/markdown_note_builder.cpp PUBLIC src/markdown_note_builder.cpp)
+target_link_libraries(test_markdown_note_builder PRIVATE gtest note)
+target_include_directories(test_markdown_note_builder PUBLIC include PRIVATE test)
+add_test(NAME test_markdown_note_builder COMMAND test_markdown_note_builder)
 
-add_executable(markdown_resource_builder)
-target_sources(markdown_resource_builder PRIVATE test/markdown_resource_builder.cpp PUBLIC src/markdown_resource_builder.cpp src/markdown_note_builder.cpp src/book.cpp)
-target_link_libraries(markdown_resource_builder PRIVATE gtest)
-target_include_directories(markdown_resource_builder PUBLIC include PRIVATE test)
-add_test(NAME markdown_resource_builder_test COMMAND markdown_resource_builder)
+add_executable(test_markdown_resource_builder)
+target_sources(test_markdown_resource_builder PRIVATE test/markdown_resource_builder.cpp PUBLIC src/markdown_resource_builder.cpp)
+target_link_libraries(test_markdown_resource_builder PRIVATE gtest PUBLIC markdown_note_builder note book)
+target_include_directories(test_markdown_resource_builder PUBLIC include PRIVATE test)
+add_test(NAME test_markdown_resource_builder COMMAND test_markdown_resource_builder)
+
+
+### installation targets ###
 
 install(TARGETS flashback)

@@ -24,7 +24,7 @@ public:
     virtual std::shared_ptr<resource> result() const = 0;
 
     virtual void read_title(std::stringstream&) const = 0;
-    virtual void read_chapter(std::stringstream&) const = 0;
+    virtual void read_chapters(std::stringstream&) const = 0;
 
 protected:
     virtual void read_note(std::stringstream&) const = 0;

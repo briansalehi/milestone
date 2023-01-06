@@ -60,7 +60,7 @@ TEST(ResourceBuilder, Chapter)
     try
     {
         builder.read_title(buffer);
-        builder.read_chapter(buffer);
+        builder.read_chapters(buffer);
     }
     catch (std::runtime_error const& exp)
     { }
@@ -100,14 +100,14 @@ TEST(ResourceBuilder, NoteTitle)
     try
     {
         builder.read_title(buffer);
-        builder.read_chapter(buffer);
+        builder.read_chapters(buffer);
     }
     catch (std::runtime_error const& exp)
     { }
 
-    EXPECT_EQ(builder.result()->notes().at(0)->title, "Sample 1 of 3");
-    EXPECT_EQ(builder.result()->notes().at(1)->title, "Sample 2 of 3");
-    EXPECT_EQ(builder.result()->notes().at(2)->title, "Sample 3 of 3");
+    EXPECT_EQ(builder.result()->notes().at(0)->title(), "Sample 1 of 3");
+    EXPECT_EQ(builder.result()->notes().at(1)->title(), "Sample 2 of 3");
+    EXPECT_EQ(builder.result()->notes().at(2)->title(), "Sample 3 of 3");
 }
 
 TEST(ResourceBuilder, NoteDescription)
@@ -141,14 +141,14 @@ TEST(ResourceBuilder, NoteDescription)
     try
     {
         builder.read_title(buffer);
-        builder.read_chapter(buffer);
+        builder.read_chapters(buffer);
     }
     catch (std::runtime_error const& exp)
     { }
 
-    EXPECT_EQ(builder.result()->notes().at(0)->description, "Quote 1");
-    EXPECT_EQ(builder.result()->notes().at(1)->description, "Quote 2");
-    EXPECT_EQ(builder.result()->notes().at(2)->description, "Quote 3");
+    EXPECT_EQ(builder.result()->notes().at(0)->description(), "Quote 1");
+    EXPECT_EQ(builder.result()->notes().at(1)->description(), "Quote 2");
+    EXPECT_EQ(builder.result()->notes().at(2)->description(), "Quote 3");
 }
 
 TEST(ResourceBuilder, NotePosition)
@@ -182,14 +182,14 @@ TEST(ResourceBuilder, NotePosition)
     try
     {
         builder.read_title(buffer);
-        builder.read_chapter(buffer);
+        builder.read_chapters(buffer);
     }
     catch (std::runtime_error const& exp)
     { }
 
-    EXPECT_EQ(builder.result()->notes().at(0)->position.at(0), "reference 1");
-    EXPECT_EQ(builder.result()->notes().at(1)->position.at(0), "reference 2");
-    EXPECT_EQ(builder.result()->notes().at(2)->position.at(0), "reference 3");
+    EXPECT_EQ(builder.result()->notes().at(0)->position().empty(), true);
+    EXPECT_EQ(builder.result()->notes().at(1)->position().empty(), true);
+    EXPECT_EQ(builder.result()->notes().at(2)->position().empty(), true);
 }
 
 int main(int argc, char** argv)

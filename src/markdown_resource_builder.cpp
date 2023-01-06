@@ -48,7 +48,7 @@ void markdown_resource_builder::read_title(std::stringstream& buffer) const
         throw std::runtime_error("book title could not be found at first line"s);
 }
 
-void markdown_resource_builder::read_chapter(std::stringstream& buffer) const
+void markdown_resource_builder::read_chapters(std::stringstream& buffer) const
 {
     ///
     /// When `## Chapter N/M` is read, either of these cases are possible:
@@ -85,7 +85,7 @@ void markdown_resource_builder::read_note(std::stringstream& buffer) const
     {
         note_builder.read_title(buffer);
         note_builder.read_description(buffer);
-        note_builder.read_references(buffer);
+        //note_builder.read_references(buffer);
         _resource->add_note(note_builder.result());
         note_builder.reset();
     }

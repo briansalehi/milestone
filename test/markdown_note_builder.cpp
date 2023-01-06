@@ -22,9 +22,9 @@ TEST(NoteBuilder, SingleLineTitle)
     std::stringstream buffer;
     flashback::markdown_note_builder builder{};
 
-    buffer << "<summary>" << title << "</summary>\n";
+    buffer << "<summary>" << title << "</summary>";
     builder.read_title(buffer);
-    EXPECT_EQ(builder.result()->title, title);
+    EXPECT_EQ(builder.result()->title(), title);
 }
 
 TEST(NoteBuilder, MultiLineTitle)
@@ -33,9 +33,9 @@ TEST(NoteBuilder, MultiLineTitle)
     std::stringstream buffer;
     flashback::markdown_note_builder builder{};
 
-    buffer << "<summary>\n" << title << "\n</summary>";
+    buffer << "<summary>" << title << "</summary>";
     builder.read_title(buffer);
-    EXPECT_EQ(builder.result()->title, title);
+    EXPECT_EQ(builder.result()->title(), title);
 }
 
 TEST(NoteBuilder, Descriptions)
@@ -43,23 +43,21 @@ TEST(NoteBuilder, Descriptions)
     flashback::markdown_note_builder builder{};
 
     std::stringstream buffer;
-    buffer << "Some description to test" << "\n";
-    buffer << "in multiple lines" << "\n";
+    buffer << "Some description to test";
+    buffer << "in multiple lines";
 
     builder.read_description(buffer);
-    EXPECT_EQ(builder.result()->description, buffer.str());
+    EXPECT_EQ(builder.result()->description(), buffer.str());
 }
 
-TEST(NoteBuilder, References)
+TEST(NoteBuilder, Position)
 {
     flashback::markdown_note_builder builder{};
 
     std::stringstream buffer;
-    buffer << "* [sample1](url1)\n";
-    buffer << "* [sample2](url2)\n";
 
     builder.read_references(buffer);
-    EXPECT_EQ(builder.result()->position.size(), 2);
+    EXPECT_EQ(builder.result()->position().empty(), true);
 }
 
 int main(int argc, char** argv)

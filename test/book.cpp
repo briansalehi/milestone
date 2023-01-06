@@ -71,7 +71,7 @@ TEST(BookTest, NotesTest)
     origin.add_note(std::make_shared<flashback::note>("title"s, "description"s, "position"s, false));
 
     ASSERT_EQ(origin.notes().size(), 1);
-    EXPECT_EQ(origin.notes().back()->title, "title"s);
+    EXPECT_EQ(origin.notes().back()->title(), "title"s);
 }
 
 TEST(BookTest, ChaptersTest)

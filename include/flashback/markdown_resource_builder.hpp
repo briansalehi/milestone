@@ -47,7 +47,7 @@ public:
     /// all chapters should be checked each time, and if all total numbers were
     /// the same, then the total number of chapters are correct.
     ///
-    virtual void read_chapter(std::stringstream&) const override;
+    virtual void read_chapters(std::stringstream&) const override;
 
 protected:
     virtual void read_note(std::stringstream&) const override;
