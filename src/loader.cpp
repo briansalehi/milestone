@@ -1,6 +1,6 @@
 #include <flashback/book.hpp>
 #include <flashback/loader.hpp>
-#include <flashback/markdown_resource_builder.hpp>
+#include <flashback/markdown_book_builder.hpp>
 
 using namespace flashback;
 using namespace std::literals::string_literals;
@@ -48,7 +48,7 @@ std::shared_ptr<resource> loader::build_resource(std::filesystem::path const& en
         return nullptr;
     }
 
-    markdown_resource_builder builder{};
+    markdown_book_builder builder{};
 
     builder.read_title(content);
     builder.read_chapters(content);

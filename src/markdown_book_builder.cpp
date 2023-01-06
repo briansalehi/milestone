@@ -1,16 +1,16 @@
-#include <flashback/markdown_resource_builder.hpp>
+#include <flashback/markdown_book_builder.hpp>
 #include <flashback/markdown_note_builder.hpp>
 #include <flashback/book.hpp>
 
 using namespace flashback;
 using namespace std::literals::string_literals;
 
-markdown_resource_builder::markdown_resource_builder():
+markdown_book_builder::markdown_book_builder():
     _resource{std::make_shared<book>()}
 {
 }
 
-void markdown_resource_builder::reset()
+void markdown_book_builder::reset()
 {
     try
     {
@@ -23,12 +23,12 @@ void markdown_resource_builder::reset()
     }
 }
 
-std::shared_ptr<resource> markdown_resource_builder::result() const
+std::shared_ptr<resource> markdown_book_builder::result() const
 {
     return _resource;
 }
 
-void markdown_resource_builder::read_title(std::stringstream& buffer) const
+void markdown_book_builder::read_title(std::stringstream& buffer) const
 {
     ///
     /// When `<details>` is read, either of these cases are possible:
@@ -48,7 +48,7 @@ void markdown_resource_builder::read_title(std::stringstream& buffer) const
         throw std::runtime_error("book title could not be found at first line"s);
 }
 
-void markdown_resource_builder::read_chapters(std::stringstream& buffer) const
+void markdown_book_builder::read_chapters(std::stringstream& buffer) const
 {
     ///
     /// When `## Chapter N/M` is read, either of these cases are possible:
@@ -74,7 +74,7 @@ void markdown_resource_builder::read_chapters(std::stringstream& buffer) const
         read_note(buffer);
 }
 
-void markdown_resource_builder::read_note(std::stringstream& buffer) const
+void markdown_book_builder::read_note(std::stringstream& buffer) const
 {
     markdown_note_builder note_builder{};
 

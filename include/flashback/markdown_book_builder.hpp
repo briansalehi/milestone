@@ -10,10 +10,10 @@
 namespace flashback
 {
 
-class markdown_resource_builder final : public resource_builder
+class markdown_book_builder final : public resource_builder
 {
 public:
-    markdown_resource_builder();
+    markdown_book_builder();
 
     virtual void reset() override;
     virtual std::shared_ptr<resource> result() const override;

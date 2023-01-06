@@ -34,9 +34,9 @@ add_library(markdown_note_builder SHARED src/markdown_note_builder.cpp)
 target_link_libraries(markdown_note_builder PUBLIC note)
 target_include_directories(book PUBLIC include)
 
-add_library(markdown_resource_builder SHARED src/markdown_resource_builder.cpp)
-target_link_libraries(markdown_resource_builder PUBLIC note book)
-target_include_directories(markdown_resource_builder PUBLIC include)
+add_library(markdown_book_builder SHARED src/markdown_book_builder.cpp)
+target_link_libraries(markdown_book_builder PUBLIC note book)
+target_include_directories(markdown_book_builder PUBLIC include)
 
 
 ### test executables ###
@@ -65,11 +65,11 @@ target_link_libraries(test_markdown_note_builder PRIVATE gtest note)
 target_include_directories(test_markdown_note_builder PUBLIC include PRIVATE test)
 add_test(NAME test_markdown_note_builder COMMAND test_markdown_note_builder)
 
-add_executable(test_markdown_resource_builder)
-target_sources(test_markdown_resource_builder PRIVATE test/markdown_resource_builder.cpp PUBLIC src/markdown_resource_builder.cpp)
-target_link_libraries(test_markdown_resource_builder PRIVATE gtest PUBLIC markdown_note_builder note book)
-target_include_directories(test_markdown_resource_builder PUBLIC include PRIVATE test)
-add_test(NAME test_markdown_resource_builder COMMAND test_markdown_resource_builder)
+add_executable(test_markdown_book_builder)
+target_sources(test_markdown_book_builder PRIVATE test/markdown_book_builder.cpp PUBLIC src/markdown_book_builder.cpp)
+target_link_libraries(test_markdown_book_builder PRIVATE gtest PUBLIC markdown_note_builder note book)
+target_include_directories(test_markdown_book_builder PUBLIC include PRIVATE test)
+add_test(NAME test_markdown_book_builder COMMAND test_markdown_book_builder)
 
 
 ### installation targets ###

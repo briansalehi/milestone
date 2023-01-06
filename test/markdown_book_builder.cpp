@@ -1,4 +1,4 @@
-#include <flashback/markdown_resource_builder.hpp>
+#include <flashback/markdown_book_builder.hpp>
 #include <flashback/book.hpp>
 #include <gtest/gtest.h>
 
@@ -7,7 +7,7 @@
 
 TEST(ResourceBuilder, Construction)
 {
-    flashback::markdown_resource_builder builder{};
+    flashback::markdown_book_builder builder{};
     EXPECT_EQ(builder.result() == nullptr, false);
 
     builder.reset();
@@ -16,7 +16,7 @@ TEST(ResourceBuilder, Construction)
 
 TEST(ResourceBuilder, Title)
 {
-    flashback::markdown_resource_builder builder{};
+    flashback::markdown_book_builder builder{};
     std::stringstream buffer{"# [Book Name](link to book)"};
 
     try
@@ -31,7 +31,7 @@ TEST(ResourceBuilder, Title)
 
 TEST(ResourceBuilder, Chapter)
 {
-    flashback::markdown_resource_builder builder{};
+    flashback::markdown_book_builder builder{};
     std::stringstream buffer;
 
     buffer << "# [Book Name](link to book)" << "\n";
@@ -71,7 +71,7 @@ TEST(ResourceBuilder, Chapter)
 
 TEST(ResourceBuilder, NoteTitle)
 {
-    flashback::markdown_resource_builder builder{};
+    flashback::markdown_book_builder builder{};
     std::stringstream buffer;
 
     buffer << "# [Book Name](link to book)" << "\n";
@@ -112,7 +112,7 @@ TEST(ResourceBuilder, NoteTitle)
 
 TEST(ResourceBuilder, NoteDescription)
 {
-    flashback::markdown_resource_builder builder{};
+    flashback::markdown_book_builder builder{};
     std::stringstream buffer;
 
     buffer << "# [Book Name](link to book)" << "\n";
@@ -153,7 +153,7 @@ TEST(ResourceBuilder, NoteDescription)
 
 TEST(ResourceBuilder, NotePosition)
 {
-    flashback::markdown_resource_builder builder{};
+    flashback::markdown_book_builder builder{};
     std::stringstream buffer;
 
     buffer << "# [Book Name](link to book)" << "\n";
