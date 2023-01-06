@@ -50,7 +50,7 @@ public:
     virtual void read_chapters(std::stringstream&) const override;
 
 protected:
-    virtual void read_note(std::stringstream&) const override;
+    virtual void read_note(std::stringstream&, std::string const&) const override;
 
 private:
     std::shared_ptr<resource> _resource;

@@ -27,7 +27,7 @@ public:
     virtual void read_chapters(std::stringstream&) const = 0;
 
 protected:
-    virtual void read_note(std::stringstream&) const = 0;
+    virtual void read_note(std::stringstream&, std::string const&) const = 0;
 };
 
 } // flashback

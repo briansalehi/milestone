@@ -21,9 +21,11 @@
 #include <sstream>
 #include <iostream>
 #include <exception>
+#include <algorithm>
 #include <filesystem>
 
 #include <flashback/argument_parser.hpp>
+#include <flashback/resource.hpp>
 #include <flashback/loader.hpp>
 
 int main(int argc, char **argv)

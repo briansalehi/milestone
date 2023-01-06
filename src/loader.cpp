@@ -26,7 +26,12 @@ std::vector<std::shared_ptr<resource>> loader::resources() const
 
 void loader::fetch_content()
 {
-    auto join = [this](auto const& p) { _resources.push_back(build_resource(p)); };
+    auto join = [this](auto const& p) {
+        _resources.push_back(build_resource(p));
+
+        unsigned int chapters = dynamic_cast<book*>(_resources.back().get())->chapters();
+        std::string title = _resources.back()->title();
+    };
     std::ranges::for_each(std::filesystem::directory_iterator(_entities_path), join);
 }
 
@@ -35,12 +40,12 @@ std::shared_ptr<resource> loader::build_resource(std::filesystem::path const& en
     if (entity_path.extension() != ".md")
         return nullptr;
 
-    std::stringstream content;
     std::ifstream entity{entity_path, std::ios::in};
+    std::stringstream content;
 
     if (entity.is_open())
     {
-        content << entity.get();
+        content << entity.rdbuf();
         entity.close();
     }
     else
