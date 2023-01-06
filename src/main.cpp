@@ -24,30 +24,21 @@
 #include <algorithm>
 #include <filesystem>
 
-#include <flashback/argument_parser.hpp>
-#include <flashback/resource.hpp>
-#include <flashback/loader.hpp>
+#include <flashback/menu.hpp>
+
+using namespace std::literals::string_literals;
 
 int main(int argc, char **argv)
 {
     try
     {
-        using namespace std::literals::string_literals;
-
         std::string program_name{std::filesystem::path(argv[0]).filename()};
         flashback::argument_parser options(argc, argv, program_name);
 
-        if (options.begin_practice && !options.resources_path.empty())
-        {
-            flashback::loader loader{options.resources_path};
-            loader.fetch_content();
-        }
+        if (options.section.empty())
+            flashback::menu menu{options.section};
         else
-        {
             std::cerr << options.get_help();
-        }
-
-        return 0;
     }
     catch (boost::program_options::error const& exp)
     {
@@ -57,6 +48,4 @@ int main(int argc, char **argv)
     {
         std::cerr << exp.what() << std::endl;
     }
-
-    return 1;
 }

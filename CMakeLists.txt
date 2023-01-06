@@ -38,6 +38,9 @@ add_library(markdown_book_builder SHARED src/markdown_book_builder.cpp)
 target_link_libraries(markdown_book_builder PUBLIC note book)
 target_include_directories(markdown_book_builder PUBLIC include)
 
+add_library(menu SHARED src/menu.cpp)
+target_link_libraries(menu PUBLIC markdown_book_builder)
+target_include_directories(menu PUBLIC include)
 
 ### test executables ###
 

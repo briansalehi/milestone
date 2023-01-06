@@ -46,6 +46,7 @@ struct argument_parser
     bool begin_practice;
     bool quiet;
     std::string program_name;
+    std::string section;
     std::filesystem::path resources_path;
 };
 } // flashback
