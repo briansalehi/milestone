@@ -36,7 +36,7 @@ int main(int argc, char **argv)
         flashback::argument_parser options(argc, argv, program_name);
 
         if (options.section.empty())
-            flashback::menu menu{options.section};
+            flashback::dashboard dashboard{options.section};
         else
             std::cerr << options.get_help();
     }

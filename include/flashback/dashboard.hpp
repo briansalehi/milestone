@@ -3,21 +3,28 @@
 #include <flashback/argument_parser.hpp>
 #include <flashback/loader.hpp>
 
+#include <string_view>
+#include <string>
+#include <vector>
+
 namespace flashback
 {
-enum class section = {library, trainer, tutorial, roadmap};
+enum class space {library, trainer, tutorials, roadmap};
 
-class menu
+class dashboard
 {
 public:
 
-    explicit menu(std::string const&);
+    explicit dashboard(std::string const&);
 
-    constexpr std::vector<std::string> sections() const;
+    constexpr std::vector<std::string> spaces() const;
 
-    section prompt(): const;
+    space prompt() const;
 
 private:
+    space get_space(std::string const&) const;
+
+    void enter_space(space const);
 };
 
 } // flashback
