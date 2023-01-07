@@ -2,18 +2,18 @@
 /// \brief Design of Application Programming Interface
 /// \tableofcontents
 ///
-/// \section dashboard_component Dashboard
+/// \section dashboard_space Dashboard
 ///
 /// Dashboard is the main page of the program where user can choose their next step.\n
-/// Either of these steps are one of the available components in the program explained
+/// Either of these steps are one of the available spaces in the program explained
 /// below.
 ///
 /// In dashboard, there are a few sections where user can enter:
 ///
-/// 1. \emoji :books: \ref library_component : A space where you can review the books and resources you already used.
-/// 2. \emoji :running: \ref trainer_component : A space to practice subjects by answering questions and comparing your answers.
-/// 3. \emoji :mortar_board: \ref tutorial_component : A space to watch video courses teaching you everything about a subject.
-/// 4. \emoji :rocket: \ref roadmap_component : A space to find your way through the skills you need to aquire to become an expert.
+/// 1. \emoji :books: \ref library_space : A space where you can review the books and resources you already used.
+/// 2. \emoji :running: \ref trainer_space : A space to practice subjects by answering questions and comparing your answers.
+/// 3. \emoji :mortar_board: \ref tutorial_space : A space to watch video courses teaching you everything about a subject.
+/// 4. \emoji :rocket: \ref roadmap_space : A space to find your way through the skills you need to aquire to become an expert.
 ///
 /// In the program, some parameters will be used program to monitor user activity.\n
 /// Of these parameters, two are time related and will be used to remember
@@ -53,7 +53,7 @@
 /// }
 /// \enduml
 ///
-/// \section library_component Library
+/// \section library_space Library
 ///
 /// This section consists of two objects:
 ///
@@ -65,8 +65,8 @@
 ///
 /// Notes can be used to review a resource. Though, user should be aware that
 /// following the subject of that resource only by using that resource is not a
-/// wise choice, but it's best to use \ref tutorial_component to learn that subject
-/// and then use \ref trainer_component component to practice the topics
+/// wise choice, but it's best to use \ref tutorial_space to learn that subject
+/// and then use \ref trainer_space space to practice the topics
 /// of that subject.
 ///
 /// Resources will be loaded into the program from any available database,
@@ -156,13 +156,13 @@
 /// Position <|-- CoursePosition
 /// @enduml
 ///
-/// \section tutorial_component Tutorial
+/// \section tutorial_space Tutorial
 ///
 ///
 ///
-/// \section trainer_component Trainer
+/// \section trainer_space Trainer
 ///
-/// Recollection component of the program consists of:
+/// Trainer space of the program consists of:
 ///
 /// - \ref subject_interface
 /// - \ref topic_interface
@@ -291,7 +291,7 @@
 /// end
 /// @enduml
 ///
-/// \section roadmap_component Roadmap
+/// \section roadmap_space Roadmap
 ///
 ///
 ///
