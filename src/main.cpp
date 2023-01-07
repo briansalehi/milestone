@@ -24,7 +24,7 @@
 #include <algorithm>
 #include <filesystem>
 
-#include <flashback/menu.hpp>
+#include <flashback/dashboard.hpp>
 
 using namespace std::literals::string_literals;
 

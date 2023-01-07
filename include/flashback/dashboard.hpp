@@ -5,13 +5,17 @@
 
 namespace flashback
 {
+enum class section = {library, trainer, tutorial, roadmap};
 
 class menu
 {
 public:
+
     explicit menu(std::string const&);
 
     constexpr std::vector<std::string> sections() const;
+
+    section prompt(): const;
 
 private:
 };

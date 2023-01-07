@@ -10,10 +10,10 @@
 ///
 /// In dashboard, there are a few sections where user can enter:
 ///
-/// 1. \ref library_component : Bank of resources used for reading notes.
-/// 2. \ref tutorial_component (**undecided**): Bank of tutorials used for learning domain specific subjects.
-/// 3. \ref recollection_component : Bank of domain specific questions and answers used for practicing subjects.
-/// 4. \ref roadmap_component (**undecided**): Bank of roadmaps introducing required subjects to become a domain expert.
+/// 1. \emoji :books: \ref library_component : A space where you can review the books and resources you already used.
+/// 2. \emoji :running: \ref trainer_component : A space to practice subjects by answering questions and comparing your answers.
+/// 3. \emoji :mortar_board: \ref tutorial_component : A space to watch video courses teaching you everything about a subject.
+/// 4. \emoji :rocket: \ref roadmap_component : A space to find your way through the skills you need to aquire to become an expert.
 ///
 /// In the program, some parameters will be used program to monitor user activity.\n
 /// Of these parameters, two are time related and will be used to remember
@@ -66,7 +66,7 @@
 /// Notes can be used to review a resource. Though, user should be aware that
 /// following the subject of that resource only by using that resource is not a
 /// wise choice, but it's best to use \ref tutorial_component to learn that subject
-/// and then use \ref recollection_component component to practice the topics
+/// and then use \ref trainer_component component to practice the topics
 /// of that subject.
 ///
 /// Resources will be loaded into the program from any available database,
@@ -160,7 +160,7 @@
 ///
 ///
 ///
-/// \section recollection_component Recollection
+/// \section trainer_component Trainer
 ///
 /// Recollection component of the program consists of:
 ///
