@@ -1,84 +1,100 @@
 #include <flashback/practice.hpp>
 #include <flashback/reference.hpp>
-#include <flashback/resource.hpp>
+#include <flashback/source.hpp>
 
 using namespace flashback;
 
-practice::practice()
+practice::practice(): _question{}, _answer{}, _references{}
 {
 }
 
-practice::practice(practice const&)
+practice::practice(practice const& other):
+    _question{other.question()},
+    _answer{other.answer()},
+    _references{}
 {
+    std::ranges::copy(other._references, std::back_inserter(_references));
 }
 
-practice::practice(practice&&) noexcept
+practice::practice(practice&& other) noexcept :
+    _question{std::move(other.question())},
+    _answer{std::move(other.answer())},
+    _references{}
 {
+    std::ranges::move(other._references, std::back_inserter(_references));
 }
 
-practice& practice::operator=(practice const&)
+practice& practice::operator=(practice const& other)
 {
+    _question = other._question;
+    _answer = other._answer;
+    std::ranges::copy(other._references, std::back_inserter(_references));
+
     return *this;
 }
 
-practice& practice::operator=(practice&&) noexcept
+practice& practice::operator=(practice&& other) noexcept
 {
+    _question = other._question;
+    _answer = other._answer;
+    std::ranges::move(other._references, std::back_inserter(_references));
+
     return *this;
 }
 
 std::string practice::question() const
 {
-    return std::string{};
+    return _question;
 }
 
-void practice::question(std::string const&)
+void practice::question(std::string const& question)
 {
+    _question = question;
 }
 
-void practice::question(std::string&&)
+void practice::question(std::string&& question)
 {
+    _question = std::move(question);
 }
 
 std::string practice::answer() const
 {
-    return std::string{};
+    return _answer;
 }
 
-void practice::answer(std::string const&)
+void practice::answer(std::string const& answer)
 {
+    _answer = answer;
 }
 
-void practice::answer(std::string&&)
+void practice::answer(std::string&& answer)
 {
+    _answer = std::move(answer);
 }
 
-std::vector<reference> practice::references() const
+std::vector<std::shared_ptr<reference>> practice::references() const
 {
-    return std::vector<reference>{};
+    return _references;
 }
 
-void practice::add_reference(reference const&)
+void practice::add_reference(std::shared_ptr<reference> ref)
 {
+    _references.push_back(ref);
 }
 
-void practice::add_reference(reference&&)
+/*
+std::vector<source> practice::soruces() const
 {
+    return _sources;
 }
 
-std::vector<resource> practice::resoruces() const
+void practice::add_source(std::shared_ptr<source> origin)
 {
-    return std::vector<resource>{};
+    _sources.push_back(origin);
 }
+*/
 
-void practice::add_resource(resource const&)
+bool practice::operator==(practice const& other)
 {
-}
-
-void practice::add_resource(resource&&)
-{
-}
-
-bool practice::operator==(practice const&)
-{
-    return false;
+    return _question == other.question() && _answer == other.answer();
 }

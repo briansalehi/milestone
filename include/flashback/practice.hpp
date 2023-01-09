@@ -1,7 +1,10 @@
 #pragma once
 
+#include <flashback/reference.hpp>
+
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace flashback {
 
@@ -26,13 +29,13 @@ public:
     void answer(std::string const&);
     void answer(std::string&&);
 
-    std::vector<reference> references() const;
-    void add_reference(reference const&);
-    void add_reference(reference&&);
+    std::vector<std::shared_ptr<reference>> references() const;
+    void add_reference(std::shared_ptr<reference>);
 
-    std::vector<resource> resoruces() const;
-    void add_resource(resource const&);
-    void add_resource(resource&&);
+    /*
+    std::vector<std::shared_ptr<source>> source() const;
+    void add_source(std::shared_ptr<source>);
+    */
     
     // operators
     bool operator==(practice const&);
@@ -40,8 +43,7 @@ public:
 private:
     std::string _question;
     std::string _answer;
-    std::vector<reference> _references;
-    std::vector<resource> _resources;
+    std::vector<std::shared_ptr<reference>> _references;
 };
 
 } // flashback

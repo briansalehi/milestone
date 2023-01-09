@@ -15,6 +15,33 @@
 /// 3. \emoji :mortar_board: \ref tutorial_space : A space to watch video courses teaching you everything about a subject.
 /// 4. \emoji :rocket: \ref roadmap_space : A space to find your way through the skills you need to aquire to become an expert.
 ///
+/// \startuml
+/// !theme cyborg
+/// rectangle Library {
+///     usecase "Resources" as res
+///     usecase "Notes" as n
+///     usecase "Reference" as ref
+///
+///     res <-- n
+///     n <-- ref
+/// }
+///
+/// rectangle Trainer {
+///     usecase "Subjects" as s
+///     usecase "Topics" as t
+///     usecase "Practices" as p
+///     usecase "References" as ref2
+///
+///     s <-- t
+///     t <-- p
+///     p <-- ref2
+/// }
+/// rectangle Tutorials {
+/// }
+/// rectangle Roadmap {
+/// }
+/// \enduml
+///
 /// In the program, some parameters will be used program to monitor user activity.\n
 /// Of these parameters, two are time related and will be used to remember
 /// how much time it took from user to actively interact with the program:
@@ -85,7 +112,7 @@
 ///
 /// The resource interface should at least have following core methods:
 ///
-/// @startuml
+/// \startuml
 /// abstract class Resource {
 ///     # title(): std::string
 ///     # notes(): std::set<Note>
@@ -101,14 +128,14 @@
 ///
 /// Resource <|-- Book
 /// Resource <|-- Course
-/// @enduml
+/// \enduml
 ///
 /// \subsection note_interface Note
 ///
 /// \ref note_definition objects are simple data objects holding text
 /// values picked directly from their corresponding \ref resource_definition objects.
 ///
-/// @startuml
+/// \startuml
 /// struct Note {
 ///     + title: std::string
 ///     + description: std::string
@@ -125,7 +152,7 @@
 /// }
 ///
 /// Note <|-- Position
-/// @enduml
+/// \enduml
 ///
 /// Notes hold text from resources, either a resource be a video or a book, the final
 /// conversion of them will be texual notes.
@@ -140,7 +167,7 @@
 /// Positions are resource specific locations where the text was taken from.\n
 /// Positions might locate pages and chapters of a book, or a duration of course.
 ///
-/// @startuml
+/// \startuml
 /// abstract class Position {
 ///     # operator<(other: Position const&): bool
 ///     # operator!=(other: Position const&): bool
@@ -154,7 +181,7 @@
 ///
 /// Position <|-- BookPosition
 /// Position <|-- CoursePosition
-/// @enduml
+/// \enduml
 ///
 /// \section tutorial_space Tutorial
 ///
@@ -173,13 +200,13 @@
 ///
 /// Subject is the material in which \ref topic_interface will be held.
 ///
-/// @startuml
+/// \startuml
 /// abstract class Subject {
 ///     # add_topic(topic: Topic): bool
 ///     # topics(): std::vector<Topic>
 ///     # queue_practices(): std::queue<Practice>
 /// }
-/// @enduml
+/// \enduml
 ///
 /// \subsection topic_interface Topic
 ///
@@ -220,12 +247,12 @@
 /// relates to.\n
 /// References are usually links to \ref resource_interface objects.
 ///
-/// @startuml
+/// \startuml
 /// abstract class Reference {
 ///     # target(): Resource
 ///     # position(): std::string
 /// }
-/// @enduml
+/// \enduml
 ///
 ///
 /// \section command_line_interface Command Line Interface Design
@@ -262,7 +289,7 @@
 ///
 /// This activity diagram is a simple flow of the program when user starts practicing.
 ///
-/// @startuml
+/// \startuml
 /// start
 /// :Connect to database;
 /// :Fetch practices;
@@ -289,7 +316,7 @@
 /// backward :Pop next practice from queue;
 /// repeat while (User continues)
 /// end
-/// @enduml
+/// \enduml
 ///
 /// \section roadmap_space Roadmap
 ///

@@ -23,9 +23,6 @@ enable_testing()
 add_library(note SHARED src/note.cpp)
 target_include_directories(note PUBLIC include)
 
-add_library(practice SHARED EXCLUDE_FROM_ALL src/practice.cpp)
-target_include_directories(practice PUBLIC include)
-
 add_library(book SHARED src/book.cpp)
 target_link_libraries(book PUBLIC note)
 target_include_directories(book PUBLIC include)
@@ -37,6 +34,21 @@ target_include_directories(book PUBLIC include)
 add_library(markdown_book_builder SHARED src/markdown_book_builder.cpp)
 target_link_libraries(markdown_book_builder PUBLIC note book)
 target_include_directories(markdown_book_builder PUBLIC include)
+
+add_library(reference SHARED src/reference.cpp)
+target_include_directories(reference PUBLIC include)
+
+add_library(practice SHARED src/practice.cpp)
+target_link_libraries(practice PUBLIC reference)
+target_include_directories(practice PUBLIC include)
+
+add_library(topic SHARED src/topic.cpp)
+target_link_libraries(topic PUBLIC practice)
+target_include_directories(topic PUBLIC include)
+
+add_library(subject SHARED src/subject.cpp)
+target_link_libraries(subject PUBLIC practice)
+target_include_directories(subject PUBLIC include)
 
 add_library(dashboard SHARED src/dashboard.cpp)
 target_link_libraries(dashboard PUBLIC markdown_book_builder)

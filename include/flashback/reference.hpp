@@ -4,10 +4,20 @@
 
 namespace flashback {
 
-struct reference
+class reference
 {
-    std::string title;
-    std::string value;
+public:
+    std::string title() const;
+    void title(std::string const&);
+    void title(std::string&&);
+
+    std::string value() const;
+    void value(std::string const&);
+    void value(std::string&&);
+
+private:
+    std::string _title;
+    std::string _value;
 };
 
 } // flashback
