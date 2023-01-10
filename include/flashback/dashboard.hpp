@@ -6,25 +6,25 @@
 #include <string_view>
 #include <string>
 #include <vector>
+#include <array>
 
 namespace flashback
 {
-enum class space {library, trainer, tutorials, roadmap};
-
 class dashboard
 {
 public:
-
     explicit dashboard(std::string const&);
 
-    constexpr std::vector<std::string> spaces() const;
+    constexpr std::vector<std::string> space_names() const;
 
-    space prompt() const;
+    std::string prompt() const;
 
 private:
-    space get_space(std::string const&) const;
+    void enter_space(std::shared_ptr<space> const);
 
-    void enter_space(space const);
+private:
+    std::shared_ptr<space_builder> _builder;
+    std::array<std::shared_ptr<space>, 4> _spaces;
 };
 
 } // flashback
