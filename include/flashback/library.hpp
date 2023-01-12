@@ -1,8 +1,24 @@
 #pragma once
 
+#include <flashback/markdown_book_builder.hpp>
+#include <flashback/reference.hpp>
+#include <flashback/resource.hpp>
+#include <flashback/space.hpp>
+
+#include <filesystem>
+#include <algorithm>
+#include <iostream>
+#include <fstream>
+#include <memory>
+#include <vector>
+#include <string>
+#include <ranges>
+
 namespace flashback
 {
 
+///
+/// \page library_space Library
 ///
 /// \brief A space where you can review the books and resources you already used.
 ///
@@ -30,14 +46,16 @@ namespace flashback
 /// case (Library)
 ///     #green:Initialize Library Space;
 /// case (Trainer)
-///     :Initialize space;
+///     :Initialize Trainer Space;
 /// case (Milestone)
-///     :Initialize space;
+///     :Initialize Milestone Space;
 /// case (Roadmap)
-///     :Initialize space;
+///     :Initialize Roadmap Space;
 /// endswitch
 /// end
 /// \enduml
+///
+/// \subsection library_space Library Space
 ///
 /// When user enters into this space, they will be able to do following tasks:
 ///
@@ -98,12 +116,120 @@ namespace flashback
 /// endswitch
 /// \enduml
 ///
+/// This space consists of three components:
+///
+/// - \ref resource
+/// - \ref note
+/// - \ref position
+///
+/// In library section, User can search through resources and select one.\n
+/// Then they will be able to see the notes captured from that resource.
+///
+/// Notes can be used to review a resource. Though, user should be aware that
+/// following the subject of that resource only by using that resource is not a
+/// wise choice, but it's best to use \ref tutorial_space to learn that subject
+/// and then use \ref trainer_space space to practice the topics
+/// of that subject.
+///
+/// Resources will be loaded into the program from any available database,
+/// either files in the first stage of the program or relational or non-relational
+/// databases, through \ref loaders.
+///
+/// \subsection resource_interface Resource
+///
+/// \ref book is an abstract class in program which holds information
+/// of a specific real \ref book_entity .\n
+/// A \ref book also holds series of \ref practice objects which is required for
+/// recollection procedure.
+///
+/// A resource may be a link, a book, a course, or an article.\n
+/// So resource must be an interface, so that its derivations extend it.
+///
+/// The resource interface should at least have following core methods:
+///
+/// \startuml
+/// abstract class Resource {
+///     # title(): std::string
+///     # notes(): std::set<Note>
+/// }
+///
+/// class Book {
+///     # chapters(): unsigned int
+/// }
+///
+/// class Course {
+///     # duration(): std::chrono::duration
+/// }
+///
+/// Resource <|-- Book
+/// Resource <|-- Course
+/// \enduml
+///
+/// \subsection note_interface Note
+///
+/// \ref note_definition objects are simple data objects holding text
+/// values picked directly from their corresponding \ref resource_definition objects.
+///
+/// \startuml
+/// struct Note {
+///     + title: std::string
+///     + description: std::string
+///     + position: Position
+///     + collected: bool
+///     # operator<(other: Note const&): bool
+///     # operator!=(other: Note const&): bool
+/// }
+///
+/// abstract class Position {
+///     # operator<(other: Position const&): bool
+///     # operator!=(other: Position const&): bool
+/// 
+/// }
+///
+/// Note <|-- Position
+/// \enduml
+///
+/// Notes hold text from resources, either a resource be a video or a book, the final
+/// conversion of them will be texual notes.
+///
+/// Notes have a flag indicating whether it has collected from \ref library_definition
+/// to the \ref recollection_definition, because notes are the final product of
+/// \ref library_definition, and they will be copied into the \ref recollection_definition
+/// and will be modified accordingly so that they turn into question-answer form.
+///
+/// \subsection position_interface Position
+///
+/// Positions are resource specific locations where the text was taken from.\n
+/// Positions might locate pages and chapters of a book, or a duration of course.
+///
+/// \startuml
+/// abstract class Position {
+///     # operator<(other: Position const&): bool
+///     # operator!=(other: Position const&): bool
+/// }
+///
+/// class BookPosition {
+/// }
+///
+/// class CoursePosition {
+/// }
+///
+/// Position <|-- BookPosition
+/// Position <|-- CoursePosition
+/// \enduml
+///
 class library: public space
 {
 public:
-    void export(std::shared_ptr<note>);
+    explicit library(std::filesystem::path const&);
+    void export_note(std::shared_ptr<note>);
+
+public:
+    virtual void init() override;
 
 private:
+    std::filesystem::path _source_path;
+    std::vector<std::shared_ptr<resource>> _resources;
 };
 
 } // flashback

@@ -18,7 +18,7 @@ target_include_directories(flashback PRIVATE include)
 
 enable_testing()
 
-### libraries ###
+########## libraries ##########
 
 add_library(note SHARED src/note.cpp)
 target_include_directories(note PUBLIC include)
@@ -32,7 +32,7 @@ target_link_libraries(markdown_note_builder PUBLIC note)
 target_include_directories(book PUBLIC include)
 
 add_library(markdown_book_builder SHARED src/markdown_book_builder.cpp)
-target_link_libraries(markdown_book_builder PUBLIC note book)
+target_link_libraries(markdown_book_builder PUBLIC book markdown_note_builder)
 target_include_directories(markdown_book_builder PUBLIC include)
 
 add_library(reference SHARED src/reference.cpp)
@@ -50,11 +50,20 @@ add_library(subject SHARED src/subject.cpp)
 target_link_libraries(subject PUBLIC practice)
 target_include_directories(subject PUBLIC include)
 
+add_library(library SHARED src/library.cpp)
+target_link_libraries(library PUBLIC markdown_book_builder)
+target_include_directories(library PUBLIC include)
+
+add_library(trainer SHARED src/trainer.cpp)
+target_link_libraries(trainer PUBLIC markdown_book_builder)
+target_include_directories(trainer PUBLIC include)
+
 add_library(dashboard SHARED src/dashboard.cpp)
-target_link_libraries(dashboard PUBLIC markdown_book_builder)
+target_link_libraries(dashboard PUBLIC library trainer)
 target_include_directories(dashboard PUBLIC include)
 
-### test executables ###
+
+########## test executables ##########
 
 add_executable(test_practice EXCLUDE_FROM_ALL)
 target_sources(test_practice PRIVATE test/practice.cpp)
@@ -86,6 +95,11 @@ target_link_libraries(test_markdown_book_builder PRIVATE gtest PUBLIC markdown_n
 target_include_directories(test_markdown_book_builder PUBLIC include PRIVATE test)
 add_test(NAME test_markdown_book_builder COMMAND test_markdown_book_builder)
 
+add_executable(test_library)
+target_sources(test_library PUBLIC test/library.cpp)
+target_link_libraries(test_library PRIVATE gtest library)
+target_include_directories(test_library PUBLIC include PRIVATE test)
+add_test(NAME test_library COMMAND test_library)
 
 ### installation targets ###
 

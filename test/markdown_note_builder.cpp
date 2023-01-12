@@ -1,7 +1,7 @@
 #include <flashback/markdown_note_builder.hpp>
 #include <gtest/gtest.h>
 
-#include <sstream>
+#include <fstream>
 #include <memory>
 #include <string>
 
@@ -9,54 +9,88 @@ using namespace std::literals::string_literals;
 
 TEST(NoteBuilder, Construction)
 {
-    flashback::markdown_note_builder builder{};
-    EXPECT_EQ(builder.result() == nullptr, false);
+    std::ifstream buffer{"/tmp/flashback.data", std::ios::in};
+    ASSERT_EQ(buffer.is_open(), true);
 
+    flashback::markdown_note_builder builder{buffer};
+
+    EXPECT_EQ(builder.result() == nullptr, false);
     builder.reset();
+
     EXPECT_EQ(builder.result() == nullptr, false);
 }
 
 TEST(NoteBuilder, SingleLineTitle)
 {
-    std::string title{"Single Line Title"};
-    std::stringstream buffer;
-    flashback::markdown_note_builder builder{};
+    std::ofstream source{"/tmp/flashback.data", std::ios::out | std::ios::trunc};
 
-    buffer << "<summary>" << title << "</summary>";
-    builder.read_title(buffer);
-    EXPECT_EQ(builder.result()->title(), title);
+    ASSERT_EQ(source.is_open(), true);
+    source << "<summary>Single Line Title</summary>";
+    source.close();
+
+    std::ifstream buffer{"/tmp/flashback.data", std::ios::in};
+    ASSERT_EQ(buffer.is_open(), true);
+
+    flashback::markdown_note_builder builder{buffer};
+    builder.read_title();
+    buffer.close();
+
+    EXPECT_EQ(builder.result()->title(), "Single Line Title"s);
 }
 
 TEST(NoteBuilder, MultiLineTitle)
 {
-    std::string title{"Multi Line Title"};
-    std::stringstream buffer;
-    flashback::markdown_note_builder builder{};
+    std::ofstream source{"/tmp/flashback.data", std::ios::out | std::ios::trunc};
+    ASSERT_EQ(source.is_open(), true);
+    source << "<summary>";
+    source << "Multi Line Title";
+    source << "</summary>";
+    source.close();
 
-    buffer << "<summary>" << title << "</summary>";
-    builder.read_title(buffer);
-    EXPECT_EQ(builder.result()->title(), title);
+    std::ifstream buffer{"/tmp/flashback.data", std::ios::in};
+    ASSERT_EQ(buffer.is_open(), true);
+
+    flashback::markdown_note_builder builder{buffer};
+    builder.read_title();
+
+    EXPECT_EQ(builder.result()->title(), "Multi Line Title");
+    buffer.close();
 }
 
 TEST(NoteBuilder, Descriptions)
 {
-    flashback::markdown_note_builder builder{};
+    std::string content{};
+    content.append("Some description to test");
+    content.append("in multiple lines");
 
-    std::stringstream buffer;
-    buffer << "Some description to test";
-    buffer << "in multiple lines";
+    std::ofstream source{"/tmp/flashback.data", std::ios::out | std::ios::trunc};
+    ASSERT_EQ(source.is_open(), true);
+    source << content;
+    source.close();
 
-    builder.read_description(buffer);
-    EXPECT_EQ(builder.result()->description(), buffer.str());
+    std::ifstream buffer{"/tmp/flashback.data", std::ios::in};
+    ASSERT_EQ(buffer.is_open(), true);
+
+    flashback::markdown_note_builder builder{buffer};
+    builder.read_description();
+    buffer.close();
+
+    EXPECT_EQ(builder.result()->description(), content);
 }
 
 TEST(NoteBuilder, Position)
 {
-    flashback::markdown_note_builder builder{};
+    std::ofstream source{"/tmp/flashback.data", std::ios::out | std::ios::trunc};
+    ASSERT_EQ(source.is_open(), true);
+    source.close();
 
-    std::stringstream buffer;
+    std::ifstream buffer{"/tmp/flashback.data", std::ios::in};
+    ASSERT_EQ(buffer.is_open(), true);
 
-    builder.read_references(buffer);
+    flashback::markdown_note_builder builder{buffer};
+    builder.read_references();
+    buffer.close();
+
     EXPECT_EQ(builder.result()->position().empty(), true);
 }
 

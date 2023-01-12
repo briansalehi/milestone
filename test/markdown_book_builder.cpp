@@ -7,7 +7,8 @@
 
 TEST(ResourceBuilder, Construction)
 {
-    flashback::markdown_book_builder builder{};
+    std::filesystem::path source_path{"/tmp/flashback.data"};
+    flashback::markdown_book_builder builder{source_path};
     EXPECT_EQ(builder.result() == nullptr, false);
 
     builder.reset();
@@ -16,180 +17,191 @@ TEST(ResourceBuilder, Construction)
 
 TEST(ResourceBuilder, Title)
 {
-    flashback::markdown_book_builder builder{};
-    std::stringstream buffer{"# [Book Name](link to book)"};
+    std::filesystem::path source_path{"/tmp/flashback.data"};
+    std::fstream source{source_path, std::ios::trunc | std::ios::out};
+
+    ASSERT_EQ(source.is_open(), true);
+    source << "# [Book Name](link to book)";
+    source.close();
 
     try
     {
-        builder.read_title(buffer);
+        flashback::markdown_book_builder builder{source_path};
+        builder.read_title();
+
+        EXPECT_EQ(builder.result()->title(), "Book Name");
     }
     catch (std::runtime_error const& exp)
     { }
-
-    EXPECT_EQ(builder.result()->title(), "Book Name");
 }
 
 TEST(ResourceBuilder, Chapter)
 {
-    flashback::markdown_book_builder builder{};
-    std::stringstream buffer;
+    std::filesystem::path source_path{"/tmp/flashback.data"};
+    std::fstream source{source_path, std::ios::trunc | std::ios::out};
 
-    buffer << "# [Book Name](link to book)" << "\n";
-    buffer << "## Chapter 1/3" << "\n";
-    buffer << "<details>" << "\n";
-    buffer << "<summary>Sample 1 of 3</summary>" << "\n";
-    buffer << "\n";
-    buffer << "Quote 1" << "\n";
-    buffer << "</details>" << "\n";
-    buffer << "* [reference 1](link)" << "\n";
-    buffer << "## Chapter 2/3" << "\n";
-    buffer << "<details>" << "\n";
-    buffer << "<summary>Sample 2 of 3</summary>" << "\n";
-    buffer << "\n";
-    buffer << "Quote 2" << "\n";
-    buffer << "</details>" << "\n";
-    buffer << "* [reference 2](link)" << "\n";
-    buffer << "## Chapter 3/3" << "\n";
-    buffer << "<details>" << "\n";
-    buffer << "<summary>Sample 3 of 3</summary>" << "\n";
-    buffer << "\n";
-    buffer << "Quote 3" << "\n";
-    buffer << "</details>" << "\n";
-    buffer << "* [reference 3](link)" << "\n";
+    source << "# [Book Name](link to book)" << "\n";
+    source << "## Chapter 1/3" << "\n";
+    source << "<details>" << "\n";
+    source << "<summary>Sample 1 of 3</summary>" << "\n";
+    source << "\n";
+    source << "Quote 1" << "\n";
+    source << "</details>" << "\n";
+    source << "* [reference 1](link)" << "\n";
+    source << "## Chapter 2/3" << "\n";
+    source << "<details>" << "\n";
+    source << "<summary>Sample 2 of 3</summary>" << "\n";
+    source << "\n";
+    source << "Quote 2" << "\n";
+    source << "</details>" << "\n";
+    source << "* [reference 2](link)" << "\n";
+    source << "## Chapter 3/3" << "\n";
+    source << "<details>" << "\n";
+    source << "<summary>Sample 3 of 3</summary>" << "\n";
+    source << "\n";
+    source << "Quote 3" << "\n";
+    source << "</details>" << "\n";
+    source << "* [reference 3](link)" << "\n";
+
+    ASSERT_EQ(source.is_open(), true);
 
     try
     {
-        builder.read_title(buffer);
-        builder.read_chapters(buffer);
+        flashback::markdown_book_builder builder{source_path};
+        builder.read_title();
+        builder.read_chapters();
+
+        EXPECT_EQ(builder.result()->notes().size(), 3);
+        EXPECT_EQ(dynamic_cast<flashback::book*>(builder.result().get())->chapters(), 3);
     }
     catch (std::runtime_error const& exp)
     { }
-
-    EXPECT_EQ(builder.result()->notes().size(), 3);
-    EXPECT_EQ(dynamic_cast<flashback::book*>(builder.result().get())->chapters(), 3);
 }
 
 TEST(ResourceBuilder, NoteTitle)
 {
-    flashback::markdown_book_builder builder{};
-    std::stringstream buffer;
+    std::filesystem::path source_path{"/tmp/flashback.data"};
+    std::fstream source{source_path, std::ios::trunc | std::ios::out};
 
-    buffer << "# [Book Name](link to book)" << "\n";
-    buffer << "## Chapter 1/3" << "\n";
-    buffer << "<details>" << "\n";
-    buffer << "<summary>Sample 1 of 3</summary>" << "\n";
-    buffer << "\n";
-    buffer << "Quote 1" << "\n";
-    buffer << "</details>" << "\n";
-    buffer << "* [reference 1](link)" << "\n";
-    buffer << "## Chapter 2/3" << "\n";
-    buffer << "<details>" << "\n";
-    buffer << "<summary>Sample 2 of 3</summary>" << "\n";
-    buffer << "\n";
-    buffer << "Quote 2" << "\n";
-    buffer << "</details>" << "\n";
-    buffer << "* [reference 2](link)" << "\n";
-    buffer << "## Chapter 3/3" << "\n";
-    buffer << "<details>" << "\n";
-    buffer << "<summary>Sample 3 of 3</summary>" << "\n";
-    buffer << "\n";
-    buffer << "Quote 3" << "\n";
-    buffer << "</details>" << "\n";
-    buffer << "* [reference 3](link)" << "\n";
+    source << "# [Book Name](link to book)" << "\n";
+    source << "## Chapter 1/3" << "\n";
+    source << "<details>" << "\n";
+    source << "<summary>Sample 1 of 3</summary>" << "\n";
+    source << "\n";
+    source << "Quote 1" << "\n";
+    source << "</details>" << "\n";
+    source << "* [reference 1](link)" << "\n";
+    source << "## Chapter 2/3" << "\n";
+    source << "<details>" << "\n";
+    source << "<summary>Sample 2 of 3</summary>" << "\n";
+    source << "\n";
+    source << "Quote 2" << "\n";
+    source << "</details>" << "\n";
+    source << "* [reference 2](link)" << "\n";
+    source << "## Chapter 3/3" << "\n";
+    source << "<details>" << "\n";
+    source << "<summary>Sample 3 of 3</summary>" << "\n";
+    source << "\n";
+    source << "Quote 3" << "\n";
+    source << "</details>" << "\n";
+    source << "* [reference 3](link)" << "\n";
 
     try
     {
-        builder.read_title(buffer);
-        builder.read_chapters(buffer);
+        flashback::markdown_book_builder builder{source_path};
+        builder.read_title();
+        builder.read_chapters();
+
+        EXPECT_EQ(builder.result()->notes().at(0)->title(), "Sample 1 of 3");
+        EXPECT_EQ(builder.result()->notes().at(1)->title(), "Sample 2 of 3");
+        EXPECT_EQ(builder.result()->notes().at(2)->title(), "Sample 3 of 3");
     }
     catch (std::runtime_error const& exp)
     { }
-
-    EXPECT_EQ(builder.result()->notes().at(0)->title(), "Sample 1 of 3");
-    EXPECT_EQ(builder.result()->notes().at(1)->title(), "Sample 2 of 3");
-    EXPECT_EQ(builder.result()->notes().at(2)->title(), "Sample 3 of 3");
 }
 
 TEST(ResourceBuilder, NoteDescription)
 {
-    flashback::markdown_book_builder builder{};
-    std::stringstream buffer;
+    std::filesystem::path source_path{"/tmp/flashback.data"};
+    std::fstream source{source_path, std::ios::trunc | std::ios::out};
 
-    buffer << "# [Book Name](link to book)" << "\n";
-    buffer << "## Chapter 1/3" << "\n";
-    buffer << "<details>" << "\n";
-    buffer << "<summary>Sample 1 of 3</summary>" << "\n";
-    buffer << "\n";
-    buffer << "Quote 1" << "\n";
-    buffer << "</details>" << "\n";
-    buffer << "* [reference 1](link)" << "\n";
-    buffer << "## Chapter 2/3" << "\n";
-    buffer << "<details>" << "\n";
-    buffer << "<summary>Sample 2 of 3</summary>" << "\n";
-    buffer << "\n";
-    buffer << "Quote 2" << "\n";
-    buffer << "</details>" << "\n";
-    buffer << "* [reference 2](link)" << "\n";
-    buffer << "## Chapter 3/3" << "\n";
-    buffer << "<details>" << "\n";
-    buffer << "<summary>Sample 3 of 3</summary>" << "\n";
-    buffer << "\n";
-    buffer << "Quote 3" << "\n";
-    buffer << "</details>" << "\n";
-    buffer << "* [reference 3](link)" << "\n";
+    source << "# [Book Name](link to book)" << "\n";
+    source << "## Chapter 1/3" << "\n";
+    source << "<details>" << "\n";
+    source << "<summary>Sample 1 of 3</summary>" << "\n";
+    source << "\n";
+    source << "Quote 1" << "\n";
+    source << "</details>" << "\n";
+    source << "* [reference 1](link)" << "\n";
+    source << "## Chapter 2/3" << "\n";
+    source << "<details>" << "\n";
+    source << "<summary>Sample 2 of 3</summary>" << "\n";
+    source << "\n";
+    source << "Quote 2" << "\n";
+    source << "</details>" << "\n";
+    source << "* [reference 2](link)" << "\n";
+    source << "## Chapter 3/3" << "\n";
+    source << "<details>" << "\n";
+    source << "<summary>Sample 3 of 3</summary>" << "\n";
+    source << "\n";
+    source << "Quote 3" << "\n";
+    source << "</details>" << "\n";
+    source << "* [reference 3](link)" << "\n";
 
     try
     {
-        builder.read_title(buffer);
-        builder.read_chapters(buffer);
+        flashback::markdown_book_builder builder{source_path};
+        builder.read_title();
+        builder.read_chapters();
+
+        EXPECT_EQ(builder.result()->notes().at(0)->description(), "Quote 1");
+        EXPECT_EQ(builder.result()->notes().at(1)->description(), "Quote 2");
+        EXPECT_EQ(builder.result()->notes().at(2)->description(), "Quote 3");
     }
     catch (std::runtime_error const& exp)
     { }
-
-    EXPECT_EQ(builder.result()->notes().at(0)->description(), "Quote 1");
-    EXPECT_EQ(builder.result()->notes().at(1)->description(), "Quote 2");
-    EXPECT_EQ(builder.result()->notes().at(2)->description(), "Quote 3");
 }
 
 TEST(ResourceBuilder, NotePosition)
 {
-    flashback::markdown_book_builder builder{};
-    std::stringstream buffer;
+    std::filesystem::path source_path{"/tmp/flashback.data"};
+    std::fstream source{source_path, std::ios::trunc | std::ios::out};
 
-    buffer << "# [Book Name](link to book)" << "\n";
-    buffer << "## Chapter 1/3" << "\n";
-    buffer << "<details>" << "\n";
-    buffer << "<summary>Sample 1 of 3</summary>" << "\n";
-    buffer << "\n";
-    buffer << "Quote 1" << "\n";
-    buffer << "</details>" << "\n";
-    buffer << "* [reference 1](link)" << "\n";
-    buffer << "## Chapter 2/3" << "\n";
-    buffer << "<details>" << "\n";
-    buffer << "<summary>Sample 2 of 3</summary>" << "\n";
-    buffer << "\n";
-    buffer << "Quote 2" << "\n";
-    buffer << "</details>" << "\n";
-    buffer << "* [reference 2](link)" << "\n";
-    buffer << "## Chapter 3/3" << "\n";
-    buffer << "<details>" << "\n";
-    buffer << "<summary>Sample 3 of 3</summary>" << "\n";
-    buffer << "\n";
-    buffer << "Quote 3" << "\n";
-    buffer << "</details>" << "\n";
-    buffer << "* [reference 3](link)" << "\n";
+    source << "# [Book Name](link to book)" << "\n";
+    source << "## Chapter 1/3" << "\n";
+    source << "<details>" << "\n";
+    source << "<summary>Sample 1 of 3</summary>" << "\n";
+    source << "\n";
+    source << "Quote 1" << "\n";
+    source << "</details>" << "\n";
+    source << "* [reference 1](link)" << "\n";
+    source << "## Chapter 2/3" << "\n";
+    source << "<details>" << "\n";
+    source << "<summary>Sample 2 of 3</summary>" << "\n";
+    source << "\n";
+    source << "Quote 2" << "\n";
+    source << "</details>" << "\n";
+    source << "* [reference 2](link)" << "\n";
+    source << "## Chapter 3/3" << "\n";
+    source << "<details>" << "\n";
+    source << "<summary>Sample 3 of 3</summary>" << "\n";
+    source << "\n";
+    source << "Quote 3" << "\n";
+    source << "</details>" << "\n";
+    source << "* [reference 3](link)" << "\n";
 
     try
     {
-        builder.read_title(buffer);
-        builder.read_chapters(buffer);
+        flashback::markdown_book_builder builder{source_path};
+        builder.read_title();
+        builder.read_chapters();
+
+        EXPECT_EQ(builder.result()->notes().at(0)->position().empty(), true);
+        EXPECT_EQ(builder.result()->notes().at(1)->position().empty(), true);
+        EXPECT_EQ(builder.result()->notes().at(2)->position().empty(), true);
     }
     catch (std::runtime_error const& exp)
     { }
-
-    EXPECT_EQ(builder.result()->notes().at(0)->position().empty(), true);
-    EXPECT_EQ(builder.result()->notes().at(1)->position().empty(), true);
-    EXPECT_EQ(builder.result()->notes().at(2)->position().empty(), true);
 }
 
 int main(int argc, char** argv)

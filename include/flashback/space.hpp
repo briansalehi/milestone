@@ -40,8 +40,7 @@ namespace flashback
 class space
 {
 public:
-
-private:
+    virtual void init() = 0;
 };
 
 } // flashback

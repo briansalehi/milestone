@@ -5,9 +5,18 @@
 using namespace flashback;
 using namespace std::literals::string_literals;
 
-markdown_book_builder::markdown_book_builder():
-    _resource{std::make_shared<book>()}
+markdown_book_builder::markdown_book_builder(std::filesystem::path const& resource_path):
+    _resource{std::make_shared<book>()},
+    _buffer{resource_path}
 {
+    if (!_buffer.is_open())
+        throw std::runtime_error("cannot open resource file "s + resource_path.string());
+}
+
+markdown_book_builder::~markdown_book_builder()
+{
+    if (_buffer.is_open())
+        _buffer.close();
 }
 
 void markdown_book_builder::reset()
@@ -28,10 +37,10 @@ std::shared_ptr<resource> markdown_book_builder::result() const
     return _resource;
 }
 
-void markdown_book_builder::read_title(std::stringstream& buffer) const
+void markdown_book_builder::read_title()
 {
     std::string title;
-    std::getline(buffer, title);
+    std::getline(_buffer, title);
 
     std::regex pattern{R"(# \[(.*)\]\(.*\))"s};
     std::smatch matches;
@@ -42,31 +51,31 @@ void markdown_book_builder::read_title(std::stringstream& buffer) const
         throw std::runtime_error("book title could not be found at first line: "s + title);
 }
 
-void markdown_book_builder::read_chapters(std::stringstream& buffer) const
+void markdown_book_builder::read_chapters()
 {
     std::regex pattern{R"(## (Chapter\s)(\d+)\s*\/\s*(\d+))"s};
     std::smatch matches;
     std::string position;
     std::string line;
 
-    std::getline(buffer, line);
+    std::getline(_buffer, line);
 
     while (!std::regex_match(line, matches, pattern))
     {
-        if (buffer.eof())
+        if (_buffer.eof())
             return;
 
-        std::getline(buffer, line);
+        std::getline(_buffer, line);
     }
 
     dynamic_cast<book*>(_resource.get())->chapters(std::stoi(matches[3]));
     position = matches[1].str() + matches[2].str();
 
-    while (std::getline(buffer, line))
+    while (std::getline(_buffer, line))
     {
         if (line == "<details>")
         {
-            read_note(buffer, position);
+            read_note(position);
         }
         else if (std::regex_match(line, matches, pattern))
         {
@@ -75,12 +84,12 @@ void markdown_book_builder::read_chapters(std::stringstream& buffer) const
     }
 }
 
-void markdown_book_builder::read_note(std::stringstream& buffer, std::string const& position) const
+void markdown_book_builder::read_note(std::string const& position)
 {
-    markdown_note_builder note_builder{};
+    markdown_note_builder note_builder{_buffer};
 
-    note_builder.read_title(buffer);
-    note_builder.read_description(buffer);
+    note_builder.read_title();
+    note_builder.read_description();
     note_builder.result()->position(position);
     _resource->add_note(note_builder.result());
 }

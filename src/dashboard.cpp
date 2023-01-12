@@ -23,7 +23,7 @@ std::string dashboard::prompt() const
 
     unsigned int index = 0;
 
-    auto index_space = [index, this](std::string_view const& space_name) mutable {
+    auto index_space = [index, this](std::string_view space_name) mutable {
         std::cerr << " " << ++index << ". " << space_name << "\n";
     };
 
@@ -34,11 +34,12 @@ std::string dashboard::prompt() const
     std::cin >> selection;
 
     if (std::soi(selection) < 0 || std::stoi(selection) >= spaces().size())
-        throw std::out_of_range("space index out of range: "s + selection);
+        throw std::out_of_range("space index out of range [1,"s + spaces().size() + "]"s);
 
     return space_names().at(std::stoi(selection)-1);
 }
 
 void dashboard::enter_space(std::shared_ptr<space> selected_space)
 {
+    selected_space.init();
 }

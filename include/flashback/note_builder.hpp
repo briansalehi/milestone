@@ -28,9 +28,9 @@ public:
     virtual void reset() = 0;
     virtual std::shared_ptr<note> result() const = 0;
 
-    virtual void read_title(std::stringstream&) const = 0;
-    virtual void read_description(std::stringstream&) const = 0;
-    virtual void read_references(std::stringstream&) const = 0;
+    virtual void read_title() const = 0;
+    virtual void read_description() const = 0;
+    virtual void read_references() const = 0;
 };
 
 } // flashback

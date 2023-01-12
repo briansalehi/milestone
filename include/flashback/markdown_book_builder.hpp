@@ -2,7 +2,8 @@
 
 #include <flashback/resource_builder.hpp>
 
-#include <iostream>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <regex>
@@ -13,7 +14,8 @@ namespace flashback
 class markdown_book_builder final : public resource_builder
 {
 public:
-    markdown_book_builder();
+    explicit markdown_book_builder(std::filesystem::path const&);
+    virtual ~markdown_book_builder();
 
     virtual void reset() override;
     virtual std::shared_ptr<resource> result() const override;
@@ -32,7 +34,7 @@ public:
     /// So the only useful part of it is within square brackets.\n
     /// The title then, will be matched through a regular expression pattern.
     ///
-    virtual void read_title(std::stringstream&) const override;
+    virtual void read_title() override;
 
     ///
     /// \brief Read Content of Chapters from Buffer
@@ -47,13 +49,14 @@ public:
     /// all chapters should be checked each time, and if all total numbers were
     /// the same, then the total number of chapters are correct.
     ///
-    virtual void read_chapters(std::stringstream&) const override;
+    virtual void read_chapters() override;
 
 protected:
-    virtual void read_note(std::stringstream&, std::string const&) const override;
+    virtual void read_note(std::string const&) override;
 
 private:
     std::shared_ptr<resource> _resource;
+    std::ifstream _buffer;
 };
 
 } // flashback
