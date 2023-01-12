@@ -69,6 +69,16 @@ void note::collected(bool const collected)
     _collected = collected;
 }
 
+bool note::collectable() const
+{
+    return _collectable;
+}
+
+void note::collectable(bool const collectable)
+{
+    _collectable = collectable;
+}
+
 bool note::operator<(note const& other)
 {
     return _position < other._position;

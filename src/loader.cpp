@@ -53,10 +53,10 @@ std::shared_ptr<resource> loader::build_resource(std::filesystem::path const& en
         return nullptr;
     }
 
-    markdown_book_builder builder{};
+    markdown_book_builder builder{"/home/brian/projects/references/books"};
 
-    builder.read_title(content);
-    builder.read_chapters(content);
+    builder.read_title();
+    builder.read_chapters();
 
     return builder.result();
 }

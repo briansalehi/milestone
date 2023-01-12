@@ -1,7 +1,9 @@
 #pragma once
 
 #include <flashback/argument_parser.hpp>
+#include <flashback/library.hpp>
 #include <flashback/loader.hpp>
+#include <flashback/space.hpp>
 
 #include <string_view>
 #include <string>
@@ -23,7 +25,6 @@ private:
     void enter_space(std::shared_ptr<space> const);
 
 private:
-    std::shared_ptr<space_builder> _builder;
     std::array<std::shared_ptr<space>, 4> _spaces;
 };
 

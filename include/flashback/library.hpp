@@ -221,15 +221,40 @@ namespace flashback
 class library: public space
 {
 public:
+    enum class resource_actions {undefined, show, add, edit, remove};
+    enum class note_actions {undefined, next, previous, promote, add, edit, remove};
+
     explicit library(std::filesystem::path const&);
-    void export_note(std::shared_ptr<note>);
 
 public:
+    ///
+    /// Resources should be loaded in initialization.
+    /// They should be sorted either by recent usage of user
+    /// or by mostly used resources by users.
+    /// \todo User implementation is not complete yet.
+    ///
     virtual void init() override;
 
 private:
-    std::filesystem::path _source_path;
+    resource_actions prompt_resource_actions() const;
+
+    note_actions prompt_note_actions() const;
+
+    void perform_resource_actions();
+
+    void perform_note_actions();
+
+    void select_resource();
+
+    void view_note(unsigned int);
+
+    void export_note(std::shared_ptr<note>);
+
+private:
+    std::filesystem::path _data_path;
     std::vector<std::shared_ptr<resource>> _resources;
+    std::vector<std::string> _resource_actions;
+    std::vector<std::string> _note_actions;
 };
 
 } // flashback

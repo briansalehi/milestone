@@ -39,6 +39,16 @@ TEST(Note, Collected)
     EXPECT_EQ(note.collected(), false);
 }
 
+TEST(Note, Collectable)
+{
+    flashback::note note;
+    note.collectable(true);
+    EXPECT_EQ(note.collectable(), true);
+
+    note.collectable(false);
+    EXPECT_EQ(note.collectable(), false);
+}
+
 TEST(Note, Construction)
 {
     flashback::note note{"title"s, "description"s, "position", false};

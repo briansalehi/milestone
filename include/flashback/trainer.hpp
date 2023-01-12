@@ -1,5 +1,10 @@
 #pragma once
 
+#include <flashback/note.hpp>
+#include <flashback/space.hpp>
+
+#include <memory>
+
 namespace flashback
 {
 

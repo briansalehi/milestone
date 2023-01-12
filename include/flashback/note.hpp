@@ -27,6 +27,9 @@ public:
     bool collected() const;
     void collected(bool const);
 
+    bool collectable() const;
+    void collectable(bool const);
+
     bool operator<(note const&);
     bool operator!=(note const&);
 
@@ -34,6 +37,7 @@ private:
     std::string _title;
     std::string _description;
     std::string _position;
+    bool _collectable;
     bool _collected;
 };
 

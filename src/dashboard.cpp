@@ -6,10 +6,15 @@ using namespace std::literals::string_literals;
 
 dashboard::dashboard(std::string const& selection)
 {
+    /*
     if (selection.empty())
         enter_space(prompt());
     else
         enter_space(selection);
+    */
+
+    auto section = std::make_shared<library>("/home/brian/projects/references/books");
+    enter_space(section);
 }
 
 constexpr std::vector<std::string> dashboard::space_names() const
@@ -33,13 +38,13 @@ std::string dashboard::prompt() const
     std::cout << "\nSpace: ";
     std::cin >> selection;
 
-    if (std::soi(selection) < 0 || std::stoi(selection) >= spaces().size())
-        throw std::out_of_range("space index out of range [1,"s + spaces().size() + "]"s);
+    if (std::stoi(selection) < 0 || std::stoi(selection) >= _spaces.size())
+        throw std::out_of_range("space index out of range [1,"s + std::to_string(_spaces.size()) + "]"s);
 
     return space_names().at(std::stoi(selection)-1);
 }
 
 void dashboard::enter_space(std::shared_ptr<space> selected_space)
 {
-    selected_space.init();
+    selected_space->init();
 }
