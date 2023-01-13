@@ -4,17 +4,22 @@
 using namespace flashback;
 using namespace std::literals::string_literals;
 
-dashboard::dashboard(std::string const& selection)
+dashboard::dashboard(): _active_space{}
 {
-    /*
-    if (selection.empty())
-        enter_space(prompt());
-    else
-        enter_space(selection);
-    */
+}
 
-    auto section = std::make_shared<library>("/home/brian/projects/references/books");
-    enter_space(section);
+void dashboard::open()
+{
+    try
+    {
+        _active_space.reset();
+        _active_space = build_space(prompt_space());
+        enter_space();
+    }
+    catch (std::exception const& exp)
+    {
+        std::cerr << "\e[1;31m" << exp.what() << "\e[0m\n";
+    }
 }
 
 constexpr std::vector<std::string> dashboard::space_names() const
@@ -22,29 +27,72 @@ constexpr std::vector<std::string> dashboard::space_names() const
     return {"library", "trainer", "tutorials", "roadmap"};
 }
 
-std::string dashboard::prompt() const
+std::string dashboard::prompt_space() const
 {
     std::cerr << "Enter one of the spaces to continue:\n\n";
 
-    unsigned int index = 0;
+    unsigned int space_index = 0;
 
-    auto index_space = [index, this](std::string_view space_name) mutable {
-        std::cerr << " " << ++index << ". " << space_name << "\n";
+    auto index_space = [space_index, this](std::string_view space_name) mutable {
+        std::cerr << " " << ++space_index << ". " << space_name << "\n";
     };
 
     std::ranges::for_each(space_names(), index_space);
 
     std::string selection;
-    std::cout << "\nSpace: ";
+
+    std::cerr << "\nSpace: ";
     std::cin >> selection;
 
-    if (std::stoi(selection) < 0 || std::stoi(selection) >= _spaces.size())
-        throw std::out_of_range("space index out of range [1,"s + std::to_string(_spaces.size()) + "]"s);
+    try
+    {
+        space_index = std::stoi(selection) - 1; // throws
 
-    return space_names().at(std::stoi(selection)-1);
+        if (space_index < 0 || space_index >= space_names().size())
+            throw std::out_of_range("out of range");
+
+        selection = space_names().at(space_index);
+    }
+    catch (std::exception const& exp)
+    {
+        std::cerr << "\e[1;31m" << exp.what() << "\e[0m\n";
+        selection.clear();
+    }
+
+    return selection;
 }
 
-void dashboard::enter_space(std::shared_ptr<space> selected_space)
+std::shared_ptr<space> dashboard::build_space(std::string_view space_name)
 {
-    selected_space->init();
+    if (space_name == "library")
+    {
+        std::filesystem::path base_path;
+        std::cerr << "Enter base path: ";
+        std::cin >> base_path;
+        return std::make_shared<library>(base_path);
+    }
+    else if (space_name == "trainer")
+    {
+        return nullptr;
+    }
+    else if (space_name == "tutorials")
+    {
+        return nullptr;
+    }
+    else if (space_name == "milestone")
+    {
+        return nullptr;
+    }
+    else
+    {
+        return nullptr;
+    }
+}
+
+void dashboard::enter_space()
+{
+    if (_active_space)
+        _active_space->init();
+    else
+        throw std::runtime_error("cannot initialize space");
 }

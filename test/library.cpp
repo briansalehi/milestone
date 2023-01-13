@@ -1,7 +1,7 @@
 #include <flashback/library.hpp>
 #include <gtest/gtest.h>
 
-TEST(Library, Construction)
+TEST(Library, Initialization)
 {
     flashback::library library{"/home/brian/projects/references/books"};
 

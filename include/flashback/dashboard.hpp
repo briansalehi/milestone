@@ -1,9 +1,10 @@
 #pragma once
 
 #include <flashback/argument_parser.hpp>
-#include <flashback/library.hpp>
 #include <flashback/loader.hpp>
 #include <flashback/space.hpp>
+#include <flashback/library.hpp>
+#include <flashback/trainer.hpp>
 
 #include <string_view>
 #include <string>
@@ -15,17 +16,21 @@ namespace flashback
 class dashboard
 {
 public:
-    explicit dashboard(std::string const&);
+    dashboard();
 
     constexpr std::vector<std::string> space_names() const;
 
-    std::string prompt() const;
+    void open();
 
 private:
-    void enter_space(std::shared_ptr<space> const);
+    std::shared_ptr<space> build_space(std::string_view);
+
+    std::string prompt_space() const;
+
+    void enter_space();
 
 private:
-    std::array<std::shared_ptr<space>, 4> _spaces;
+    std::shared_ptr<space> _active_space;
 };
 
 } // flashback

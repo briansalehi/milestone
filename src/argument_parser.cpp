@@ -35,7 +35,6 @@ argument_parser::argument_parser(int argc, char **argv, std::string const& progr
         ("quiet,q", "do not show output");
 
     practice_options.add_options()
-        ("section,s", boost::program_options::value<std::string>(), "entry section")
         ("resources,r", boost::program_options::value<std::filesystem::path>(), "resources directory");
 
     all_options.add(general_options).add(practice_options);
@@ -61,9 +60,6 @@ void argument_parser::verify_options()
 
     if (variables_map.count("resources"))
         resources_path = variables_map["resources"].as<std::filesystem::path>();
-
-    if (variables_map.count("section"))
-        section = variables_map["section"].as<std::string>();
 
     if (variables_map.count("quiet"))
         quiet = true;

@@ -51,10 +51,10 @@ public:
     void fetch_content();
 
 private:
-    std::shared_ptr<resource> build_resource(std::filesystem::path const&);
+    void add_resource(std::filesystem::path const&);
 
 private:
-    std::filesystem::path _entities_path;
+    std::filesystem::path _base_path;
     std::vector<std::shared_ptr<resource>> _resources;
 };
 

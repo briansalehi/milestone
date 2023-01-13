@@ -3,9 +3,32 @@
 using namespace flashback;
 using namespace std::literals::string_literals;
 
+constexpr std::string resource_action_view{"view notes"};
+constexpr std::string resource_action_add{"add resource"};
+constexpr std::string resource_action_edit{"edit resource"};
+constexpr std::string resource_action_remove{"remove resource"};
+constexpr std::string note_action_next{"next note"};
+constexpr std::string note_action_previous{"previous note"};
+constexpr std::string note_action_collect{"collect note"};
+constexpr std::string note_action_add{"add note"};
+constexpr std::string note_action_edit{"edit note"};
+constexpr std::string note_action_remove{"remove note"};
+
 library::library(std::filesystem::path const& data_path):
-    _resource_actions{"view notes", "add resource", "edit resource", "remove resource"},
-    _note_actions{"next note", "previous note", "promote note", "add note", "edit note", "remove note"},
+    _resource_actions{
+        resource_action_view,
+        resource_action_add,
+        resource_action_edit,
+        resource_action_remove
+    },
+    _note_actions{
+        note_action_next,
+        note_action_previous,
+        note_action_collect,
+        note_action_add,
+        note_action_edit,
+        note_action_remove
+    },
     _data_path{data_path},
     _resources{}
 {
@@ -13,23 +36,28 @@ library::library(std::filesystem::path const& data_path):
 
 void library::init()
 {
-    auto builder = [this](auto const& entry) {
-        flashback::markdown_book_builder builder{entry.path()};
-        builder.read_title();
-        builder.read_chapters();
-        _resources.push_back(builder.result());
-    };
-
     if (std::filesystem::exists(_data_path) && std::filesystem::is_directory(_data_path))
     {
-        std::ranges::for_each(std::filesystem::directory_iterator(_data_path), builder);
-        std::cerr << _resources.size() << " resources loaded:\n\n";
-
-        select_resource();
+        loader database{_data_path};
+        database.fetch_content();
+        _resources = std::move(database.resources());
     }
     else
     {
-        throw std::runtime_error("invalid resource path: "s + _data_path.string());
+        std::error_code ec{};
+        throw std::filesystem::filesystem_error("invalid base path"s, _data_path, ec);
+    }
+
+    while (true)
+    {
+        try
+        {
+            select_resource();
+        }
+        catch (std::exception const& exp)
+        {
+            std::cerr << "\e[1;31m" << exp.what() << "\e[0m\n";
+        }
     }
 }
 
@@ -37,25 +65,26 @@ library::resource_actions library::prompt_resource_actions() const
 {
     unsigned int index = 0;
 
-    std::cerr << "Select an action:\n";
+    std::cerr << "\nSelect an action:\n";
     std::ranges::for_each(_resource_actions, [&index](auto const& action) mutable {
-        std::cerr << ++index << ". " << action << "\n";
+        std::cerr << ++index << ". " << action << " ";
     });
 
     std::cin >> index;
+    --index;
 
     if (index < 0 || index > _resource_actions.size())
-        throw std::out_of_range("out of range [1,"s + std::to_string(_resource_actions.size()) + "]"s);
+        throw std::out_of_range("out of range"s);
 
     resource_actions action;
 
-    if (_resource_actions.at(index) == "view notes")
+    if (_resource_actions.at(index) == resource_action_view)
         action = resource_actions::show;
-    else if (_resource_actions.at(index) == "add resource")
+    else if (_resource_actions.at(index) == resource_action_add)
         action = resource_actions::add;
-    else if (_resource_actions.at(index) == "edit resource")
+    else if (_resource_actions.at(index) == resource_action_edit)
         action = resource_actions::edit;
-    else if (_resource_actions.at(index) == "remove resource")
+    else if (_resource_actions.at(index) == resource_action_remove)
         action = resource_actions::remove;
     else
         action = resource_actions::undefined;
@@ -67,29 +96,31 @@ library::note_actions library::prompt_note_actions() const
 {
     unsigned int index = 0;
 
-    std::cerr << "Select an action:\n";
+    std::cerr << "\nSelect an action:\n";
+
     std::ranges::for_each(_note_actions, [&index](auto const& action) mutable {
-        std::cerr << ++index << ". " << action << "\n";
+        std::cerr << ++index << ". " << action << " ";
     });
 
     std::cin >> index;
+    --index;
 
     if (index < 0 || index > _note_actions.size())
-        throw std::out_of_range("out of range [1,"s + std::to_string(_note_actions.size()) + "]"s);
+        throw std::out_of_range("out of range"s);
 
     note_actions action;
 
-    if (_note_actions.at(index) == "next note")
+    if (_note_actions.at(index) == note_action_next)
         action = note_actions::next;
-    else if (_note_actions.at(index) == "previous note")
+    else if (_note_actions.at(index) == note_action_previous)
         action = note_actions::previous;
-    else if (_note_actions.at(index) == "promote note")
-        action = note_actions::promote;
-    else if (_note_actions.at(index) == "add note")
+    else if (_note_actions.at(index) == note_action_collect)
+        action = note_actions::collect;
+    else if (_note_actions.at(index) == note_action_add)
         action = note_actions::add;
-    else if (_note_actions.at(index) == "edit note")
+    else if (_note_actions.at(index) == note_action_edit)
         action = note_actions::edit;
-    else if (_note_actions.at(index) == "remove note")
+    else if (_note_actions.at(index) == note_action_remove)
         action = note_actions::remove;
     else
         action = note_actions::undefined;
@@ -97,25 +128,47 @@ library::note_actions library::prompt_note_actions() const
     return action;
 }
 
-void library::perform_resource_actions()
+void library::perform_resource_actions(unsigned int resource_index)
 {
     switch (prompt_resource_actions())
     {
         case resource_actions::show:
+        {
+            unsigned int note_index{};
+
+            std::ranges::for_each(_resources.at(resource_index)->notes(),
+                [&note_index, this](std::shared_ptr<note> note) {
+                    std::cerr << "\e[1;32m  "
+                              << ++note_index << ". "
+                              << note->title() << "\e[0m\n";
+                    perform_note_actions(note_index);
+                }
+            );
             break;
+        }
         case resource_actions::add:
+        {
             break;
+        }
         case resource_actions::edit:
+        {
             break;
+        }
         case resource_actions::remove:
+        {
             break;
+        }
         case resource_actions::undefined:
+        {
+        }
         default:
-            throw std::runtime_error("undefined resource action to perform");
+        {
+            throw std::runtime_error("undefined action");
+        }
     }
 }
 
-void library::perform_note_actions()
+void library::perform_note_actions(unsigned int)
 {
     switch (prompt_note_actions())
     {
@@ -123,7 +176,7 @@ void library::perform_note_actions()
             break;
         case note_actions::previous:
             break;
-        case note_actions::promote:
+        case note_actions::collect:
             break;
         case note_actions::add:
             break;
@@ -133,7 +186,7 @@ void library::perform_note_actions()
             break;
         case note_actions::undefined:
         default:
-            throw std::runtime_error("undefined note action to perform");
+            throw std::runtime_error("undefined action");
     }
 }
 
@@ -143,32 +196,45 @@ void library::select_resource()
     unsigned int resource_index{};
 
     auto writer = [&index](auto const& res) mutable {
-        std::cerr << "\e[1;35m  " << ++index << ". " << res->title() << "\e[0m" << "\n";
+        std::cerr << "\e[1;34m  "
+                  << ++index << ". " << res->title()
+                  << "\e[0m\n";
     };
 
     std::ranges::for_each(_resources, writer);
 
-    std::cerr << "Select a resource: ";
+    std::cerr << "\nSelect a resource: ";
     std::cin >> resource_index;
+    --resource_index;
 
-    view_note(resource_index);
-    perform_resource_actions();
+    if (resource_index < 0 || resource_index > _resources.size())
+        throw std::out_of_range("out of range");
+
+    while (true)
+    {
+        try
+        {
+            std::cerr << "\n\e[1;32mSelected : "
+                << _resources.at(resource_index)->title()
+                << "\e[0m\n";
+            perform_resource_actions(resource_index);
+        }
+        catch (std::exception const& exp)
+        {
+            std::cerr << "\e[1;31m" << exp.what() << "\e[0m\n";
+        }
+    }
 }
 
 void library::view_note(unsigned int resource_index)
 {
     if (resource_index < 0 || resource_index > _resources.size())
-        throw std::out_of_range("out of range [1,"s + std::to_string(_resources.size()) + "]"s);
+        throw std::out_of_range("out of range"s);
 
     std::shared_ptr<resource> selected_resource = _resources.at(resource_index);
-    unsigned int index{};
     unsigned int note_index{};
 
-    auto writer = [&index](auto const& note) {
-        std::cerr << "\e[1;35m  " << ++index << ". " << note->title() << "\e[0m" << "\n";
-    };
-
-    std::ranges::for_each(selected_resource->notes(), writer);
+    //std::cerr << "\e[1;36m  " << ++note_index << ". " << note->title() << "\e[0m\n";
 }
 
 void library::export_note(std::shared_ptr<note>)

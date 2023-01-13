@@ -29,23 +29,22 @@
 using namespace std::literals::string_literals;
 
 int main(int argc, char **argv)
+try
 {
-    try
-    {
-        std::string program_name{std::filesystem::path(argv[0]).filename()};
-        flashback::argument_parser options(argc, argv, program_name);
+    std::string program_name{std::filesystem::path(argv[0]).filename()};
+    flashback::argument_parser options(argc, argv, program_name);
+    flashback::dashboard dashboard{};
 
-        if (options.section.empty())
-            flashback::dashboard dashboard{options.section};
-        else
-            std::cerr << options.get_help();
-    }
-    catch (boost::program_options::error const& exp)
+    while (true)
     {
-        std::cerr << exp.what() << std::endl;
+        dashboard.open();
     }
-    catch (std::exception const& exp)
-    {
-        std::cerr << exp.what() << std::endl;
-    }
+}
+catch (boost::program_options::error const& exp)
+{
+    std::cerr << exp.what() << "\n";
+}
+catch (std::exception const& exp)
+{
+    std::cerr << "\e[1;31m" << exp.what() << "\e[0m\n";
 }

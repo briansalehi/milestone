@@ -1,8 +1,8 @@
 #pragma once
 
-#include <flashback/markdown_book_builder.hpp>
 #include <flashback/reference.hpp>
 #include <flashback/resource.hpp>
+#include <flashback/loader.hpp>
 #include <flashback/space.hpp>
 
 #include <filesystem>
@@ -222,7 +222,7 @@ class library: public space
 {
 public:
     enum class resource_actions {undefined, show, add, edit, remove};
-    enum class note_actions {undefined, next, previous, promote, add, edit, remove};
+    enum class note_actions {undefined, next, previous, collect, add, edit, remove};
 
     explicit library(std::filesystem::path const&);
 
@@ -236,15 +236,15 @@ public:
     virtual void init() override;
 
 private:
+    void select_resource();
+
     resource_actions prompt_resource_actions() const;
 
     note_actions prompt_note_actions() const;
 
-    void perform_resource_actions();
+    void perform_resource_actions(unsigned int);
 
-    void perform_note_actions();
-
-    void select_resource();
+    void perform_note_actions(unsigned int);
 
     void view_note(unsigned int);
 
@@ -252,9 +252,9 @@ private:
 
 private:
     std::filesystem::path _data_path;
-    std::vector<std::shared_ptr<resource>> _resources;
-    std::vector<std::string> _resource_actions;
     std::vector<std::string> _note_actions;
+    std::vector<std::string> _resource_actions;
+    std::vector<std::shared_ptr<resource>> _resources;
 };
 
 } // flashback
