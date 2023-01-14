@@ -50,6 +50,10 @@ add_library(subject SHARED src/subject.cpp)
 target_link_libraries(subject PUBLIC practice)
 target_include_directories(subject PUBLIC include)
 
+add_library(loader SHARED src/loader.cpp)
+target_link_libraries(loader PUBLIC markdown_book_builder)
+target_include_directories(loader PUBLIC include)
+
 add_library(library SHARED src/library.cpp)
 target_link_libraries(library PUBLIC markdown_book_builder)
 target_include_directories(library PUBLIC include)
@@ -59,7 +63,7 @@ target_link_libraries(trainer PUBLIC markdown_book_builder)
 target_include_directories(trainer PUBLIC include)
 
 add_library(dashboard SHARED src/dashboard.cpp)
-target_link_libraries(dashboard PUBLIC library trainer)
+target_link_libraries(dashboard PUBLIC library trainer loader)
 target_include_directories(dashboard PUBLIC include)
 
 
@@ -100,6 +104,12 @@ target_sources(test_library PUBLIC test/library.cpp)
 target_link_libraries(test_library PRIVATE gtest library)
 target_include_directories(test_library PUBLIC include PRIVATE test)
 add_test(NAME test_library COMMAND test_library)
+
+add_executable(test_dashboard)
+target_sources(test_dashboard PUBLIC test/dashboard.cpp)
+target_link_libraries(test_dashboard PRIVATE gtest dashboard)
+target_include_directories(test_dashboard PUBLIC include PRIVATE test)
+add_test(NAME test_dashboard COMMAND test_dashboard)
 
 ### installation targets ###
 

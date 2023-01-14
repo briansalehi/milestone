@@ -29,20 +29,21 @@ constexpr std::vector<std::string> dashboard::space_names() const
 
 std::string dashboard::prompt_space() const
 {
-    std::cerr << "Enter one of the spaces to continue:\n\n";
+    std::cerr << "\e[1;37mEnter one of the spaces to continue:\n\n\e[1;33m";
 
     unsigned int space_index = 0;
 
     auto index_space = [space_index, this](std::string_view space_name) mutable {
-        std::cerr << " " << ++space_index << ". " << space_name << "\n";
+        std::cerr << " " << ++space_index << ". " << space_name << "   ";
     };
 
     std::ranges::for_each(space_names(), index_space);
 
     std::string selection;
 
-    std::cerr << "\nSpace: ";
+    std::cerr << "\n\n\e[1;37mSpace: ";
     std::cin >> selection;
+    std::cerr << "\e[0m";
 
     try
     {
@@ -67,8 +68,9 @@ std::shared_ptr<space> dashboard::build_space(std::string_view space_name)
     if (space_name == "library")
     {
         std::filesystem::path base_path;
-        std::cerr << "Enter base path: ";
+        std::cerr << "\e[1;27mEnter base path: ";
         std::cin >> base_path;
+        std::cerr << "\e[0m\n";
         return std::make_shared<library>(base_path);
     }
     else if (space_name == "trainer")

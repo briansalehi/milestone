@@ -221,6 +221,7 @@ namespace flashback
 class library: public space
 {
 public:
+    enum class library_actions {undefined, list_resources, search_resource};
     enum class resource_actions {undefined, show, add, edit, remove};
     enum class note_actions {undefined, next, previous, collect, add, edit, remove};
 
@@ -238,15 +239,19 @@ public:
 private:
     void select_resource();
 
+    library_actions prompt_library_actions() const;
+
     resource_actions prompt_resource_actions() const;
 
     note_actions prompt_note_actions() const;
 
-    void perform_resource_actions(unsigned int);
+    void perform_library_actions();
 
-    void perform_note_actions(unsigned int);
+    void perform_resource_actions(unsigned int const);
 
-    void view_note(unsigned int);
+    void perform_note_actions(unsigned int const, unsigned int const);
+
+    void view_note(unsigned int const);
 
     void export_note(std::shared_ptr<note>);
 
@@ -254,6 +259,7 @@ private:
     std::filesystem::path _data_path;
     std::vector<std::string> _note_actions;
     std::vector<std::string> _resource_actions;
+    std::vector<std::string> _library_actions;
     std::vector<std::shared_ptr<resource>> _resources;
 };
 
