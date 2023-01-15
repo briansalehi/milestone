@@ -71,6 +71,9 @@ std::shared_ptr<space> dashboard::build_space(std::string_view space_name)
         std::cerr << "\e[1;27mEnter base path: ";
         std::cin >> base_path;
         std::cerr << "\e[0m\n";
+
+        std::cerr << "\e[1;32mSpace " << space_name << "\e[0m\n\n";
+
         return std::make_shared<library>(base_path);
     }
     else if (space_name == "trainer")

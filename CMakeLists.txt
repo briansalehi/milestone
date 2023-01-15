@@ -23,6 +23,9 @@ enable_testing()
 add_library(note SHARED src/note.cpp)
 target_include_directories(note PUBLIC include)
 
+add_library(console SHARED src/console.cpp)
+target_include_directories(console PUBLIC include)
+
 add_library(book SHARED src/book.cpp)
 target_link_libraries(book PUBLIC note)
 target_include_directories(book PUBLIC include)
@@ -55,11 +58,11 @@ target_link_libraries(loader PUBLIC markdown_book_builder)
 target_include_directories(loader PUBLIC include)
 
 add_library(library SHARED src/library.cpp)
-target_link_libraries(library PUBLIC markdown_book_builder)
+target_link_libraries(library PUBLIC markdown_book_builder console)
 target_include_directories(library PUBLIC include)
 
 add_library(trainer SHARED src/trainer.cpp)
-target_link_libraries(trainer PUBLIC markdown_book_builder)
+target_link_libraries(trainer PUBLIC markdown_book_builder console)
 target_include_directories(trainer PUBLIC include)
 
 add_library(dashboard SHARED src/dashboard.cpp)

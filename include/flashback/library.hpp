@@ -2,6 +2,7 @@
 
 #include <flashback/reference.hpp>
 #include <flashback/resource.hpp>
+#include <flashback/console.hpp>
 #include <flashback/loader.hpp>
 #include <flashback/space.hpp>
 
@@ -239,11 +240,11 @@ public:
 private:
     void select_resource();
 
-    library_actions prompt_library_actions() const;
+    library_actions prompt_library_actions();
 
-    resource_actions prompt_resource_actions() const;
+    resource_actions prompt_resource_actions();
 
-    note_actions prompt_note_actions() const;
+    note_actions prompt_note_actions();
 
     void perform_library_actions();
 
@@ -256,6 +257,7 @@ private:
     void export_note(std::shared_ptr<note>);
 
 private:
+    console _stream;
     std::filesystem::path _data_path;
     std::vector<std::string> _note_actions;
     std::vector<std::string> _resource_actions;

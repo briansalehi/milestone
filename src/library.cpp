@@ -35,6 +35,7 @@ library::library(std::filesystem::path const& data_path):
         note_action_edit,
         note_action_remove
     },
+    _stream{std::cerr, std::cin},
     _data_path{data_path},
     _resources{}
 {
@@ -62,24 +63,22 @@ void library::init()
         }
         catch (std::exception const& exp)
         {
-            std::cerr << "\e[1;31m" << exp.what() << "\e[0m\n";
+            _stream.write(exp.what(), console::color::darkred);
         }
     }
 }
 
-library::library_actions library::prompt_library_actions() const
+library::library_actions library::prompt_library_actions()
 {
     unsigned int index = 0;
 
-    std::cerr << "\e[1;37m" << "Select an action:\n\n\e[1;33m";
-    std::ranges::for_each(_library_actions, [&index](auto const& action) mutable {
-        std::cerr << ++index << ". " << action << "   ";
+    _stream.write("Select an action: ", console::color::white);
+
+    std::ranges::for_each(_library_actions, [&index, this](auto const& action) mutable {
+        _stream.write(std::to_string(++index) + ". " + action + "   ", console::color::orange);
     });
 
-    std::cerr << "\n\n\e[1;37mAction: ";
-    std::cin >> index;
-    std::cerr << "\e[0m\n";
-    --index;
+    index = _stream.read_size("Action", console::color::white) - 1;
 
     if (index < 0 || index > _library_actions.size())
         throw std::out_of_range("out of range"s);
@@ -96,19 +95,17 @@ library::library_actions library::prompt_library_actions() const
     return action;
 }
 
-library::resource_actions library::prompt_resource_actions() const
+library::resource_actions library::prompt_resource_actions()
 {
     unsigned int index = 0;
 
-    std::cerr << "\e[1;37m" << "Select an action:\n\e[1;33m";
-    std::ranges::for_each(_resource_actions, [&index](auto const& action) mutable {
-        std::cerr << ++index << ". " << action << "   ";
+    _stream.write("Select an action: ", console::color::white);
+
+    std::ranges::for_each(_resource_actions, [&index, this](auto const& action) mutable {
+        _stream.write(std::to_string(++index) + ". " + action + "   ", console::color::orange);
     });
 
-    std::cerr << "\n\e[1;37mAction: ";
-    std::cin >> index;
-    std::cerr << "\e[0m\n";
-    --index;
+    index = _stream.read_size("Action", console::color::white) - 1;
 
     if (index < 0 || index > _resource_actions.size())
         throw std::out_of_range("out of range"s);
@@ -129,20 +126,17 @@ library::resource_actions library::prompt_resource_actions() const
     return action;
 }
 
-library::note_actions library::prompt_note_actions() const
+library::note_actions library::prompt_note_actions()
 {
     unsigned int index = 0;
 
-    std::cerr << "\e[1;37m" << "Select an action:\n\n\e[1;33m";
+    _stream.write("Select an action: ", console::color::white);
 
-    std::ranges::for_each(_note_actions, [&index](auto const& action) mutable {
-        std::cerr << ++index << ". " << action << "   ";
+    std::ranges::for_each(_note_actions, [&index, this](auto const& action) mutable {
+        _stream.write(std::to_string(++index) + ". " + action + "   ", console::color::orange);
     });
 
-    std::cerr << "\n\n\n\e[1;37mAction: ";
-    std::cin >> index;
-    std::cerr << "\e[0m\n";
-    --index;
+    index = _stream.read_size("Action", console::color::white) - 1;
 
     if (index < 0 || index > _note_actions.size())
         throw std::out_of_range("out of range"s);
@@ -246,17 +240,13 @@ void library::select_resource()
     unsigned int index{};
     unsigned int resource_index{};
 
-    auto writer = [&index](auto const& res) mutable {
-        std::cerr << "\e[1;34m  "
-                  << ++index << ". " << res->title()
-                  << "\e[0m\n";
+    auto writer = [&index, this](auto const& res) mutable {
+        _stream.write(std::to_string(++index) + ". " + res->title(), console::color::pink);
     };
 
     std::ranges::for_each(_resources, writer);
 
-    std::cerr << "\e[1;37m" << "\nSelect a resource: ";
-    std::cin >> resource_index;
-    --resource_index;
+    resource_index = _stream.read_size("Select a resource", console::color::white) - 1;
 
     if (resource_index < 0 || resource_index > _resources.size())
         throw std::out_of_range("out of range");
@@ -286,7 +276,7 @@ void library::select_resource()
         }
         catch (std::exception const& exp)
         {
-            std::cerr << "\e[1;31m" << exp.what() << "\e[0m\n";
+            _stream.write(exp.what(), console::color::darkred);
         }
     }
 }
@@ -302,8 +292,7 @@ void library::view_note(unsigned int const resource_index)
 
     std::ranges::for_each(selected_resource->notes(),
         [&note_index, &resource_index, this](std::shared_ptr<note> note) {
-            std::cerr << "\e[1;34m" << ++note_index << ". "
-            << note->title() << "\e[0m\n";
+            _stream.write(std::to_string(++note_index) + ". " + note->title(), console::color::pink);
             perform_note_actions(resource_index, note_index);
     });
 }
