@@ -3,8 +3,9 @@
 
 using namespace flashback;
 using namespace std::literals::string_literals;
+using namespace std::literals::string_view_literals;
 
-dashboard::dashboard(): _active_space{}
+dashboard::dashboard(): _active_space{}, _stream{std::cerr, std::cin}
 {
 }
 
@@ -18,7 +19,7 @@ void dashboard::open()
     }
     catch (std::exception const& exp)
     {
-        std::cerr << "\e[1;31m" << exp.what() << "\e[0m\n";
+        _stream.write(exp.what(), console::color::darkred);
     }
 }
 
@@ -27,23 +28,19 @@ constexpr std::vector<std::string> dashboard::space_names() const
     return {"library", "trainer", "tutorials", "roadmap"};
 }
 
-std::string dashboard::prompt_space() const
+std::string dashboard::prompt_space()
 {
-    std::cerr << "\e[1;37mEnter one of the spaces to continue:\n\n\e[1;33m";
+    _stream.write("Enter one of the spaces to continue: ", console::color::white, false);
 
     unsigned int space_index = 0;
 
     auto index_space = [space_index, this](std::string_view space_name) mutable {
-        std::cerr << " " << ++space_index << ". " << space_name << "   ";
+        _stream.write(std::to_string(++space_index) + ". "s + std::string{space_name} + "  "s, console::color::orange, false);
     };
 
     std::ranges::for_each(space_names(), index_space);
 
-    std::string selection;
-
-    std::cerr << "\n\n\e[1;37mSpace: ";
-    std::cin >> selection;
-    std::cerr << "\e[0m";
+    std::string selection = _stream.read_string("\nSpace", console::color::white);
 
     try
     {
@@ -56,7 +53,7 @@ std::string dashboard::prompt_space() const
     }
     catch (std::exception const& exp)
     {
-        std::cerr << "\e[1;31m" << exp.what() << "\e[0m\n";
+        _stream.write(exp.what(), console::color::darkred);
         selection.clear();
     }
 
@@ -67,12 +64,9 @@ std::shared_ptr<space> dashboard::build_space(std::string_view space_name)
 {
     if (space_name == "library")
     {
-        std::filesystem::path base_path;
-        std::cerr << "\e[1;27mEnter base path: ";
-        std::cin >> base_path;
-        std::cerr << "\e[0m\n";
+        std::filesystem::path base_path = _stream.read_string("Enter base path", console::color::darkred);
 
-        std::cerr << "\e[1;32mSpace " << space_name << "\e[0m\n\n";
+        _stream.write(space_name, console::color::green);
 
         return std::make_shared<library>(base_path);
     }

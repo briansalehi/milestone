@@ -8,10 +8,10 @@ console::console(std::ostream& output, std::istream& input):
 {
 }
 
-void console::write(std::string_view text, console::color const color = console::color::reset)
+void console::write(std::string_view text, console::color const color, bool const newline)
 {
     brush color_brush{color};
-    _output << text << "\n";
+    _output << text << (newline ? "\n" : " ");
 }
 
 std::string console::read_string()

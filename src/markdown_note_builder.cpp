@@ -73,7 +73,7 @@ void markdown_note_builder::read_description() const
         if (line == "</details>")
             break;
         else
-            body << line;
+            body << line << "\n";
     }
 
     _note->description(body.str());

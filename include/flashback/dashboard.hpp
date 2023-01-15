@@ -1,10 +1,11 @@
 #pragma once
 
 #include <flashback/argument_parser.hpp>
-#include <flashback/loader.hpp>
-#include <flashback/space.hpp>
 #include <flashback/library.hpp>
 #include <flashback/trainer.hpp>
+#include <flashback/console.hpp>
+#include <flashback/loader.hpp>
+#include <flashback/space.hpp>
 
 #include <string_view>
 #include <string>
@@ -25,11 +26,12 @@ public:
 private:
     std::shared_ptr<space> build_space(std::string_view);
 
-    std::string prompt_space() const;
+    std::string prompt_space();
 
     void enter_space();
 
 private:
+    console _stream;
     std::shared_ptr<space> _active_space;
 };
 

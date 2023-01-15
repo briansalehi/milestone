@@ -9,9 +9,10 @@ constexpr std::string resource_action_view{"view notes"};
 constexpr std::string resource_action_add{"add resource"};
 constexpr std::string resource_action_edit{"edit resource"};
 constexpr std::string resource_action_remove{"remove resource"};
-constexpr std::string note_action_next{"next note"};
-constexpr std::string note_action_previous{"previous note"};
-constexpr std::string note_action_collect{"collect note"};
+constexpr std::string note_action_expand{"expand"};
+constexpr std::string note_action_next{"next"};
+constexpr std::string note_action_previous{"previous"};
+constexpr std::string note_action_collect{"collect"};
 constexpr std::string note_action_add{"add note"};
 constexpr std::string note_action_edit{"edit note"};
 constexpr std::string note_action_remove{"remove note"};
@@ -28,6 +29,7 @@ library::library(std::filesystem::path const& data_path):
         resource_action_remove
     },
     _note_actions{
+        note_action_expand,
         note_action_next,
         note_action_previous,
         note_action_collect,
@@ -72,13 +74,13 @@ library::library_actions library::prompt_library_actions()
 {
     unsigned int index = 0;
 
-    _stream.write("Select an action: ", console::color::white);
+    _stream.write("Select an action: ", console::color::white, false);
 
     std::ranges::for_each(_library_actions, [&index, this](auto const& action) mutable {
-        _stream.write(std::to_string(++index) + ". " + action + "   ", console::color::orange);
+        _stream.write(std::to_string(++index) + ". " + action + "  ", console::color::orange, false);
     });
 
-    index = _stream.read_size("Action", console::color::white) - 1;
+    index = _stream.read_size("\nAction", console::color::white) - 1;
 
     if (index < 0 || index > _library_actions.size())
         throw std::out_of_range("out of range"s);
@@ -99,13 +101,13 @@ library::resource_actions library::prompt_resource_actions()
 {
     unsigned int index = 0;
 
-    _stream.write("Select an action: ", console::color::white);
+    _stream.write("Select an action: ", console::color::white, false);
 
     std::ranges::for_each(_resource_actions, [&index, this](auto const& action) mutable {
-        _stream.write(std::to_string(++index) + ". " + action + "   ", console::color::orange);
+        _stream.write(std::to_string(++index) + ". " + action + "  ", console::color::orange, false);
     });
 
-    index = _stream.read_size("Action", console::color::white) - 1;
+    index = _stream.read_size("\nAction", console::color::white) - 1;
 
     if (index < 0 || index > _resource_actions.size())
         throw std::out_of_range("out of range"s);
@@ -130,20 +132,22 @@ library::note_actions library::prompt_note_actions()
 {
     unsigned int index = 0;
 
-    _stream.write("Select an action: ", console::color::white);
+    _stream.write("Select an action: ", console::color::white, false);
 
     std::ranges::for_each(_note_actions, [&index, this](auto const& action) mutable {
-        _stream.write(std::to_string(++index) + ". " + action + "   ", console::color::orange);
+        _stream.write(std::to_string(++index) + ". " + action + "  ", console::color::orange, false);
     });
 
-    index = _stream.read_size("Action", console::color::white) - 1;
+    index = _stream.read_size("\nAction", console::color::white) - 1;
 
     if (index < 0 || index > _note_actions.size())
         throw std::out_of_range("out of range"s);
 
     note_actions action;
 
-    if (_note_actions.at(index) == note_action_next)
+    if (_note_actions.at(index) == note_action_expand)
+        action = note_actions::expand;
+    else if (_note_actions.at(index) == note_action_next)
         action = note_actions::next;
     else if (_note_actions.at(index) == note_action_previous)
         action = note_actions::previous;
@@ -217,6 +221,9 @@ void library::perform_note_actions(unsigned int const resource_index, unsigned i
 {
     switch (prompt_note_actions())
     {
+        case note_actions::expand:
+            _stream.write(_resources.at(resource_index)->notes().at(note_index)->description());
+            break;
         case note_actions::next:
             break;
         case note_actions::previous:
@@ -257,21 +264,20 @@ void library::select_resource()
         {
             std::shared_ptr<resource> selected_resource = _resources.at(resource_index);
             unsigned int note_count = selected_resource->notes().size();
-            unsigned int collected_notes = std::ranges::count_if(
+            unsigned int collected = std::ranges::count_if(
                 selected_resource->notes(),
                 [](std::shared_ptr<note> note) { return note->collected(); }
             );
-            unsigned int collectable_notes = std::ranges::count_if(
+            unsigned int collectable = std::ranges::count_if(
                 selected_resource->notes(),
                 [](std::shared_ptr<note> note) { return note->collectable(); }
             );
 
-            std::cerr << "\n\e[1;35m"
-                << resource_index << ". "
-                << selected_resource->title() << "\e[0m\e[1;32m ("
-                << note_count << " notes available, "
-                << collectable_notes << " notes collectable, "
-                << collected_notes << " notes collected)\e[0m\n\n";
+            _stream.write(std::to_string(resource_index+1) + ". " + selected_resource->title(), console::color::pink, false);
+            _stream.write(std::to_string(note_count) + " (notes available, ", console::color::green, false);
+            _stream.write(std::to_string(collectable) + " collectable, ", console::color::green, false);
+            _stream.write(std::to_string(collected) + " notes collected)", console::color::green);
+
             perform_resource_actions(resource_index);
         }
         catch (std::exception const& exp)
@@ -292,7 +298,7 @@ void library::view_note(unsigned int const resource_index)
 
     std::ranges::for_each(selected_resource->notes(),
         [&note_index, &resource_index, this](std::shared_ptr<note> note) {
-            _stream.write(std::to_string(++note_index) + ". " + note->title(), console::color::pink);
+            _stream.write(std::to_string(++note_index) + ". " + note->title(), console::color::blue);
             perform_note_actions(resource_index, note_index);
     });
 }

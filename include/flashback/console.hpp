@@ -14,7 +14,7 @@ public:
 
     explicit console(std::ostream&, std::istream&);
 
-    void write(std::string_view, color const);
+    void write(std::string_view, color const = color::reset, bool const = true);
 
     std::string read_string();
     std::string read_string(std::string_view, color);

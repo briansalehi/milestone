@@ -224,7 +224,7 @@ class library: public space
 public:
     enum class library_actions {undefined, list_resources, search_resource};
     enum class resource_actions {undefined, show, add, edit, remove};
-    enum class note_actions {undefined, next, previous, collect, add, edit, remove};
+    enum class note_actions {undefined, expand, next, previous, collect, add, edit, remove};
 
     explicit library(std::filesystem::path const&);
 
