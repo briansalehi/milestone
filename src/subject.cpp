@@ -47,3 +47,13 @@ std::queue<std::shared_ptr<practice>> subject::queue_practices() const
 
     return practice_queue;
 }
+
+bool subject::operator==(subject const& other) const
+{
+    return _title == other.title();
+}
+
+bool subject::operator<(subject const& other) const
+{
+    return _title < other.title();
+}

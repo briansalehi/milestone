@@ -53,8 +53,9 @@ public:
     void title(std::string const&) override;
     void title(std::string&&) noexcept override;
 
-    std::vector<std::shared_ptr<note>> notes() const override;
     bool add_note(std::shared_ptr<note>) override;
+    std::vector<std::shared_ptr<note>> notes() const override;
+    std::shared_ptr<note> take_note(std::size_t const) const override;
 
     unsigned int chapters() const;
     void chapters(unsigned int const);

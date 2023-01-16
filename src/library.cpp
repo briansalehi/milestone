@@ -39,7 +39,8 @@ library::library(std::filesystem::path const& data_path):
     },
     _stream{std::cerr, std::cin},
     _data_path{data_path},
-    _resources{}
+    _resources{},
+    _subjects{}
 {
 }
 
@@ -222,13 +223,14 @@ void library::perform_note_actions(unsigned int const resource_index, unsigned i
     switch (prompt_note_actions())
     {
         case note_actions::expand:
-            _stream.write(_resources.at(resource_index)->notes().at(note_index)->description());
+            expand_note(resource_index, note_index);
             break;
         case note_actions::next:
             break;
         case note_actions::previous:
             break;
         case note_actions::collect:
+            collect_note(resource_index, note_index);
             break;
         case note_actions::add:
             break;
@@ -274,9 +276,9 @@ void library::select_resource()
             );
 
             _stream.write(std::to_string(resource_index+1) + ". " + selected_resource->title(), console::color::pink, false);
-            _stream.write(std::to_string(note_count) + " (notes available, ", console::color::green, false);
-            _stream.write(std::to_string(collectable) + " collectable, ", console::color::green, false);
-            _stream.write(std::to_string(collected) + " notes collected)", console::color::green);
+            _stream.write("(" + std::to_string(note_count) + " notes available,", console::color::green, false);
+            _stream.write(std::to_string(collectable) + " collectable,", console::color::green, false);
+            _stream.write(std::to_string(collected) + " collected)", console::color::green);
 
             perform_resource_actions(resource_index);
         }
@@ -303,6 +305,42 @@ void library::view_note(unsigned int const resource_index)
     });
 }
 
-void library::export_note(std::shared_ptr<note>)
+void library::expand_note(std::size_t const resource_index, std::size_t const note_index)
 {
+    _stream.write(_resources.at(resource_index)->take_note(note_index)->description());
+}
+
+void library::collect_note(std::size_t const resource_index, std::size_t const note_index)
+{
+    std::shared_ptr<note> note = _resources.at(resource_index)->take_note(note_index);
+    std::string title = _stream.read_string("Enter subject", console::color::white);
+    auto subject_predicate = [&title](auto s) { return s->title() == title; };
+    auto subject_iterator = std::ranges::find_if(_subjects, subject_predicate);
+    std::shared_ptr<subject> selected_subject{nullptr};
+
+    if (subject_iterator != _subjects.cend())
+    {
+        _stream.write("Subject found", console::color::green);
+        selected_subject = *subject_iterator;
+    }
+    else
+    {
+        bool inserted = false;
+        std::string answer = _stream.read_string("Subject not found, make one? (y/n)", console::color::darkred);
+
+        if (answer == "y")
+            std::tie(subject_iterator, inserted) = _subjects.insert(std::make_shared<subject>(title));
+
+        if (inserted)
+        {
+            _stream.write("Subject " + title + " created");
+            selected_subject = *subject_iterator;
+        }
+        else
+        {
+            throw std::runtime_error("failed to create new subject");
+        }
+    }
+
+    std::string topic_name = _stream.read_string("Enter topic", console::color::white);
 }

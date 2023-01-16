@@ -73,6 +73,11 @@ void book::title(std::string&& title) noexcept
     _title = std::move(title);
 }
 
+std::shared_ptr<note> book::take_note(std::size_t const index) const
+{
+    return _notes.at(index);
+}
+
 std::vector<std::shared_ptr<note>> book::notes() const
 {
     return _notes;

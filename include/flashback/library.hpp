@@ -2,6 +2,7 @@
 
 #include <flashback/reference.hpp>
 #include <flashback/resource.hpp>
+#include <flashback/subject.hpp>
 #include <flashback/console.hpp>
 #include <flashback/loader.hpp>
 #include <flashback/space.hpp>
@@ -11,9 +12,10 @@
 #include <iostream>
 #include <fstream>
 #include <memory>
-#include <vector>
 #include <string>
 #include <ranges>
+#include <vector>
+#include <set>
 
 namespace flashback
 {
@@ -254,7 +256,9 @@ private:
 
     void view_note(unsigned int const);
 
-    void export_note(std::shared_ptr<note>);
+    void expand_note(std::size_t const, std::size_t const);
+
+    void collect_note(std::size_t const, std::size_t const);
 
 private:
     console _stream;
@@ -263,6 +267,7 @@ private:
     std::vector<std::string> _resource_actions;
     std::vector<std::string> _library_actions;
     std::vector<std::shared_ptr<resource>> _resources;
+    std::set<std::shared_ptr<subject>> _subjects;
 };
 
 } // flashback
