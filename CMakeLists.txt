@@ -69,6 +69,9 @@ add_library(dashboard SHARED src/dashboard.cpp)
 target_link_libraries(dashboard PUBLIC library trainer loader)
 target_include_directories(dashboard PUBLIC include)
 
+add_library(practice_collection SHARED src/practice_collection.cpp)
+target_link_libraries(practice_collection PUBLIC console practice)
+target_include_directories(practice_collection PUBLIC include)
 
 ########## test executables ##########
 

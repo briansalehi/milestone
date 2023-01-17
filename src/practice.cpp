@@ -3,6 +3,7 @@
 #include <flashback/source.hpp>
 
 using namespace flashback;
+using namespace std::literals::chrono_literals;
 
 practice::practice(): _question{}, _answer{}, _references{}
 {
@@ -94,6 +95,26 @@ void practice::add_source(std::shared_ptr<source> origin)
 }
 */
 
+std::chrono::days practice::last_usage() const
+{
+    return _last_usage;
+}
+
+void practice::reset_usage()
+{
+    _last_usage = 0s;
+}
+
+std::chrono::seconds practice::elapsed_time() const
+{
+    return _elapsed_time;
+}
+
+void practice::elapsed_time(std::chrono::seconds const elapsed_time)
+{
+    _elapsed_time = elapsed_time; 
+}
+    
 bool practice::operator==(practice const& other)
 {
     return _question == other.question() && _answer == other.answer();
