@@ -2,11 +2,12 @@
 
 #include <flashback/practice.hpp>
 
+#include <algorithm>
 #include <utility>
 #include <string>
 #include <memory>
 #include <vector>
-#include <set>
+#include <ranges>
 
 namespace flashback
 {
@@ -22,11 +23,13 @@ public:
     void title(std::string&&);
 
     bool add_practice(std::shared_ptr<practice>);
-    std::set<std::shared_ptr<practice>> practices() const;
+    std::vector<std::shared_ptr<practice>> practices() const;
+
+    std::vector<std::shared_ptr<practice>> candidates(std::size_t = 1);
 
 private:
     std::string _title;
-    std::set<std::shared_ptr<practice>> _practices;
+    std::vector<std::shared_ptr<practice>> _practices;
 };
 
 } // flashback

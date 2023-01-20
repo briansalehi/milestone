@@ -25,15 +25,23 @@ void topic::title(std::string&& title)
     _title = std::move(title);
 }
 
-bool topic::add_practice(std::shared_ptr<practice> incomplete_practice)
+bool topic::add_practice(std::shared_ptr<practice> input_practice)
 {
-    bool success;
-    std::tie(std::ignore, success) = _practices.insert(incomplete_practice);
-    return success;
+    _practices.push_back(input_practice);
+    return true;
 }
 
-std::set<std::shared_ptr<practice>> topic::practices() const
+std::vector<std::shared_ptr<practice>> topic::practices() const
 {
     return _practices;
 }
 
+std::vector<std::shared_ptr<practice>> topic::candidates(std::size_t amount)
+{
+    std::vector<std::shared_ptr<practice>> buffer;
+
+    std::ranges::sort(_practices);
+    std::copy_n(_practices.begin(), amount, buffer.begin());
+
+    return buffer;
+}

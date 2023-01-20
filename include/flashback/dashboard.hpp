@@ -28,11 +28,10 @@ private:
 
     std::string prompt_space();
 
-    void enter_space();
+    void enter_space(std::shared_ptr<space>);
 
 private:
     console _stream;
-    std::shared_ptr<space> _active_space;
 };
 
 } // flashback

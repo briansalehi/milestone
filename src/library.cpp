@@ -5,14 +5,16 @@ using namespace std::literals::string_literals;
 
 constexpr std::string library_action_list{"list resources"};
 constexpr std::string library_action_search{"search resource"};
+
+constexpr std::string resource_action_extract{"extract notes"};
 constexpr std::string resource_action_view{"view notes"};
 constexpr std::string resource_action_add{"add resource"};
 constexpr std::string resource_action_edit{"edit resource"};
 constexpr std::string resource_action_remove{"remove resource"};
+
 constexpr std::string note_action_expand{"expand"};
 constexpr std::string note_action_next{"next"};
 constexpr std::string note_action_previous{"previous"};
-constexpr std::string note_action_collect{"collect"};
 constexpr std::string note_action_add{"add note"};
 constexpr std::string note_action_edit{"edit note"};
 constexpr std::string note_action_remove{"remove note"};
@@ -23,6 +25,7 @@ library::library(std::filesystem::path const& data_path):
         library_action_search
     },
     _resource_actions{
+        resource_action_extract,
         resource_action_view,
         resource_action_add,
         resource_action_edit,
@@ -32,7 +35,6 @@ library::library(std::filesystem::path const& data_path):
         note_action_expand,
         note_action_next,
         note_action_previous,
-        note_action_collect,
         note_action_add,
         note_action_edit,
         note_action_remove
@@ -42,6 +44,7 @@ library::library(std::filesystem::path const& data_path):
     _resources{},
     _subjects{}
 {
+    _stream.write("\nLibrary", console::color::pink);
 }
 
 void library::init()
@@ -60,33 +63,31 @@ void library::init()
 
     while (true)
     {
-        try
-        {
-            perform_library_actions();
-        }
-        catch (std::exception const& exp)
-        {
-            _stream.write(exp.what(), console::color::darkred);
-        }
+        perform_library_actions();
     }
+}
+
+std::size_t library::count() const
+{
+    return _resources.size();
 }
 
 library::library_actions library::prompt_library_actions()
 {
-    unsigned int index = 0;
+    std::size_t index = 0;
 
-    _stream.write("Select an action: ", console::color::white, false);
+    _stream.write("\nSelect an action: ", console::color::white, false);
 
     std::ranges::for_each(_library_actions, [&index, this](auto const& action) mutable {
         _stream.write(std::to_string(++index) + ". " + action + "  ", console::color::orange, false);
     });
 
+    library_actions action{library_actions::undefined};
+
     index = _stream.read_size("\nAction", console::color::white) - 1;
 
-    if (index < 0 || index > _library_actions.size())
+    if (index > _library_actions.size())
         throw std::out_of_range("out of range"s);
-
-    library_actions action;
 
     if (_library_actions.at(index) == library_action_list)
         action = library_actions::list_resources;
@@ -102,7 +103,7 @@ library::resource_actions library::prompt_resource_actions()
 {
     unsigned int index = 0;
 
-    _stream.write("Select an action: ", console::color::white, false);
+    _stream.write("\nSelect an action: ", console::color::white, false);
 
     std::ranges::for_each(_resource_actions, [&index, this](auto const& action) mutable {
         _stream.write(std::to_string(++index) + ". " + action + "  ", console::color::orange, false);
@@ -117,6 +118,8 @@ library::resource_actions library::prompt_resource_actions()
 
     if (_resource_actions.at(index) == resource_action_view)
         action = resource_actions::show;
+    else if (_resource_actions.at(index) == resource_action_extract)
+        action = resource_actions::extract;
     else if (_resource_actions.at(index) == resource_action_add)
         action = resource_actions::add;
     else if (_resource_actions.at(index) == resource_action_edit)
@@ -152,8 +155,6 @@ library::note_actions library::prompt_note_actions()
         action = note_actions::next;
     else if (_note_actions.at(index) == note_action_previous)
         action = note_actions::previous;
-    else if (_note_actions.at(index) == note_action_collect)
-        action = note_actions::collect;
     else if (_note_actions.at(index) == note_action_add)
         action = note_actions::add;
     else if (_note_actions.at(index) == note_action_edit)
@@ -191,6 +192,11 @@ void library::perform_resource_actions(unsigned int const resource_index)
 {
     switch (prompt_resource_actions())
     {
+        case resource_actions::extract:
+        {
+            extract_notes(resource_index);
+            break;
+        }
         case resource_actions::show:
         {
             view_note(resource_index);
@@ -223,14 +229,11 @@ void library::perform_note_actions(unsigned int const resource_index, unsigned i
     switch (prompt_note_actions())
     {
         case note_actions::expand:
-            expand_note(resource_index, note_index);
+            view_note_description(resource_index, note_index);
             break;
         case note_actions::next:
             break;
         case note_actions::previous:
-            break;
-        case note_actions::collect:
-            collect_note(resource_index, note_index);
             break;
         case note_actions::add:
             break;
@@ -249,43 +252,41 @@ void library::select_resource()
     unsigned int index{};
     unsigned int resource_index{};
 
+    _stream.clear();
+    _stream.write("Resource list:\n", console::color::white);
+
     auto writer = [&index, this](auto const& res) mutable {
         _stream.write(std::to_string(++index) + ". " + res->title(), console::color::pink);
     };
 
     std::ranges::for_each(_resources, writer);
 
-    resource_index = _stream.read_size("Select a resource", console::color::white) - 1;
+    resource_index = _stream.read_size("\nSelect a resource", console::color::white) - 1;
 
     if (resource_index < 0 || resource_index > _resources.size())
         throw std::out_of_range("out of range");
+    else
+        _stream.clear();
 
     while (true)
     {
-        try
-        {
-            std::shared_ptr<resource> selected_resource = _resources.at(resource_index);
-            unsigned int note_count = selected_resource->notes().size();
-            unsigned int collected = std::ranges::count_if(
-                selected_resource->notes(),
-                [](std::shared_ptr<note> note) { return note->collected(); }
-            );
-            unsigned int collectable = std::ranges::count_if(
-                selected_resource->notes(),
-                [](std::shared_ptr<note> note) { return note->collectable(); }
-            );
+        std::shared_ptr<resource> selected_resource = _resources.at(resource_index);
+        unsigned int note_count = selected_resource->notes().size();
+        unsigned int collected = std::ranges::count_if(
+            selected_resource->notes(),
+            [](std::shared_ptr<note> note) { return note->collected(); }
+        );
+        unsigned int collectable = std::ranges::count_if(
+            selected_resource->notes(),
+            [](std::shared_ptr<note> note) { return note->collectable(); }
+        );
 
-            _stream.write(std::to_string(resource_index+1) + ". " + selected_resource->title(), console::color::pink, false);
-            _stream.write("(" + std::to_string(note_count) + " notes available,", console::color::green, false);
-            _stream.write(std::to_string(collectable) + " collectable,", console::color::green, false);
-            _stream.write(std::to_string(collected) + " collected)", console::color::green);
+        _stream.write(std::to_string(resource_index+1) + ". " + selected_resource->title(), console::color::pink, false);
+        _stream.write("(" + std::to_string(note_count) + " notes available,", console::color::green, false);
+        _stream.write(std::to_string(collectable) + " collectable,", console::color::green, false);
+        _stream.write(std::to_string(collected) + " collected)", console::color::green);
 
-            perform_resource_actions(resource_index);
-        }
-        catch (std::exception const& exp)
-        {
-            _stream.write(exp.what(), console::color::darkred);
-        }
+        perform_resource_actions(resource_index);
     }
 }
 
@@ -305,42 +306,125 @@ void library::view_note(unsigned int const resource_index)
     });
 }
 
-void library::expand_note(std::size_t const resource_index, std::size_t const note_index)
+void library::view_note_description(std::size_t const resource_index, std::size_t const note_index)
 {
     _stream.write(_resources.at(resource_index)->take_note(note_index)->description());
 }
 
-void library::collect_note(std::size_t const resource_index, std::size_t const note_index)
+void library::extract_notes(std::size_t const resource_index)
 {
-    std::shared_ptr<note> note = _resources.at(resource_index)->take_note(note_index);
-    std::string title = _stream.read_string("Enter subject", console::color::white);
-    auto subject_predicate = [&title](auto s) { return s->title() == title; };
-    auto subject_iterator = std::ranges::find_if(_subjects, subject_predicate);
-    std::shared_ptr<subject> selected_subject{nullptr};
+    for (auto selected_resource: _resources)
+    {
+        for (auto selected_note: selected_resource->notes())
+        {
+            if (selected_note->collectable() && !selected_note->collected())
+            {
+                _stream.clear();
+                _stream.write(selected_note->title(), console::color::blue);
+                _stream.write(selected_note->description());
+
+                if (!_stream.read_bool("Extract this note", console::color::white))
+                    continue;
+
+                std::shared_ptr<subject> selected_subject = take_subject();
+                std::shared_ptr<topic> selected_topic = take_topic(selected_subject);
+                std::shared_ptr<practice> result = make_practice(selected_note);
+                selected_topic->add_practice(result);
+                _stream.write("Note extracted", console::color::green);
+            }
+        }
+    }
+}
+
+std::shared_ptr<subject> library::take_subject()
+{
+    std::string title = _stream.read_string("Enter subject name", console::color::white);
+
+    auto title_predicate = [&title](auto s) { return s->title() == title; };
+    auto subject_iterator = std::ranges::find_if(_subjects, title_predicate);
+
+    std::shared_ptr<subject> selected_subject{};
 
     if (subject_iterator != _subjects.cend())
     {
-        _stream.write("Subject found", console::color::green);
+        _stream.write("Subject " + title + " selected", console::color::green);
         selected_subject = *subject_iterator;
     }
     else
     {
-        bool inserted = false;
-        std::string answer = _stream.read_string("Subject not found, make one? (y/n)", console::color::darkred);
-
-        if (answer == "y")
-            std::tie(subject_iterator, inserted) = _subjects.insert(std::make_shared<subject>(title));
-
-        if (inserted)
+        if (_stream.read_bool("Create subject", console::color::white))
         {
-            _stream.write("Subject " + title + " created");
-            selected_subject = *subject_iterator;
+            std::shared_ptr<subject> latest_subject = std::make_shared<subject>(title);
+            bool created = false;
+            std::tie(subject_iterator, created) = _subjects.insert(latest_subject);
+            if (created)
+            {
+                _stream.write("Subject " + title + " created", console::color::green);
+                selected_subject = *subject_iterator;
+            }
+            else
+            {
+                throw std::runtime_error("failed to create new subject");
+            }
         }
         else
         {
-            throw std::runtime_error("failed to create new subject");
+            throw std::runtime_error("Collection cancelled");
         }
     }
 
-    std::string topic_name = _stream.read_string("Enter topic", console::color::white);
+    return selected_subject;
+}
+
+std::shared_ptr<topic> library::take_topic(std::shared_ptr<subject> input_subject)
+{
+    std::vector<std::shared_ptr<topic>> topics{input_subject->topics()};
+
+    std::string title{_stream.read_string("Enter topic name", console::color::white)};
+    auto title_predicate = [&title](auto t) { return t->title() == title; };
+
+    auto topic_iterator = std::ranges::find_if(topics, title_predicate);
+
+    std::shared_ptr<topic> selected_topic{};
+
+    if (topic_iterator != topics.cend())
+    {
+        _stream.write("Topic " + title + " from " + input_subject->title() + " selected", console::color::green);
+        selected_topic = *topic_iterator;
+    }
+    else
+    {
+        if (_stream.read_bool("Create topic " + title, console::color::white))
+        {
+            selected_topic = std::make_shared<topic>(title);
+            
+            if (input_subject->add_topic(selected_topic))
+            {
+                _stream.write("Topic " + title + " in subject " + input_subject->title() + " created", console::color::green);
+            }
+            else
+            {
+                throw std::runtime_error("failed to create new topic");
+            }
+        }
+        else
+        {
+            throw std::runtime_error("Collection cancelled");
+        }
+    }
+
+    return selected_topic;
+}
+
+std::shared_ptr<practice> library::make_practice(std::shared_ptr<note> input_note)
+{
+    std::string question{};
+    std::string description{input_note->description()};
+
+    if (_stream.read_bool("Overwrite question", console::color::white))
+        question = _stream.read_string("Question", console::color::white);
+    else
+        question = input_note->title();
+
+    return std::make_shared<practice>(question, description);
 }

@@ -2,8 +2,11 @@
 
 #include <flashback/note.hpp>
 #include <flashback/space.hpp>
+#include <flashback/console.hpp>
+#include <flashback/practice.hpp>
 
 #include <memory>
+#include <queue>
 
 namespace flashback
 {
@@ -14,9 +17,13 @@ namespace flashback
 class trainer: public space
 {
 public:
-    void import(std::shared_ptr<note>);
+    trainer();
+
+    void init() override;
 
 private:
+    console _stream;
+    std::queue<std::shared_ptr<practice>> _practice_queue;
 };
 
 } // flashback

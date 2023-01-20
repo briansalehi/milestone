@@ -19,8 +19,12 @@ public:
     std::string read_string();
     std::string read_string(std::string_view, color);
 
+    bool read_bool(std::string_view, color);
+
     std::size_t read_size();
     std::size_t read_size(std::string_view, color);
+
+    void clear();
 
 private:
     struct brush

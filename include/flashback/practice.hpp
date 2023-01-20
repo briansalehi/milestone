@@ -16,7 +16,8 @@ class resource;
 class practice
 {
 public:
-    explicit practice();
+    practice();
+    explicit practice(std::string const&, std::string const&);
     practice(practice const&);
     practice(practice&&) noexcept;
     practice& operator=(practice const&);
@@ -46,6 +47,7 @@ public:
     
     // operators
     bool operator==(practice const&);
+    bool operator<(practice const&);
 
 private:
     std::string _question;

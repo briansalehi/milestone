@@ -34,11 +34,7 @@ try
     std::string program_name{std::filesystem::path(argv[0]).filename()};
     flashback::argument_parser options(argc, argv, program_name);
     flashback::dashboard dashboard{};
-
-    while (true)
-    {
-        dashboard.open();
-    }
+    dashboard.open();
 }
 catch (boost::program_options::error const& exp)
 {

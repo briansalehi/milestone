@@ -8,7 +8,7 @@ namespace flashback
 class collection
 {
 public:
-    virtual std::vector<std::shared_ptr<practice>> collect_practices() const = 0;
+    virtual std::vector<std::shared_ptr<practice>> collect_practices() = 0;
 };
 
 } // flashback

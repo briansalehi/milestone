@@ -9,6 +9,11 @@ practice::practice(): _question{}, _answer{}, _references{}
 {
 }
 
+practice::practice(std::string const& question, std::string const& answer):
+    _question{question}, _answer{answer}, _references{}
+{
+}
+
 practice::practice(practice const& other):
     _question{other.question()},
     _answer{other.answer()},
@@ -97,12 +102,12 @@ void practice::add_source(std::shared_ptr<source> origin)
 
 std::chrono::days practice::last_usage() const
 {
-    return _last_usage;
+    return std::chrono::duration_cast<std::chrono::days>(std::chrono::steady_clock::now() - _last_usage);
 }
 
 void practice::reset_usage()
 {
-    _last_usage = 0s;
+    _last_usage -= _last_usage.time_since_epoch();
 }
 
 std::chrono::seconds practice::elapsed_time() const
@@ -117,5 +122,10 @@ void practice::elapsed_time(std::chrono::seconds const elapsed_time)
     
 bool practice::operator==(practice const& other)
 {
-    return _question == other.question() && _answer == other.answer();
+    return last_usage() == other.last_usage() && _question == other.question();
+}
+
+bool practice::operator<(practice const& other)
+{
+    return last_usage() < other.last_usage();
 }

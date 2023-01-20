@@ -225,10 +225,12 @@ class library: public space
 {
 public:
     enum class library_actions {undefined, list_resources, search_resource};
-    enum class resource_actions {undefined, show, add, edit, remove};
-    enum class note_actions {undefined, expand, next, previous, collect, add, edit, remove};
+    enum class resource_actions {undefined, extract, show, add, edit, remove};
+    enum class note_actions {undefined, expand, next, previous, add, edit, remove};
 
     explicit library(std::filesystem::path const&);
+
+    std::size_t count() const;
 
 public:
     ///
@@ -256,9 +258,15 @@ private:
 
     void view_note(unsigned int const);
 
-    void expand_note(std::size_t const, std::size_t const);
+    void view_note_description(std::size_t const, std::size_t const);
 
-    void collect_note(std::size_t const, std::size_t const);
+    void extract_notes(std::size_t const);
+
+    std::shared_ptr<subject> take_subject();
+
+    std::shared_ptr<topic> take_topic(std::shared_ptr<subject>);
+
+    std::shared_ptr<practice> make_practice(std::shared_ptr<note>);
 
 private:
     console _stream;
