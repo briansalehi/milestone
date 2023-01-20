@@ -58,11 +58,11 @@ target_link_libraries(loader PUBLIC markdown_book_builder)
 target_include_directories(loader PUBLIC include)
 
 add_library(library SHARED src/library.cpp)
-target_link_libraries(library PUBLIC markdown_book_builder console)
+target_link_libraries(library PRIVATE pqxx pq PUBLIC markdown_book_builder console)
 target_include_directories(library PUBLIC include)
 
 add_library(trainer SHARED src/trainer.cpp)
-target_link_libraries(trainer PUBLIC markdown_book_builder console)
+target_link_libraries(trainer PRIVATE pqxx pq PUBLIC markdown_book_builder console)
 target_include_directories(trainer PUBLIC include)
 
 add_library(dashboard SHARED src/dashboard.cpp)
