@@ -6,14 +6,4 @@ create table if not exists subjects (
     primary key (id)
 );
 
-create or replace function get_resource_list (
-    in user_id integer
-)
-returns table (
-    subject_id integer,
-    subject_title varchar(50)
-)
-{
-}
-
 commit work;

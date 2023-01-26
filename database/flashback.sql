@@ -1,5 +1,1 @@
-begin work;
-
-    create database flashback;
-
-commit work;
+create database flashback;
