@@ -1,5 +1,5 @@
 ///
-/// \page manual_page Flashback User Manual
+/// \page user_manual Flashback User Manual
 /// \brief User Manual Page
 /// \tableofcontents
 ///
