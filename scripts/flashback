@@ -25,7 +25,6 @@ done
 
 [ -d "$FLASHBACK_PROGRESS_PATH" ] || mkdir "$FLASHBACK_PROGRESS_PATH"
 
-# make a general way for user to stop at any practice.
 trap "stop_shell" SIGINT
 
 function stop_shell() {
@@ -33,12 +32,6 @@ function stop_shell() {
     local mark="\e[1;31m"
     local reset="\e[0m"
 
-    # notify user about the progress since the beginning of the session.
-    # following information is all that is available in this script,
-    # while this should not be true in the product.
-    # more information like the time spent in this session is expected.
-    # also the progress should be saved somewhere for real,
-    # until the next time user opens a session to continue practicing.
     echo -ne "\b\b${bold}saving progress at${reset} "
     echo -ne "${mark}$title${reset} "
     echo -ne "${bold}chapter${reset} ${mark}${chapter}${reset} "
@@ -90,51 +83,50 @@ do
     chapter=0
     practice=0
     progress=
-    begin_timepoint=0
-    end_timepoint=0
-    practice_duration=0
 
-    # retrieve title and other infomation of the book.
-    title="$(sed -n '1s/^# \[\([^)]\+\)\].*/\1/p' "$book")"
+    title="$(sed -n '1s/^# \[\(.*\)\](\(.*\))$/\1/p' "$book")"
+    link="$(sed -n '1s/^# \[\(.*\)\](\(.*\))$/\2/p'  "$book")"
 
-    # find out in which line the chapters begin.
-    # this line is needed to parse practices correctly.
-    # parsing earlier lines would result in incorrect practice fill up
-    # while they do not represent any valid practice.
     resource_begin="$(sed -n '1,/^## /=' "$book" | tail -n2 | head -n1)"
 
-    # print title of the book before printing any practice.
-    # this step is not necessary in product and is only for debugging.
-    echo -e "\e[1;35m>>> $title\e[0m"
+    base_command="psql -U postgres -h localhost -d flashback"
+    headless_command="$base_command -A --csv -c"
+    quiet_command="$base_command -c"
 
-    # iterate over available practices of this book.
-    # practices should be entities storing information.
-    # all practices should be owned by their corresponding book entity.
-    # practices should be ordered based on representing chapter and practice number.
-    # practices should be comparable to each other.
-    # books should aware of the number of practices they holds.
+    qtitle="${title//\'/\'\'}"
+    qlink="${link//\'/\'\'}"
+
+    brief_link="$(sed -n 's/https:\/\/[w.]\+\?\([^/]\+\).*/\1/p' <<< "$link")"
+
+    brief_title="$title"
+    [ "${#title}" -gt 25 ] && brief_title="${title:0:30}..."
+
+    if grep -q 'https://' <<< "$link"
+    then
+        color="\e[1;32m"
+    else
+        color="\e[1;31m"
+    fi
+
+    printf "\e[1;35m%8s\e[1;34m %-33s \e[0m($color%s\e[0m)" "Resource" "$brief_title" "${brief_link:-$link}"
+
+    query_sql="select id from resources where name = '$qtitle';"
+    insert_sql="insert into resources (name, purchase_link) values ('$qtitle', '$qlink') returning id;"
+
+    resource_id="$($headless_command "$query_sql" 2>/tmp/importer.log | sed '1d' | grep -v 'INSERT')"
+
+    if [ -z "$resource_id" ]
+    then
+        resource_id="$($headless_command "$insert_sql" 2>/tmp/importer.log | sed '1d' | grep -v 'INSERT')"
+        echo -e "\e[1;33m"" Imported\e[0m"
+    else
+        echo -e "\e[1;35m"" Already exists\e[0m"
+    fi
+
     while IFS= read -r line
     do
         if [ "$line" == "<details>" ]
         then
-            # read from file until all necessary information is retrieved.
-            # one possible implementation is to construct a practice after
-            # another starting tag is found.
-            # in this case, the first hit should be ignored.
-            # for this kind of implementation, context needs to be attached
-            # to the parsing text using context scopes.
-            # three context scopes are available here: chapter, body, references.
-            # extending context scope concept, there are following entities available
-            # in the text: chapter, title, body, code, reference.
-            # each entity holds information in the text which should be mapped into
-            # objects.
-            # the references context scope is only open when at least one practice
-            # is parsed. therefore, first practice can be ignored by checking if
-            # references context scope is open or not.
-            # in case references context scope is open, hitting new practice should
-            # result in wrapping up passed practice and preparing for a new one.
-            # otherwise, no practice wrap up should be done, because new hit is
-            # the first practice and a new practice object shall be prepared for it.
             if [ "$references_scope" -eq 1 ]
             then
                 if [ "${RESUMABLE:-0}" -eq 1 ] && [ "$progress" == "$LATEST_PROGRESS" ]
@@ -143,126 +135,56 @@ do
                     LATEST_PROGRESS=
                 fi
 
-                # this is for previous practice where references_scope is still open
-                # but program hits another practice
-                echo -e "\e[1;33m"'<<< wrap up practice'"\e[0m"
+                brief_note="$note_title"
+                [ "${#note_title}" -gt 30 ] && brief_note="${brief_note:0:30}..."
+
+                printf '\e[1;35m%8s\e[1;34m %-33s' "Note" "$brief_note"
+
+                qnote_title="${note_title//\'/\'\'}"
+                note_description="$(sed "s/'/''/g" /tmp/note_description.txt)"
+                qnote_position="${note_position//\'/\'\'}"
+                # resource_id
+                # note_references[@] # !
+
+                insert_sql="insert into notes (title, position, resource) values ('$qnote_title', '$qnote_position', $resource_id);"
+
+                if $quiet_command "$insert_sql" &>/tmp/importer.log
+                then
+                    echo -e "\e[1;33m"" Imported\e[0m"
+                else
+                    echo -e "\e[1;35m"" Failed\e[0m"
+                fi
+
+                #echo "resource ($resource_id): $title"
+                #echo "note title: $note_title"
+                #echo "note position: $note_position"
+                #echo -e "note description: \e[1;36m${note_description}\e[0m"
+
+                #echo -e "\e[1;33m"'<<< wrap up practice'"\e[0m"
+                # - title => note_title
+                # - description => note_description
+                # - position => note_position
+                # - resource => resource_id
+                # - collected => false (default)
+                # - collectable => true (default)
+                # - reference =>
             fi
 
-            # this part is the cost of sequencial operations of scripts.
-            # this will not be part of the product as is here.
-            # practices should be stored in book entities
-            # before parsing them sequencially.
-            # starting a session should be outside of the scope of the books.
             ((++practice))
             progress="$title $chapter $practice"
-
-            if [ "$references_scope" -eq 1 ] && [ "${RESUMABLE:-0}" -eq 0 ]
-            then
-                # check if there is a time duration for this practice from
-                # last session, and notify user about the expected end time
-                if [ -f "$FLASHBACK_PROGRESS_PATH/records" ]
-                then
-                    last_duration="$(grep "$progress" "$FLASHBACK_PROGRESS_PATH/records" | cut -d':' -f1)"
-                    if [ "${last_duration:-0}" -gt 0 ]
-                    then
-                        echo -ne "\e[1;30m"">>> expected duration: $(show_time_duration "$last_duration")""\e[0m"
-                    fi
-                fi
-
-                # wait for user to finish current practice.
-                # only meaningful in this script and not in production code.
-                # practices should be represented differently in product.
-                # each practice should be controlled with shortcuts
-                read -r < /dev/tty
-
-                if [ "$begin_timepoint" -gt 0 ] && [ "${RESUMABLE:-0}" -eq 0 ]
-                then
-                    # evaluate how long last practice took to complete and store it
-                    end_timepoint="$(date +%s)"
-                    practice_duration="$((end_timepoint - begin_timepoint))"
-
-                    if [ -f "$FLASHBACK_PROGRESS_PATH/records" ]
-                    then
-                        # find previous practice record and replace it or add new record
-                        record_line="$(grep -n "$progress" "$FLASHBACK_PROGRESS_PATH/records" | cut -d ':' -f 1)"
-                        if [ "${record_line:-0}" -gt 0 ]
-                        then
-                            sed -i "${record_line}d" "$FLASHBACK_PROGRESS_PATH/records"
-                        fi
-                    fi
-
-                    # store previous practice time duration
-                    if [ "$practice_duration" -gt 0 ]
-                    then
-                        echo "$practice_duration:$progress" >> "$FLASHBACK_PROGRESS_PATH/records"
-                    fi
-
-                    begin_timepoint=0
-                    end_timepoint=0
-                    practice_duration=0
-                fi
-            fi
-
-            clear
-            echo -e "\e[1;35m""$title - chapter $chapter - practice $practice""\e[0m\n"
-
-            # only after the references context scope is checked for practice wrap up
-            # is done, shall it be closed for opening then next practice's
-            # body context scope.
-            references_scope=0; echo -ne "\e[0m"
-
-            # body context scope should be opened when new practice is being retrieved.
-            # body context scope and references context scope shall never be both open.
-            # both body and references context scopes shall always be within
-            # chapter context scope.
-            # chapter context scope is only closed at the beginning of the file.
-            # the moment practices are started to be parsed, chapter context scope
-            # is opened until the end of the book context scope.
-            # book context scope shall not be implemented as it always is open.
-            body_scope=1; echo -e "\e[1;32m"'>>> body begin'"\e[0m"
-
-            # start recording practice time
-            [ "${RESUMABLE:-0}" -eq 0 ] && begin_timepoint="$(date +%s)"
+            references_scope=0
+            body_scope=1
+            exec 3> /tmp/note_description.txt
         elif [ "$line" == "</details>" ]
         then
-            # body context scope shall be closed when ending tag of body hits.
-            body_scope=0; echo -e "\e[1;32m"'<<< body end'"\e[0m"
-
-            # references context scope shall be always opened right after the
-            # closing of body context scope, regardless of existing or non-existing
-            # references in this practice.
-            references_scope=1; echo -ne "\e[1;34m"
+            references_scope=1
+            body_scope=0
+            exec 3<&-
         elif [ "${line:0:9}" == "<summary>" ]
         then
-            # title shall be retrieved from the title entity in the text when
-            # its corresponding tag hits.
-            echo -e "\e[1;36m""${line:9:-10}""\e[0m"
+            note_title="${line:9:-10}"
         elif [ "${line:0:3}" == "## " ]
         then
-            # when a chapter entity hits, the practice being parsed shall be
-            # closed.
-            # first chapter can be identified by inspecting open body or references
-            # context scope. in either case, if one of them is already open,
-            # the chapter context scope belongs to any chapters other than first one.
-            # and in case both of them are closed, first chapter entity is hit.
-            # identifying first chapter does not give much information to user,
-            # except to help parsing practice to be closed.
-            # when first chapter entity hits, all three chapter, body and references
-            # context scopes must be already closed, it would be semantically
-            # meaningless otherwise and execution shall be terminated.
-            # one way to implement this is to check for open body or references
-            # context scope.
-            # this is because when chapter context scope gets closed, body and
-            # references context scopes must be closed too.
-            # the reason for checking both body and references context scope
-            # before closing chapter context scope is due to the fact that
-            # there is no reason to predict the end of a practice, and it is not
-            # possible to tell if a practice has references before reaching to
-            # them, which in some case they might not exist and practice ends
-            # with its body or code entity.
-            # in that case, the practice's corresponding chapter might also
-            # have had ended, which leads to this situation when chapter entity
-            # hits right after the body, code or references entity of parsing practice.
             if [ "$body_scope" -eq 1 ] || [ "$references_scope" -eq 1 ]
             then
                 if [ "${RESUMABLE:-0}" -eq 1 ] && [ "$progress" == "$LATEST_PROGRESS" ]
@@ -271,78 +193,48 @@ do
                     LATEST_PROGRESS=
                 fi
 
-                # when chapter entity hits, body and references context scope
-                # shall be closed unconditionally.
-                body_scope=0; echo -e "\e[1;33m"'<<< wrap up practice'"\e[0m"
-                references_scope=0; echo -ne "\e[0m"
-
-                if [ "$references_scope" -eq 1 ] && [ "${RESUMABLE:-0}" -eq 0 ]
-                then
-                    # only meaningful in script and not in production code.
-                    read -r < /dev/tty
-                fi
-
-                begin_timepoint=0
-                end_timepoint=0
-                practice_duration=0
+                body_scope=0
+                references_scope=0
             fi
 
-            # chapter context scope shall begin when it was already closed and
-            # a new chapter entity hits.
-            # this is the case when first chapter entity hits.
-            # other chapter entities are adjacent and closed chapter context scope
-            # shall immediately be opened again.
-            # closed chapter context scope is almost only useful for identifying
-            # the beginning of the file and book information section.
             if [ "$chapter_scope" -eq 0 ]
             then
                 chapter="${line#*Chapter }"
                 chapter_scope=1
-                echo -e "\e[1;37m"">>> beginning of chapter $chapter""\e[0m"
+                #echo -e "\e[1;37m"">>> beginning of chapter $chapter""\e[0m"
             else
-                echo -e "\e[1;37m""<<< end of chapter $chapter""\e[0m\n"
+                #echo -e "\e[1;37m""<<< end of chapter $chapter""\e[0m\n"
                 chapter="${line#*Chapter }"
-                echo -e "\e[1;37m"">>> beginning of chapter $chapter""\e[0m"
+                #echo -e "\e[1;37m"">>> beginning of chapter $chapter""\e[0m"
             fi
+
+            note_position="Chapter $chapter"
         elif [ "${#line}" -eq 0 ] && [ "$body_scope" -eq 0 ]
         then
-            # empty lines shall be stripped from all context scopes.
             continue
         else
-            # reading lines shall be stored only when they are within one of the
-            # body or references context scopes.
-            # lines shall be ignored otherwise.
-            if [ "$body_scope" -eq 1 ] || [ "$references_scope" -eq 1 ]
+            if [ "$body_scope" -eq 1 ]
             then
-                echo "$line"
+                echo "$line" >&3
+            elif [ "$references_scope" -eq 1 ]
+            then
+                note_references+=("${line#\* }")
             fi
         fi
     done <<< "$(sed "1,${resource_begin}d" "$book")"
 
-    # all three chapter, body and references context scope shall be close
-    # at the end of a book.
-    # this checking is due to the fact that last practices are always
-    # ended with the end of its corresponding chapter and the its contained book.
-    # therefore, the only way of knowing if the last practice hits, is by
-    # checking for open body or references context scope when end of chapter
-    # context scope hits.
-    # either of the simultaneus endings are possible. simultaneusly end of
-    # body and chapter context scope or references and chapter context scope.
     if [ "$references_scope" -eq 1 ]
     then
-        references_scope=0; echo -ne "\e[0m"
+        references_scope=0
     fi
 
     if [ "$body_scope" -eq 1 ]
     then
-        body_scope=0; echo -e "\e[1;33m"'<<< wrap up practice'"\e[0m"
+        body_scope=0
     fi
 
     if [ "$chapter_scope" -eq 1 ]
     then
-        chapter_scope=0; echo -e "\e[1;37m""<<< end of chapter $chapter""\e[0m"
+        chapter_scope=0
     fi
-
-    # only for debugging, printing this information alone is not meaningful.
-    echo -e "\e[1;35m""<<< end of book $title""\e[0m\n"
 done
