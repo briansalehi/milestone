@@ -97,9 +97,9 @@ do
     qlink="${link//\'/\'\'}"
 
     brief_title="$title"
-    [ "${#title}" -gt 25 ] && brief_title="${title:0:30}..."
+    [ "${#title}" -gt 60 ] && brief_title="${title:0:60}..."
 
-    printf "\e[1;35m%8s\e[1;34m %-63s" "Resource" "$brief_title"
+    printf "\e[1;35m%-8s\e[1;34m %-63s" "Resource" "$brief_title"
 
     query_sql="select id from resources where name = '$qtitle';"
     insert_sql="insert into resources (name, purchase_link) values ('$qtitle', '$qlink') returning id;"
@@ -129,13 +129,13 @@ do
                 brief_note="$note_title"
                 [ "${#note_title}" -gt 60 ] && brief_note="${brief_note:0:60}..."
 
-                printf '\e[1;35m%-8s\e[1;34m %-63s' "Note" "$brief_note"
+                printf '\e[35m%-8s\e[34m %-63s' "Note" "$brief_note"
 
                 qnote_title="${note_title//\'/\'\'}"
                 note_description="$(sed "s/'/''/g" /tmp/note_description.txt)"
                 qnote_position="${note_position//\'/\'\'}"
 
-                insert_sql="insert into notes (title, description, position, resource) values ('$qnote_title', '$note_description', '$qnote_position', $resource_id);"
+                insert_sql="insert into notes (title, description, position, resource) values ('$qnote_title', '${note_description:-NULL}', '$qnote_position', $resource_id);"
 
                 if $insertion_sql_command "$insert_sql" &>>/tmp/importer.log
                 then
@@ -143,20 +143,6 @@ do
                 else
                     echo -e "\e[1;31m"" Failed\e[0m"
                 fi
-
-                #echo "resource ($resource_id): $title"
-                #echo "note title: $note_title"
-                #echo "note position: $note_position"
-                #echo -e "note description: \e[1;36m${note_description}\e[0m"
-
-                #echo -e "\e[1;33m"'<<< wrap up practice'"\e[0m"
-                # - title => note_title
-                # - description => note_description
-                # - position => note_position
-                # - resource => resource_id
-                # - collected => false (default)
-                # - collectable => true (default)
-                # - reference =>
             fi
 
             ((++practice))
@@ -185,13 +171,13 @@ do
                 brief_note="$note_title"
                 [ "${#note_title}" -gt 60 ] && brief_note="${brief_note:0:60}..."
 
-                printf '\e[1;35m%-8s\e[1;34m %-63s' "Note" "$brief_note"
+                printf '\e[35m%-8s\e[34m %-63s' "Note" "$brief_note"
 
                 qnote_title="${note_title//\'/\'\'}"
                 note_description="$(sed "s/'/''/g" /tmp/note_description.txt)"
                 qnote_position="${note_position//\'/\'\'}"
 
-                insert_sql="insert into notes (title, description, position, resource) values ('$qnote_title', '$note_description', '$qnote_position', $resource_id);"
+                insert_sql="insert into notes (title, description, position, resource) values ('$qnote_title', '${note_description:-NULL}', '$qnote_position', $resource_id);"
 
                 if $insertion_sql_command "$insert_sql" &>>/tmp/importer.log
                 then
