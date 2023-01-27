@@ -6,14 +6,6 @@ note::note(): _title{}, _description{}, _position{}, _collected{false}, _collect
 {
 }
 
-note::note(std::string const& title, std::string const& description, std::string const& position = std::string{}, bool const collected = false) :
-    _title{title},
-    _description{description},
-    _position{position},
-    _collected{collected}
-{
-}
-
 std::string note::title() const
 {
     return _title;

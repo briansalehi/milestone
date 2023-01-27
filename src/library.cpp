@@ -51,9 +51,9 @@ void library::init()
 {
     if (std::filesystem::exists(_data_path) && std::filesystem::is_directory(_data_path))
     {
-        loader database{_data_path};
-        database.fetch_content();
-        _resources = std::move(database.resources());
+        loader resource_loader{_data_path};
+        resource_loader.fetch_content();
+        _resources = std::move(resource_loader.resources());
     }
     else
     {

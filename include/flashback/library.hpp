@@ -47,13 +47,13 @@ namespace flashback
 /// :Open Dashboard;
 /// switch (Select a space)
 /// case (Library)
-///     #green:Initialize Library Space;
+///     #green:Library Space;
 /// case (Trainer)
-///     :Initialize Trainer Space;
+///     :Trainer Space;
 /// case (Milestone)
-///     :Initialize Milestone Space;
+///     :Milestone Space;
 /// case (Roadmap)
-///     :Initialize Roadmap Space;
+///     :Roadmap Space;
 /// endswitch
 /// end
 /// \enduml
@@ -80,17 +80,19 @@ namespace flashback
 /// endif
 ///
 /// switch (Perform an action on resources)
-/// case (Select)
+/// case (select)
 ///     :Select a resource;
 ///     :Load notes\nwithin resource;
 ///     #green:Show note operations;
-/// case (Add)
+/// case (export)
+///     :Export notes into practices;
+/// case (add)
 ///     :Prompt for title;
 ///     :Create resource;
 ///     :Insert resource\ninto database;
-/// case (Edit)
+/// case (edit)
 ///     :Undefined;
-/// case (Remove)
+/// case (remove)
 ///     :Undefined;
 /// endswitch
 /// end
@@ -103,18 +105,18 @@ namespace flashback
 /// !theme cyborg
 /// :Load notes in order;
 /// switch (Show note operations)
-/// case (Select)
+/// case (select)
 ///     :Select note;
 ///
 ///     repeat
 ///     :Show note;
 ///     backward:Load next note;
 ///     repeat while (Next note?) is (yes)
-/// case (Add)
+/// case (add)
 ///     :;
-/// case (Edit)
+/// case (edit)
 ///     :;
-/// case (Remove)
+/// case (remove)
 ///     :;
 /// endswitch
 /// \enduml

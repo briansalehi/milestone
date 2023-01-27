@@ -10,7 +10,6 @@ class note
 {
 public:
     note();
-    explicit note(std::string const& title, std::string const& description, std::string const& position, bool const collected);
 
     std::string title() const;
     void title(std::string const&);
