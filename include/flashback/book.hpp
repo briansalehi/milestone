@@ -49,9 +49,9 @@ public:
     book& operator=(book const&);
     book& operator=(book&&) noexcept;
 
-    std::string title() const override;
-    void title(std::string const&) override;
-    void title(std::string&&) noexcept override;
+    std::string name() const override;
+    void name(std::string const&) override;
+    void name(std::string&&) noexcept override;
 
     bool add_note(std::shared_ptr<note>) override;
     std::vector<std::shared_ptr<note>> notes() const override;

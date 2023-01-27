@@ -3,8 +3,8 @@
 
 using namespace flashback;
 
-book::book(std::string const& title, unsigned int const chapters)
-    : _title{title}, _chapters{chapters}, _notes{}
+book::book(std::string const& name, unsigned int const chapters)
+    : _title{name}, _chapters{chapters}, _notes{}
 {
 }
 
@@ -58,19 +58,19 @@ book& book::operator=(book&& other) noexcept
     return *this;
 }
 
-std::string book::title() const
+std::string book::name() const
 {
     return _title;
 }
 
-void book::title(std::string const& title)
+void book::name(std::string const& name)
 {
-    _title = title;
+    _title = name;
 }
 
-void book::title(std::string&& title) noexcept
+void book::name(std::string&& name) noexcept
 {
-    _title = std::move(title);
+    _title = std::move(name);
 }
 
 std::shared_ptr<note> book::take_note(std::size_t const index) const
