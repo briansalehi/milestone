@@ -36,11 +36,6 @@ namespace flashback
 class loader
 {
 public:
-    loader(loader const&) = delete;
-    loader& operator=(loader const&) = delete;
-    loader(loader&&) = delete;
-    loader& operator=(loader&&) = delete;
-
     virtual ~loader();
 
     virtual void fetch_content() = 0;

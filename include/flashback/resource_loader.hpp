@@ -1,5 +1,7 @@
 #pragma once
 
+#include <flashback/loader.hpp>
+
 #include <pqxx/pqxx>
 
 #include <regex>

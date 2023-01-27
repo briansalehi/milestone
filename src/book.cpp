@@ -73,6 +73,36 @@ void book::name(std::string&& name) noexcept
     _title = std::move(name);
 }
 
+std::string book::description() const
+{
+    return _description;
+}
+
+void book::description(std::string const& description)
+{
+    _description = description;
+}
+
+void book::description(std::string&& description) noexcept
+{
+    _description = std::move(description);
+}
+
+std::string book::link() const
+{
+    return _link;
+}
+
+void book::link(std::string const& link)
+{
+    _link = link;
+}
+
+void book::link(std::string&& link) noexcept
+{
+    _link = std::move(link);
+}
+
 std::shared_ptr<note> book::take_note(std::size_t const index) const
 {
     return _notes.at(index);

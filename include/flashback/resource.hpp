@@ -14,9 +14,17 @@ class resource
 public:
     virtual ~resource(){}
 
-    virtual std::string title() const = 0;
-    virtual void title(std::string const&) = 0;
-    virtual void title(std::string&&) = 0;
+    virtual std::string name() const = 0;
+    virtual void name(std::string const&) = 0;
+    virtual void name(std::string&&) = 0;
+
+    virtual std::string description() const;
+    virtual void description(std::string const&);
+    virtual void description(std::string&&) noexcept;
+
+    virtual std::string link() const;
+    virtual void link(std::string const&);
+    virtual void link(std::string&&) noexcept;
 
     virtual bool add_note(std::shared_ptr<note>) = 0;
     virtual std::vector<std::shared_ptr<note>> notes() const = 0;
