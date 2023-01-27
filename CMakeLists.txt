@@ -30,14 +30,6 @@ add_library(book SHARED src/book.cpp)
 target_link_libraries(book PUBLIC note)
 target_include_directories(book PUBLIC include)
 
-add_library(markdown_note_builder SHARED src/markdown_note_builder.cpp)
-target_link_libraries(markdown_note_builder PUBLIC note)
-target_include_directories(book PUBLIC include)
-
-add_library(markdown_book_builder SHARED src/markdown_book_builder.cpp)
-target_link_libraries(markdown_book_builder PUBLIC book markdown_note_builder)
-target_include_directories(markdown_book_builder PUBLIC include)
-
 add_library(reference SHARED src/reference.cpp)
 target_include_directories(reference PUBLIC include)
 
@@ -54,15 +46,15 @@ target_link_libraries(subject PUBLIC practice)
 target_include_directories(subject PUBLIC include)
 
 add_library(resource_loader SHARED src/resource_loader.cpp)
-target_link_libraries(resource_loader PUBLIC markdown_book_builder pqxx)
+target_link_libraries(resource_loader PUBLIC pqxx)
 target_include_directories(resource_loader PUBLIC include)
 
 add_library(library SHARED src/library.cpp)
-target_link_libraries(library PRIVATE pqxx pq PUBLIC markdown_book_builder console)
+target_link_libraries(library PRIVATE pqxx pq PUBLIC console)
 target_include_directories(library PUBLIC include)
 
 add_library(trainer SHARED src/trainer.cpp)
-target_link_libraries(trainer PRIVATE pqxx pq PUBLIC markdown_book_builder console)
+target_link_libraries(trainer PRIVATE pqxx pq PUBLIC console)
 target_include_directories(trainer PUBLIC include)
 
 add_library(dashboard SHARED src/dashboard.cpp)
@@ -92,18 +84,6 @@ target_sources(test_book PRIVATE test/book.cpp PUBLIC src/book.cpp)
 target_link_libraries(test_book PRIVATE gtest book)
 target_include_directories(test_book PUBLIC include PRIVATE test)
 add_test(NAME test_book COMMAND test_book)
-
-add_executable(test_markdown_note_builder)
-target_sources(test_markdown_note_builder PRIVATE test/markdown_note_builder.cpp PUBLIC src/markdown_note_builder.cpp)
-target_link_libraries(test_markdown_note_builder PRIVATE gtest note)
-target_include_directories(test_markdown_note_builder PUBLIC include PRIVATE test)
-add_test(NAME test_markdown_note_builder COMMAND test_markdown_note_builder)
-
-add_executable(test_markdown_book_builder)
-target_sources(test_markdown_book_builder PRIVATE test/markdown_book_builder.cpp PUBLIC src/markdown_book_builder.cpp)
-target_link_libraries(test_markdown_book_builder PRIVATE gtest PUBLIC markdown_note_builder note book)
-target_include_directories(test_markdown_book_builder PUBLIC include PRIVATE test)
-add_test(NAME test_markdown_book_builder COMMAND test_markdown_book_builder)
 
 add_executable(test_library)
 target_sources(test_library PUBLIC test/library.cpp)
