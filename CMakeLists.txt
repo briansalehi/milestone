@@ -42,15 +42,15 @@ target_link_libraries(topic PUBLIC practice)
 target_include_directories(topic PUBLIC include)
 
 add_library(subject SHARED src/subject.cpp)
-target_link_libraries(subject PUBLIC practice)
+target_link_libraries(subject PUBLIC topic)
 target_include_directories(subject PUBLIC include)
 
 add_library(resource_loader SHARED src/resource_loader.cpp)
-target_link_libraries(resource_loader PUBLIC pqxx book)
+target_link_libraries(resource_loader PRIVATE pqxx pq PUBLIC book)
 target_include_directories(resource_loader PUBLIC include)
 
 add_library(library SHARED src/library.cpp)
-target_link_libraries(library PRIVATE pqxx pq PUBLIC console)
+target_link_libraries(library PUBLIC resource_loader console)
 target_include_directories(library PUBLIC include)
 
 add_library(trainer SHARED src/trainer.cpp)

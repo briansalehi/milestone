@@ -1,3 +1,7 @@
+#include <flashback/note.hpp>
+#include <flashback/subject.hpp>
+#include <flashback/topic.hpp>
+#include <flashback/practice.hpp>
 #include <flashback/library.hpp>
 
 using namespace flashback;
@@ -49,17 +53,9 @@ library::library(std::filesystem::path const& data_path):
 
 void library::init()
 {
-    if (std::filesystem::exists(_data_path) && std::filesystem::is_directory(_data_path))
-    {
-        loader resource_loader{_data_path};
-        resource_loader.fetch_content();
-        _resources = std::move(resource_loader.resources());
-    }
-    else
-    {
-        std::error_code ec{};
-        throw std::filesystem::filesystem_error("invalid base path"s, _data_path, ec);
-    }
+    resource_loader database{_data_path};
+    database.fetch_content();
+    _resources = std::move(database.resources());
 
     while (true)
     {
@@ -256,7 +252,7 @@ void library::select_resource()
     _stream.write("Resource list:\n", console::color::white);
 
     auto writer = [&index, this](auto const& res) mutable {
-        _stream.write(std::to_string(++index) + ". " + res->title(), console::color::pink);
+        _stream.write(std::to_string(++index) + ". " + res->name(), console::color::pink);
     };
 
     std::ranges::for_each(_resources, writer);
@@ -281,7 +277,7 @@ void library::select_resource()
             [](std::shared_ptr<note> note) { return note->collectable(); }
         );
 
-        _stream.write(std::to_string(resource_index+1) + ". " + selected_resource->title(), console::color::pink, false);
+        _stream.write(std::to_string(resource_index+1) + ". " + selected_resource->name(), console::color::pink, false);
         _stream.write("(" + std::to_string(note_count) + " notes available,", console::color::green, false);
         _stream.write(std::to_string(collectable) + " collectable,", console::color::green, false);
         _stream.write(std::to_string(collected) + " collected)", console::color::green);
