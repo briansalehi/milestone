@@ -3,7 +3,7 @@
 
 TEST(Library, Initialization)
 {
-    flashback::library library{"/home/brian/projects/references/books"};
+    flashback::library library{"postgres://postgres@localhost/flashback_test"};
 
     library.init();
     EXPECT_EQ(1, 1);

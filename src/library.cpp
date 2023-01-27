@@ -23,7 +23,7 @@ constexpr std::string note_action_add{"add note"};
 constexpr std::string note_action_edit{"edit note"};
 constexpr std::string note_action_remove{"remove note"};
 
-library::library(std::filesystem::path const& data_path):
+library::library(std::string const& database_address):
     _library_actions{
         library_action_list,
         library_action_search
@@ -44,7 +44,7 @@ library::library(std::filesystem::path const& data_path):
         note_action_remove
     },
     _stream{std::cerr, std::cin},
-    _data_path{data_path},
+    _database_address{database_address},
     _resources{},
     _subjects{}
 {
@@ -53,7 +53,7 @@ library::library(std::filesystem::path const& data_path):
 
 void library::init()
 {
-    resource_loader database{_data_path};
+    resource_loader database{_database_address};
     database.fetch_content();
     _resources = std::move(database.resources());
 

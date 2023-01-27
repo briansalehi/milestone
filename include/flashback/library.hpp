@@ -234,7 +234,7 @@ public:
     enum class resource_actions {undefined, extract, show, add, edit, remove};
     enum class note_actions {undefined, expand, next, previous, add, edit, remove};
 
-    explicit library(std::filesystem::path const&);
+    explicit library(std::string const&);
 
     std::size_t count() const;
 
@@ -276,7 +276,7 @@ private:
 
 private:
     console _stream;
-    std::filesystem::path _data_path;
+    std::string _database_address;
     std::vector<std::string> _note_actions;
     std::vector<std::string> _resource_actions;
     std::vector<std::string> _library_actions;
