@@ -1,7 +1,6 @@
 #pragma once
 
 #include <flashback/resource.hpp>
-#include <flashback/note.hpp>
 
 #include <memory>
 #include <vector>
@@ -10,6 +9,7 @@
 
 namespace flashback
 {
+class note;
 
 ///
 /// \brief A Concrete Implementation of Resource

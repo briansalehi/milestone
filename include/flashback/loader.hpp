@@ -36,9 +36,10 @@ namespace flashback
 class loader
 {
 public:
-    virtual ~loader();
+    virtual ~loader() {}
 
     virtual void fetch_content() = 0;
+    virtual bool connected() const = 0;
 };
 
 } // flashback

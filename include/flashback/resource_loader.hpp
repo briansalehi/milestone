@@ -1,12 +1,9 @@
 #pragma once
 
+#include <flashback/resource.hpp>
 #include <flashback/loader.hpp>
 
 #include <pqxx/pqxx>
-
-#include <regex>
-#include <sstream>
-#include <fstream>
 
 #include <memory>
 #include <vector>
@@ -15,8 +12,6 @@
 
 namespace flashback
 {
-class resource;
-
 class resource_loader: public loader
 {
 public:
@@ -24,6 +19,7 @@ public:
     virtual ~resource_loader();
 
     virtual void fetch_content() override;
+    virtual bool connected() const override;
 
     std::vector<std::shared_ptr<resource>> resources() const;
 

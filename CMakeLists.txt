@@ -46,7 +46,7 @@ target_link_libraries(subject PUBLIC practice)
 target_include_directories(subject PUBLIC include)
 
 add_library(resource_loader SHARED src/resource_loader.cpp)
-target_link_libraries(resource_loader PUBLIC pqxx)
+target_link_libraries(resource_loader PUBLIC pqxx book)
 target_include_directories(resource_loader PUBLIC include)
 
 add_library(library SHARED src/library.cpp)
@@ -90,6 +90,12 @@ target_sources(test_library PUBLIC test/library.cpp)
 target_link_libraries(test_library PRIVATE gtest library)
 target_include_directories(test_library PUBLIC include PRIVATE test)
 add_test(NAME test_library COMMAND test_library)
+
+add_executable(test_resource_loader)
+target_sources(test_resource_loader PUBLIC test/resource_loader.cpp)
+target_link_libraries(test_resource_loader PUBLIC resource_loader PRIVATE gtest)
+target_include_directories(test_resource_loader PUBLIC include PRIVATE test)
+add_test(NAME test_resource_loader COMMAND test_resource_loader)
 
 add_executable(test_dashboard)
 target_sources(test_dashboard PUBLIC test/dashboard.cpp)
