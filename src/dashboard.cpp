@@ -52,7 +52,7 @@ std::shared_ptr<space> dashboard::build_space(std::string_view space_name)
 {
     if (space_name == "library")
     {
-        return std::make_shared<library>("../references/books");
+        return std::make_shared<library>("postgres://postgres@localhost/flashback");
     }
     else if (space_name == "trainer")
     {

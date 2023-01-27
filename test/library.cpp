@@ -1,12 +1,11 @@
 #include <flashback/library.hpp>
 #include <gtest/gtest.h>
 
-TEST(Library, Initialization)
+TEST(Library, Construction)
 {
     flashback::library library{"postgres://postgres@localhost/flashback_test"};
 
-    library.init();
-    EXPECT_EQ(1, 1);
+    EXPECT_EQ(library.count(), 40);
 }
 
 int main(int argc, char** argv)

@@ -11,11 +11,6 @@ file(GLOB source_files src/*)
 file(GLOB header_files include/*)
 file(GLOB doc_files docs/*)
 
-add_executable(flashback)
-target_sources(flashback PRIVATE ${source_files})
-target_link_libraries(flashback PRIVATE Boost::program_options)
-target_include_directories(flashback PRIVATE include)
-
 enable_testing()
 
 ########## libraries ##########
@@ -46,7 +41,7 @@ target_link_libraries(subject PUBLIC topic)
 target_include_directories(subject PUBLIC include)
 
 add_library(resource_loader SHARED src/resource_loader.cpp)
-target_link_libraries(resource_loader PRIVATE pq pqxx PUBLIC book)
+target_link_libraries(resource_loader PUBLIC pq pqxx book subject)
 target_include_directories(resource_loader PUBLIC include)
 
 add_library(library SHARED src/library.cpp)
@@ -54,7 +49,7 @@ target_link_libraries(library PUBLIC resource_loader console)
 target_include_directories(library PUBLIC include)
 
 add_library(trainer SHARED src/trainer.cpp)
-target_link_libraries(trainer PRIVATE pq pqxx PUBLIC console)
+target_link_libraries(trainer PUBLIC pq pqxx console)
 target_include_directories(trainer PUBLIC include)
 
 add_library(dashboard SHARED src/dashboard.cpp)
@@ -64,6 +59,11 @@ target_include_directories(dashboard PUBLIC include)
 add_library(practice_collection SHARED src/practice_collection.cpp)
 target_link_libraries(practice_collection PUBLIC console practice)
 target_include_directories(practice_collection PUBLIC include)
+
+add_executable(flashback)
+target_sources(flashback PRIVATE ${source_files})
+target_link_libraries(flashback PRIVATE Boost::program_options dashboard)
+target_include_directories(flashback PRIVATE include)
 
 ########## test executables ##########
 

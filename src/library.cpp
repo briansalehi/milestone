@@ -49,14 +49,14 @@ library::library(std::string const& database_address):
     _subjects{}
 {
     _stream.write("\nLibrary", console::color::pink);
+
+    resource_loader database{_database_address};
+    database.fetch_content();
+    _resources = std::move(database.resources());
 }
 
 void library::init()
 {
-    resource_loader database{_database_address};
-    database.fetch_content();
-    _resources = std::move(database.resources());
-
     while (true)
     {
         perform_library_actions();

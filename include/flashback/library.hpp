@@ -1,8 +1,8 @@
 #pragma once
 
+#include <flashback/resource_loader.hpp>
 #include <flashback/reference.hpp>
 #include <flashback/resource.hpp>
-#include <flashback/resource_loader.hpp>
 #include <flashback/console.hpp>
 #include <flashback/loader.hpp>
 #include <flashback/space.hpp>
