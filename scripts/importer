@@ -90,35 +90,26 @@ do
     resource_begin="$(sed -n '1,/^## /=' "$book" | tail -n2 | head -n1)"
 
     base_command="psql -U postgres -h localhost -d flashback"
-    headless_command="$base_command -A --csv -c"
-    quiet_command="$base_command -c"
+    sql_command_with_return="$base_command -A --csv -c"
+    insertion_sql_command="$base_command -c"
 
     qtitle="${title//\'/\'\'}"
     qlink="${link//\'/\'\'}"
 
-    brief_link="$(sed -n 's/https:\/\/[w.]\+\?\([^/]\+\).*/\1/p' <<< "$link")"
-
     brief_title="$title"
     [ "${#title}" -gt 25 ] && brief_title="${title:0:30}..."
 
-    if grep -q 'https://' <<< "$link"
-    then
-        color="\e[1;32m"
-    else
-        color="\e[1;31m"
-    fi
-
-    printf "\e[1;35m%8s\e[1;34m %-33s \e[0m($color%s\e[0m)" "Resource" "$brief_title" "${brief_link:-$link}"
+    printf "\e[1;35m%8s\e[1;34m %-63s" "Resource" "$brief_title"
 
     query_sql="select id from resources where name = '$qtitle';"
     insert_sql="insert into resources (name, purchase_link) values ('$qtitle', '$qlink') returning id;"
 
-    resource_id="$($headless_command "$query_sql" 2>/tmp/importer.log | sed '1d' | grep -v 'INSERT')"
+    resource_id="$($sql_command_with_return "$query_sql" 2>>/tmp/importer.log | sed '1d' | grep -v 'INSERT')"
 
     if [ -z "$resource_id" ]
     then
-        resource_id="$($headless_command "$insert_sql" 2>/tmp/importer.log | sed '1d' | grep -v 'INSERT')"
-        echo -e "\e[1;33m"" Imported\e[0m"
+        resource_id="$($sql_command_with_return "$insert_sql" 2>>/tmp/importer.log | sed '1d' | grep -v 'INSERT')"
+        echo -e "\e[1;32m"" Imported\e[0m"
     else
         echo -e "\e[1;35m"" Already exists\e[0m"
     fi
@@ -136,23 +127,21 @@ do
                 fi
 
                 brief_note="$note_title"
-                [ "${#note_title}" -gt 30 ] && brief_note="${brief_note:0:30}..."
+                [ "${#note_title}" -gt 60 ] && brief_note="${brief_note:0:60}..."
 
-                printf '\e[1;35m%8s\e[1;34m %-33s' "Note" "$brief_note"
+                printf '\e[1;35m%-8s\e[1;34m %-63s' "Note" "$brief_note"
 
                 qnote_title="${note_title//\'/\'\'}"
                 note_description="$(sed "s/'/''/g" /tmp/note_description.txt)"
                 qnote_position="${note_position//\'/\'\'}"
-                # resource_id
-                # note_references[@] # !
 
-                insert_sql="insert into notes (title, position, resource) values ('$qnote_title', '$qnote_position', $resource_id);"
+                insert_sql="insert into notes (title, description, position, resource) values ('$qnote_title', '$note_description', '$qnote_position', $resource_id);"
 
-                if $quiet_command "$insert_sql" &>/tmp/importer.log
+                if $insertion_sql_command "$insert_sql" &>>/tmp/importer.log
                 then
-                    echo -e "\e[1;33m"" Imported\e[0m"
+                    echo -e "\e[1;32m"" Imported\e[0m"
                 else
-                    echo -e "\e[1;35m"" Failed\e[0m"
+                    echo -e "\e[1;31m"" Failed\e[0m"
                 fi
 
                 #echo "resource ($resource_id): $title"
@@ -194,23 +183,21 @@ do
                 fi
 
                 brief_note="$note_title"
-                [ "${#note_title}" -gt 30 ] && brief_note="${brief_note:0:30}..."
+                [ "${#note_title}" -gt 60 ] && brief_note="${brief_note:0:60}..."
 
-                printf '\e[1;35m%8s\e[1;34m %-33s' "Note" "$brief_note"
+                printf '\e[1;35m%-8s\e[1;34m %-63s' "Note" "$brief_note"
 
                 qnote_title="${note_title//\'/\'\'}"
                 note_description="$(sed "s/'/''/g" /tmp/note_description.txt)"
                 qnote_position="${note_position//\'/\'\'}"
-                # resource_id
-                # note_references[@] # !
 
-                insert_sql="insert into notes (title, position, resource) values ('$qnote_title', '$qnote_position', $resource_id);"
+                insert_sql="insert into notes (title, description, position, resource) values ('$qnote_title', '$note_description', '$qnote_position', $resource_id);"
 
-                if $quiet_command "$insert_sql" &>/tmp/importer.log
+                if $insertion_sql_command "$insert_sql" &>>/tmp/importer.log
                 then
-                    echo -e "\e[1;33m"" Imported\e[0m"
+                    echo -e "\e[1;32m"" Imported\e[0m"
                 else
-                    echo -e "\e[1;35m"" Failed\e[0m"
+                    echo -e "\e[1;31m"" Failed\e[0m"
                 fi
 
                 body_scope=0
