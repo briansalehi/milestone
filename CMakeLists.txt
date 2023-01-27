@@ -53,9 +53,9 @@ add_library(subject SHARED src/subject.cpp)
 target_link_libraries(subject PUBLIC practice)
 target_include_directories(subject PUBLIC include)
 
-add_library(loader SHARED src/loader.cpp)
-target_link_libraries(loader PUBLIC markdown_book_builder)
-target_include_directories(loader PUBLIC include)
+add_library(resource_loader SHARED src/resource_loader.cpp)
+target_link_libraries(resource_loader PUBLIC markdown_book_builder pqxx)
+target_include_directories(resource_loader PUBLIC include)
 
 add_library(library SHARED src/library.cpp)
 target_link_libraries(library PRIVATE pqxx pq PUBLIC markdown_book_builder console)
@@ -66,7 +66,7 @@ target_link_libraries(trainer PRIVATE pqxx pq PUBLIC markdown_book_builder conso
 target_include_directories(trainer PUBLIC include)
 
 add_library(dashboard SHARED src/dashboard.cpp)
-target_link_libraries(dashboard PUBLIC library trainer loader)
+target_link_libraries(dashboard PUBLIC library trainer resource_loader)
 target_include_directories(dashboard PUBLIC include)
 
 add_library(practice_collection SHARED src/practice_collection.cpp)

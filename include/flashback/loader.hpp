@@ -1,3 +1,5 @@
+#pragma once
+
 ///
 /// \page loaders Loaders
 /// \brief Database Connections and Loading Components
@@ -7,55 +9,41 @@
 ///
 /// @startuml
 /// abstract class Loader {
-///     # open(): bool
-///     # do_whatever_the_fuck_needed_to_make_product(): std::vector<Product>
-///     # close(): void
+///     # fetch_content(): void
 /// }
 ///
 /// class ResourceLoader {
-///     + open(): bool
-///     + close(): void
-///     + fetch_resources(): std::vector<Resource>
+///     # fetch_content(): void
+///     - add_resource(): void
+///     + resources(): std::vector<Resource>
+///     + entities_path(): std::filesyste::path
 /// }
+///
+/// class SubjectLoader {
+///     # fetch_content(): void
+///     - add_subject(): void
+///     + subjects(): std::vector<Subject>
+///     + database_address(): std::string
+/// }
+///
+/// Loader <-- ResourceLoader
+/// Loader <-- SubjectLoader
 /// @enduml
 ///
-#pragma once
-
-#include <regex>
-#include <memory>
-#include <ranges>
-#include <sstream>
-#include <fstream>
-#include <iostream> // remove this
-#include <algorithm>
-#include <filesystem>
 
 namespace flashback
 {
-class resource;
-
 class loader
 {
 public:
-    explicit loader(std::filesystem::path const&);
-    virtual ~loader();
-
     loader(loader const&) = delete;
     loader& operator=(loader const&) = delete;
     loader(loader&&) = delete;
     loader& operator=(loader&&) = delete;
 
-    std::filesystem::path entities_path() const;
-    std::vector<std::shared_ptr<resource>> resources() const;
+    virtual ~loader();
 
-    void fetch_content();
-
-private:
-    void add_resource(std::filesystem::path const&);
-
-private:
-    std::filesystem::path _base_path;
-    std::vector<std::shared_ptr<resource>> _resources;
+    virtual void fetch_content() = 0;
 };
 
 } // flashback
