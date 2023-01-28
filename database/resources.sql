@@ -5,6 +5,7 @@ create table if not exists resources (
     name varchar(200) not null,
     description varchar(500),
     purchase_link varchar(2000),
+    full_coverage bool not null default false,
     primary key (id)
 );
 
