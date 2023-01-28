@@ -57,10 +57,7 @@ library::library(std::string const& database_address):
 
 void library::init()
 {
-    while (true)
-    {
-        perform_library_actions();
-    }
+    perform_library_actions();
 }
 
 std::size_t library::count() const
