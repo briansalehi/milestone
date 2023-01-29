@@ -2,12 +2,18 @@
 
 using namespace flashback;
 
-subject::subject() : _title{}, _topics{}
+subject::subject(unsigned long int const id): _id{id}, _title{}, _topics{}
 {
 }
 
-subject::subject(std::string const& title) : _title{title}, _topics{}
+subject::subject(unsigned long int const id, std::string const& title):
+    _id{id}, _title{title}, _topics{}
 {
+}
+
+unsigned long int subject::id() const
+{
+    return _id;
 }
 
 std::string subject::title() const

@@ -14,8 +14,10 @@ namespace flashback
 class subject
 {
 public:
-    subject();
-    explicit subject(std::string const&);
+    explicit subject(unsigned long int const);
+    explicit subject(unsigned long int const, std::string const&);
+
+    unsigned long int id() const;
 
     std::string title() const;
     void title(std::string const&);
@@ -31,6 +33,7 @@ public:
 
 private:
     std::string _title;
+    unsigned long int _id;
     std::vector<std::shared_ptr<topic>> _topics;
 };
 

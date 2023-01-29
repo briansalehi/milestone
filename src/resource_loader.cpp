@@ -21,8 +21,8 @@ void resource_loader::fetch_content()
     pqxx::work tx{_connection};
     pqxx::result resources = tx.exec("select id from resources"s);
     tx.commit();
-    std::ranges::for_each(resources, [this](pqxx::row const& r) {
-        add_resource(r.at(0).as<unsigned long>());
+    std::ranges::for_each(resources, [this](pqxx::row const& row) {
+        add_resource(row.at(0).as<unsigned long int>());
     });
 }
 

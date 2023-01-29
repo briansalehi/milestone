@@ -16,12 +16,14 @@ class resource;
 class practice
 {
 public:
-    practice();
-    explicit practice(std::string const&, std::string const&);
+    explicit practice(unsigned long int const);
+
     practice(practice const&);
     practice(practice&&) noexcept;
     practice& operator=(practice const&);
     practice& operator=(practice&&) noexcept;
+
+    unsigned long int id() const;
 
     std::string question() const;
     void question(std::string const&);
@@ -50,6 +52,7 @@ public:
     bool operator<(practice const&);
 
 private:
+    unsigned long int _id;
     std::string _question;
     std::string _answer;
     std::vector<std::shared_ptr<reference>> _references;

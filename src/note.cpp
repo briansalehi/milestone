@@ -2,8 +2,14 @@
 
 using namespace flashback;
 
-note::note(): _title{}, _description{}, _position{}, _collected{false}, _collectable{true}
+note::note(unsigned long int const id):
+    _id{id}, _title{}, _description{}, _position{}, _collected{false}, _collectable{true}
 {
+}
+
+unsigned long int note::id() const
+{
+    return _id;
 }
 
 std::string note::title() const

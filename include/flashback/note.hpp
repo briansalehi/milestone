@@ -9,7 +9,9 @@ namespace flashback
 class note
 {
 public:
-    note();
+    explicit note(unsigned long int const);
+
+    unsigned long int id() const;
 
     std::string title() const;
     void title(std::string const&);
@@ -33,6 +35,7 @@ public:
     bool operator!=(note const&);
 
 private:
+    unsigned long int _id;
     std::string _title;
     std::string _description;
     std::string _position;

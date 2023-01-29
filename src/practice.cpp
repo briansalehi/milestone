@@ -5,12 +5,8 @@
 using namespace flashback;
 using namespace std::literals::chrono_literals;
 
-practice::practice(): _question{}, _answer{}, _references{}
-{
-}
-
-practice::practice(std::string const& question, std::string const& answer):
-    _question{question}, _answer{answer}, _references{}
+practice::practice(unsigned long int const id):
+    _id{id}, _question{}, _answer{}, _references{}
 {
 }
 
