@@ -45,14 +45,18 @@ library::library(std::string const& database_address):
     },
     _stream{std::cerr, std::cin},
     _database_address{database_address},
+    _connection{database_address},
     _resources{},
     _subjects{}
 {
-    _stream.write("\nLibrary", console::color::pink);
+    if (_connection.is_open())
+        _stream.write("\nLibrary", console::color::pink);
+    else
+        throw std::runtime_error("cannot connect to database");
 
-    resource_loader database{_database_address};
-    database.fetch_content();
-    _resources = std::move(database.resources());
+    resource_loader resource_bank{_database_address};
+    resource_bank.fetch_content();
+    _resources = std::move(resource_bank.resources());
 }
 
 void library::init()
@@ -306,24 +310,35 @@ void library::view_note_description(std::size_t const resource_index, std::size_
 
 void library::extract_notes(std::size_t const resource_index)
 {
-    for (auto selected_resource: _resources)
+    for (auto selected_note: _resources.at(resource_index)->notes())
     {
-        for (auto selected_note: selected_resource->notes())
+        if (selected_note->collectable() && !selected_note->collected())
         {
-            if (selected_note->collectable() && !selected_note->collected())
-            {
-                _stream.clear();
-                _stream.write(selected_note->title(), console::color::blue);
-                _stream.write(selected_note->description());
+            _stream.clear();
+            _stream.write(selected_note->title(), console::color::blue);
+            _stream.write(selected_note->description(), console::color::gray);
 
-                if (!_stream.read_bool("Extract this note", console::color::white))
+            if (_stream.read_bool("Extract this note", console::color::white))
+            {
+                std::shared_ptr<subject> selected_subject = take_subject();
+                if (!selected_subject)
                     continue;
 
-                std::shared_ptr<subject> selected_subject = take_subject();
                 std::shared_ptr<topic> selected_topic = take_topic(selected_subject);
-                std::shared_ptr<practice> result = make_practice(selected_note);
+                if (!selected_topic)
+                    continue;
+
+                std::shared_ptr<practice> result = make_practice(selected_note, selected_topic);
+                if (!result)
+                    continue;
+
                 selected_topic->add_practice(result);
-                _stream.write("Note extracted", console::color::green);
+                _stream.write(
+                    "Practice imported into " +
+                    selected_subject->title() + ", " +
+                    selected_topic->title(),
+                    console::color::green
+                );
             }
         }
     }
@@ -331,93 +346,131 @@ void library::extract_notes(std::size_t const resource_index)
 
 std::shared_ptr<subject> library::take_subject()
 {
-    std::string title = _stream.read_string("Enter subject name", console::color::white);
+    pqxx::nontransaction nontransaction{_connection};
+    std::shared_ptr<subject> generated_subject{};
 
-    auto title_predicate = [&title](auto s) { return s->title() == title; };
-    auto subject_iterator = std::ranges::find_if(_subjects, title_predicate);
+    std::string title{_stream.read_string("Enter subject name", console::color::white)};
 
-    std::shared_ptr<subject> selected_subject{};
+    if (title.empty())
+        throw std::runtime_error("subject name cannot be empty");
 
-    if (subject_iterator != _subjects.cend())
+    pqxx::result subject_result = nontransaction.exec("select id from subjects where title = "s + _connection.quote(title));
+    nontransaction.commit();
+
+    if (!_stream.read_bool("Create subject?", console::color::white))
+        return nullptr;
+
+    if (subject_result[0][0].is_null())
     {
-        _stream.write("Subject " + title + " selected", console::color::green);
-        selected_subject = *subject_iterator;
+        pqxx::transaction transaction{_connection};
+
+        pqxx::row id_row = transaction.exec1("insert into subjects (title) values (" + _connection.quote(title) + ") returning id");
+        transaction.commit();
+
+        unsigned long int id = id_row[0].as<unsigned long int>();
+        generated_subject = std::make_shared<subject>(id);
+
+        _stream.write("Subject " + title + " created", console::color::green);
     }
     else
     {
-        if (_stream.read_bool("Create subject", console::color::white))
-        {
-            std::shared_ptr<subject> latest_subject = std::make_shared<subject>(title);
-            bool created = false;
-            std::tie(subject_iterator, created) = _subjects.insert(latest_subject);
-            if (created)
-            {
-                _stream.write("Subject " + title + " created", console::color::green);
-                selected_subject = *subject_iterator;
-            }
-            else
-            {
-                throw std::runtime_error("failed to create new subject");
-            }
-        }
-        else
-        {
-            throw std::runtime_error("Collection cancelled");
-        }
+        unsigned long int id = subject_result[0][0].as<unsigned long int>();
+        generated_subject = std::make_shared<subject>(id);
+
+        _stream.write("Subject " + title + " selected", console::color::dimgreen);
     }
 
-    return selected_subject;
+    return generated_subject;
 }
 
-std::shared_ptr<topic> library::take_topic(std::shared_ptr<subject> input_subject)
+std::shared_ptr<topic> library::take_topic(std::shared_ptr<subject> selected_subject)
 {
-    std::vector<std::shared_ptr<topic>> topics{input_subject->topics()};
+    if (!selected_subject)
+        return nullptr;
+
+    pqxx::nontransaction nontransaction{_connection};
+    std::shared_ptr<topic> generated_topic{};
 
     std::string title{_stream.read_string("Enter topic name", console::color::white)};
-    auto title_predicate = [&title](auto t) { return t->title() == title; };
 
-    auto topic_iterator = std::ranges::find_if(topics, title_predicate);
+    if (title.empty())
+        throw std::runtime_error("topic name cannot be empty");
 
-    std::shared_ptr<topic> selected_topic{};
+    pqxx::result topic_result = nontransaction.exec(
+        "select id from topics where subject = "s +
+        std::to_string(selected_subject->id()) +
+        " and title = " + _connection.quote(title)
+    );
+    nontransaction.commit();
 
-    if (topic_iterator != topics.cend())
+    if (!_stream.read_bool("Create topic?", console::color::white))
+        return nullptr;
+
+    if (topic_result[0][0].is_null())
     {
-        _stream.write("Topic " + title + " from " + input_subject->title() + " selected", console::color::green);
-        selected_topic = *topic_iterator;
+        pqxx::transaction transaction{_connection};
+
+        pqxx::row id_row = transaction.exec1(
+                "insert into topics (title, subject) values (" +
+                _connection.quote(title) + ", " +
+                std::to_string(selected_subject->id()) + ") returning id"
+                );
+        transaction.commit();
+
+        unsigned long int id = id_row[0].as<unsigned long int>();
+        generated_topic = std::make_shared<topic>(id);
+
+        _stream.write("Topic " + title + " created", console::color::green);
     }
     else
     {
-        if (_stream.read_bool("Create topic " + title, console::color::white))
-        {
-            selected_topic = std::make_shared<topic>(title);
-            
-            if (input_subject->add_topic(selected_topic))
-            {
-                _stream.write("Topic " + title + " in subject " + input_subject->title() + " created", console::color::green);
-            }
-            else
-            {
-                throw std::runtime_error("failed to create new topic");
-            }
-        }
-        else
-        {
-            throw std::runtime_error("Collection cancelled");
-        }
+        unsigned long int id = topic_result[0][0].as<unsigned long int>();
+        generated_topic = std::make_shared<topic>(id);
+
+        _stream.write("Topic " + title + " selected", console::color::dimgreen);
     }
 
-    return selected_topic;
+    selected_subject->add_topic(generated_topic);
+
+    return generated_topic;
 }
 
-std::shared_ptr<practice> library::make_practice(std::shared_ptr<note> input_note)
+std::shared_ptr<practice> library::make_practice(std::shared_ptr<note> selected_note, std::shared_ptr<topic> selected_topic)
 {
+    if (!selected_note || !selected_topic)
+        return nullptr;
+
+    pqxx::transaction insert_tx{_connection};
     std::string question{};
-    std::string description{input_note->description()};
+    std::string answer{selected_note->description()};
+    std::shared_ptr<practice> generated_practice{};
 
     if (_stream.read_bool("Overwrite question", console::color::white))
         question = _stream.read_string("Question", console::color::white);
     else
-        question = input_note->title();
+        question = selected_note->title();
 
-    return std::make_shared<practice>(question, description);
+    pqxx::row id_row = insert_tx.exec1(
+        "insert into practices (question, answer, topic, origin) values ("s +
+        _connection.quote(question) + ", " +
+        _connection.quote(answer) + ", " +
+        std::to_string(selected_topic->id()) + ", " +
+        std::to_string(selected_note->id()) + ") returning id"
+    );
+    insert_tx.commit();
+
+    pqxx::transaction update_tx{_connection};
+    update_tx.exec0(
+        "update notes set collected = true where id = "s +
+        std::to_string(selected_note->id())
+    );
+    update_tx.commit();
+
+    unsigned long int id = id_row[0].as<unsigned long int>();
+
+    generated_practice = std::make_shared<practice>(id);
+    generated_practice->question(question);
+    generated_practice->answer(answer);
+
+    return generated_practice;
 }

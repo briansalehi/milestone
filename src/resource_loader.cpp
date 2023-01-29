@@ -44,23 +44,33 @@ void resource_loader::add_resource(unsigned long int const id)
         from resources where id = )"s + tx.quote(std::to_string(id))
     );
     pqxx::result notes = tx.exec(
-        R"(select title, description, position, collected, collectable
+        R"(select id, title, description, position, collected, collectable
         from notes where resource = )"s + tx.quote(std::to_string(id))
     );
     tx.commit();
 
+    std::string resource_name{resource_info[0].as<std::string>()};
+
+    std::string resource_description{};
+    if (!resource_info[1].is_null())
+        resource_description = resource_description = resource_info[1].as<std::string>();
+
+    std::string resource_link{};
+    if (!resource_info[2].is_null())
+        resource_link = resource_info[2].as<std::string>();
+
     std::shared_ptr<book> partial_book = std::make_shared<book>();
-    partial_book->name(resource_info[0].as<std::string>());
-    partial_book->description(resource_info[1].is_null() ? std::string{} : resource_info[1].as<std::string>());
-    partial_book->link(resource_info[2].is_null() ? std::string() : resource_info[2].as<std::string>());
+    partial_book->name(resource_name);
+    partial_book->description(resource_description);
+    partial_book->link(resource_link);
 
     std::ranges::for_each(notes, [&partial_book](pqxx::row const& record) {
-        std::shared_ptr<note> partial_note = std::make_shared<note>();
-        partial_note->title(record[0].as<std::string>());
-        partial_note->description(record[1].is_null() ? std::string{} : record[1].as<std::string>());
-        partial_note->position(record[2].is_null() ? std::string{} : record[2].as<std::string>());
-        partial_note->collected(record[3].as<bool>());
-        partial_note->collectable(record[4].as<bool>());
+        std::shared_ptr<note> partial_note = std::make_shared<note>(record[0].as<unsigned long int>());
+        partial_note->title(record[1].as<std::string>());
+        partial_note->description(record[2].is_null() ? std::string{} : record[2].as<std::string>());
+        partial_note->position(record[3].is_null() ? std::string{} : record[3].as<std::string>());
+        partial_note->collected(record[4].as<bool>());
+        partial_note->collectable(record[5].as<bool>());
 
         partial_book->add_note(std::move(partial_note));
     });

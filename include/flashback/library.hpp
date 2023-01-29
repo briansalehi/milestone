@@ -272,11 +272,12 @@ private:
 
     std::shared_ptr<topic> take_topic(std::shared_ptr<subject>);
 
-    std::shared_ptr<practice> make_practice(std::shared_ptr<note>);
+    std::shared_ptr<practice> make_practice(std::shared_ptr<note>, std::shared_ptr<topic>);
 
 private:
     console _stream;
     std::string _database_address;
+    pqxx::connection _connection;
     std::vector<std::string> _note_actions;
     std::vector<std::string> _resource_actions;
     std::vector<std::string> _library_actions;
