@@ -5,6 +5,7 @@ create table if not exists reference_list (
     value varchar(2000) not null,
     practice integer references practices(id),
     creation_date date not null default date(now()),
+    modification_date date,
     /* created_by integer references user (id), */
     primary key (id)
 );

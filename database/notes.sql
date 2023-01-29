@@ -9,6 +9,7 @@ create table if not exists notes (
     collectable bool not null default true,
     resource integer references resources(id),
     creation_date date not null default date(now()),
+    modification_date date,
     /* created_by integer references user (id), */
     primary key (id)
 );

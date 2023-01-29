@@ -5,6 +5,7 @@ create table if not exists topics (
     title varchar(50) not null,
     subject integer references subjects(id),
     creation_date date not null default date(now()),
+    modification_date date,
     /* created_by integer references users (id), */
     primary key (id)
 );

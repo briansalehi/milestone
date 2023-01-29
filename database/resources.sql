@@ -7,6 +7,7 @@ create table if not exists resources (
     purchase_link varchar(2000),
     full_coverage bool not null default false,
     creation_date date not null default date(now()),
+    modification_date date,
     /* created_by integer references user (id), */
     primary key (id)
 );

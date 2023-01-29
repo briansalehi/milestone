@@ -9,6 +9,7 @@ create table if not exists practices (
     topic integer references topics (id),
     origin integer references notes (id),
     creation_date date not null default date(now()),
+    modification_date date,
     /* created_by integer references user (id), */
     primary key (id)
 );
