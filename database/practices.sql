@@ -8,6 +8,8 @@ create table if not exists practices (
     elapsed_time integer not null default 0,
     topic integer references topics (id),
     origin integer references notes (id),
+    creation_date date not null default date(now()),
+    /* created_by integer references user (id), */
     primary key (id)
 );
 

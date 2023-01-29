@@ -108,8 +108,12 @@ do
 
     if [ -z "$resource_id" ]
     then
-        resource_id="$($sql_command_with_return "$insert_sql" 2>>/tmp/importer.log | sed '1d' | grep -v 'INSERT')"
-        echo -e "\e[1;32m"" Imported\e[0m"
+        if resource_id="$($sql_command_with_return "$insert_sql" 2>>/tmp/importer.log | sed '1d' | grep -v 'INSERT')"
+        then
+            echo -e "\e[1;32m"" Imported\e[0m"
+        else
+            echo -e "\e[1;31m"" Failed\e[0m"
+        fi
     else
         echo -e "\e[1;35m"" Already exists\e[0m"
     fi
