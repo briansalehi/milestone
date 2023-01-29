@@ -19,15 +19,16 @@ bool console::read_bool(std::string_view text, console::color const color)
     brush color_brush{color};
 
     _output << text << "? (N/y) ";
-    char buffer{static_cast<char>(_input.get())};
+    std::string buffer{};
 
-    return buffer == 'y' ? true : false;
+    std::getline(_input, buffer);
+
+    return buffer == "y" ? true : false;
 }
 
 std::string console::read_string()
 {
     std::string buffer;
-    _input.ignore(std::numeric_limits<int>::max(), '\n');
     std::getline(_input, buffer);
 
     if (_input.eof())
@@ -39,7 +40,6 @@ std::string console::read_string()
 std::size_t console::read_size()
 {
     std::string buffer;
-
     std::getline(_input, buffer);
 
     if (_input.eof())
@@ -54,9 +54,9 @@ std::string console::read_string(std::string_view prompt, console::color color)
 {
     brush color_brush{color};
 
-    std::string buffer;
     _output << prompt << ": ";
-    _input.ignore(std::numeric_limits<int>::max(), '\n');
+
+    std::string buffer;
     std::getline(_input, buffer);
 
     if (_input.eof())
