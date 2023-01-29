@@ -357,20 +357,20 @@ std::shared_ptr<subject> library::take_subject()
     pqxx::result subject_result = nontransaction.exec("select id from subjects where title = "s + _connection.quote(title));
     nontransaction.commit();
 
-    if (!_stream.read_bool("Create subject?", console::color::white))
-        return nullptr;
-
     if (subject_result[0][0].is_null())
     {
-        pqxx::transaction transaction{_connection};
+        if (_stream.read_bool("Create subject", console::color::white))
+        {
+            pqxx::transaction transaction{_connection};
 
-        pqxx::row id_row = transaction.exec1("insert into subjects (title) values (" + _connection.quote(title) + ") returning id");
-        transaction.commit();
+            pqxx::row id_row = transaction.exec1("insert into subjects (title) values (" + _connection.quote(title) + ") returning id");
+            transaction.commit();
 
-        unsigned long int id = id_row[0].as<unsigned long int>();
-        generated_subject = std::make_shared<subject>(id);
+            unsigned long int id = id_row[0].as<unsigned long int>();
+            generated_subject = std::make_shared<subject>(id);
 
-        _stream.write("Subject " + title + " created", console::color::green);
+            _stream.write("Subject " + title + " created", console::color::green);
+        }
     }
     else
     {
@@ -403,24 +403,24 @@ std::shared_ptr<topic> library::take_topic(std::shared_ptr<subject> selected_sub
     );
     nontransaction.commit();
 
-    if (!_stream.read_bool("Create topic?", console::color::white))
-        return nullptr;
-
     if (topic_result[0][0].is_null())
     {
-        pqxx::transaction transaction{_connection};
+        if (_stream.read_bool("Create topic", console::color::white))
+        {
+            pqxx::transaction transaction{_connection};
 
-        pqxx::row id_row = transaction.exec1(
-                "insert into topics (title, subject) values (" +
-                _connection.quote(title) + ", " +
-                std::to_string(selected_subject->id()) + ") returning id"
-                );
-        transaction.commit();
+            pqxx::row id_row = transaction.exec1(
+                    "insert into topics (title, subject) values (" +
+                    _connection.quote(title) + ", " +
+                    std::to_string(selected_subject->id()) + ") returning id"
+                    );
+            transaction.commit();
 
-        unsigned long int id = id_row[0].as<unsigned long int>();
-        generated_topic = std::make_shared<topic>(id);
+            unsigned long int id = id_row[0].as<unsigned long int>();
+            generated_topic = std::make_shared<topic>(id);
 
-        _stream.write("Topic " + title + " created", console::color::green);
+            _stream.write("Topic " + title + " created", console::color::green);
+        }
     }
     else
     {
