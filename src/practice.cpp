@@ -44,6 +44,11 @@ practice& practice::operator=(practice&& other) noexcept
     return *this;
 }
 
+unsigned long int practice::id() const
+{
+    return _id;
+}
+
 std::string practice::question() const
 {
     return _question;
