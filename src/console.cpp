@@ -17,10 +17,9 @@ void console::write(std::string_view text, console::color const color, bool cons
 bool console::read_bool(std::string_view text, console::color const color)
 {
     brush color_brush{color};
-    char buffer{};
 
     _output << text << "? (N/y) ";
-    _input >> buffer;
+    char buffer{static_cast<char>(_input.get())};
 
     return buffer == 'y' ? true : false;
 }
@@ -28,7 +27,8 @@ bool console::read_bool(std::string_view text, console::color const color)
 std::string console::read_string()
 {
     std::string buffer;
-    _input >> buffer;
+    _input.ignore(std::numeric_limits<int>::max(), '\n');
+    std::getline(_input, buffer);
 
     if (_input.eof())
         throw std::runtime_error("operation cancelled");
@@ -40,7 +40,7 @@ std::size_t console::read_size()
 {
     std::string buffer;
 
-    _input >> buffer;
+    std::getline(_input, buffer);
 
     if (_input.eof())
         throw std::runtime_error("operation cancelled");
@@ -53,10 +53,11 @@ std::size_t console::read_size()
 std::string console::read_string(std::string_view prompt, console::color color)
 {
     brush color_brush{color};
-    std::string buffer;
 
+    std::string buffer;
     _output << prompt << ": ";
-    _input >> buffer;
+    _input.ignore(std::numeric_limits<int>::max(), '\n');
+    std::getline(_input, buffer);
 
     if (_input.eof())
         throw std::runtime_error("operation cancelled");
@@ -67,11 +68,13 @@ std::string console::read_string(std::string_view prompt, console::color color)
 std::size_t console::read_size(std::string_view prompt, console::color color)
 {
     brush color_brush{color};
-    std::size_t size{};
+    std::string buffer;
 
     _output << prompt << ": ";
 
-    _input >> size;
+    std::getline(_input, buffer);
+
+    std::size_t size{std::stoul(buffer)};
 
     if (_input.eof())
         throw std::runtime_error("operation cancelled");
@@ -100,9 +103,19 @@ console::brush::brush(console::color const picked_color)
             color_code = "\e[1;31m";
             break;
         }
+        case console::color::dimred:
+        {
+            color_code = "\e[31m";
+            break;
+        }
         case console::color::blue:
         {
             color_code = "\e[1;34m";
+            break;
+        }
+        case console::color::dimblue:
+        {
+            color_code = "\e[34m";
             break;
         }
         case console::color::green:
@@ -110,9 +123,19 @@ console::brush::brush(console::color const picked_color)
             color_code = "\e[1;32m";
             break;
         }
+        case console::color::dimgreen:
+        {
+            color_code = "\e[32m";
+            break;
+        }
         case console::color::orange:
         {
             color_code = "\e[1;33m";
+            break;
+        }
+        case console::color::dimorange:
+        {
+            color_code = "\e[33m";
             break;
         }
         case console::color::pink:
@@ -120,9 +143,24 @@ console::brush::brush(console::color const picked_color)
             color_code = "\e[1;35m";
             break;
         }
+        case console::color::dimpink:
+        {
+            color_code = "\e[35m";
+            break;
+        }
         case console::color::white:
         {
             color_code = "\e[1;37m";
+            break;
+        }
+        case console::color::dimwhite:
+        {
+            color_code = "\e[1;37m";
+            break;
+        }
+        case console::color::gray:
+        {
+            color_code = "\e[38m";
             break;
         }
         case console::color::darkred:

@@ -2,6 +2,7 @@
 
 #include <string_view>
 #include <iostream>
+#include <numeric>
 #include <string>
 
 namespace flashback
@@ -10,7 +11,9 @@ namespace flashback
 class console
 {
 public:
-    enum class color {reset,red,blue,green,orange,pink,white,darkred};
+    enum class color {
+        reset, red, dimred, blue, dimblue, green, dimgreen,
+        orange, dimorange, pink, dimpink, white, dimwhite, gray, darkred};
 
     explicit console(std::ostream&, std::istream&);
 
