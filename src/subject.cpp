@@ -56,10 +56,10 @@ std::queue<std::shared_ptr<practice>> subject::queue_practices() const
 
 bool subject::operator==(subject const& other) const
 {
-    return _title == other.title();
+    return _id == other.id();
 }
 
 bool subject::operator<(subject const& other) const
 {
-    return _title < other.title();
+    return _id == other.id(); // this needs to be replaced by creation_date
 }

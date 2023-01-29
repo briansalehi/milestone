@@ -118,7 +118,7 @@ void practice::elapsed_time(std::chrono::seconds const elapsed_time)
     
 bool practice::operator==(practice const& other)
 {
-    return last_usage() == other.last_usage() && _question == other.question();
+    return _id == other.id();
 }
 
 bool practice::operator<(practice const& other)

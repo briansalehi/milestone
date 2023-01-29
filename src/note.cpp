@@ -84,5 +84,5 @@ bool note::operator<(note const& other)
 
 bool note::operator!=(note const& other)
 {
-    return _position != other._position;
+    return _id != other.id();
 }
