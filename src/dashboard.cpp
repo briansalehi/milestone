@@ -5,15 +5,15 @@ using namespace flashback;
 using namespace std::literals::string_literals;
 using namespace std::literals::string_view_literals;
 
-dashboard::dashboard(): _stream{std::cerr, std::cin}
+dashboard::dashboard(): _stream{std::cin, std::cout}
 {
 }
 
 void dashboard::open()
 {
-    std::string space_name = prompt_space();
-    std::shared_ptr<space> active_space = build_space(space_name);
-    enter_space(active_space);
+    char space_id = prompt_space();
+    std::shared_ptr<space> selected_space = build_space(space_id);
+    enter_space(selected_space);
 }
 
 constexpr std::vector<std::string> dashboard::space_names() const
@@ -21,61 +21,57 @@ constexpr std::vector<std::string> dashboard::space_names() const
     return {"library", "trainer", "tutorials", "roadmap"};
 }
 
-std::string dashboard::prompt_space()
+char dashboard::prompt_space()
 {
-    _stream.clear();
-    _stream.write("Enter one of the spaces to continue: ", console::color::white, false);
-
-    std::size_t space_index{};
-
-    auto index_space = [space_index, this](std::string_view space_name) mutable {
-        _stream.write(std::to_string(++space_index) + ". "s + std::string{space_name} + "  "s, console::color::orange, false);
+    std::vector<std::string> spaces {
+        "[i] library",
+        "[t] trainer",
+        "[u] tutorials",
+        "[r] roadmap"
     };
 
-    std::ranges::for_each(space_names(), index_space);
+    char selected_space;
 
-    std::string selection{};
+    _stream.clear();
+    _stream << style::bold << color::blue;
+    _stream.header("Flashback");
+    _stream << style::bold << color::white << "\n";
+    _stream << "Enter one of the spaces to continue:\n\n";
+    _stream << color::pink;
 
-    selection = _stream.read_string("\nSpace", console::color::white); // throws
+    //std::ranges::for_each(spaces, std::ostream_iterator<char>(std::cout, "\n"));
+    std::ranges::for_each(spaces, [](std::string const& s) {
+        std::cout << "  " << s << "\n";
+    });
 
-    space_index = std::stoi(selection) - 1; // throws
+    _stream << color::white;
+    _stream << "\nSpace: ";
 
-    if (space_index >= space_names().size())
-        throw std::out_of_range("out of range");
+    std::cin >> selected_space;
+    _stream << color::reset;
 
-    selection = space_names().at(space_index);
-
-    return selection;
+    return selected_space;
 }
 
-std::shared_ptr<space> dashboard::build_space(std::string_view space_name)
+std::shared_ptr<space> dashboard::build_space(char space_id)
 {
-    if (space_name == "library")
+    std::shared_ptr<space> selected_space{};
+
+    switch (space_id)
     {
-        return std::make_shared<library>("postgres://postgres@localhost/flashback");
+        case 'i': selected_space = std::make_shared<library>(); break;
+        case 't': selected_space = std::make_shared<trainer>(); break;
+        case 'u': selected_space = nullptr; break;
+        case 'r': selected_space = nullptr; break;
     }
-    else if (space_name == "trainer")
-    {
-        return std::make_shared<trainer>();
-    }
-    else if (space_name == "tutorials")
-    {
-        return nullptr;
-    }
-    else if (space_name == "milestone")
-    {
-        return nullptr;
-    }
-    else
-    {
-        return nullptr;
-    }
+
+    return selected_space;
 }
 
-void dashboard::enter_space(std::shared_ptr<space> active_space)
+void dashboard::enter_space(std::shared_ptr<space> selected_space)
 {
-    if (active_space)
-        active_space->init();
+    if (selected_space)
+        selected_space->init();
     else
         throw std::runtime_error("cannot initialize space");
 }

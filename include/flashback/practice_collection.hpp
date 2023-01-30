@@ -19,7 +19,7 @@ public:
     std::vector<std::shared_ptr<practice>> collect_practices() override;
 
 private:
-    console _console;
+    console<std::istream, std::ostream> _console;
     std::vector<std::shared_ptr<practice>> _practices;
 };
 

@@ -17,6 +17,9 @@ namespace flashback
 class dashboard
 {
 public:
+    using color = console<std::istream, std::ostream>::color;
+    using style = console<std::istream, std::ostream>::style;
+
     dashboard();
 
     constexpr std::vector<std::string> space_names() const;
@@ -24,14 +27,14 @@ public:
     void open();
 
 private:
-    std::shared_ptr<space> build_space(std::string_view);
+    std::shared_ptr<space> build_space(char);
 
-    std::string prompt_space();
+    char prompt_space();
 
     void enter_space(std::shared_ptr<space>);
 
 private:
-    console _stream;
+    console<std::istream, std::ostream> _stream;
 };
 
 } // flashback

@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <iostream>
+#include <iterator>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -230,15 +231,13 @@ class practice;
 class library: public space
 {
 public:
-    enum class library_actions {undefined, list_resources, search_resource};
-    enum class resource_actions {undefined, extract, show, add, edit, remove};
-    enum class note_actions {undefined, expand, next, previous, add, edit, remove};
+    using color = console<std::istream, std::ostream>::color;
+    using style = console<std::istream, std::ostream>::style;
 
-    explicit library(std::string const&);
+    library();
 
     std::size_t count() const;
 
-public:
     ///
     /// Resources should be loaded in initialization.
     /// They should be sorted either by recent usage of user
@@ -250,11 +249,11 @@ public:
 private:
     void select_resource();
 
-    library_actions prompt_library_actions();
+    char prompt_library_actions();
 
-    resource_actions prompt_resource_actions();
+    char prompt_resource_actions();
 
-    note_actions prompt_note_actions();
+    char prompt_note_actions();
 
     void perform_library_actions();
 
@@ -275,7 +274,7 @@ private:
     std::shared_ptr<practice> make_practice(std::shared_ptr<note>, std::shared_ptr<topic>);
 
 private:
-    console _stream;
+    console<std::istream, std::ostream> _stream;
     std::string _database_address;
     pqxx::connection _connection;
     std::vector<std::string> _note_actions;

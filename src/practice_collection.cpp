@@ -5,7 +5,7 @@ using namespace std::literals::chrono_literals;
 
 practice_collection::practice_collection(std::vector<std::shared_ptr<practice>> const practices):
     _practices{practices},
-    _console{std::cerr, std::cin}
+    _console{std::cin, std::cout}
 {
 }
 

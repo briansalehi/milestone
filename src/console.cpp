@@ -2,182 +2,88 @@
 
 using namespace flashback;
 
-console::console(std::ostream& output, std::istream& input):
-    _output{output},
-    _input{input}
+/*
+template <typename I, typename O>
+console<I, O>::console(I& input, O& output): _input{input}, _output{output}
 {
 }
 
-void console::write(std::string_view text, console::color const color, bool const newline)
-{
-    brush color_brush{color};
-    _output << text << (newline ? "\n" : " ");
-}
-
-bool console::read_bool(std::string_view text, console::color const color)
-{
-    brush color_brush{color};
-
-    _output << text << "? (N/y) ";
-    std::string buffer{};
-
-    std::getline(_input, buffer);
-
-    return buffer == "y" ? true : false;
-}
-
-std::string console::read_string()
-{
-    std::string buffer;
-    std::getline(_input, buffer);
-
-    if (_input.eof())
-        throw std::runtime_error("operation cancelled");
-
-    return buffer;
-}
-
-std::size_t console::read_size()
-{
-    std::string buffer;
-    std::getline(_input, buffer);
-
-    if (_input.eof())
-        throw std::runtime_error("operation cancelled");
-
-    std::size_t size{std::stoul(buffer)};
-    
-    return size;
-}
-
-std::string console::read_string(std::string_view prompt, console::color color)
-{
-    brush color_brush{color};
-
-    _output << prompt << ": ";
-
-    std::string buffer;
-    std::getline(_input, buffer);
-
-    if (_input.eof())
-        throw std::runtime_error("operation cancelled");
-
-    return buffer;
-}
-
-std::size_t console::read_size(std::string_view prompt, console::color color)
-{
-    brush color_brush{color};
-    std::string buffer;
-
-    _output << prompt << ": ";
-
-    std::getline(_input, buffer);
-
-    std::size_t size{std::stoul(buffer)};
-
-    if (_input.eof())
-        throw std::runtime_error("operation cancelled");
-
-    return size;
-}
-
-void console::clear()
+template <typename I, typename O>
+void console<I, O>::clear()
 {
     _output << "\e[2J\e[1;1H";
 }
 
-console::brush::brush(console::color const picked_color)
+template <typename I, typename O>
+template <typename T>
+void console<I, O>::header(T const& printable_object)
+{
+    _output << style::reverse;
+    _output.width(90);
+    _output << printable_object;
+}
+
+template <typename I, typename O>
+template <typename T>
+console<I, O>& console<I, O>::operator>>(T const& writable_object)
+{
+    _input >> writable_object;
+
+    return *this;
+}
+
+template <typename I, typename O>
+template <typename T>
+console<I, O>& console<I, O>::operator<<(T const& printable_object)
+{
+    _output << printable_object; 
+
+    return *this;
+}
+
+template <typename I, typename O>
+console<I, O>& console<I, O>::operator<<(console<I, O>::color const picked_color)
 {
     std::string color_code{};
 
     switch (picked_color)
     {
-        case console::color::reset:
-        {
-            color_code = "\e[0m";
-            break;
-        }
-        case console::color::red:
-        {
-            color_code = "\e[1;31m";
-            break;
-        }
-        case console::color::dimred:
-        {
-            color_code = "\e[31m";
-            break;
-        }
-        case console::color::blue:
-        {
-            color_code = "\e[1;34m";
-            break;
-        }
-        case console::color::dimblue:
-        {
-            color_code = "\e[34m";
-            break;
-        }
-        case console::color::green:
-        {
-            color_code = "\e[1;32m";
-            break;
-        }
-        case console::color::dimgreen:
-        {
-            color_code = "\e[32m";
-            break;
-        }
-        case console::color::orange:
-        {
-            color_code = "\e[1;33m";
-            break;
-        }
-        case console::color::dimorange:
-        {
-            color_code = "\e[33m";
-            break;
-        }
-        case console::color::pink:
-        {
-            color_code = "\e[1;35m";
-            break;
-        }
-        case console::color::dimpink:
-        {
-            color_code = "\e[35m";
-            break;
-        }
-        case console::color::white:
-        {
-            color_code = "\e[1;37m";
-            break;
-        }
-        case console::color::dimwhite:
-        {
-            color_code = "\e[1;37m";
-            break;
-        }
-        case console::color::gray:
-        {
-            color_code = "\e[38m";
-            break;
-        }
-        case console::color::darkred:
-        {
-            color_code = "\e[1;27m";
-            break;
-        }
-        default:
-        {
-            color_code = "\e[0m";
-        }
+        case color::reset:      color_code = "\e[0m";
+        case color::red:        color_code = "\e[31m";
+        case color::green:      color_code = "\e[32m";
+        case color::orange:     color_code = "\e[33m";
+        case color::blue:       color_code = "\e[34m";
+        case color::pink:       color_code = "\e[35m";
+        case color::cyan:       color_code = "\e[36m";
+        case color::white:      color_code = "\e[37m";
+        case color::gray:       color_code = "\e[38m";
+        default:                color_code = "\e[0m";
     }
 
-    std::cerr << color_code;
+    _output << color_code;
+
+    return *this;
 }
 
-console::brush::~brush()
+template <typename I, typename O>
+console<I, O>& console<I, O>::operator<<(console<I, O>::style const picked_style)
 {
-    std::cerr << "\e[0m";
+    std::string style_code;
+
+    switch (picked_style)
+    {
+        case style::newline:    style_code = "\n";
+        case style::bold:       style_code = "\e[1m";
+        case style::dim:        style_code = "\e[2m";
+        case style::italic:     style_code = "\e[3m";
+        case style::underline:  style_code = "\e[4m";
+        case style::blink:      style_code = "\e[5m";
+        case style::reverse:    style_code = "\e[7m";
+        case style::strike:     style_code = "\e[9m";
+        default:                style_code = "\e[0m";
+    }
+    _output << style_code;
+
+    return *this;
 }
+*/

@@ -17,12 +17,14 @@ namespace flashback
 class trainer: public space
 {
 public:
+    using color = console<std::istream, std::ostream>::color;
+
     trainer();
 
     void init() override;
 
 private:
-    console _stream;
+    console<std::istream, std::ostream> _stream;
     std::queue<std::shared_ptr<practice>> _practice_queue;
 };
 
