@@ -1,8 +1,8 @@
-#include <flashback/note.hpp>
-#include <flashback/subject.hpp>
-#include <flashback/topic.hpp>
 #include <flashback/practice.hpp>
 #include <flashback/library.hpp>
+#include <flashback/subject.hpp>
+#include <flashback/topic.hpp>
+#include <flashback/note.hpp>
 
 using namespace flashback;
 using namespace std::literals::string_literals;
@@ -191,6 +191,12 @@ void library::perform_note_actions(unsigned int const resource_index, unsigned i
 
 void library::select_resource()
 {
+    pqxx::work resource_query{_connection};
+    pqxx::result resources = resource_query.exec(
+        "select id, name, full_coverage from resources"
+    );
+    resource_query.commit();
+
     _stream.clear();
     _stream << color::red;
     _stream.header("Flashback >> Library >> Resources");
@@ -199,46 +205,46 @@ void library::select_resource()
     unsigned int index{};
     unsigned int resource_index{};
 
-    auto writer = [&index, this](auto const& res) mutable {
-        _stream << ++index << ". " << res->name() << "\n";
+    auto writer = [&index, this](pqxx::row const& res) mutable {
+        _stream << ++index << ". " << res[1].as<std::string>() << "\n";
     };
 
     _stream << style::bold << color::blue << "\n";
-    std::ranges::for_each(_resources, writer);
+    std::ranges::for_each(resources, writer);
 
-    _stream << color::white;
-    _stream << "\nSelect a resource: ";
-    std::cin >> resource_index;
-    resource_index--;
-    _stream << color::reset;
+    while (std::cin.good())
+    {
+        _stream << color::white;
+        _stream << "\nSelect a resource: ";
+        std::cin >> resource_index;
+        resource_index--;
+        _stream << color::reset;
 
-    if (resource_index < 0 || resource_index > _resources.size())
-        throw std::out_of_range("out of range");
-    else
-        _stream.clear();
+        if (resource_index < resources.size())
+            break;
 
-    std::shared_ptr<resource> selected_resource = _resources.at(resource_index);
-    unsigned int note_count = selected_resource->notes().size();
-    unsigned int collected = std::ranges::count_if(
-        selected_resource->notes(),
-        [](std::shared_ptr<note> note) { return note->collected(); }
-    );
-    unsigned int collectable = std::ranges::count_if(
-        selected_resource->notes(),
-        [](std::shared_ptr<note> note) { return note->collectable(); }
-    );
+        _stream << style::bold << color::red;
+        _stream << "Invalid resource index, try again!\n";
+        _stream << color::reset;
+    }
 
+    pqxx::row row = resources[resource_index];
+    unsigned int note_count{0};
+    unsigned int collected{0};
+    unsigned int collectable{0};
+
+    _stream.clear();
     _stream << color::red;
     _stream.header("Flashback >> Library >> Resources");
     _stream << style::bold << color::orange << "\n";
-    _stream << selected_resource->name();
+    _stream << row[1].as<std::string>();
     _stream << style::bold << color::green << " (";
     _stream << note_count << " notes available, ";
     _stream << collectable << " collectable, ";
     _stream << collected << " collected)\n";
     _stream << color::reset;
 
-    perform_resource_actions(resource_index);
+    perform_resource_actions(++resource_index);
 }
 
 void library::view_note(unsigned int const resource_index)
@@ -266,74 +272,120 @@ void library::view_note_description(std::size_t const resource_index, std::size_
 
 void library::extract_notes(std::size_t const resource_index)
 {
+    pqxx::work uncollected_query{_connection};
+    pqxx::result uncollected_notes = uncollected_query.exec(
+        "select id, title, description, position, collected, collectable"s
+        + " from notes where resource = "s
+        + std::to_string(resource_index)
+        + " and collected = false and collectable = true"s
+    );
+    uncollected_query.commit();
+
+    std::ranges::for_each(uncollected_notes, [this](pqxx::row const& note_row) {
+        prompt_extraction_actions(note_row);
+    });
+    //std::ranges::copy(uncollected_notes, std::ref(prompt_extraction_actions));
+}
+
+void library::prompt_extraction_actions(pqxx::row const& note_row)
+{
     std::vector<std::string> actions{
         "[x] export to practice",
-        "[c] mark not collectable",
+        "[n] mark not collectable",
+        "[c] mark collectable",
         "[s] skip this note",
         "[q] quit"
     };
 
-    for (auto selected_note: _resources.at(resource_index)->notes())
+    char action;
+    auto selected_note = std::make_shared<note>(note_row[0].as<unsigned long>());
+    selected_note->title(note_row[1].as<std::string>());
+    selected_note->description(note_row[2].as<std::string>());
+    selected_note->position(note_row[3].as<std::string>());
+    selected_note->collected(note_row[4].as<bool>());
+    selected_note->collectable(note_row[5].as<bool>());
+
+    _stream.clear();
+    _stream << color::red;
+    _stream.header("Flashback >> Library >> Resources");
+    _stream << style::bold << color::orange << "\n";
+    _stream << selected_note->title() << "\n\n";
+    _stream << color::reset << style::dim << color::white;
+    _stream << selected_note->description() << "\n\n";
+    _stream << color::reset << style::bold << color::white;
+    _stream << "Select an action:\n\n";
+    _stream << color::pink;
+
+    //std::ranges::copy(actions, std::ostream_iterator<int>(std::cout, "\n"));
+    std::ranges::for_each(actions, [](std::string const& s) {
+        std::cout << "  " << s << "\n";
+    });
+
+    _stream << style::bold << color::white;
+    _stream << "\nAction: ";
+    std::cin >> action;
+    _stream << color::reset;
+
+    switch (action)
     {
-        char action;
-
-        _stream.clear();
-        _stream << color::red;
-        _stream.header("Flashback >> Library >> Resources");
-        _stream << style::bold << color::orange << "\n";
-        _stream << selected_note->title() << "\n";
-        _stream << color::reset << style::dim << color::white;
-        _stream << selected_note->description();
-        _stream << color::reset << style::bold << color::white;
-        _stream << "\n\nSelect an action:\n\n";
-        _stream << color::pink;
-
-        //std::ranges::copy(actions, std::ostream_iterator<int>(std::cout, "\n"));
-        std::ranges::for_each(actions, [](std::string const& s) {
-            std::cout << "  " << s << "\n";
-        });
-
-        _stream << style::bold << color::white;
-        _stream << "\nAction: ";
-        std::cin >> action;
-        _stream << color::reset;
-
-        switch (action)
+        case 'x':
         {
-            case 'x':
-            {
-                std::shared_ptr<subject> selected_subject = take_subject();
-                if (!selected_subject)
-                    continue;
-
-                std::shared_ptr<topic> selected_topic = take_topic(selected_subject);
-                if (!selected_topic)
-                    continue;
-
-                std::shared_ptr<practice> result = make_practice(selected_note, selected_topic);
-                if (!result)
-                    continue;
-
-                selected_topic->add_practice(result);
-
-                _stream << color::green;
-                _stream << "Practice imported into ";
-                _stream << selected_subject->title();
-                _stream << ", " << selected_topic->title();
+            std::shared_ptr<subject> selected_subject = take_subject();
+            if (!selected_subject)
                 break;
-            }
-            case 'c':
-            {
+
+            std::shared_ptr<topic> selected_topic = take_topic(selected_subject);
+            if (!selected_topic)
                 break;
-            }
-            case 's':
-            {
+
+            std::shared_ptr<practice> result = make_practice(selected_note, selected_topic);
+            if (!result)
                 break;
-            }
-            case 'q':
-            {
-                break;
-            }
+
+            selected_topic->add_practice(result);
+
+            _stream << color::green;
+            _stream << "Practice imported into ";
+            _stream << selected_subject->title();
+            _stream << ", " << selected_topic->title();
+            std::cin.get();
+            break;
+        }
+        case 'n':
+        {
+            pqxx::work marking_query{_connection};
+            marking_query.exec0(
+                "update notes set collectable = false where id = "
+                + std::to_string(selected_note->id())
+            );
+            marking_query.commit();
+
+            _stream << style::bold << color::green;
+            _stream << "Note marked as not collectable";
+            _stream << color::reset;
+            break;
+        }
+        case 'c':
+        {
+            pqxx::work marking_query{_connection};
+            marking_query.exec0(
+                "update notes set collectable = true where id = "
+                + std::to_string(selected_note->id())
+            );
+            marking_query.commit();
+
+            _stream << style::bold << color::green;
+            _stream << "Note marked as collectable";
+            _stream << color::reset;
+            break;
+        }
+        case 's':
+        {
+            break;
+        }
+        case 'q':
+        {
+            return;
         }
     }
 }
@@ -347,7 +399,8 @@ std::shared_ptr<subject> library::take_subject()
 
     _stream << style::bold << color::white;
     _stream << "Enter subject name: ";
-    std::cin >> title;
+    std::cin.ignore();
+    std::getline(std::cin, title);
     _stream << color::reset;
 
     if (title.empty())
@@ -421,7 +474,7 @@ std::shared_ptr<topic> library::take_topic(std::shared_ptr<subject> selected_sub
 
     _stream << style::bold << color::white;
     _stream << "Enter topic name: ";
-    std::cin >> title;
+    std::getline(std::cin, title);
     _stream << color::reset;
 
     if (title.empty())
@@ -440,7 +493,6 @@ std::shared_ptr<topic> library::take_topic(std::shared_ptr<subject> selected_sub
 
         _stream << style::bold << color::white;
         _stream << "Create topic? [N/y] ";
-        std::cin.get();
         std::cin >> confirmed;
         _stream << color::reset;
 
@@ -511,7 +563,8 @@ std::shared_ptr<practice> library::make_practice(std::shared_ptr<note> selected_
         {
             _stream << style::bold << color::white;
             _stream << "Question: ";
-            std::cin >> question;
+            std::cin.ignore();
+            std::getline(std::cin, question);
             _stream << color::reset;
             break;
         }

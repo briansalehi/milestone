@@ -63,6 +63,7 @@ std::shared_ptr<space> dashboard::build_space(char space_id)
         case 't': selected_space = std::make_shared<trainer>(); break;
         case 'u': selected_space = nullptr; break;
         case 'r': selected_space = nullptr; break;
+        default: throw std::invalid_argument("incorrect space");
     }
 
     return selected_space;

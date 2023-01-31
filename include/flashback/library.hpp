@@ -255,6 +255,8 @@ private:
 
     char prompt_note_actions();
 
+    void prompt_extraction_actions(pqxx::row const&);
+
     void perform_library_actions();
 
     void perform_resource_actions(unsigned int const);
