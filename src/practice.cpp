@@ -103,12 +103,16 @@ void practice::add_source(std::shared_ptr<source> origin)
 
 std::chrono::days practice::last_usage() const
 {
-    return std::chrono::duration_cast<std::chrono::days>(std::chrono::steady_clock::now() - _last_usage);
+    return _last_usage;
+}
+
+void practice::last_usage(std::chrono::days const days)
+{
+    _last_usage = days;
 }
 
 void practice::reset_usage()
 {
-    _last_usage -= _last_usage.time_since_epoch();
 }
 
 std::chrono::seconds practice::elapsed_time() const

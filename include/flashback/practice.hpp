@@ -42,6 +42,7 @@ public:
     */
 
     std::chrono::days last_usage() const;
+    void last_usage(std::chrono::days const);
     void reset_usage();
 
     std::chrono::seconds elapsed_time() const;
@@ -56,7 +57,7 @@ private:
     std::string _question;
     std::string _answer;
     std::vector<std::shared_ptr<reference>> _references;
-    std::chrono::time_point<std::chrono::steady_clock, std::chrono::days> _last_usage;
+    std::chrono::days _last_usage;
     std::chrono::seconds _elapsed_time;
 };
 

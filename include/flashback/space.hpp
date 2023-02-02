@@ -41,6 +41,10 @@ class space
 {
 public:
     virtual void init() = 0;
+
+protected:
+    virtual char prompt_space_actions() = 0;
+    virtual void perform_space_actions() = 0;
 };
 
 } // flashback

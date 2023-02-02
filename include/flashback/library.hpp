@@ -17,6 +17,7 @@
 #include <ranges>
 #include <vector>
 #include <set>
+#include <map>
 
 namespace flashback
 {
@@ -246,18 +247,19 @@ public:
     ///
     virtual void init() override;
 
+protected:
+    virtual char prompt_space_actions() override;
+
+    virtual void perform_space_actions() override;
+
 private:
     void select_resource();
 
-    char prompt_library_actions();
-
-    char prompt_resource_actions();
+    char prompt_resource_actions(unsigned int const);
 
     char prompt_note_actions();
 
     void prompt_extraction_actions(pqxx::row const&);
-
-    void perform_library_actions();
 
     void perform_resource_actions(unsigned int const);
 
@@ -279,9 +281,6 @@ private:
     console<std::istream, std::ostream> _stream;
     std::string _database_address;
     pqxx::connection _connection;
-    std::vector<std::string> _note_actions;
-    std::vector<std::string> _resource_actions;
-    std::vector<std::string> _library_actions;
     std::vector<std::shared_ptr<resource>> _resources;
     std::set<std::shared_ptr<subject>> _subjects;
 };

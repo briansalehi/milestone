@@ -7,45 +7,10 @@
 using namespace flashback;
 using namespace std::literals::string_literals;
 
-constexpr std::string library_action_list{"list resources"};
-constexpr std::string library_action_search{"search resource"};
-
-constexpr std::string resource_action_extract{"extract notes"};
-constexpr std::string resource_action_view{"view notes"};
-constexpr std::string resource_action_add{"add resource"};
-constexpr std::string resource_action_edit{"edit resource"};
-constexpr std::string resource_action_remove{"remove resource"};
-
-constexpr std::string note_action_expand{"expand"};
-constexpr std::string note_action_next{"next"};
-constexpr std::string note_action_previous{"previous"};
-constexpr std::string note_action_add{"add note"};
-constexpr std::string note_action_edit{"edit note"};
-constexpr std::string note_action_remove{"remove note"};
-
 library::library():
-    _library_actions{
-        library_action_list,
-        library_action_search
-    },
-    _resource_actions{
-        resource_action_extract,
-        resource_action_view,
-        resource_action_add,
-        resource_action_edit,
-        resource_action_remove
-    },
-    _note_actions{
-        note_action_expand,
-        note_action_next,
-        note_action_previous,
-        note_action_add,
-        note_action_edit,
-        note_action_remove
-    },
     _stream{std::cin, std::cout},
     _database_address{"postgres://postgres@localhost:5432/flashback"s},
-    _connection{_database_address},
+    _connection{"postgres://postgres@localhost:5432/flashback"s},
     _resources{},
     _subjects{}
 {
@@ -67,7 +32,7 @@ library::library():
 
 void library::init()
 {
-    perform_library_actions();
+    perform_space_actions();
 }
 
 std::size_t library::count() const
@@ -75,21 +40,24 @@ std::size_t library::count() const
     return _resources.size();
 }
 
-char library::prompt_library_actions()
+char library::prompt_space_actions()
 {
-    std::vector<std::string> actions{
-        "[i] list resources",
-        "[s] search resource"
-    };
-
-    char action;
-
     _stream << style::bold << color::white;
     _stream << "\nSelect an action:\n\n";
     _stream << color::pink;
 
-    //std::ranges::copy(actions, std::ostream_iterator<int>(std::cout, "\n"));
-    std::ranges::for_each(actions, [](std::string const& s) { std::cout << "  " << s << "\n"; });
+    std::map<char, std::string> actions{
+        {'i', "select resource from list"},
+        {'s', "search resource"}
+    };
+
+    auto print_action = [](std::pair<char, std::string> const& action) {
+        std::cout << "  [" << action.first << "] " << action.second << "\n";
+    };
+
+    std::ranges::for_each(actions, print_action);
+
+    char action;
 
     _stream << color::white;
     _stream << "\nAction: ";
@@ -99,24 +67,45 @@ char library::prompt_library_actions()
     return action;
 }
 
-char library::prompt_resource_actions()
+char library::prompt_resource_actions(unsigned int const resource_index)
 {
-    std::vector<std::string> actions{
-        "[x] export notes",
-        "[v] view notes",
-        "[a] add resource",
-        "[e] edit resource",
-        "[r] remove resource (restricted)"
-    };
+    pqxx::work collectable_query{_connection};
+    pqxx::field count_field = collectable_query.exec(
+        "select count(n.id) from resources r "s +
+        "inner join notes n on r.id = n.resource "s +
+        "where n.collectable = true and n.collected = false "s +
+        "and r.id = " + std::to_string(resource_index) +
+        " group by (n.id)"
+    )[0][0];
+    collectable_query.commit();
 
-    char action;
+    std::size_t uncollected_count{};
+
+    if (count_field.is_null())
+        uncollected_count = 0;
+    else
+        uncollected_count = count_field.as<std::size_t>();
 
     _stream << style::bold << color::white;
     _stream << "\nSelect an action:\n\n";
     _stream << color::pink;
 
-    //std::ranges::copy(actions, std::ostream_iterator<int>(std::cout, "\n"));
-    std::ranges::for_each(actions, [](std::string const& s) { std::cout << "  " << s << "\n"; });
+    std::map<char, std::string> actions{
+        {'v', "view notes"},
+        {'e', "edit resource"},
+        {'r', "remove resource (restricted)"}
+    };
+
+    if (uncollected_count > 0)
+        actions.insert({'x', "export notes"});
+
+    auto print_action = [](std::pair<char, std::string> const& action) {
+        std::cout << "  [" << action.first << "] " << action.second << "\n";
+    };
+
+    std::ranges::for_each(actions, print_action);
+
+    char action;
 
     _stream << color::white;
     _stream << "\nAction: ";
@@ -128,22 +117,25 @@ char library::prompt_resource_actions()
 
 char library::prompt_note_actions()
 {
-    std::vector<std::string> actions{
-        "[x] export to practice",
-        "[m] mark as not collectable",
-        "[n] next note",
-        "[e] edit note",
-        "[r] remove note"
-    };
-
-    char action;
-
     _stream << style::bold << color::white;
     _stream << "Select an action:\n\n";
     _stream << color::pink;
 
-    //std::ranges::copy(actions, std::ostream_iterator<int>(std::cout, "\n"));
-    std::ranges::for_each(actions, [](std::string const& s) { std::cout << s << "\n"; });
+    std::map<char, std::string> actions{
+        {'x', "export to practice"},
+        {'m', "mark as not collectable"},
+        {'n', "next note"},
+        {'e', "edit note"},
+        {'r', "remove note"}
+    };
+
+    auto print_action = [](std::pair<char, std::string> const& action) {
+        std::cout << "  [" << action.first << "] " << action.second << "\n";
+    };
+
+    std::ranges::for_each(actions, print_action);
+
+    char action;
 
     _stream << color::white;
     _stream << "\nAction";
@@ -153,9 +145,9 @@ char library::prompt_note_actions()
     return action;
 }
 
-void library::perform_library_actions()
+void library::perform_space_actions()
 {
-    switch (prompt_library_actions())
+    switch (prompt_space_actions())
     {
         case 'i': select_resource();
         case 's': /*search_resource();*/ break;
@@ -165,11 +157,10 @@ void library::perform_library_actions()
 
 void library::perform_resource_actions(unsigned int const resource_index)
 {
-    switch (prompt_resource_actions())
+    switch (prompt_resource_actions(resource_index))
     {
         case 'x': extract_notes(resource_index); break;
         case 'v': view_note(resource_index); break;
-        case 'a': /*add_resource(resource_index);*/ break;
         case 'e': /*edit_resource(resource_index);*/ break;
         case 'r': /*remove_resource(resource_index);*/ break;
         default:  throw std::runtime_error("undefined action");
@@ -193,7 +184,14 @@ void library::select_resource()
 {
     pqxx::work resource_query{_connection};
     pqxx::result resources = resource_query.exec(
-        "select id, name, full_coverage from resources"
+        R"(select r.id, r.name, count(n.id) as total,
+            (select count(nn.id) from notes nn
+             where nn.resource = r.id and nn.collectable = true
+             and nn.collected = true) as collected_notes
+        from resources r
+        left join notes n on r.id = n.resource
+        group by (r.id)
+        order by total desc)"
     );
     resource_query.commit();
 
@@ -206,7 +204,17 @@ void library::select_resource()
     unsigned int resource_index{};
 
     auto writer = [&index, this](pqxx::row const& res) mutable {
-        _stream << ++index << ". " << res[1].as<std::string>() << "\n";
+        _stream << color::blue << style::bold;
+        _stream << ++index << ". ";
+        _stream << std::setw(43) << res[1].as<std::string>().substr(0, 40);
+        _stream << color::white << " (";
+        _stream << color::green << res[3].as<std::string>();
+        _stream << color::white << " collected, ";
+        _stream << color::red << res[2].as<int>() - res[3].as<int>();
+        _stream << color::white << " uncollected, ";
+        _stream << color::orange << res[2].as<std::string>();
+        _stream << color::white << " notes)\n";
+        _stream << color::reset;
     };
 
     _stream << style::bold << color::blue << "\n";
@@ -284,20 +292,10 @@ void library::extract_notes(std::size_t const resource_index)
     std::ranges::for_each(uncollected_notes, [this](pqxx::row const& note_row) {
         prompt_extraction_actions(note_row);
     });
-    //std::ranges::copy(uncollected_notes, std::ref(prompt_extraction_actions));
 }
 
 void library::prompt_extraction_actions(pqxx::row const& note_row)
 {
-    std::vector<std::string> actions{
-        "[x] export to practice",
-        "[n] mark not collectable",
-        "[c] mark collectable",
-        "[s] skip this note",
-        "[q] quit"
-    };
-
-    char action;
     auto selected_note = std::make_shared<note>(note_row[0].as<unsigned long>());
     selected_note->title(note_row[1].as<std::string>());
     selected_note->description(note_row[2].as<std::string>());
@@ -316,10 +314,21 @@ void library::prompt_extraction_actions(pqxx::row const& note_row)
     _stream << "Select an action:\n\n";
     _stream << color::pink;
 
-    //std::ranges::copy(actions, std::ostream_iterator<int>(std::cout, "\n"));
-    std::ranges::for_each(actions, [](std::string const& s) {
-        std::cout << "  " << s << "\n";
-    });
+    std::map<char, std::string> actions{
+        {'x', "export to practice"},
+        {'n', "mark not collectable"},
+        {'c', "mark collectable"},
+        {'s', "skip this note"},
+        {'q', "quit"}
+    };
+
+    auto print_action = [](std::pair<char, std::string> const& action) {
+        std::cout << "  [" << action.first << "] " << action.second << "\n";
+    };
+
+    std::ranges::for_each(actions, print_action);
+
+    char action;
 
     _stream << style::bold << color::white;
     _stream << "\nAction: ";
@@ -399,8 +408,7 @@ std::shared_ptr<subject> library::take_subject()
 
     _stream << style::bold << color::white;
     _stream << "Enter subject name: ";
-    std::cin.ignore();
-    std::getline(std::cin, title);
+    std::getline(std::cin >> std::ws, title);
     _stream << color::reset;
 
     if (title.empty())
@@ -474,7 +482,7 @@ std::shared_ptr<topic> library::take_topic(std::shared_ptr<subject> selected_sub
 
     _stream << style::bold << color::white;
     _stream << "Enter topic name: ";
-    std::getline(std::cin, title);
+    std::getline(std::cin >> std::ws, title);
     _stream << color::reset;
 
     if (title.empty())
@@ -563,8 +571,7 @@ std::shared_ptr<practice> library::make_practice(std::shared_ptr<note> selected_
         {
             _stream << style::bold << color::white;
             _stream << "Question: ";
-            std::cin.ignore();
-            std::getline(std::cin, question);
+            std::getline(std::cin >> std::ws, question);
             _stream << color::reset;
             break;
         }
