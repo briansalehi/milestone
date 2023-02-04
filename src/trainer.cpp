@@ -68,10 +68,10 @@ void trainer::start_practice_session()
                max(p.answer) as practice_answer,
                max(p.last_usage) as practice_last_usage,
                max(p.elapsed_time) as practice_elapsed_time
-       from practices p
-       inner join topics t on t.id = p.topic
-       group by (t.id)
-       order by (t.id)
+        from practices p
+        inner join topics t on t.id = p.topic
+        group by (t.id, p.last_usage)
+        order by p.last_usage desc nulls first, t.id asc
     )");
     queue_query.commit();
 
@@ -174,7 +174,7 @@ void trainer::mark_practice_solved(std::shared_ptr<practice> active_practice)
     pqxx::work update_query{_connection};
     update_query.exec0(
         "update practices "s +
-        "set last_usage = date(now()), "s +
+        "set last_usage = now(), "s +
         "elapsed_time = "s + std::to_string(elapsed.count()) +
         " where id = "s + std::to_string(active_practice->id())
     );

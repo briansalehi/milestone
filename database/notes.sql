@@ -8,8 +8,8 @@ create table if not exists notes (
     collected bool not null default false,
     collectable bool not null default true,
     resource integer references resources(id),
-    creation_date date not null default date(now()),
-    modification_date date,
+    creation_date datetime not null default now(),
+    modification_date datetime,
     /* created_by integer references user (id), */
     primary key (id)
 );
