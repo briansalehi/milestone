@@ -70,8 +70,8 @@ void trainer::start_practice_session()
                max(p.elapsed_time) as practice_elapsed_time
         from practices p
         inner join topics t on t.id = p.topic
-        group by (t.id, p.last_usage)
-        order by p.last_usage desc nulls first, t.id asc
+        group by (t.subject, t.id, p.last_usage)
+        order by p.last_usage desc nulls first, t.subject asc, t.id asc
     )");
     queue_query.commit();
 
