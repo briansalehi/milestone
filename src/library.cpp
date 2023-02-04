@@ -186,7 +186,10 @@ void library::select_resource()
         R"(select r.id, r.name, count(n.id) as total,
             (select count(nn.id) from notes nn
              where nn.resource = r.id and nn.collectable = true
-             and nn.collected = true) as collected_notes
+             and nn.collected = true) as collected_notes,
+            (select count(nn.id) from notes nn
+             where nn.resource = r.id and nn.collectable = true
+             and nn.collected = false) as uncollected_notes
         from resources r
         left join notes n on r.id = n.resource
         group by (r.id)
@@ -211,7 +214,7 @@ void library::select_resource()
         _stream << color::white << " (";
         _stream << color::green << res[3].as<std::string>();
         _stream << color::white << " collected, ";
-        _stream << color::red << res[2].as<int>() - res[3].as<int>();
+        _stream << color::red << res[4].as<int>();
         _stream << color::white << " uncollected, ";
         _stream << color::orange << res[2].as<std::string>();
         _stream << color::white << " notes)\n";
