@@ -74,8 +74,7 @@ char library::prompt_resource_actions(unsigned int const resource_index)
         "select count(n.id) from resources r "s +
         "inner join notes n on r.id = n.resource "s +
         "where n.collectable = true and n.collected = false "s +
-        "and r.id = " + std::to_string(resource_index) +
-        " group by (n.id)"
+        "and r.id = " + std::to_string(resource_index)
     )[0][0];
     collectable_query.commit();
 
@@ -200,10 +199,12 @@ void library::select_resource()
     _stream.header("Flashback >> Library >> Resources");
     _stream << color::reset;
 
-    unsigned int index{};
-    unsigned int resource_index{};
+    std::size_t index{};
+    std::size_t representable_resource_index{};
 
-    auto writer = [&index, this](pqxx::row const& res) mutable {
+    std::map<std::size_t, std::size_t> index_mapping{};
+
+    auto writer = [&index, &index_mapping, this](pqxx::row const& res) mutable {
         _stream << color::blue << style::bold;
         _stream << ++index << ". ";
         _stream << std::setw(43) << res[1].as<std::string>().substr(0, 40);
@@ -215,6 +216,8 @@ void library::select_resource()
         _stream << color::orange << res[2].as<std::string>();
         _stream << color::white << " notes)\n";
         _stream << color::reset;
+
+        index_mapping.insert({index, res[0].as<std::size_t>()});
     };
 
     _stream << style::bold << color::blue << "\n";
@@ -224,11 +227,10 @@ void library::select_resource()
     {
         _stream << color::white;
         _stream << "\nSelect a resource: ";
-        std::cin >> resource_index;
-        resource_index--;
+        std::cin >> representable_resource_index;
         _stream << color::reset;
 
-        if (resource_index < resources.size())
+        if (representable_resource_index < resources.size())
             break;
 
         _stream << style::bold << color::red;
@@ -236,7 +238,9 @@ void library::select_resource()
         _stream << color::reset;
     }
 
-    pqxx::row row = resources[resource_index];
+    std::size_t real_resource_index = index_mapping[representable_resource_index];
+    pqxx::row row = resources[real_resource_index];
+
     unsigned int note_count{0};
     unsigned int collected{0};
     unsigned int collectable{0};
@@ -252,7 +256,7 @@ void library::select_resource()
     _stream << collected << " collected)\n";
     _stream << color::reset;
 
-    perform_resource_actions(++resource_index);
+    perform_resource_actions(real_resource_index);
 }
 
 void library::view_note(unsigned int const resource_index)
