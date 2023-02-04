@@ -5,8 +5,8 @@ create table if not exists resources (
     name varchar(200) not null,
     description varchar(500),
     purchase_link varchar(2000),
-    creation_date datetime not null default now(),
-    modification_date datetime,
+    creation_date timestamp without time zone not null default now(),
+    modification_date timestamp without time zone,
     /* created_by integer references user (id), */
     primary key (id)
 );
