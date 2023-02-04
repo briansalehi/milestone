@@ -73,31 +73,31 @@ target_link_libraries(test_practice PRIVATE gtest PUBLIC practice)
 target_include_directories(test_practice PUBLIC include PRIVATE test)
 #add_test(NAME practice_test COMMAND practice)
 
-add_executable(test_note)
+add_executable(test_note EXCLUDE_FROM_ALL)
 target_sources(test_note PRIVATE test/note.cpp PUBLIC src/note.cpp)
 target_link_libraries(test_note PRIVATE gtest note)
 target_include_directories(test_note PUBLIC include PRIVATE test)
 add_test(NAME test_note COMMAND test_note)
 
-add_executable(test_book)
+add_executable(test_book EXCLUDE_FROM_ALL)
 target_sources(test_book PRIVATE test/book.cpp PUBLIC src/book.cpp)
 target_link_libraries(test_book PRIVATE gtest book)
 target_include_directories(test_book PUBLIC include PRIVATE test)
 add_test(NAME test_book COMMAND test_book)
 
-add_executable(test_library)
+add_executable(test_library EXCLUDE_FROM_ALL)
 target_sources(test_library PUBLIC test/library.cpp)
 target_link_libraries(test_library PRIVATE gtest library)
 target_include_directories(test_library PUBLIC include PRIVATE test)
 add_test(NAME test_library COMMAND test_library)
 
-add_executable(test_resource_loader)
+add_executable(test_resource_loader EXCLUDE_FROM_ALL)
 target_sources(test_resource_loader PUBLIC test/resource_loader.cpp)
 target_link_libraries(test_resource_loader PUBLIC resource_loader PRIVATE gtest)
 target_include_directories(test_resource_loader PUBLIC include PRIVATE test)
 add_test(NAME test_resource_loader COMMAND test_resource_loader)
 
-add_executable(test_dashboard)
+add_executable(test_dashboard EXCLUDE_FROM_ALL)
 target_sources(test_dashboard PUBLIC test/dashboard.cpp)
 target_link_libraries(test_dashboard PRIVATE gtest dashboard)
 target_include_directories(test_dashboard PUBLIC include PRIVATE test)
@@ -105,4 +105,4 @@ add_test(NAME test_dashboard COMMAND test_dashboard)
 
 ### installation targets ###
 
-install(TARGETS flashback)
+install(TARGETS flashback RUNTIME DESTINATION ${CMAKE_PREFIX_PATH}/bin LIBRARY DESTINATION ${CMAKE_PREFIX_PATH}/lib)
