@@ -228,6 +228,7 @@ void library::select_resource()
         _stream << color::white;
         _stream << "\nSelect a resource: ";
         std::cin >> representable_resource_index;
+        --representable_resource_index;
         _stream << color::reset;
 
         if (representable_resource_index < resources.size())
@@ -238,8 +239,8 @@ void library::select_resource()
         _stream << color::reset;
     }
 
-    std::size_t real_resource_index = index_mapping[representable_resource_index];
-    pqxx::row row = resources[real_resource_index];
+    pqxx::row row = resources[representable_resource_index];
+    std::size_t real_resource_index = row[0].as<std::size_t>();
 
     unsigned int note_count{0};
     unsigned int collected{0};
