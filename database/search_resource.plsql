@@ -1,16 +1,17 @@
 create or replace function search_resource ( iname varchar(200))
 returns table (
-    id integer,
-    name varchar(200),
-    description varchar(500),
-    link varchar(5000),
-    created timestamp
+    resource_id integer,
+    resource_name varchar(200),
+    resource_description varchar(500),
+    resource_link varchar(5000),
+    resource_creation_date timestamp
 ) as
 $$
 begin
-    select id, name, description, creation_date
+    return query select id, name, description, purchase_link, creation_date
     from resources
-    where to_tsvector(name) @@ to_tsquery();
+    where lower(name) like '%' || lower(iname) || '%'
+    order by name;
 end
 $$
 language plpgsql;
