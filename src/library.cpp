@@ -48,7 +48,8 @@ char library::prompt_space_actions()
 
     std::map<char, std::string> actions{
         {'i', "select resource from list"},
-        {'s', "search resource"}
+        {'s', "search a resource"},
+        {'c', "create a new resource"}
     };
 
     auto print_action = [](std::pair<char, std::string> const& action) {
@@ -67,7 +68,7 @@ char library::prompt_space_actions()
     return action;
 }
 
-char library::prompt_resource_actions(unsigned int const resource_index)
+char library::prompt_resource_actions(std::size_t const resource_index)
 {
     pqxx::work collectable_query{_connection};
     pqxx::field count_field = collectable_query.exec(
@@ -148,13 +149,14 @@ void library::perform_space_actions()
 {
     switch (prompt_space_actions())
     {
-        case 'i': select_resource();
-        case 's': /*search_resource();*/ break;
+        case 'i': perform_resource_actions(select_resource()); break;
+        case 's': perform_resource_actions(search_resource()); break;
+        case 'c': perform_resource_actions(create_resource()); break;
         default:  throw std::runtime_error("undefined action");
     }
 }
 
-void library::perform_resource_actions(unsigned int const resource_index)
+void library::perform_resource_actions(std::size_t const resource_index)
 {
     switch (prompt_resource_actions(resource_index))
     {
@@ -166,7 +168,7 @@ void library::perform_resource_actions(unsigned int const resource_index)
     }
 }
 
-void library::perform_note_actions(unsigned int const resource_index, unsigned int const note_index)
+void library::perform_note_actions(std::size_t const resource_index, std::size_t const note_index)
 {
     switch (prompt_note_actions())
     {
@@ -179,7 +181,7 @@ void library::perform_note_actions(unsigned int const resource_index, unsigned i
     }
 }
 
-void library::select_resource()
+std::size_t library::select_resource()
 {
     pqxx::work resource_query{_connection};
     pqxx::result resources = resource_query.exec(
@@ -191,7 +193,7 @@ void library::select_resource()
              where nn.resource = r.id and nn.collectable = true
              and nn.collected = false) as uncollected_notes
         from resources r
-        left join notes n on r.id = n.resource
+        inner join notes n on r.id = n.resource
         group by (r.id)
         order by total desc)"
     );
@@ -245,13 +247,13 @@ void library::select_resource()
     pqxx::row row = resources[representable_resource_index];
     std::size_t real_resource_index = row[0].as<std::size_t>();
 
-    unsigned int note_count{0};
-    unsigned int collected{0};
-    unsigned int collectable{0};
+    std::size_t note_count{0};
+    std::size_t collected{0};
+    std::size_t collectable{0};
 
     _stream.clear();
     _stream << color::red;
-    _stream.header("Flashback >> Library >> Resources");
+    _stream.header("Flashback >> Library >> "s + row[1].as<std::string>());
     _stream << style::bold << color::orange << "\n";
     _stream << row[1].as<std::string>();
     _stream << style::bold << color::green << " (";
@@ -260,17 +262,17 @@ void library::select_resource()
     _stream << collected << " collected)\n";
     _stream << color::reset;
 
-    perform_resource_actions(real_resource_index);
+    return real_resource_index;
 }
 
-void library::view_note(unsigned int const resource_index)
+void library::view_note(std::size_t const resource_index)
 {
     if (resource_index < 0 || resource_index > _resources.size())
         throw std::out_of_range("out of range"s);
 
     std::shared_ptr<resource> selected_resource = _resources.at(resource_index);
 
-    unsigned int note_index{};
+    std::size_t note_index{};
 
     std::ranges::for_each(selected_resource->notes(),
         [&note_index, &resource_index, this](std::shared_ptr<note> note) {
@@ -313,7 +315,7 @@ void library::prompt_extraction_actions(pqxx::row const& note_row)
 
     _stream.clear();
     _stream << color::red;
-    _stream.header("Flashback >> Library >> Resources");
+    _stream.header("Flashback >> Library >> Notes");
     _stream << style::bold << color::orange << "\n";
     _stream << selected_note->title() << "\n\n";
     _stream << color::reset << style::dim << color::white;
@@ -612,4 +614,165 @@ std::shared_ptr<practice> library::make_practice(std::shared_ptr<note> selected_
     generated_practice->answer(answer);
 
     return generated_practice;
+}
+
+std::size_t library::create_resource()
+{
+    std::string name;
+    std::string description;
+    std::string link;
+
+    _stream.clear();
+    _stream << color::red;
+    _stream.header("Flashback >> Library >> New Resource");
+
+    _stream << style::bold << color::white << "\nResource name: " << color::orange;
+    std::getline(std::cin >> std::ws, name);
+
+    if (name.empty())
+        throw std::runtime_error("resource name cannot be empty");
+
+    _stream << color::white << "\nDescription: " << color::orange;
+    std::getline(std::cin >> std::ws, description);
+
+    _stream << color::white << "\nPurchase link: " << color::orange;
+    std::getline(std::cin >> std::ws, link);
+
+    if (search_resource(name) > 0)
+        throw std::runtime_error("resource already exists");
+
+    pqxx::work resource_creation_work{_connection};
+    pqxx::row resulting_id = resource_creation_work.exec1(
+        "select create_resource("s + resource_creation_work.quote(name) +
+        ", "s + resource_creation_work.quote(description) + ", "s +
+        resource_creation_work.quote(link) + ")"s
+    );
+    resource_creation_work.commit();
+
+    _stream << color::reset << style::bold << color::green;
+    _stream << "Resource \"" << name << "\" created.\n";
+    _stream << color::reset;
+    std::cin.get();
+
+    _stream.clear();
+    _stream << color::red;
+    _stream.header("Flashback >> Library >> "s + name);
+
+    return resulting_id[0].as<std::size_t>();
+}
+
+std::size_t library::search_resource()
+{
+    std::string name;
+    _stream << style::bold << color::white;
+    _stream << "Enter resource name: ";
+    _stream << color::orange;
+    std::getline(std::cin >> std::ws, name);
+
+    pqxx::work search_query{_connection};
+    pqxx::result search_results = search_query.exec(
+        "select * from search_resource("s + search_query.quote(name) + ")"s
+    );
+    search_query.commit();
+
+    std::size_t id{};
+    std::string complete_name{};
+
+    if (search_results.size() > 0)
+    {
+        std::size_t index{};
+        std::map<std::size_t, std::size_t> index_mapping;
+
+        _stream << style::bold << color::blue << "\n";
+
+        std::ranges::for_each(search_results, [&index, &index_mapping, this]
+            (pqxx::row const& row) mutable {
+                _stream << ++index << ". "s << row[1].as<std::string>() << "\n";
+                index_mapping.insert({index, row[0].as<std::size_t>()});
+        });
+
+        _stream << color::white << "\n";
+        _stream << "Resource: " << color::orange;
+
+        std::size_t selection;
+        std::cin >> selection;
+
+        if (selection > index_mapping.size())
+            throw std::out_of_range("index out of range");
+
+        id = search_results[selection-1][0].as<std::size_t>();
+        complete_name = search_results[selection-1][1].as<std::string>();
+
+        std::size_t note_count{0};
+        std::size_t collected{0};
+        std::size_t collectable{0};
+
+        _stream.clear();
+        _stream << color::red;
+        _stream.header("Flashback >> Library >> "s + complete_name);
+        _stream << style::bold << color::orange << "\n";
+        _stream << complete_name;
+        _stream << style::bold << color::green << " (";
+        _stream << note_count << " notes available, ";
+        _stream << collectable << " collectable, ";
+        _stream << collected << " collected)\n";
+        _stream << color::reset;
+    }
+
+    return id;
+}
+
+std::size_t library::search_resource(std::string const& name)
+{
+    pqxx::work search_query{_connection};
+    pqxx::result search_results = search_query.exec(
+        "select * from search_resource("s + search_query.quote(name) + ")"s
+    );
+    search_query.commit();
+
+    std::size_t id{};
+    std::string complete_name{};
+
+    if (search_results.size() > 0)
+    {
+        std::size_t index{};
+        std::map<std::size_t, std::size_t> index_mapping;
+
+        _stream << style::bold << color::blue << "\n";
+
+        std::ranges::for_each(search_results, [&index, &index_mapping, this]
+            (pqxx::row const& row) mutable {
+                _stream << ++index << ". "s << row[1].as<std::string>() << "\n";
+                index_mapping.insert({index, row[0].as<std::size_t>()});
+        });
+
+        _stream << color::white << "\n";
+        _stream << "Resource: " << color::orange;
+
+        std::size_t selection;
+        std::cin >> selection;
+
+        if (selection > index_mapping.size())
+            throw std::out_of_range("index out of range");
+
+        id = search_results[selection-1][0].as<std::size_t>();
+        complete_name = search_results[selection-1][1].as<std::string>();
+
+        std::size_t note_count{0};
+        std::size_t collected{0};
+        std::size_t collectable{0};
+
+        _stream.clear();
+        _stream << color::red;
+        _stream.header("Flashback >> Library >> "s + complete_name);
+        _stream << style::bold << color::orange << "\n";
+        _stream << complete_name;
+        _stream << style::bold << color::green << " (";
+        _stream << note_count << " notes available, ";
+        _stream << collectable << " collectable, ";
+        _stream << collected << " collected)\n";
+        _stream << color::reset;
+    }
+
+    return id;
 }

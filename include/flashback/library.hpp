@@ -165,7 +165,7 @@ class practice;
 /// }
 ///
 /// class Book {
-///     # chapters(): unsigned int
+///     # chapters(): std::size_t
 /// }
 ///
 /// class Course {
@@ -253,19 +253,25 @@ protected:
     virtual void perform_space_actions() override;
 
 private:
-    void select_resource();
+    std::size_t select_resource();
 
-    char prompt_resource_actions(unsigned int const);
+    std::size_t create_resource();
+
+    std::size_t search_resource();
+
+    std::size_t search_resource(std::string const&);
+
+    char prompt_resource_actions(std::size_t const);
 
     char prompt_note_actions();
 
     void prompt_extraction_actions(pqxx::row const&);
 
-    void perform_resource_actions(unsigned int const);
+    void perform_resource_actions(std::size_t const);
 
-    void perform_note_actions(unsigned int const, unsigned int const);
+    void perform_note_actions(std::size_t const, std::size_t const);
 
-    void view_note(unsigned int const);
+    void view_note(std::size_t const);
 
     void view_note_description(std::size_t const, std::size_t const);
 
