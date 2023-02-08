@@ -23,11 +23,12 @@ constexpr std::vector<std::string> dashboard::space_names() const
 
 char dashboard::prompt_space()
 {
+        /*"[u] tutorials space",*/
+        /*"[r] roadmap space",*/
     std::vector<std::string> spaces {
-        "[i] library",
-        "[t] trainer",
-        "[u] tutorials",
-        "[r] roadmap"
+        "[i] library space",
+        "[t] training space",
+        "[q] quit from flashback"
     };
 
     char selected_space;
@@ -63,6 +64,7 @@ std::shared_ptr<space> dashboard::build_space(char space_id)
         case 't': selected_space = std::make_shared<trainer>(); break;
         case 'u': selected_space = nullptr; break;
         case 'r': selected_space = nullptr; break;
+        case 'q': selected_space = nullptr; break;
         default: throw std::invalid_argument("incorrect space");
     }
 
@@ -73,6 +75,4 @@ void dashboard::enter_space(std::shared_ptr<space> selected_space)
 {
     if (selected_space)
         selected_space->init();
-    else
-        throw std::runtime_error("cannot initialize space");
 }
