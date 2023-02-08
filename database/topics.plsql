@@ -6,6 +6,7 @@ create table if not exists topics (
     subject integer references subjects(id),
     creation_date timestamp without time zone not null default now(),
     modification_date timestamp without time zone,
+    last_usage timestamp without time zone,
     /* created_by integer references users (id), */
     primary key (id)
 );
