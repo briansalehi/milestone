@@ -15,48 +15,48 @@ enable_testing()
 
 ########## libraries ##########
 
-add_library(note SHARED src/note.cpp)
+add_library(note EXCLUDE_FROM_ALL SHARED src/note.cpp)
 target_include_directories(note PUBLIC include)
 
-add_library(console SHARED src/console.cpp)
+add_library(console EXCLUDE_FROM_ALL SHARED src/console.cpp)
 target_include_directories(console PUBLIC include)
 
-add_library(book SHARED src/book.cpp)
+add_library(book EXCLUDE_FROM_ALL SHARED src/book.cpp)
 target_link_libraries(book PUBLIC note)
 target_include_directories(book PUBLIC include)
 
-add_library(reference SHARED src/reference.cpp)
+add_library(reference EXCLUDE_FROM_ALL SHARED src/reference.cpp)
 target_include_directories(reference PUBLIC include)
 
-add_library(practice SHARED src/practice.cpp)
+add_library(practice EXCLUDE_FROM_ALL SHARED src/practice.cpp)
 target_link_libraries(practice PUBLIC reference)
 target_include_directories(practice PUBLIC include)
 
-add_library(topic SHARED src/topic.cpp)
+add_library(topic EXCLUDE_FROM_ALL SHARED src/topic.cpp)
 target_link_libraries(topic PUBLIC practice)
 target_include_directories(topic PUBLIC include)
 
-add_library(subject SHARED src/subject.cpp)
+add_library(subject EXCLUDE_FROM_ALL SHARED src/subject.cpp)
 target_link_libraries(subject PUBLIC topic)
 target_include_directories(subject PUBLIC include)
 
-add_library(resource_loader SHARED src/resource_loader.cpp)
+add_library(resource_loader EXCLUDE_FROM_ALL SHARED src/resource_loader.cpp)
 target_link_libraries(resource_loader PUBLIC pq pqxx book subject)
 target_include_directories(resource_loader PUBLIC include)
 
-add_library(library SHARED src/library.cpp)
+add_library(library EXCLUDE_FROM_ALL SHARED src/library.cpp)
 target_link_libraries(library PUBLIC resource_loader console)
 target_include_directories(library PUBLIC include)
 
-add_library(trainer SHARED src/trainer.cpp)
+add_library(trainer EXCLUDE_FROM_ALL SHARED src/trainer.cpp)
 target_link_libraries(trainer PUBLIC pq pqxx console)
 target_include_directories(trainer PUBLIC include)
 
-add_library(dashboard SHARED src/dashboard.cpp)
+add_library(dashboard EXCLUDE_FROM_ALL SHARED src/dashboard.cpp)
 target_link_libraries(dashboard PUBLIC library trainer resource_loader)
 target_include_directories(dashboard PUBLIC include)
 
-add_library(practice_collection SHARED src/practice_collection.cpp)
+add_library(practice_collection EXCLUDE_FROM_ALL SHARED src/practice_collection.cpp)
 target_link_libraries(practice_collection PUBLIC console practice)
 target_include_directories(practice_collection PUBLIC include)
 
@@ -105,4 +105,4 @@ add_test(NAME test_dashboard COMMAND test_dashboard)
 
 ### installation targets ###
 
-install(TARGETS flashback RUNTIME DESTINATION ${CMAKE_PREFIX_PATH}/${CMAKE_INSTALL_BINDIR} LIBRARY DESTINATION ${CMAKE_PREFIX_PATH}/${CMAKE_INSTALL_LIBDIR} PUBLIC_HEADER DESTINATION ${CMAKE_PREFIX_PATH}/${CMAKE_INSTALL_INCLUDEDIR})
+install(TARGETS flashback RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
