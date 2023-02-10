@@ -62,7 +62,7 @@ target_include_directories(practice_collection PUBLIC include)
 
 add_executable(flashback)
 target_sources(flashback PRIVATE ${source_files})
-target_link_libraries(flashback PRIVATE Boost::program_options dashboard)
+target_link_libraries(flashback PRIVATE Boost::program_options pq pqxx)
 target_include_directories(flashback PRIVATE include)
 
 ########## test executables ##########
@@ -105,4 +105,4 @@ add_test(NAME test_dashboard COMMAND test_dashboard)
 
 ### installation targets ###
 
-install(TARGETS flashback RUNTIME DESTINATION ${CMAKE_PREFIX_PATH}/bin LIBRARY DESTINATION ${CMAKE_PREFIX_PATH}/lib)
+install(TARGETS flashback RUNTIME DESTINATION ${CMAKE_PREFIX_PATH}/${CMAKE_INSTALL_BINDIR} LIBRARY DESTINATION ${CMAKE_PREFIX_PATH}/${CMAKE_INSTALL_LIBDIR} PUBLIC_HEADER DESTINATION ${CMAKE_PREFIX_PATH}/${CMAKE_INSTALL_INCLUDEDIR})
