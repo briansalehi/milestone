@@ -2,7 +2,7 @@
 
 #include <flashback/argument_parser.hpp>
 #include <flashback/library.hpp>
-#include <flashback/trainer.hpp>
+#include <flashback/training.hpp>
 #include <flashback/console.hpp>
 #include <flashback/loader.hpp>
 #include <flashback/space.hpp>
@@ -21,8 +21,6 @@ public:
     using style = console<std::istream, std::ostream>::style;
 
     dashboard();
-
-    constexpr std::vector<std::string> space_names() const;
 
     void open();
 

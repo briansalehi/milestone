@@ -1,9 +1,9 @@
-#include <flashback/trainer.hpp>
+#include <flashback/training.hpp>
 
 using namespace flashback;
 using namespace std::literals::string_literals;
 
-trainer::trainer():
+training::training():
     _connection{"postgres://postgres@localhost:5432/flashback"},
     _practice_queue{},
     _practice_start_time{},
@@ -21,12 +21,12 @@ trainer::trainer():
     }
 }
 
-void trainer::init()
+void training::init()
 {
     perform_space_actions();
 }
 
-char trainer::prompt_space_actions()
+char training::prompt_space_actions()
 {
     _stream << style::bold << color::white;
     _stream << "\nSelect an action:\n\n";
@@ -50,7 +50,7 @@ char trainer::prompt_space_actions()
     return action;
 }
 
-void trainer::perform_space_actions()
+void training::perform_space_actions()
 {
     switch (prompt_space_actions())
     {
@@ -59,7 +59,7 @@ void trainer::perform_space_actions()
     }
 }
 
-void trainer::start_practice_session()
+void training::start_practice_session()
 {
     pqxx::work queue_query{_connection};
     pqxx::result practice_results = queue_query.exec(R"(
@@ -126,7 +126,7 @@ void trainer::start_practice_session()
     std::ranges::for_each(_practice_queue, queue_iterator);
 }
 
-char trainer::prompt_practice_actions()
+char training::prompt_practice_actions()
 {
     std::map<char, std::string> actions{
         {'a', "see answer of practice"},
@@ -149,7 +149,7 @@ char trainer::prompt_practice_actions()
     return action;
 }
 
-void trainer::perform_practice_actions(std::shared_ptr<practice> active_practice)
+void training::perform_practice_actions(std::shared_ptr<practice> active_practice)
 {
     switch (prompt_practice_actions())
     {
@@ -159,7 +159,7 @@ void trainer::perform_practice_actions(std::shared_ptr<practice> active_practice
     }
 }
 
-void trainer::print_practice_answer(std::shared_ptr<practice> active_practice)
+void training::print_practice_answer(std::shared_ptr<practice> active_practice)
 {
     _stream << color::reset << color::gray;
     _stream << active_practice->answer();
@@ -167,7 +167,7 @@ void trainer::print_practice_answer(std::shared_ptr<practice> active_practice)
     perform_practice_actions(active_practice);
 }
 
-void trainer::mark_practice_solved(std::shared_ptr<practice> active_practice)
+void training::mark_practice_solved(std::shared_ptr<practice> active_practice)
 {
     auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - _practice_start_time);
 

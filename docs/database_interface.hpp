@@ -16,7 +16,7 @@
 /// - update note as collectable
 /// - query notes of a resource
 ///
-/// \section db_interface_trainer Trainer
+/// \section db_interface_training Training
 ///
 /// Subject operations:
 ///

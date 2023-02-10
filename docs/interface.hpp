@@ -11,7 +11,7 @@
 /// In dashboard, there are a few sections where user can enter:
 ///
 /// 1. \emoji :books: \ref library_space : A space where you can review the books and resources you already used.
-/// 2. \emoji :running: \ref trainer_space : A space to practice subjects by answering questions and comparing your answers.
+/// 2. \emoji :running: \ref training_space : A space to practice subjects by answering questions and comparing your answers.
 /// 3. \emoji :mortar_board: \ref tutorial_space : A space to watch video courses teaching you everything about a subject.
 /// 4. \emoji :rocket: \ref roadmap_space : A space to find your way through the skills you need to aquire to become an expert.
 ///
@@ -26,7 +26,7 @@
 ///     n <-- ref
 /// }
 ///
-/// rectangle Trainer {
+/// rectangle Training {
 ///     usecase "Subjects" as s
 ///     usecase "Topics" as t
 ///     usecase "Practices" as p
@@ -82,9 +82,9 @@
 ///
 /// \section tutorial_space Tutorial
 ///
-/// \section trainer_space Trainer
+/// \section training_space Training
 ///
-/// Trainer space of the program consists of:
+/// Training space of the program consists of:
 ///
 /// - \ref subject_interface
 /// - \ref topic_interface

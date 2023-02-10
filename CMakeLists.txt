@@ -48,12 +48,12 @@ add_library(library EXCLUDE_FROM_ALL SHARED src/library.cpp)
 target_link_libraries(library PUBLIC resource_loader console)
 target_include_directories(library PUBLIC include)
 
-add_library(trainer EXCLUDE_FROM_ALL SHARED src/trainer.cpp)
-target_link_libraries(trainer PUBLIC pq pqxx console)
-target_include_directories(trainer PUBLIC include)
+add_library(training EXCLUDE_FROM_ALL SHARED src/training.cpp)
+target_link_libraries(training PUBLIC pq pqxx console)
+target_include_directories(training PUBLIC include)
 
 add_library(dashboard EXCLUDE_FROM_ALL SHARED src/dashboard.cpp)
-target_link_libraries(dashboard PUBLIC library trainer resource_loader)
+target_link_libraries(dashboard PUBLIC library training resource_loader)
 target_include_directories(dashboard PUBLIC include)
 
 add_library(practice_collection EXCLUDE_FROM_ALL SHARED src/practice_collection.cpp)

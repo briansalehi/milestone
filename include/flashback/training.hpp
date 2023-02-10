@@ -19,13 +19,13 @@ namespace flashback
 ///
 /// \brief A space to practice subjects by answering questions and comparing your answers.
 ///
-class trainer: public space
+class training: public space
 {
 public:
     using color = console<std::istream, std::ostream>::color;
     using style = console<std::istream, std::ostream>::style;
 
-    trainer();
+    training();
 
     void init() override;
 

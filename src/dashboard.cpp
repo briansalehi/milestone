@@ -16,11 +16,6 @@ void dashboard::open()
     enter_space(selected_space);
 }
 
-constexpr std::vector<std::string> dashboard::space_names() const
-{
-    return {"library", "trainer", "tutorials", "roadmap"};
-}
-
 char dashboard::prompt_space()
 {
         /*"[u] tutorials space",*/
@@ -61,7 +56,7 @@ std::shared_ptr<space> dashboard::build_space(char space_id)
     switch (space_id)
     {
         case 'i': selected_space = std::make_shared<library>(); break;
-        case 't': selected_space = std::make_shared<trainer>(); break;
+        case 't': selected_space = std::make_shared<training>(); break;
         case 'u': selected_space = nullptr; break;
         case 'r': selected_space = nullptr; break;
         case 'q': selected_space = nullptr; break;
