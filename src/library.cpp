@@ -93,6 +93,7 @@ char library::prompt_resource_actions(std::size_t const resource_index)
     std::map<char, std::string> actions{
         {'v', "view notes"},
         {'e', "edit resource"},
+        {'a', "add new note"},
         {'r', "remove resource (restricted)"}
     };
 
@@ -162,8 +163,9 @@ void library::perform_resource_actions(std::size_t const resource_index)
     {
         case 'x': extract_notes(resource_index); break;
         case 'v': view_note(resource_index); break;
-        case 'e': /*edit_resource(resource_index);*/ break;
-        case 'r': /*remove_resource(resource_index);*/ break;
+        case 'a': add_note(resource_index); break;
+        case 'e': /*edit_note(resource_index);*/ break;
+        case 'r': /*remove_note(resource_index);*/ break;
         default:  throw std::runtime_error("undefined action");
     }
 }
@@ -247,9 +249,7 @@ std::size_t library::select_resource()
     pqxx::row row = resources[representable_resource_index];
     std::size_t real_resource_index = row[0].as<std::size_t>();
 
-    std::size_t note_count{0};
-    std::size_t collected{0};
-    std::size_t collectable{0};
+    std::size_t note_count{0}, collected{0}, collectable{0};
 
     _stream.clear();
     _stream << color::red;
@@ -281,6 +281,94 @@ void library::view_note(std::size_t const resource_index)
             _stream << color::reset;
             perform_note_actions(resource_index, note_index);
     });
+}
+
+void library::add_note(std::size_t const resource_index)
+{
+    std::string title{}, description{}, position{}, line{};
+    std::ostringstream buffer{};
+
+    _stream << color::reset << style::bold << color::white;
+    _stream << "Enter title: " << color::orange;
+    std::getline(std::cin >> std::ws, title);
+
+    _stream << color::reset << style::bold << color::white;
+    _stream << "Enter description: " << color::orange;
+    std::getline(std::cin, description);
+
+    _stream << color::reset << style::bold << color::white;
+    _stream << "Enter position: " << color::orange;
+    std::getline(std::cin >> std::ws, position);
+
+    _stream << color::reset << style::bold << "\n";
+    _stream << color::blue << title;
+    _stream << std::setw(title.size()) << std::setfill('-') << "\n";
+    _stream << "\n" << color::white << description << "\n";
+    _stream << color::pink << position << "\n\n";
+    _stream << style::bold << color::white << "Is this correct? [N/y] ";
+
+    std::string response{"n"};
+    std::getline(std::cin >> std::ws, response);
+
+    while (response.at(0) != 'y')
+    {
+        _stream << "Edit [t] title [d] description [p] position: ";
+
+        std::getline(std::cin >> std::ws, response);
+
+        if (response.at(0) == 't')
+        {
+            _stream << color::reset << style::bold << "\n";
+            _stream << color::white << title << "\n";
+            _stream << "Title: " << color::blue;
+            std::getline(std::cin >> std::ws, title);
+        }
+
+        if (response.at(0) == 'd')
+        {
+            _stream << color::reset << style::dim << "\n";
+            _stream << color::white << description << "\n";
+            _stream << "Description: " << color::blue;
+            std::getline(std::cin >> std::ws, description);
+        }
+
+        if (response.at(0) == 'p')
+        {
+            _stream << color::reset << style::dim << "\n";
+            _stream << color::white << position << "\n";
+            _stream << "Position: " << color::pink;
+            std::getline(std::cin >> std::ws, position);
+        }
+
+        _stream << color::reset << style::bold << "\n";
+        _stream << color::blue << title;
+        _stream << std::setw(title.size()) << std::setfill('-') << "\n";
+        _stream << "\n" << color::white << description << "\n";
+        _stream << color::pink << position << "\n\n";
+        _stream << style::bold << color::white << "Is this correct? [N/y] ";
+        std::getline(std::cin >> std::ws, response);
+    }
+
+    std::size_t note_id;
+
+    if (title.size() && description.size() && position.size())
+    {
+        pqxx::work add_note_query{_connection};
+        note_id = add_note_query.exec1(
+            "insert into notes (title, description, position, resource)"s +
+            "values ("s +
+            add_note_query.quote(title) + ", " +
+            add_note_query.quote(description) + ", " +
+            add_note_query.quote(position) + ", " +
+            std::to_string(resource_index) +
+            ") returning id"s
+        )[0].as<std::size_t>();
+    }
+
+    if (note_id > 0)
+        _stream << style::bold << color::green << "New note created\n";
+    else
+        throw std::runtime_error("Failed to create note");
 }
 
 void library::view_note_description(std::size_t const resource_index, std::size_t const note_index)

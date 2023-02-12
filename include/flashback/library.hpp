@@ -11,7 +11,9 @@
 #include <algorithm>
 #include <iostream>
 #include <iterator>
+#include <iomanip>
 #include <fstream>
+#include <sstream>
 #include <memory>
 #include <string>
 #include <ranges>
@@ -272,6 +274,8 @@ private:
     void perform_note_actions(std::size_t const, std::size_t const);
 
     void view_note(std::size_t const);
+
+    void add_note(std::size_t const);
 
     void view_note_description(std::size_t const, std::size_t const);
 
