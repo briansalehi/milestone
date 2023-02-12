@@ -326,7 +326,7 @@ void library::add_note(std::size_t const resource_index)
 
         if (response.at(0) == 'd')
         {
-            _stream << color::reset << style::dim << "\n";
+            _stream << color::reset << style::bold << "\n";
             _stream << color::white << description << "\n";
             _stream << "Description: " << color::blue;
             std::getline(std::cin >> std::ws, description);
@@ -334,7 +334,7 @@ void library::add_note(std::size_t const resource_index)
 
         if (response.at(0) == 'p')
         {
-            _stream << color::reset << style::dim << "\n";
+            _stream << color::reset << style::bold << "\n";
             _stream << color::white << position << "\n";
             _stream << "Position: " << color::pink;
             std::getline(std::cin >> std::ws, position);
@@ -350,10 +350,10 @@ void library::add_note(std::size_t const resource_index)
     }
 
     std::size_t note_id;
+    pqxx::work add_note_query{_connection};
 
     if (title.size() && description.size() && position.size())
     {
-        pqxx::work add_note_query{_connection};
         note_id = add_note_query.exec1(
             "insert into notes (title, description, position, resource)"s +
             "values ("s +
@@ -366,9 +366,14 @@ void library::add_note(std::size_t const resource_index)
     }
 
     if (note_id > 0)
+    {
+        add_note_query.commit();
         _stream << style::bold << color::green << "New note created\n";
+    }
     else
+    {
         throw std::runtime_error("Failed to create note");
+    }
 }
 
 void library::view_note_description(std::size_t const resource_index, std::size_t const note_index)
