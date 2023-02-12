@@ -195,7 +195,7 @@ std::size_t library::select_resource()
              where nn.resource = r.id and nn.collectable = true
              and nn.collected = false) as uncollected_notes
         from resources r
-        inner join notes n on r.id = n.resource
+        left join notes n on r.id = n.resource
         group by (r.id)
         order by total desc)"
     );
