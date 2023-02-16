@@ -4,6 +4,8 @@
 #include <flashback/topic.hpp>
 #include <flashback/note.hpp>
 
+#include <syscall.h>
+
 using namespace flashback;
 using namespace std::literals::string_literals;
 
@@ -308,6 +310,32 @@ void library::view_note(std::size_t const resource_index)
             perform_note_actions(resource_index, note_index);
     });
 }
+
+/*
+std::string library::get_text(std::string_view prompt) const
+{
+    pid_t child_pid{};
+    std::ofstream temp{"/tmp/flashback.tmp"s};
+
+    _stream << prompt.data() << ": \n";
+
+    if (!temp.is_open())
+        throw std::filesystem::filesystem_error("failed to create temp file");
+
+    if ((child_pid = fork()) != 0)
+    {
+        throw std::runtime_error("failed to open editing file");
+    }
+    else if (getpid() > 0)
+    {
+        lexec("/usr/bin/xdg-open", "xdg-open", temp.name());
+    }
+
+    wait(child_pid);
+
+    return temp.read();
+}
+*/
 
 void library::add_note(std::size_t const resource_index)
 {
