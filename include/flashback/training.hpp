@@ -34,7 +34,10 @@ protected:
     virtual void perform_space_actions() override;
 
 private:
+    std::size_t get_record_id(pqxx::result const&);
+
     void start_practice_session();
+    void practice_subject();
 
     char prompt_practice_actions();
     void perform_practice_actions(std::shared_ptr<practice>);

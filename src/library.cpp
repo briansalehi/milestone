@@ -159,6 +159,8 @@ void library::perform_space_actions()
 
 void library::perform_resource_actions(std::size_t const resource_index)
 {
+    show_resource_menu(resource_index);
+
     switch (prompt_resource_actions(resource_index))
     {
         case 'x': extract_notes(resource_index); break;
@@ -181,6 +183,43 @@ void library::perform_note_actions(std::size_t const resource_index, std::size_t
         case 'r': break;
         default:  throw std::runtime_error("undefined action");
     }
+}
+
+void library::show_resource_menu(std::size_t const resource_index)
+{
+    pqxx::work resource_query{_connection};
+    pqxx::row resource_info = resource_query.exec1(
+        R"(select r.name,
+            count(n.id) as total,
+            (select count(nn.id) from notes nn
+             where nn.resource = r.id and nn.collectable = true
+             and nn.collected = true) as collected_notes,
+            (select count(nn.id) from notes nn
+             where nn.resource = r.id and nn.collectable = true
+             and nn.collected = false) as uncollected_notes
+        from resources r
+        left join notes n on r.id = n.resource
+        where r.id = )" + std::to_string(resource_index) +
+        R"( group by (r.id)
+        order by total desc)"
+    );
+    resource_query.commit();
+
+    std::string name{resource_info[0].as<std::string>()};
+    std::size_t note_count{resource_info[1].as<std::size_t>()};
+    std::size_t collected{resource_info[2].as<std::size_t>()};
+    std::size_t collectable{resource_info[3].as<std::size_t>()};
+
+    _stream.clear();
+    _stream << color::red;
+    _stream.header("Flashback >> Library >> "s + name);
+    _stream << style::bold << color::orange << "\n";
+    _stream << name;
+    _stream << style::bold << color::green << " (";
+    _stream << note_count << " notes available, ";
+    _stream << collectable << " collectable, ";
+    _stream << collected << " collected)\n";
+    _stream << color::reset;
 }
 
 std::size_t library::select_resource()
@@ -248,19 +287,6 @@ std::size_t library::select_resource()
 
     pqxx::row row = resources[representable_resource_index];
     std::size_t real_resource_index = row[0].as<std::size_t>();
-
-    std::size_t note_count{0}, collected{0}, collectable{0};
-
-    _stream.clear();
-    _stream << color::red;
-    _stream.header("Flashback >> Library >> "s + row[1].as<std::string>());
-    _stream << style::bold << color::orange << "\n";
-    _stream << row[1].as<std::string>();
-    _stream << style::bold << color::green << " (";
-    _stream << note_count << " notes available, ";
-    _stream << collectable << " collectable, ";
-    _stream << collected << " collected)\n";
-    _stream << color::reset;
 
     return real_resource_index;
 }
@@ -578,74 +604,172 @@ std::shared_ptr<topic> library::take_topic(std::shared_ptr<subject> selected_sub
     if (!selected_subject)
         return nullptr;
 
-    pqxx::nontransaction nontransaction{_connection};
     std::shared_ptr<topic> generated_topic{};
 
-    std::string title;
+    std::size_t index{};
+    std::map<std::size_t, std::size_t> index_mapping{};
 
-    _stream << style::bold << color::white;
-    _stream << "Enter topic name: ";
-    std::getline(std::cin >> std::ws, title);
-    _stream << color::reset;
-
-    if (title.empty())
-        throw std::runtime_error("topic name cannot be empty");
-
-    pqxx::result topic_result = nontransaction.exec(
-        "select id from topics where subject = "s +
-        std::to_string(selected_subject->id()) +
-        " and title = " + _connection.quote(title)
+    pqxx::work topics_query{_connection};
+    pqxx::result available_topics = topics_query.exec(
+        "select id, title from topics where subject = "s +
+        std::to_string(selected_subject->id())
     );
-    nontransaction.commit();
+    topics_query.commit();
 
-    if (topic_result[0][0].is_null())
+    std::ranges::for_each(available_topics,
+        [&index, &index_mapping, this](pqxx::row const& row) mutable {
+            _stream << ++index << ". " << row[1].as<std::string>() << "\n";
+            index_mapping.insert({index, row[0].as<std::size_t>()});
+        }
+    );
+
+    std::map<char, std::string> topic_options{
+        {'n', "select by topic name"},
+        {'c', "create new topic"},
+        {'i', "select topic from list"}
+    };
+
+    std::ranges::for_each(topic_options,
+        [this](auto option) {
+            _stream << "[" << option.first << "] " << option.second << "\n";
+        }
+    );
+
+    std::string action{};
+    _stream << "\nAction: ";
+    std::getline(std::cin >> std::ws, action);
+
+    switch (action.at(0))
     {
-        char confirmed;
-
-        _stream << style::bold << color::white;
-        _stream << "Create topic? [N/y] ";
-        std::cin >> confirmed;
-        _stream << color::reset;
-
-        switch (confirmed)
+        case 'i':
         {
-            case 'y':
+            _stream << "\nTitle index: ";
+            std::cin >> std::ws >> index;
+
+            if (index < index_mapping.size())
             {
-                pqxx::transaction transaction{_connection};
+                std::size_t real_index = index_mapping.find(index)->second;
+                std::string topic_name = available_topics[real_index][1].as<std::string>();
+                generated_topic = std::make_shared<topic>(real_index);
+                generated_topic->title(topic_name);
+                selected_subject->add_topic(generated_topic);
+            }
+            else
+            {
+                throw std::out_of_range("index out of range");
+            }
+            break;
+        }
+        case 'n':
+        {
+            std::string title{};
+            _stream << style::bold << color::white;
+            _stream << "Enter topic name: ";
+            std::getline(std::cin >> std::ws, title);
+            _stream << color::reset;
 
-                pqxx::row id_row = transaction.exec1(
-                        "insert into topics (title, subject) values (" +
-                        _connection.quote(title) + ", " +
-                        std::to_string(selected_subject->id()) + ") returning id"
+            if (title.empty())
+                throw std::runtime_error("topic name cannot be empty");
+
+            pqxx::nontransaction nontransaction{_connection};
+            pqxx::result topic_result = nontransaction.exec(
+                "select id from topics where subject = "s +
+                std::to_string(selected_subject->id()) +
+                " and title = " + _connection.quote(title)
+            );
+            nontransaction.commit();
+
+            if (topic_result[0][0].is_null())
+            {
+                char confirmed;
+
+                _stream << style::bold << color::white;
+                _stream << "Create topic? [N/y] ";
+                std::cin >> confirmed;
+                _stream << color::reset;
+
+                switch (confirmed)
+                {
+                    case 'y':
+                    {
+                        pqxx::transaction transaction{_connection};
+
+                        pqxx::row id_row = transaction.exec1(
+                            "insert into topics (title, subject) values (" +
+                            _connection.quote(title) + ", " +
+                            std::to_string(selected_subject->id()) + ") returning id"
                         );
-                transaction.commit();
+                        transaction.commit();
 
-                unsigned long int id = id_row[0].as<unsigned long int>();
+                        std::size_t id = id_row[0].as<unsigned long int>();
+                        generated_topic = std::make_shared<topic>(id);
+                        generated_topic->title(title);
+                        selected_subject->add_topic(generated_topic);
+
+                        _stream << style::bold << color::green;
+                        _stream << "Topic \"" << title << "\" created\n";
+                        _stream << color::reset;
+                        break;
+                    }
+                    default:
+                    {
+                        _stream << style::bold << color::red << "Cancelled\n" << color::reset;
+                    }
+                }
+            }
+            else
+            {
+                std::size_t id = topic_result[0][0].as<unsigned long int>();
                 generated_topic = std::make_shared<topic>(id);
                 generated_topic->title(title);
                 selected_subject->add_topic(generated_topic);
 
-                _stream << style::bold << color::green;
-                _stream << "Topic \"" << title << "\" created\n";
+                _stream << color::green;
+                _stream << "Selected " << title << " topic\n";
                 _stream << color::reset;
-                break;
             }
-            default:
-            {
-                _stream << style::bold << color::red << "Cancelled\n" << color::reset;
-            }
+            break;
         }
-    }
-    else
-    {
-        unsigned long int id = topic_result[0][0].as<unsigned long int>();
-        generated_topic = std::make_shared<topic>(id);
-        generated_topic->title(title);
-        selected_subject->add_topic(generated_topic);
+        case 'c':
+        {
+            std::string title{};
+            _stream << style::bold << color::white;
+            _stream << "Enter topic name: ";
+            std::getline(std::cin >> std::ws, title);
+            _stream << color::reset;
 
-        _stream << color::green;
-        _stream << "Selected " << title << " topic\n";
-        _stream << color::reset;
+            if (title.empty())
+                throw std::runtime_error("topic name cannot be empty");
+
+            pqxx::nontransaction nontransaction{_connection};
+            pqxx::result topic_result = nontransaction.exec(
+                "select id from topics where subject = "s +
+                std::to_string(selected_subject->id()) +
+                " and title = " + _connection.quote(title)
+            );
+            nontransaction.commit();
+
+            if (!topic_result[0][0].is_null())
+                throw std::runtime_error("topic already exists!");
+
+            pqxx::transaction transaction{_connection};
+
+            pqxx::row id_row = transaction.exec1(
+                "insert into topics (title, subject) values (" +
+                _connection.quote(title) + ", " +
+                std::to_string(selected_subject->id()) + ") returning id"
+            );
+            transaction.commit();
+
+            std::size_t id = id_row[0].as<unsigned long int>();
+            generated_topic = std::make_shared<topic>(id);
+            generated_topic->title(title);
+            selected_subject->add_topic(generated_topic);
+
+            _stream << style::bold << color::green;
+            _stream << "Topic \"" << title << "\" created\n";
+            _stream << color::reset;
+        }
     }
 
     return generated_topic;
@@ -711,9 +835,8 @@ std::shared_ptr<practice> library::make_practice(std::shared_ptr<note> selected_
 
 std::size_t library::create_resource()
 {
-    std::string name;
-    std::string description;
-    std::string link;
+    std::string name{}, description{}, link{};
+    std::size_t resource_id{};
 
     _stream.clear();
     _stream << color::red;
@@ -725,33 +848,48 @@ std::size_t library::create_resource()
     if (name.empty())
         throw std::runtime_error("resource name cannot be empty");
 
-    _stream << color::white << "\nDescription: " << color::orange;
-    std::getline(std::cin >> std::ws, description);
-
-    _stream << color::white << "\nPurchase link: " << color::orange;
-    std::getline(std::cin >> std::ws, link);
-
-    if (search_resource(name) > 0)
-        throw std::runtime_error("resource already exists");
-
-    pqxx::work resource_creation_work{_connection};
-    pqxx::row resulting_id = resource_creation_work.exec1(
-        "select create_resource("s + resource_creation_work.quote(name) +
-        ", "s + resource_creation_work.quote(description) + ", "s +
-        resource_creation_work.quote(link) + ")"s
+    pqxx::work resource_check{_connection};
+    pqxx::result existing_record = resource_check.exec(
+        "select id from resources where name = "s + resource_check.quote(name)
     );
-    resource_creation_work.commit();
+    resource_check.commit();
 
-    _stream << color::reset << style::bold << color::green;
-    _stream << "Resource \"" << name << "\" created.\n";
-    _stream << color::reset;
-    std::cin.get();
+    if (existing_record[0][0].is_null())
+    {
+        _stream << color::white << "\nDescription: " << color::orange;
+        std::getline(std::cin >> std::ws, description);
 
-    _stream.clear();
-    _stream << color::red;
-    _stream.header("Flashback >> Library >> "s + name);
+        _stream << color::white << "\nPurchase link: " << color::orange;
+        std::getline(std::cin >> std::ws, link);
 
-    return resulting_id[0].as<std::size_t>();
+        if (search_resource(name) > 0)
+            throw std::runtime_error("resource already exists");
+
+        pqxx::work resource_creation_work{_connection};
+        pqxx::row resulting_id = resource_creation_work.exec1(
+            "select create_resource("s + resource_creation_work.quote(name) +
+            ", "s + resource_creation_work.quote(description) + ", "s +
+            resource_creation_work.quote(link) + ")"s
+        );
+        resource_creation_work.commit();
+
+        _stream << color::reset << style::bold << color::green;
+        _stream << "Resource \"" << name << "\" created.\n";
+        _stream << color::reset;
+        std::cin.get();
+
+        _stream.clear();
+        _stream << color::red;
+        _stream.header("Flashback >> Library >> "s + name);
+
+        resource_id = resulting_id[0].as<std::size_t>();
+    }
+    else
+    {
+        resource_id = existing_record[0][0].as<std::size_t>();
+    }
+
+    return resource_id;
 }
 
 std::size_t library::search_resource()
@@ -795,21 +933,6 @@ std::size_t library::search_resource()
 
         id = search_results[selection-1][0].as<std::size_t>();
         complete_name = search_results[selection-1][1].as<std::string>();
-
-        std::size_t note_count{0};
-        std::size_t collected{0};
-        std::size_t collectable{0};
-
-        _stream.clear();
-        _stream << color::red;
-        _stream.header("Flashback >> Library >> "s + complete_name);
-        _stream << style::bold << color::orange << "\n";
-        _stream << complete_name;
-        _stream << style::bold << color::green << " (";
-        _stream << note_count << " notes available, ";
-        _stream << collectable << " collectable, ";
-        _stream << collected << " collected)\n";
-        _stream << color::reset;
     }
 
     return id;

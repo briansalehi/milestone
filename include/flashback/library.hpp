@@ -7,6 +7,7 @@
 #include <flashback/loader.hpp>
 #include <flashback/space.hpp>
 
+#include <string_view>
 #include <filesystem>
 #include <algorithm>
 #include <iostream>
@@ -280,6 +281,8 @@ private:
     void view_note_description(std::size_t const, std::size_t const);
 
     void extract_notes(std::size_t const);
+
+    void show_resource_menu(std::size_t const);
 
     std::shared_ptr<subject> take_subject();
 
