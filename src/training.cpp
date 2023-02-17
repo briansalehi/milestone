@@ -133,14 +133,17 @@ std::size_t training::get_record_id(pqxx::result const& results)
     std::size_t index{1};
     std::map<std::size_t, std::size_t> index_map{};
 
+    _stream << style::bold << color::pink << "\n";
+
     std::ranges::for_each(results, [&index, &index_map, this](pqxx::row subject_row) {
         index_map[index] = subject_row[0].as<std::size_t>();
-        _stream << index << ". " << subject_row[1].as<std::string>() << "\n";
+        _stream << "  " << index << ". " << subject_row[1].as<std::string>() << "\n";
         ++index;
     });
 
-    _stream << "\nSubject: ";
+    _stream << style::bold << color::white << "\nSubject: " << color::orange;
     std::cin >> std::ws >> index;
+    _stream << color::reset;
 
     if (index >= index_map.size())
         throw std::out_of_range("invalid index");
