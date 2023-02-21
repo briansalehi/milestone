@@ -867,9 +867,10 @@ std::size_t library::create_resource()
 
         pqxx::work resource_creation_work{_connection};
         pqxx::row resulting_id = resource_creation_work.exec1(
-            "select create_resource("s + resource_creation_work.quote(name) +
-            ", "s + resource_creation_work.quote(description) + ", "s +
-            resource_creation_work.quote(link) + ")"s
+            "insert into resources (name, description, purchase_link) "s +
+            "values ("s + resource_creation_work.quote(name) +
+            ", "s + resource_creation_work.quote(description) +
+            ", "s + resource_creation_work.quote(link) + ") returning id"s
         );
         resource_creation_work.commit();
 
