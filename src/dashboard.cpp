@@ -1,14 +1,16 @@
 #include <flashback/dashboard.hpp>
-#include <flashback/loader.hpp>
 
 using namespace flashback;
-using namespace std::literals::string_literals;
-using namespace std::literals::string_view_literals;
 
-dashboard::dashboard(): _stream{std::cin, std::cout}
+void dashboard::dashboard(argument_parser const& options)
 {
+    std::ranges::transform(
+            std::filesystem::directory_iterator(options.resource_directory),
+            std::back_inserter(_topics),
+            parse_topic);
 }
 
+/*
 void dashboard::open()
 {
     char space_id = prompt_space();
@@ -18,12 +20,12 @@ void dashboard::open()
 
 char dashboard::prompt_space()
 {
-        /*"[u] tutorials space",*/
-        /*"[r] roadmap space",*/
-    std::vector<std::string> spaces {
-        "[i] library space",
-        "[t] training space",
-        "[q] quit from flashback"
+    std::map<char, std::string> spaces {
+        {'i', "library space"s},
+      //{'u', "tutorials space"s},
+      //{'r', "roadmap space"s},
+        {'t', "training space"s},
+        {'q', "quit from flashback"s}
     };
 
     char selected_space;
@@ -36,8 +38,8 @@ char dashboard::prompt_space()
     _stream << color::pink;
 
     //std::ranges::for_each(spaces, std::ostream_iterator<char>(std::cout, "\n"));
-    std::ranges::for_each(spaces, [](std::string const& s) {
-        std::cout << "  " << s << "\n";
+    std::ranges::for_each(spaces, [](auto const& option) {
+        std::cout << "  [" << option.first << "] " << option.second << "\n";
     });
 
     _stream << color::white;
@@ -71,3 +73,4 @@ void dashboard::enter_space(std::shared_ptr<space> selected_space)
     if (selected_space)
         selected_space->init();
 }
+*/

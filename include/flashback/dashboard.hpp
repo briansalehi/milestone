@@ -1,38 +1,44 @@
 #pragma once
 
 #include <flashback/argument_parser.hpp>
-#include <flashback/library.hpp>
-#include <flashback/training.hpp>
-#include <flashback/console.hpp>
-#include <flashback/loader.hpp>
-#include <flashback/space.hpp>
+#include <flashback/topic.hpp>
+#include <flashback/practice.hpp>
+//#include <flashback/library.hpp>
+//#include <flashback/training.hpp>
+//#include <flashback/console.hpp>
+//#include <flashback/loader.hpp>
+//#include <flashback/space.hpp>
 
-#include <string_view>
+#include <thread>
 #include <string>
 #include <vector>
-#include <array>
+#include <memory>
+#include <algorithm>
+#include <filesystem>
 
 namespace flashback
 {
+
 class dashboard
 {
 public:
-    using color = console<std::istream, std::ostream>::color;
-    using style = console<std::istream, std::ostream>::style;
-
-    dashboard();
-
-    void open();
+    explicit dashboard(argument_parser const&);
 
 private:
+    std::vector<std::shared_ptr<topic>> parse_topic(std::filesystem::directory_entry const&) const;
+
+    /*
+    void open();
+
     std::shared_ptr<space> build_space(char);
 
     char prompt_space();
 
     void enter_space(std::shared_ptr<space>);
+    */
 
 private:
-    console<std::istream, std::ostream> _stream;
+    std::vector<std::shared_ptr<topic>> _topics;
 };
 
 } // flashback

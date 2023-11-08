@@ -835,7 +835,7 @@ std::shared_ptr<practice> library::make_practice(std::shared_ptr<note> selected_
 
 std::size_t library::create_resource()
 {
-    std::string name{}, description{}, link{};
+    std::string name{};
     std::size_t resource_id{};
 
     _stream.clear();
@@ -856,21 +856,13 @@ std::size_t library::create_resource()
 
     if (existing_record[0][0].is_null())
     {
-        _stream << color::white << "\nDescription: " << color::orange;
-        std::getline(std::cin >> std::ws, description);
-
-        _stream << color::white << "\nPurchase link: " << color::orange;
-        std::getline(std::cin >> std::ws, link);
-
         if (search_resource(name) > 0)
             throw std::runtime_error("resource already exists");
 
         pqxx::work resource_creation_work{_connection};
         pqxx::row resulting_id = resource_creation_work.exec1(
-            "insert into resources (name, description, purchase_link) "s +
-            "values ("s + resource_creation_work.quote(name) +
-            ", "s + resource_creation_work.quote(description) +
-            ", "s + resource_creation_work.quote(link) + ") returning id"s
+            "insert into resources (name) "s +
+            "values ("s + resource_creation_work.quote(name) + ") returning id"s
         );
         resource_creation_work.commit();
 

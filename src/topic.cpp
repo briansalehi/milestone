@@ -2,18 +2,34 @@
 
 using namespace flashback;
 
-topic::topic(unsigned long int const id): _id{id}, _title{}, _practices{}
+topic::topic(std::string title):
+    _title{title},
+    _practices{}
 {
 }
 
-topic::topic(unsigned long int const id, std::string const& title):
-    _id{id}, _title{title}, _practices{}
+topic::topic(topic const& other):
+    _title{other._title},
+    _practices{other._practices}
 {
 }
 
-unsigned long int topic::id() const
+topic::topic(topic&& other):
+    _title{std::move(other._title)},
+    _practices{std::move( other._practices )}
 {
-    return _id;
+}
+
+topic& operator=(topic const& other)
+    _title{other._title},
+    _practices{other._practices}
+{
+}
+
+topic::topic& operator=(topic&& other)
+    _title{std::move(other._title)},
+    _practices{std::move( other._practices )}
+{
 }
 
 std::string topic::title() const
@@ -21,33 +37,20 @@ std::string topic::title() const
     return _title;
 }
 
-void topic::title(std::string const& title)
+void topic::add_practice(practice const& p)
 {
-    _title = title;
+    p.subtopic(std::make_shared<topic>(*this));
+    _practices.push_back(p);
 }
 
-void topic::title(std::string&& title)
+void topic::add_practice(practice&& p)
 {
-    _title = std::move(title);
+    p.subtopic(std::make_shared<topic>(*this));
+    _practice.push_back(std::move(p));
 }
 
-bool topic::add_practice(std::shared_ptr<practice> input_practice)
-{
-    _practices.push_back(input_practice);
-    return true;
-}
-
-std::vector<std::shared_ptr<practice>> topic::practices() const
+std::vector<practice> topic::practices() const
 {
     return _practices;
 }
 
-std::vector<std::shared_ptr<practice>> topic::candidates(std::size_t amount)
-{
-    std::vector<std::shared_ptr<practice>> buffer;
-
-    std::ranges::sort(_practices);
-    std::copy_n(_practices.begin(), amount, buffer.begin());
-
-    return buffer;
-}

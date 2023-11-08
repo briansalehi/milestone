@@ -1,52 +1,64 @@
 #include <flashback/practice.hpp>
-#include <flashback/reference.hpp>
-#include <flashback/source.hpp>
 
 using namespace flashback;
-using namespace std::literals::chrono_literals;
 
-practice::practice(unsigned long int const id):
-    _id{id}, _question{}, _answer{}, _references{}
+practice::practice(std::weak_ptr<topic> subtopic):
+    _question{},
+    _answer{},
+    _origins{},
+    _references{},
+    _subtopic{subtopic},
+    _last_usage{},
+    _elapsed_time{}
 {
+    if (!subtopic)
+    {
+        throw std::bad_weak_ptr{"invalid subtopic assigned to practice"};
+    }
 }
 
 practice::practice(practice const& other):
-    _question{other.question()},
-    _answer{other.answer()},
-    _references{}
+    _question{other._question},
+    _answer{other._answer},
+    _origins{other._origins},
+    _references{other._references},
+    _subtopic{other._subtopic},
+    _last_usage{other._last_usage},
+    _elapsed_time{other._elapsed_time}
 {
-    std::ranges::copy(other._references, std::back_inserter(_references));
 }
 
-practice::practice(practice&& other) noexcept :
-    _question{std::move(other.question())},
-    _answer{std::move(other.answer())},
-    _references{}
+practice::practice(practice&& other)
+    _question{std::move( other._question )},
+    _answer{std::move( other._answer )},
+    _origins{std::move(others._origins)},
+    _references{std::move(other._references)},
+    _subtopic{std::move( other._subtopic)},
+    _last_usage{std::move( other._last_usage )},
+    _elapsed_time{std::move( other._elapsed_time )}
 {
-    std::ranges::move(other._references, std::back_inserter(_references));
 }
 
-practice& practice::operator=(practice const& other)
+practice::practice& operator=(practice const&)
 {
     _question = other._question;
     _answer = other._answer;
-    std::ranges::copy(other._references, std::back_inserter(_references));
-
-    return *this;
+    _origins = other._origins;
+    _references = other._references;
+    _subtopic = other._subtopic;
+    _last_usage = other._last_usage;
+    _elapsed_time = other._elapsed_time;
 }
 
-practice& practice::operator=(practice&& other) noexcept
+practice::practice& operator=(practice&& other)
 {
-    _question = other._question;
-    _answer = other._answer;
-    std::ranges::move(other._references, std::back_inserter(_references));
-
-    return *this;
-}
-
-unsigned long int practice::id() const
-{
-    return _id;
+    _question = std::move(other._question);
+    _answer = std::move(other._answer);
+    _origins = std::move(other._origins);
+    _references = std::move(other._references);
+    _subtopic = std::move(other._subtopic);
+    _last_usage = std::move(other._last_usage);
+    _elapsed_time = std::move(other._elapsed_time);
 }
 
 std::string practice::question() const
@@ -54,14 +66,14 @@ std::string practice::question() const
     return _question;
 }
 
-void practice::question(std::string const& question)
+void practice::question(std::string const& q)
 {
-    _question = question;
+    _question = q;
 }
 
-void practice::question(std::string&& question)
+void practice::question(std::string&& q)
 {
-    _question = std::move(question);
+    _question = std::move(q);
 }
 
 std::string practice::answer() const
@@ -69,50 +81,64 @@ std::string practice::answer() const
     return _answer;
 }
 
-void practice::answer(std::string const& answer)
+void practice::answer(std::string const& a)
 {
-    _answer = answer;
+    _answer = a;
 }
 
-void practice::answer(std::string&& answer)
+void practice::answer(std::string&& a)
 {
-    _answer = std::move(answer);
+    _answer = std::move(a);
 }
 
-std::vector<std::shared_ptr<reference>> practice::references() const
+std::vector<reference> practice::references() const
 {
     return _references;
 }
 
-void practice::add_reference(std::shared_ptr<reference> ref)
+void practice::add_reference(reference const& r)
 {
-    _references.push_back(ref);
+    _references.push_back(r);
 }
 
-/*
-std::vector<source> practice::soruces() const
+void practice::add_reference(reference&& r)
+{
+    _references.push_back(std::move(r));
+}
+
+std::vector<source> practice::source() const
 {
     return _sources;
 }
 
-void practice::add_source(std::shared_ptr<source> origin)
+void practice::add_source(source const& s)
 {
-    _sources.push_back(origin);
+    _sources.push_back(s);
 }
-*/
+
+void practice::add_source(source&& s)
+{
+    _sources.push_back(std::move(s));
+}
+
+void practice::subsection(std::weak_ptr<topic> p)
+{
+    _subtopic.reset(p);
+}
 
 std::chrono::days practice::last_usage() const
 {
     return _last_usage;
 }
 
-void practice::last_usage(std::chrono::days const days)
+void practice::last_usage(std::chrono::days days)
 {
     _last_usage = days;
 }
 
 void practice::reset_usage()
 {
+    _last_usage = 0;
 }
 
 std::chrono::seconds practice::elapsed_time() const
@@ -120,17 +146,8 @@ std::chrono::seconds practice::elapsed_time() const
     return _elapsed_time;
 }
 
-void practice::elapsed_time(std::chrono::seconds const elapsed_time)
+void practice::elapsed_time(std::chrono::seconds seconds)
 {
-    _elapsed_time = elapsed_time; 
-}
-    
-bool practice::operator==(practice const& other)
-{
-    return _id == other.id();
+    _elapsed_time = seconds;
 }
 
-bool practice::operator<(practice const& other)
-{
-    return last_usage() < other.last_usage();
-}

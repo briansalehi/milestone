@@ -2,37 +2,35 @@
 
 #include <flashback/practice.hpp>
 
-#include <algorithm>
-#include <utility>
 #include <string>
 #include <memory>
 #include <vector>
-#include <ranges>
+#include <compare>
 
 namespace flashback
 {
 
-class topic
+class topic: public std::enable_shared_from_this<topic>
 {
 public:
-    explicit topic(unsigned long int const);
-    explicit topic(unsigned long int const, std::string const&);
+    topic(std::string);
 
-    unsigned long int id() const;
+    topic(topic const&);
+    topic(topic&&) noexcept;
+    topic& operator=(topic const&);
+    topic& operator=(topic&&) noexcept;
 
     std::string title() const;
-    void title(std::string const&);
-    void title(std::string&&);
 
-    bool add_practice(std::shared_ptr<practice>);
-    std::vector<std::shared_ptr<practice>> practices() const;
+    void add_practice(practice const&);
+    void add_practice(practice&&) noexcept;
+    std::vector<practice> practices() const;
 
-    std::vector<std::shared_ptr<practice>> candidates(std::size_t = 1);
+    auto operator<=>(topic const&) = default;
 
 private:
-    unsigned long int _id;
     std::string _title;
-    std::vector<std::shared_ptr<practice>> _practices;
+    std::vector<practice> _practices;
 };
 
 } // flashback
