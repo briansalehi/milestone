@@ -1,108 +1,69 @@
-cmake_minimum_required(VERSION 3.15)
-project(Flashback VERSION 0.1 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.25)
 
-find_package(Boost COMPONENTS program_options REQUIRED)
+project(flashback VERSION 0.3 LANGUAGES CXX)
 
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-file(GLOB source_files src/*)
-file(GLOB header_files include/*)
-file(GLOB doc_files docs/*)
+set(components Widgets LinguistTools WebEngineWidgets)
 
-enable_testing()
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS ${components})
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS ${components})
 
-########## libraries ##########
+file(GLOB source_files src/*.cpp)
+file(GLOB header_files include/flashback/*.hpp)
+file(GLOB ui_files ui/*.ui)
+file(GLOB ts_files ts/*.ts)
 
-add_library(note EXCLUDE_FROM_ALL SHARED src/note.cpp)
-target_include_directories(note PUBLIC include)
+set(PROJECT_SOURCES ${source_files} ${header_files} ${ui_files} ${ts_files})
 
-add_library(console EXCLUDE_FROM_ALL SHARED src/console.cpp)
-target_include_directories(console PUBLIC include)
+if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
+    qt_add_executable(flashback MANUAL_FINALIZATION ${PROJECT_SOURCES})
+    qt_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${ts_files})
 
-add_library(book EXCLUDE_FROM_ALL SHARED src/book.cpp)
-target_link_libraries(book PUBLIC note)
-target_include_directories(book PUBLIC include)
+    # Define target properties for Android with Qt 6 as:
+    #   set_property(TARGET flashback APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/android)
+    # For more information, see https://doc.qt.io/qt-6/qt-add-executable.html#target-creation
+else()
+    if(ANDROID)
+        add_library(flashback SHARED ${PROJECT_SOURCES})
+        # Define properties for Android with Qt 5 after find_package() calls as:
+        #  set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
+    else()
+        add_executable(flashback ${PROJECT_SOURCES})
+    endif()
 
-add_library(reference EXCLUDE_FROM_ALL SHARED src/reference.cpp)
-target_include_directories(reference PUBLIC include)
+    qt5_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${ts_files})
+endif()
 
-add_library(practice EXCLUDE_FROM_ALL SHARED src/practice.cpp)
-target_link_libraries(practice PUBLIC reference)
-target_include_directories(practice PUBLIC include)
+target_link_libraries(flashback PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 
-add_library(topic EXCLUDE_FROM_ALL SHARED src/topic.cpp)
-target_link_libraries(topic PUBLIC practice)
-target_include_directories(topic PUBLIC include)
+# Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
+# If you are developing for iOS or macOS you should consider setting an
+# explicit, fixed bundle identifier manually though.
+if(${QT_VERSION} VERSION_LESS 6.1.0)
+    set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.flashback)
+endif()
 
-add_library(subject EXCLUDE_FROM_ALL SHARED src/subject.cpp)
-target_link_libraries(subject PUBLIC topic)
-target_include_directories(subject PUBLIC include)
+set_target_properties(flashback PROPERTIES
+    ${BUNDLE_ID_OPTION}
+    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+    MACOSX_BUNDLE TRUE
+    WIN32_EXECUTABLE TRUE
+)
 
-add_library(resource_loader EXCLUDE_FROM_ALL SHARED src/resource_loader.cpp)
-target_link_libraries(resource_loader PUBLIC pq pqxx book subject)
-target_include_directories(resource_loader PUBLIC include)
+include(GNUInstallDirs)
+install(TARGETS flashback
+    BUNDLE DESTINATION .
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
 
-add_library(library EXCLUDE_FROM_ALL SHARED src/library.cpp)
-target_link_libraries(library PUBLIC resource_loader console)
-target_include_directories(library PUBLIC include)
-
-add_library(training EXCLUDE_FROM_ALL SHARED src/training.cpp)
-target_link_libraries(training PUBLIC pq pqxx console)
-target_include_directories(training PUBLIC include)
-
-add_library(dashboard EXCLUDE_FROM_ALL SHARED src/dashboard.cpp)
-target_link_libraries(dashboard PUBLIC library training resource_loader)
-target_include_directories(dashboard PUBLIC include)
-
-add_library(practice_collection EXCLUDE_FROM_ALL SHARED src/practice_collection.cpp)
-target_link_libraries(practice_collection PUBLIC console practice)
-target_include_directories(practice_collection PUBLIC include)
-
-add_executable(flashback)
-target_sources(flashback PRIVATE ${source_files})
-target_link_libraries(flashback PRIVATE Boost::program_options pq pqxx)
-target_include_directories(flashback PRIVATE include)
-
-########## test executables ##########
-
-add_executable(test_practice EXCLUDE_FROM_ALL)
-target_sources(test_practice PRIVATE test/practice.cpp)
-target_link_libraries(test_practice PRIVATE gtest PUBLIC practice)
-target_include_directories(test_practice PUBLIC include PRIVATE test)
-#add_test(NAME practice_test COMMAND practice)
-
-add_executable(test_note EXCLUDE_FROM_ALL)
-target_sources(test_note PRIVATE test/note.cpp PUBLIC src/note.cpp)
-target_link_libraries(test_note PRIVATE gtest note)
-target_include_directories(test_note PUBLIC include PRIVATE test)
-add_test(NAME test_note COMMAND test_note)
-
-add_executable(test_book EXCLUDE_FROM_ALL)
-target_sources(test_book PRIVATE test/book.cpp PUBLIC src/book.cpp)
-target_link_libraries(test_book PRIVATE gtest book)
-target_include_directories(test_book PUBLIC include PRIVATE test)
-add_test(NAME test_book COMMAND test_book)
-
-add_executable(test_library EXCLUDE_FROM_ALL)
-target_sources(test_library PUBLIC test/library.cpp)
-target_link_libraries(test_library PRIVATE gtest library)
-target_include_directories(test_library PUBLIC include PRIVATE test)
-add_test(NAME test_library COMMAND test_library)
-
-add_executable(test_resource_loader EXCLUDE_FROM_ALL)
-target_sources(test_resource_loader PUBLIC test/resource_loader.cpp)
-target_link_libraries(test_resource_loader PUBLIC resource_loader PRIVATE gtest)
-target_include_directories(test_resource_loader PUBLIC include PRIVATE test)
-add_test(NAME test_resource_loader COMMAND test_resource_loader)
-
-add_executable(test_dashboard EXCLUDE_FROM_ALL)
-target_sources(test_dashboard PUBLIC test/dashboard.cpp)
-target_link_libraries(test_dashboard PRIVATE gtest dashboard)
-target_include_directories(test_dashboard PUBLIC include PRIVATE test)
-add_test(NAME test_dashboard COMMAND test_dashboard)
-
-### installation targets ###
-
-install(TARGETS flashback RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+if(QT_VERSION_MAJOR EQUAL 6)
+    qt_finalize_executable(flashback)
+endif()
