@@ -256,6 +256,8 @@ protected:
     virtual void perform_space_actions() override;
 
 private:
+    //std::string get_text(std::string_view) const;
+
     std::size_t select_resource();
 
     std::size_t create_resource();
