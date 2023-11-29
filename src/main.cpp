@@ -1,25 +1,18 @@
-#include "dashboard.hpp"
-
-#include <QApplication>
-#include <QLocale>
-#include <QTranslator>
+#include <QGuiApplication>
+#include <QQmlApplicationEngine>
 
 int main(int argc, char *argv[])
 {
-    QApplication a(argc, argv);
+    QGuiApplication app(argc, argv);
 
-    QTranslator translator;
-    const QStringList uiLanguages = QLocale::system().uiLanguages();
-    for (const QString &locale : uiLanguages) {
-        const QString baseName = "flashback_" + QLocale(locale).name();
-        if (translator.load(":/i18n/" + baseName)) {
-            a.installTranslator(&translator);
-            break;
-        }
-    }
+    QQmlApplicationEngine engine;
+    QObject::connect(
+        &engine,
+        &QQmlApplicationEngine::objectCreationFailed,
+        &app,
+        []() { QCoreApplication::exit(-1); },
+        Qt::QueuedConnection);
+    engine.loadFromModule("flashback", "Main");
 
-    Dashboard w;
-    w.show();
-
-    return a.exec();
+    return app.exec();
 }

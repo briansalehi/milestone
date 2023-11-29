@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-FLASHBACK_PRACTICES_PATH="${FLASHBACK_PRACTICES_PATH:-$HOME/projects/references/books}"
+FLASHBACK_PRACTICES_PATH="${FLASHBACK_PRACTICES_PATH:-$HOME/projects/bookmarks/references}"
 FLASHBACK_PROGRESS_PATH="${FLASHBACK_PROGRESS_PATH:-$HOME/.cache/flashback}"
 RESUMABLE=0
 
