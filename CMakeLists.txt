@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Quick)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Quick WebView)
 
 file(GLOB source_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
 file(GLOB qml_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.qml)
@@ -27,7 +27,7 @@ set_target_properties(flashback-gui PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
-target_link_libraries(flashback-gui PRIVATE Qt6::Quick)
+target_link_libraries(flashback-gui PRIVATE Qt6::Quick Qt6::WebView)
 
 include(GNUInstallDirs)
 install(TARGETS flashback-gui

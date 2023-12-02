@@ -1,4 +1,5 @@
 import QtQuick
+import QtWebView
 
 Window {
     id: root
@@ -29,17 +30,17 @@ Window {
         ListModel {
             id: topics
 
-            ListElement { triggered: function() { }; name: 'Boost' }
-            ListElement { triggered: function() { }; name: 'C++' }
-            ListElement { triggered: function() { }; name: 'CMake' }
-            ListElement { triggered: function() { }; name: 'Docker' }
-            ListElement { triggered: function() { }; name: 'GDB' }
-            ListElement { triggered: function() { }; name: 'Linux Kernel' }
-            ListElement { triggered: function() { }; name: 'Mathematics' }
-            ListElement { triggered: function() { }; name: 'OpenCV' }
-            ListElement { triggered: function() { }; name: 'Qt' }
-            ListElement { triggered: function() { }; name: 'Tmux' }
-            ListElement { triggered: function() { }; name: 'x64 Assembly' }
+            ListElement { triggered: function() { }; link: 'boost.md';       name: 'Boost' }
+            ListElement { triggered: function() { }; link: 'cpp.md';         name: 'C++' }
+            ListElement { triggered: function() { }; link: 'cmake.md';       name: 'CMake' }
+            ListElement { triggered: function() { }; link: 'docker.md';      name: 'Docker' }
+            ListElement { triggered: function() { }; link: 'gdb.md';         name: 'GDB' }
+            ListElement { triggered: function() { }; link: 'kernel.md';      name: 'Linux Kernel' }
+            ListElement { triggered: function() { }; link: 'mathematics.md'; name: 'Mathematics' }
+            ListElement { triggered: function() { }; link: 'opencv.md';      name: 'OpenCV' }
+            ListElement { triggered: function() { }; link: 'qt.md';          name: 'Qt' }
+            ListElement { triggered: function() { }; link: 'tmux.md';        name: 'Tmux' }
+            ListElement { triggered: function() { }; link: 'assembly.md';    name: 'x64 Assembly' }
         }
 
         ListView {
@@ -59,9 +60,10 @@ Window {
         Topic {
             required property int index
             required property string name
+            required property string link
 
             title: name
-            onClicked: { editor.heading = title }
+            //onClicked: { preview.url = link }
         }
     }
 
@@ -72,7 +74,7 @@ Window {
         height: root.height - root.padding * 2
         radius: 5
 
-        property alias heading: label.text
+        // property alias url: webview.address
 
         anchors.left: parent.left
         anchors.leftMargin: root.padding
@@ -86,14 +88,11 @@ Window {
             anchors.bottomMargin: buttom_layout.height + root.padding * 2
             radius: 5
 
-            Text {
-                id: label
-                color: 'white'
-                font.family: 'OpenSans'
-                font.pixelSize: 24
-                anchors.top: parent.top
-                anchors.topMargin: root.padding
-                anchors.horizontalCenter: parent.horizontalCenter
+            WebView {
+                id: webview
+                anchors.fill: parent
+                anchors.margins: 5
+                url: 'http://localhost:1337'
             }
         }
 
