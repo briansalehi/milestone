@@ -19,7 +19,7 @@ Window {
     Rectangle {
         id: sidebar
         color: Qt.darker(background.color, 1.2)
-        width: root.width / 3 - root.padding
+        width: ((root.width / 3) < 300 ? (root.width / 3) : 300) - root.padding
         height: root.height - root.padding * 2
         radius: 5
 
@@ -114,7 +114,7 @@ Window {
     Rectangle {
         id: editor
         color: Qt.darker(background.color, 1.2)
-        width: root.width * 2 / 3 - root.padding * 2
+        width: root.width - sidebar.width - root.padding
         height: root.height - root.padding * 2
         radius: 5
 
