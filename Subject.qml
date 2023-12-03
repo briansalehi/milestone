@@ -13,7 +13,7 @@ Item {
         id: element
         radius: 5
         anchors.fill: parent
-        color: 'lightblue'
+        color: 'lightgreen'
     }
 
     Text {

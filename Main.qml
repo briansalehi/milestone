@@ -3,8 +3,8 @@ import QtWebView
 
 Window {
     id: root
-    width: 1000
-    height: 600
+    width: 1280
+    height: 768
     visible: true
     title: qsTr("Flashback")
 
@@ -28,19 +28,38 @@ Window {
         anchors.verticalCenter: parent.verticalCenter
 
         ListModel {
+            id: subjects
+
+            ListElement { name: 'Boost' }
+            ListElement { name: 'C++' }
+            ListElement { name: 'CMake' }
+            ListElement { name: 'Docker' }
+            ListElement { name: 'GDB' }
+            ListElement { name: 'Linux Kernel' }
+            ListElement { name: 'Mathematics' }
+            ListElement { name: 'OpenCV' }
+            ListElement { name: 'Qt' }
+            ListElement { name: 'Tmux' }
+            ListElement { name: 'x64 Assembly' }
+        }
+
+        ListModel {
             id: topics
 
-            ListElement { triggered: function() { }; link: 'boost.md';       name: 'Boost' }
-            ListElement { triggered: function() { }; link: 'cpp.md';         name: 'C++' }
-            ListElement { triggered: function() { }; link: 'cmake.md';       name: 'CMake' }
-            ListElement { triggered: function() { }; link: 'docker.md';      name: 'Docker' }
-            ListElement { triggered: function() { }; link: 'gdb.md';         name: 'GDB' }
-            ListElement { triggered: function() { }; link: 'kernel.md';      name: 'Linux Kernel' }
-            ListElement { triggered: function() { }; link: 'mathematics.md'; name: 'Mathematics' }
-            ListElement { triggered: function() { }; link: 'opencv.md';      name: 'OpenCV' }
-            ListElement { triggered: function() { }; link: 'qt.md';          name: 'Qt' }
-            ListElement { triggered: function() { }; link: 'tmux.md';        name: 'Tmux' }
-            ListElement { triggered: function() { }; link: 'assembly.md';    name: 'x64 Assembly' }
+            ListElement { name: 'Asynchronous IO Context'; }
+            ListElement { name: 'Asynchronous Event Processing Loop'; }
+            ListElement { name: 'Queueing Asynchronous Tasks'; }
+            ListElement { name: 'Serializing Event Processing Loop'; }
+            ListElement { name: 'Handling Exceptional Event Processing Loop Control FLow'; }
+            ListElement { name: 'Deadline Timer'; }
+            ListElement { name: 'Endpoint'; }
+            ListElement { name: 'Active Socket'; }
+            ListElement { name: 'Passive Socket'; }
+            ListElement { name: 'Resolving DNS'; }
+            ListElement { name: 'Synchronous TCP Client'; }
+            ListElement { name: 'Synchronous TCP Connection'; }
+            ListElement { name: 'Asynchronous TCP Connection'; }
+            ListElement { name: 'Writing into and Reading from Socket'; }
         }
 
         ListView {
@@ -48,22 +67,47 @@ Window {
             anchors.fill: parent
             anchors.margins: root.padding
             spacing: 5
-            model: topics
-            delegate: create_topic
+            model: subjects
+            delegate: subject_entry
             clip: true
         }
     }
 
     Component {
-        id: create_topic
+        id: subject_entry
+
+        Subject {
+            required property int index
+            required property string name
+
+            title: name
+            onClicked: {
+                view.header = topic_heading;
+                view.model = topics
+                view.delegate = topic_entry
+            }
+        }
+    }
+
+    Component {
+        id: topic_entry
 
         Topic {
             required property int index
             required property string name
-            required property string link
 
             title: name
-            //onClicked: { preview.url = link }
+        }
+    }
+
+    Component {
+        id: topic_heading
+
+        Subject {
+            required property int index
+            required property string name
+
+            title: 'Boost'
         }
     }
 
