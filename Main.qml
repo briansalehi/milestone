@@ -137,6 +137,15 @@ Window {
                 anchors.fill: parent
                 anchors.margins: 5
                 url: 'http://localhost:1337'
+                onLoadingChanged: reminder.start()
+            }
+
+            Timer {
+                id: reminder
+                interval: 1000
+                running: true
+                repeat: false
+                onTriggered: webview.reload()
             }
         }
 
