@@ -35,9 +35,17 @@ target_link_libraries(flashback-gui PRIVATE Qt6::Quick Qt6::WebView)
 
 include(GNUInstallDirs)
 
-add_executable(validator EXCLUDE_FROM_ALL src/validator.cpp)
+add_executable(validator src/validator.cpp)
 target_include_directories(validator PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(validator PRIVATE Boost::program_options pthread)
+
+add_executable(test-validator test/test-validator.cpp)
+target_include_directories(test-validator PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(test-validator PRIVATE gtest)
+
+enable_testing()
+
+add_test(NAME validator COMMAND $<TARGET_FILE:test-validator>)
 
 install(TARGETS flashback-gui
     BUNDLE DESTINATION .
