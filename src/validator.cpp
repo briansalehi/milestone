@@ -45,6 +45,9 @@ argument_parser::argument_parser(int argc, char** argv)
         complete_flag = option_mapper.contains("complete");
         writing_flag  = option_mapper.contains("writing");
 
+        std::filesystem::file_status resource_status{std::filesystem::status(resource_path)};
+        std::filesystem::file_type resource_type{resource_status.type()};
+
         // conflicts and missing prerequisites that cannot be handled here
         if (debug_flag && (quiet_flag || brief_flag))
             throw std::invalid_argument{"debugging cannot be done silently"};
@@ -52,11 +55,11 @@ argument_parser::argument_parser(int argc, char** argv)
             throw std::invalid_argument{"cannot log details in quiet mode"};
         else if (resource_path.empty())
             throw std::invalid_argument{"resource path not given"};
-        else if (!std::filesystem::exists(resource_path))
+        else if (resource_type == std::filesystem::file_type::not_found)
             throw std::invalid_argument{"resource path does not exist"};
         else if (
-                !std::filesystem::is_regular_file(resource_path) &&
-                !std::filesystem::is_directory(resource_path)
+                resource_type != std::filesystem::file_type::directory &&
+                resource_type != std::filesystem::file_type::regular
             )
             throw std::invalid_argument{
                 "resource should be a regular file or directory"};
@@ -79,10 +82,6 @@ int main(int argc, char** argv)
     {
         flashback::argument_parser options{argc, argv};
 
-    }
-    catch (flashback::help_requested const& exp)
-    {
-        std::cerr << exp.what() << std::endl;
     }
     catch (std::exception const& exp)
     {
