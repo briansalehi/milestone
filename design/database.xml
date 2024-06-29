@@ -28,6 +28,8 @@ practice_blocks
 id pk int identity
 practice_id fk >- practices.id
 block string
+type enum{text,code}
+extension char[3]
 updated date default=getutcdate()
 
 resources
