@@ -43,21 +43,21 @@ create type flashback.block_type as enum ('text', 'code');
 create table flashback.practice_blocks (
     id int generated always as identity,
     practice_id int,
-    block text,
+    content text,
     type flashback.block_type not null default 'text',
-    extension char(3) not null,
+    language varchar(10) not null,
     updated timestamp not null default now(),
     primary key (id),
     constraint fk_practice_block foreign key (practice_id) references flashback.practices(id) on update cascade on delete cascade
 );
 
-create type flashback.resource_type as enum ('book', 'link', 'video');
+create type flashback.resource_type as enum ('unknown', 'book', 'link', 'video');
 
 create table flashback.resources (
     id int generated always as identity,
     practice_id int,
     origin varchar(2000) not null,
-    type flashback.resource_type not null,
+    type flashback.resource_type not null default 'unknown',
     updated timestamp not null default now(),
     primary key (id),
     constraint fk_practice_resource foreign key (practice_id) references flashback.practices(id) on update cascade on delete cascade
@@ -67,7 +67,7 @@ create table flashback.references (
     id int generated always as identity,
     practice_id int,
     origin varchar(2000) not null,
-    type flashback.resource_type not null,
+    type flashback.resource_type not null default 'unknown',
     updated timestamp not null default now(),
     primary key (id),
     constraint fk_practice_reference foreign key (practice_id) references flashback.references(id) on update cascade on delete cascade

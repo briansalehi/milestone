@@ -1,6 +1,43 @@
 #!/usr/bin/env bash
 
 error() { tput setaf 1; tput bold; echo "$@" >&2; tput sgr0; exit 1; }
+alert()
+{
+    tput bold
+    if [ $# -eq 1 ]
+    then
+        tput setaf 5
+        echo -e "$1"
+    else
+        tput setaf 4
+        echo -ne "$1: "
+        tput setaf 8
+        echo -e "$2"
+    fi
+    tput sgr0
+}
+notice()
+{
+    [ "${DEBUG:-0}" -ne 1 ] && return
+    alert "$1" "$2"
+}
+log()
+{
+    [ "${DEBUG:-0}" -ne 1 ] && return
+
+    tput bold
+    if [ $# -eq 1 ]
+    then
+        tput setaf 5
+        echo -e "$1"
+    else
+        tput setaf 4
+        echo -ne "$1: "
+        tput setaf 8
+        read -rp "$2" </dev/tty
+    fi
+    tput sgr0
+}
 report_progress()
 {
     local counter="${1:-0}"
@@ -98,61 +135,178 @@ do
 done <<< "$(psql -U flashback_importer -d flashback -At -c 'select t.id, s.id from flashback.subjects s join flashback.topics t on t.subject_id = s.id;' | sed 's/\(.*\)|\(.*\)/ [\1]="\2"/' | tr -d '\n' || error "Cannot collect subject and topic identifiers")"
 
 practice_index=1
+declare -a blocks=()
+declare -a resources=()
+declare -a references=()
 total_practices="$(find /tmp/references/subjects/ -mindepth 2 -maxdepth 2 -type f -name '*.md' -not -name 'README.md' -exec grep '<details>' {} \; | wc -l)"
 for subject in "${!subjects[@]}"
 do
+    log "Subject" "${subjects[$subject]}"
     subject="/tmp/references/subjects/${subject}/${subject}.md"
     inside_block=0
+    code_block=0
     current_topic=
-    blocks=
+    blocks=()
+    resources=()
+    references=()
     heading=
 
     while read -r line
     do
+        log "Line" "$line"
         if grep -q '## ' <<< "$line"
         then
+            log "Topic Header"
             current_topic="${line/\#\# /}"
         elif [ "${line/> /}" == "---" ]
         then
+            log "Horizontal Line"
+            resources_block=0
+            references_block=0
+            code_block=0
             continue
         elif grep -q '<details>' <<< "$line"
         then
+            log "Block Begin"
             inside_block=1
         elif grep -q '<summary>' <<< "$line"
         then
+            log "Heading"
             heading="$(sed 's/<.\?summary>//g' <<< "$line")"
             read -r line
         elif grep -q '</details>' <<< "$line"
         then
+            log "End of Block"
             inside_block=0
+            resources_block=0
+            references_block=0
+            code_block=0
             topic_id="${topic_records[$current_topic]}"
-            blocks="${blocks//\'/\'\'}"
             heading="${heading//\'/\'\'}"
-
-            practice_id="$(psql -U flashback_importer -d flashback -Aqt -c "insert into flashback.practices (heading, topic_id) values ('${heading}', '$topic_id') returning id;" || error "Practice failed to be inserted" || error "Failed to collect practice identifier")"
-            if ! psql -q -U flashback_importer -d flashback -c "insert into flashback.practice_blocks (block, extension, practice_id) values ('${blocks}', 'txt', ${practice_id});"
-            then
-
-                echo
-                echo ">>>>>>>>>>>>>>>>>>>>>"
-                echo "Topic: $topic_id $current_topic"
-                echo "$heading"
-                echo "$blocks"
-                echo "<<<<<<<<<<<<<<<<<<<<<"
-                echo
-
-                error "Practice block failed to be inserted"
-            fi
 
             report_progress $practice_index "Storing practice" "$total_practices"
             practice_index=$((practice_index + 1))
 
-            blocks=
+            query="insert into flashback.practices (heading, topic_id) values ('${heading}', '$topic_id') returning id;"
+            practice_id="$(psql -U flashback_importer -d flashback -Aqt -c "$query" || error "Practice failed to be inserted" || error "Failed to collect practice identifier")"
+
+            for record in "${blocks[@]}"
+            do
+                block_type="${record%%:*}"
+                record="${record#*:}"
+                language="${record%%:*}"
+                record="${record#*:}"
+                block="${record%%:*}"
+                block="${block//\'/\'\'}"
+
+                query="insert into flashback.practice_blocks (content, type, language, practice_id) values ('${block}', '${block_type}', '${language}', ${practice_id});"
+                if ! psql -q -U flashback_importer -d flashback -c "$query"
+                then
+                    alert "\nPractice"
+                    alert "Query" "$query"
+                    alert "Topic" "$topic_id $current_topic"
+                    alert "Heading" "$heading"
+                    alert "Block" "${blocks[*]}"
+
+                    error "Practice block failed to be inserted"
+                fi
+            done
+
+            for record in "${resources[@]}"
+            do
+                record="${record//\'/\'\'}"
+                query="insert into flashback.resources (origin, practice_id) values ('${record}', ${practice_id});"
+                if ! psql -q -U flashback_importer -d flashback -c "$query"
+                then
+                    alert "\nPractice"
+                    alert "Query" "$query"
+                    alert "Topic" "$topic_id $current_topic"
+                    alert "Heading" "$heading"
+                    alert "Block" "${blocks[*]}"
+                    alert "Resources" "${resources[*]}"
+
+                    error "Practice block failed to be inserted"
+                fi
+            done
+
+            for record in "${references[@]}"
+            do
+                record="${record//\'/\'\'}"
+                query="insert into flashback.references (origin, practice_id) values ('${record}', ${practice_id});"
+                if ! psql -q -U flashback_importer -d flashback -c "$query"
+                then
+                    alert "\nPractice"
+                    alert "Query" "$query"
+                    alert "Topic" "$topic_id $current_topic"
+                    alert "Heading" "$heading"
+                    alert "Block" "${blocks[*]}"
+                    alert "Resources" "${resources[*]}"
+                    alert "References" "${references[*]}"
+
+                    error "Practice block failed to be inserted"
+                fi
+            done
+
+            notice "\nPractice"
+            notice "Topic" "$topic_id $current_topic"
+            notice "Heading" "$heading"
+            notice "Block" "${blocks[*]}"
+            notice "Resources" "${resources[*]}"
+            notice "References" "${references[*]}"
+
+            blocks=()
+            resources=()
+            references=()
+        elif [ "$inside_block" -eq 1 ] && grep -Eq '\*+Description\*+' <<< "$line"
+        then
+            log "Description Ignored"
+            continue
+        elif [ "$inside_block" -eq 1 ] && grep -Eq '\*+Resources\*+' <<< "$line"
+        then
+            log "Resources Begin"
+            code_block=0
+            resources_block=1
+            resources=()
+        elif [ "$inside_block" -eq 1 ] && grep -Eq '\*+References\*+' <<< "$line"
+        then
+            log "References Begin"
+            code_block=0
+            references_block=1
+            references=()
+        elif [ "$inside_block" -eq 1 ] && [ "${resources_block:-0}" -eq 1 ]
+        then
+            log "Resource Record"
+            resources+=( "${line/> - /}" )
+        elif [ "$inside_block" -eq 1 ] && [ "${references_block:-0}" -eq 1 ]
+        then
+            log "Reference Record"
+            references+=( "${line/> - /}" )
+        elif [ "$inside_block" -eq 1 ] && grep -Eq '`+\w+$' <<< "$line"
+        then
+            log "Code Block Begin"
+            code_block=1
+            language="$(sed 's/.*`\+//' <<< "$line")"
+        elif [ "$inside_block" -eq 1 ] && [ "$code_block" -eq 1 ] && grep -Eq '[`]{3,7}$' <<< "$line"
+        then
+            log "Code Block End"
+            blocks+=( "code:$language:$buffer" )
+            buffer=
+            language=
+            code_block=0
+        elif [ "$inside_block" -eq 1 ] && [ -z "${line/>/}" ]
+        then
+            log "Text Block End"
+            if [ -n "$buffer" ]
+            then
+                blocks+=( "text::$buffer" )
+            fi
+            buffer=
         elif [ "$inside_block" -eq 1 ]
         then
+            log "Buffer Line"
             line="${line/> /}"
             line="${line/>/}"
-            blocks="$(echo -e "${blocks}${blocks:+\n}${line:-\n}")"
+            buffer="$(echo -e "${buffer}${buffer:+\n}${line:-\n}")"
         fi
     done < "$subject"
 done
