@@ -195,8 +195,7 @@ do
                 block_type="${record%%:*}"
                 record="${record#*:}"
                 language="${record%%:*}"
-                record="${record#*:}"
-                block="${record%%:*}"
+                block="${record#*:}"
                 block="${block//\'/\'\'}"
 
                 query="insert into flashback.practice_blocks (content, type, language, practice_id) values ('${block}', '${block_type}', '${language}', ${practice_id});"
