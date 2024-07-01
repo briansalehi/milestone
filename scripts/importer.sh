@@ -202,7 +202,7 @@ do
                 query="insert into flashback.practice_blocks (content, type, language, practice_id) values ('${block}', '${block_type}', '${language}', ${practice_id});"
                 if ! psql -q -U flashback_importer -d flashback -c "$query"
                 then
-                    alert "\nPractice"
+                    alert "\nPractice $practice_id"
                     alert "Query" "$query"
                     alert "Topic" "$topic_id $current_topic"
                     alert "Heading" "$heading"
@@ -218,7 +218,7 @@ do
                 query="insert into flashback.resources (origin, practice_id) values ('${record}', ${practice_id});"
                 if ! psql -q -U flashback_importer -d flashback -c "$query"
                 then
-                    alert "\nPractice"
+                    alert "\nPractice $practice_id"
                     alert "Query" "$query"
                     alert "Topic" "$topic_id $current_topic"
                     alert "Heading" "$heading"
@@ -235,7 +235,7 @@ do
                 query="insert into flashback.references (origin, practice_id) values ('${record}', ${practice_id});"
                 if ! psql -q -U flashback_importer -d flashback -c "$query"
                 then
-                    alert "\nPractice"
+                    alert "\nPractice $practice_id"
                     alert "Query" "$query"
                     alert "Topic" "$topic_id $current_topic"
                     alert "Heading" "$heading"
@@ -247,7 +247,7 @@ do
                 fi
             done
 
-            notice "\nPractice"
+            notice "\nPractice $practice_id"
             notice "Topic" "$topic_id $current_topic"
             notice "Heading" "$heading"
             notice "Block" "${blocks[*]}"

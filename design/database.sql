@@ -70,6 +70,6 @@ create table flashback.references (
     type flashback.resource_type not null default 'unknown',
     updated timestamp not null default now(),
     primary key (id),
-    constraint fk_practice_reference foreign key (practice_id) references flashback.references(id) on update cascade on delete cascade
+    constraint fk_practice_reference foreign key (practice_id) references flashback.practices(id) on update cascade on delete cascade
 );
 
