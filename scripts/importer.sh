@@ -126,8 +126,8 @@ do
         then
             inside_block=0
             topic_id="${topic_records[$current_topic]}"
-            blocks="${blocks//\'/}"
-            heading="${heading//\'/}"
+            blocks="${blocks//\'/\'\'}"
+            heading="${heading//\'/\'\'}"
 
             practice_id="$(psql -U flashback_importer -d flashback -Aqt -c "insert into flashback.practices (heading, topic_id) values ('${heading}', '$topic_id') returning id;" || error "Practice failed to be inserted" || error "Failed to collect practice identifier")"
             if ! psql -q -U flashback_importer -d flashback -c "insert into flashback.practice_blocks (block, extension, practice_id) values ('${blocks}', 'txt', ${practice_id});"
@@ -152,7 +152,7 @@ do
         then
             line="${line/> /}"
             line="${line/>/}"
-            blocks="${blocks}${blocks:+\n}${line}"
+            blocks="$(echo -e "${blocks}${blocks:+\n}${line:-\n}")"
         fi
     done < "$subject"
 done
