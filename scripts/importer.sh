@@ -48,7 +48,8 @@ report_progress()
     then
         length="$(echo -n "$((counter - 1))${total:+/}${total}" | wc -c)"
         printf "%.s\b" $(seq 1 "$length")
-        echo "$counter${total:+/}${total}"
+        [ "$total" -gt 1 ] && echo "$counter${total:+/}${total}"
+        [ "$total" -eq 1 ] && echo "${2:-Untitled}: $counter${total:+/}${total}"
     elif [ "$counter" -eq 1 ]
     then
         echo -n "${2:-Untitled}: $counter${total:+/}${total}"
@@ -75,7 +76,7 @@ then
 fi
 
 # recreate database
-psql -q -U postgres -d flashback -c "\i $PWD/design/database.sql" || error "Cannot recreate database"
+psql -q -U postgres -c "\i $PWD/design/database.sql" || error "Cannot recreate database"
 
 subject_index=1
 total_subjects=$(find /tmp/references/subjects -mindepth 1 -maxdepth 1 | wc -l)
@@ -92,7 +93,8 @@ done
 subjects_query="insert into flashback.subjects (name) values ${subject_entries[*]};"
 
 # import subjects
-psql -q -U flashback_importer -d flashback -c "${subjects_query}" || error "Cannot store subjects"
+report_progress 1 "Storing Subjects" 1
+psql -q -U postgres -d flashback -c "${subjects_query}" || error "Cannot store subjects"
 
 subject_id=1
 topic_index=1
@@ -103,7 +105,7 @@ do
     do
         [ -z "$topic" ] && continue
         report_progress $topic_index "Collecting Topics" "$total_topics"
-        subject_id=$(psql -U flashback_importer -d flashback -At -c "select id from flashback.subjects where name = '${subjects[$subject]}';")
+        subject_id=$(psql -U postgres -d flashback -At -c "select id from flashback.subjects where name = '${subjects[$subject]}';")
         subject_records[$subject_id]="${subjects[$subject]}"
         topic_entries+=( "${topic_entries[*]:+, }('${topic}', '${subject_id}')" )
         topic_index=$((topic_index + 1))
@@ -116,7 +118,7 @@ done
 topics_query="insert into flashback.topics (name, subject_id) values ${topic_entries[*]};"
 
 # import topics
-psql -q -U flashback_importer -d flashback -c "${topics_query}" || error "Cannot store topics"
+psql -q -U postgres -d flashback -c "${topics_query}" || error "Cannot store topics"
 
 declare -A topic_records
 while read -r record
@@ -124,7 +126,7 @@ do
     [ -z "${record#*=}" ] && continue
     [ -z "${record%=*}" ] && continue
     topic_records["${record#*=}"]="${record%=*}"
-done <<< "$(psql -U flashback_importer -d flashback -At -c 'select id, name from flashback.topics;' | sed 's/\(.*\)|\(.*\)/\1=\2/' || error "Cannot collect topics")"
+done <<< "$(psql -U postgres -d flashback -At -c 'select id, name from flashback.topics;' | sed 's/\(.*\)|\(.*\)/\1=\2/' || error "Cannot collect topics")"
 
 declare -A topic_subject_mapping
 while read -r record
@@ -132,7 +134,7 @@ do
     [ -z "${record#*=}" ] && continue
     [ -z "${record%=*}" ] && continue
     topic_subject_mapping["${record%=*}"]="${record#*=}"
-done <<< "$(psql -U flashback_importer -d flashback -At -c 'select t.id, s.id from flashback.subjects s join flashback.topics t on t.subject_id = s.id;' | sed 's/\(.*\)|\(.*\)/ [\1]="\2"/' | tr -d '\n' || error "Cannot collect subject and topic identifiers")"
+done <<< "$(psql -U postgres -d flashback -At -c 'select t.id, s.id from flashback.subjects s join flashback.topics t on t.subject_id = s.id;' | sed 's/\(.*\)|\(.*\)/ [\1]="\2"/' | tr -d '\n' || error "Cannot collect subject and topic identifiers")"
 
 practice_index=1
 declare -a blocks=()
@@ -188,7 +190,7 @@ do
             practice_index=$((practice_index + 1))
 
             query="insert into flashback.practices (heading, topic_id) values ('${heading}', '$topic_id') returning id;"
-            practice_id="$(psql -U flashback_importer -d flashback -Aqt -c "$query" || error "Practice failed to be inserted" || error "Failed to collect practice identifier")"
+            practice_id="$(psql -U postgres -d flashback -Aqt -c "$query" || error "Practice failed to be inserted" || error "Failed to collect practice identifier")"
 
             for record in "${blocks[@]}"
             do
@@ -199,7 +201,7 @@ do
                 block="${block//\'/\'\'}"
 
                 query="insert into flashback.practice_blocks (content, type, language, practice_id) values ('${block}', '${block_type}', '${language}', ${practice_id});"
-                if ! psql -q -U flashback_importer -d flashback -c "$query"
+                if ! psql -q -U postgres -d flashback -c "$query"
                 then
                     alert "\nPractice $practice_id"
                     alert "Query" "$query"
@@ -215,7 +217,7 @@ do
             do
                 record="${record//\'/\'\'}"
                 query="insert into flashback.resources (origin, practice_id) values ('${record}', ${practice_id});"
-                if ! psql -q -U flashback_importer -d flashback -c "$query"
+                if ! psql -q -U postgres -d flashback -c "$query"
                 then
                     alert "\nPractice $practice_id"
                     alert "Query" "$query"
@@ -232,7 +234,7 @@ do
             do
                 record="${record//\'/\'\'}"
                 query="insert into flashback.references (origin, practice_id) values ('${record}', ${practice_id});"
-                if ! psql -q -U flashback_importer -d flashback -c "$query"
+                if ! psql -q -U postgres -d flashback -c "$query"
                 then
                     alert "\nPractice $practice_id"
                     alert "Query" "$query"

@@ -1,14 +1,16 @@
-﻿\c template1
+﻿\c template1;
 
 drop database if exists flashback;
-create database flashback;
-
 drop schema if exists flashback;
-create schema flashback authorization flashback_importer;
+drop role if exists flashback;
+
+create role flashback;
+create schema flashback authorization flashback;
+create database flashback template template1;
+
+set role to flashback;
 
 \c flashback;
-
-set role to flashback_importer;
 
 create table flashback.subjects (
     id int generated always as identity,
