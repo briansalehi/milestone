@@ -35,12 +35,12 @@ checkpoint()
 }
 notice()
 {
-    [ "${DEBUG:-0}" -ge 1 ] && return
+    [ "${DEBUG:-0}" -ge 1 ] || return
     alert "$1" "$2"
 }
 log()
 {
-    [ "${DEBUG:-0}" -ge 2 ] && return
+    [ "${DEBUG:-0}" -ge 2 ] || return
 
     tput bold
     if [ $# -eq 1 ]
@@ -216,6 +216,7 @@ do
     blocks=()
     practice_resources=()
     references=()
+    related_resources=()
     heading=
 
     while read -r line
@@ -284,38 +285,39 @@ do
             for record in "${practice_resources[@]}"
             do
                 record="${record//\'/\'\'}"
-                resource_headline="$(record%-*)"
+                resource_headline="${record% - *}"
+		section_headline="${record##* - }"
                 resource_state="released"
-                resource_id="${resource_mapping[$resource_name]}"
-                current_subject="${subjects[$subject_file]}"
+                resource_id="${resources_mapping[$resource_headline]}"
+                current_subject="${subjects[$subject]}"
                 [ "${DEBUG:-0}" -ge 3 ] && checkpoint "Check Current Subject and Resource Headline Relation" "$current_subject <> $resource_headline $resource_id"
 
-                local -a related_resources
                 while read -r related_resource
                 do
-                    if grep -q "$current_subject" "$related_resource"
+                    if grep -q "$current_subject" <<< "$related_resource"
                     then
                         related_resources+=( "$related_resource" )
                     fi
-                done <<< "${practice_resources[@]}"
-                [ "${DEBUG:-0}" -ge 3 ] && checkpoint "Check Related Resources" "${related_resources[@]}"
+                done <<< "${resources[@]}"
+                [ "${DEBUG:-0}" -ge 3 ] && checkpoint "Check Current Subject with Related Resources" "$current_subject <> ${related_resources[@]}"
 
                 if [ -z "${resource_id}" ] && [ "${#related_resources[*]}" -eq 0 ]
                 then
                     alert "Resource did not match any of the existing records"
-                    read -rp "Enter resource: " resource_headline
+                    read -rp "Enter resource: " resource_headline </dev/tty
                     [ -z "$resource_headline" ] && error "Incorrect Resource Headline"
                 elif [ -z "${resource_id}" ]
                 then
-                    alert "Resource did not have exact match but there are similars, choose:"
+                    alert "Resource headline did not have exact match but there are similars to '$resource_headline':"
                     select resource_headline in "${related_resources[@]}"
                     do
-                        break
-                    done
-                    [ "${DEBUG:-0}" -ge 3 ] && checkpoint "Check Selected Resource" "$resource_headline"
+                        resource_id="${resources_mapping[$resource_headline]}"
+			[ -n "$resource_id" ] && break
+                    done </dev/tty
+                    [ "${DEBUG:-0}" -ge 3 ] && checkpoint "Check Selected Resource" "$resource_headline $resource_id"
                 fi
 
-                query="insert into flashback.resource_sections (practice_id, resource_id, headline, state) values (${practice_id}, ${resource_id}, '${resource_headline}', '${resource_state}');"
+                query="insert into flashback.resource_sections (practice_id, resource_id, headline, state) values (${practice_id}, ${resource_id}, '${section_headline}', '${resource_state}');"
                 [ "${DEBUG:-0}" -ge 3 ] && checkpoint "Check Resource Sections Query" "$query"
 
                 if ! psql -q -U postgres -d flashback -c "$query"
@@ -378,28 +380,33 @@ do
         elif [ "$inside_block" -eq 1 ] && [ "${resources_block:-0}" -eq 1 ]
         then
             log "Resource Record"
-            stripped+=( "${line/> - /}" )
-            if [ "${stripped# *}" == "" ]
+            stripped=( "${line/> - /}" )
+	    log "Stripped Resource" "$stripped"
+            if [ "${stripped/ /}" == "" ]
             then
-                practice_resources+=( "$stripped" )
-            else
                 log "Empty Resource Ignored"
+            else
+                practice_resources+=( "$stripped" )
             fi
+	    stripped=
         elif [ "$inside_block" -eq 1 ] && [ "${references_block:-0}" -eq 1 ]
         then
             log "Reference Record"
-            stripped+=( "${line/> - /}" )
-            if [ "${stripped# *}" == "" ]
+            stripped=( "${line/> - /}" )
+	    log "Stripped Reference" "$stripped"
+            if [ "${stripped/ /}" == "" ]
             then
-                references+=( "$stripped" )
-            else
                 log "Empty Reference Ignored"
+            else
+                references+=( "$stripped" )
             fi
+	    stripped=
         elif [ "$inside_block" -eq 1 ] && grep -Eq '`+\w+$' <<< "$line"
         then
             log "Code Block Begin"
             code_block=1
             language="$(sed 's/.*`\+//' <<< "$line")"
+	    log "Detected Language" "$language"
         elif [ "$inside_block" -eq 1 ] && [ "$code_block" -eq 1 ] && grep -Eq '[`]{3,7}$' <<< "$line"
         then
             log "Code Block End"
