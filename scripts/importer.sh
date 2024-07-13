@@ -63,7 +63,6 @@ report_progress()
 declare -A subjects
 declare -A subject_records
 declare -a subject_entries
-declare -a topic_entries
 
 if [ ! -s "$PWD/design/database.sql" ]
 then
@@ -96,6 +95,7 @@ subjects_query="insert into flashback.subjects (name) values ${subject_entries[*
 report_progress 1 "Storing Subjects" 1
 psql -q -U postgres -d flashback -c "${subjects_query}" || error "Cannot store subjects"
 
+declare -a topic_entries
 subject_id=1
 topic_index=1
 total_topics="$(find /tmp/references/subjects/ -mindepth 2 -maxdepth 2 -type f -name '*.md' -not -name 'README.md' -exec grep '^## ' {} \; | wc -l)"
@@ -115,30 +115,74 @@ do
     subject_index=$((subject_index + 1))
 done
 
-topics_query="insert into flashback.topics (name, subject_id) values ${topic_entries[*]};"
-
 # import topics
+report_progress 1 "Storing Topics" 1
+topics_query="insert into flashback.topics (name, subject_id) values ${topic_entries[*]};"
 psql -q -U postgres -d flashback -c "${topics_query}" || error "Cannot store topics"
 
 declare -A topic_records
+topic_record_index=1
 while read -r record
 do
-    [ -z "${record#*=}" ] && continue
-    [ -z "${record%=*}" ] && continue
-    topic_records["${record#*=}"]="${record%=*}"
-done <<< "$(psql -U postgres -d flashback -At -c 'select id, name from flashback.topics;' | sed 's/\(.*\)|\(.*\)/\1=\2/' || error "Cannot collect topics")"
+    report_progress $topic_record_index "Collecting Topic Indexes" $topic_index
+    [ -z "${record#*|}" ] && continue
+    [ -z "${record%|*}" ] && continue
+    topic_records["${record#*|}"]="${record%|*}"
+    topic_record_index="$((topic_record_index + 1))"
+done <<< "$(psql -U postgres -d flashback -At -c 'select id, name from flashback.topics;' || error "Cannot collect topics")"
 
 declare -A topic_subject_mapping
+topic_subject_index=1
 while read -r record
 do
-    [ -z "${record#*=}" ] && continue
-    [ -z "${record%=*}" ] && continue
-    topic_subject_mapping["${record%=*}"]="${record#*=}"
-done <<< "$(psql -U postgres -d flashback -At -c 'select t.id, s.id from flashback.subjects s join flashback.topics t on t.subject_id = s.id;' | sed 's/\(.*\)|\(.*\)/ [\1]="\2"/' | tr -d '\n' || error "Cannot collect subject and topic identifiers")"
+    report_progress $topic_subject_index "Collecting Topic-Subject Relation Maps" $topic_index
+    [ -z "${record#*|}" ] && continue
+    [ -z "${record%|*}" ] && continue
+    topic_subject_mapping["${record%|*}"]="${record#*|}"
+    topic_subject_index="$((topic_subject_index + 1))"
+done <<< "$(psql -U postgres -d flashback -At -c 'select t.id, s.id from flashback.subjects s join flashback.topics t on t.subject_id = s.id;' || error "Cannot collect subject and topic identifiers")"
+
+report_progress 1 "Collecting Resources" 1
+readarray resources <<< "$(while read -r resource_dir; do while read -r resource; do sed -n '1s/#\s*//p' $resource; done <<< "$(find "$resource_dir" -type f -name '*.md')"; done <<< "$(find ~/projects/references/subjects/ -mindepth 1 -maxdepth 2 -type d -name resources)")"
+
+resources_query=""
+resources_query_values=""
+for resource in "${resources[@]}"
+do
+    resources_query_values="${resources_query_values}${resources_query_values:+ , }'${$resources}'"
+done
+resources_query="insert into flashback.resources (name) values ($resources_query_values);"
+
+report_progress 1 "Storing Resources" 1
+psql -q -U postgres -d flashback -c "$resources_query"
+
+declare -A resources_mapping
+resource_index=1
+while read -r record
+do
+    report_progress $resource_index "Collecting Resource Identifiers" ${#resources[*]}
+    [ -z "${record#*|}" ] && continue
+    [ -z "${record%|*}" ] && continue
+    topic_subject_mapping["${record%|*}"]="${record#*|}"
+    resource_index="$((resource_index + 1))"
+done <<< "$(psql -U postgres -d flashback -At -c 'select name, id from flashback.resources;' || error "Cannot collect resources from database")"
+
+resource_index=1
+for record in "${resources[@]}"
+do
+    report_progress $topic_subject_index "Storing Resources" $topic_index
+    record="${record//\'/\'\'}"
+    query="insert into flashback.resources (name, practice_id) values ('${record}', ${practice_id});"
+    if ! psql -q -U postgres -d flashback -c "$query"
+    then
+        alert "Resources" "${resources[*]}"
+        error "Practice block failed to be inserted"
+    fi
+done
 
 practice_index=1
 declare -a blocks=()
-declare -a resources=()
+declare -a practice_resources=()
 declare -a references=()
 total_practices="$(find /tmp/references/subjects/ -mindepth 2 -maxdepth 2 -type f -name '*.md' -not -name 'README.md' -exec grep '<details>' {} \; | wc -l)"
 for subject in "${!subjects[@]}"
@@ -149,7 +193,7 @@ do
     code_block=0
     current_topic=
     blocks=()
-    resources=()
+    practice_resources=()
     references=()
     heading=
 
@@ -186,7 +230,7 @@ do
             topic_id="${topic_records[$current_topic]}"
             heading="${heading//\'/\'\'}"
 
-            report_progress $practice_index "Storing practice" "$total_practices"
+            report_progress $practice_index "Storing Practice" "$total_practices"
             practice_index=$((practice_index + 1))
 
             query="insert into flashback.practices (heading, topic_id) values ('${heading}', '$topic_id') returning id;"
@@ -213,10 +257,26 @@ do
                 fi
             done
 
-            for record in "${resources[@]}"
+            for record in "${practice_resources[@]}"
             do
                 record="${record//\'/\'\'}"
-                query="insert into flashback.resources (origin, practice_id) values ('${record}', ${practice_id});"
+                resource_headline="$(record%-*)"
+                resource_state="released"
+                resource_id="${resource_mapping[$resource_name]}"
+
+                if ! psql -q -U postgres -d flashback -c "$query"
+                then
+                    alert "\nPractice $practice_id"
+                    alert "Resource" "$resource_name"
+                    alert "Resource ID" "$resource_id"
+                    alert "Topic" "$topic_id $current_topic"
+                    alert "Heading" "$heading"
+                    alert "Block" "${blocks[*]}"
+                    alert "Resources" "${practice_resources[*]}"
+                    error "Resource does not match any of the existing records"
+                fi
+
+                query="insert into flashback.resource_sections (practice_id, resource_id, headline, state) values (${practice_id}, ${resource_id}, '${resource_headline}', '${resource_state}');"
                 if ! psql -q -U postgres -d flashback -c "$query"
                 then
                     alert "\nPractice $practice_id"
@@ -224,11 +284,11 @@ do
                     alert "Topic" "$topic_id $current_topic"
                     alert "Heading" "$heading"
                     alert "Block" "${blocks[*]}"
-                    alert "Resources" "${resources[*]}"
-
+                    alert "Resources" "${practice_resources[*]}"
                     error "Practice block failed to be inserted"
                 fi
             done
+
 
             for record in "${references[@]}"
             do
@@ -241,9 +301,8 @@ do
                     alert "Topic" "$topic_id $current_topic"
                     alert "Heading" "$heading"
                     alert "Block" "${blocks[*]}"
-                    alert "Resources" "${resources[*]}"
+                    alert "Resources" "${practice_resources[*]}"
                     alert "References" "${references[*]}"
-
                     error "Practice block failed to be inserted"
                 fi
             done
@@ -252,11 +311,11 @@ do
             notice "Topic" "$topic_id $current_topic"
             notice "Heading" "$heading"
             notice "Block" "${blocks[*]}"
-            notice "Resources" "${resources[*]}"
+            notice "Resources" "${practice_resources[*]}"
             notice "References" "${references[*]}"
 
             blocks=()
-            resources=()
+            practice_resources=()
             references=()
         elif [ "$inside_block" -eq 1 ] && grep -Eq '\*+Description\*+' <<< "$line"
         then
@@ -267,7 +326,7 @@ do
             log "Resources Begin"
             code_block=0
             resources_block=1
-            resources=()
+            practice_resources=()
         elif [ "$inside_block" -eq 1 ] && grep -Eq '\*+References\*+' <<< "$line"
         then
             log "References Begin"
@@ -277,11 +336,23 @@ do
         elif [ "$inside_block" -eq 1 ] && [ "${resources_block:-0}" -eq 1 ]
         then
             log "Resource Record"
-            resources+=( "${line/> - /}" )
+            stripped+=( "${line/> - /}" )
+            if [ "${stripped# *}" == "" ]
+            then
+                practice_resources+=( "$stripped" )
+            else
+                log "Empty Resource Ignored"
+            fi
         elif [ "$inside_block" -eq 1 ] && [ "${references_block:-0}" -eq 1 ]
         then
             log "Reference Record"
-            references+=( "${line/> - /}" )
+            stripped+=( "${line/> - /}" )
+            if [ "${stripped# *}" == "" ]
+            then
+                references+=( "$stripped" )
+            else
+                log "Empty Reference Ignored"
+            fi
         elif [ "$inside_block" -eq 1 ] && grep -Eq '`+\w+$' <<< "$line"
         then
             log "Code Block Begin"
