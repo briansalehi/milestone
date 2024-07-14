@@ -106,7 +106,7 @@ for subject in /tmp/references/subjects/*
 do
     report_progress $subject_index "Collecting Subjects" "$total_subjects"
     subject_path="$(basename "$subject")"
-    subject_name="$(sed -n '1{s/#\s*//p}' "/tmp/references/subjects/${subject_path}/${subject_path}.md")"
+    subject_name="$(sed -n '1{s/#\s*\(.*\)/\1/p;{s/\s*<sup>.*//p}}' "/tmp/references/subjects/${subject_path}/${subject_path}.md")"
     subject_entries+=( "${subject_entries:+, }('${subject_name}')" )
     subjects["${subject_path}"]="${subject_name}"
     subject_index=$((subject_index + 1))
@@ -355,17 +355,8 @@ do
                     if [ -z "$section_headline" ]
                     then
                         alert "Section headline was not detected in '$record'"
-                        read -rp "Enter section headline: " section_headline
                     fi
 
-                    if [ -z "${resource_id}" ] && grep -Eq 'https://(www\.)?youtube.com' <<< "$record"
-                    then
-                        resource_id=1
-                        resource_name="YouTube"
-                        section_headline="$record"
-                    elif [ -z "${resource_id}" ] && grep -Eq 'https://youtube.com' <<< "$record"
-                    then
-                        alert "Resource name '$record' contains a link but does not match: Practice [$practice_id]"
                     #elif [ -z "${resource_id}" ]
                     #then
                     #    alert "Resource name '$resource_name' did not have exact match but there are similars: '$resource_name':"
@@ -375,7 +366,7 @@ do
                     #        [ -n "$resource_id" ] && break
                     #    done </dev/tty
                     #    [ "${DEBUG:-0}" -ge 3 ] && checkpoint "Check Selected Resource" "$resource_name $resource_id"
-                    elif [ -z "${resource_id}" ]
+                    if [ -z "${resource_id}" ]
                     then
                         alert "Resource name '$record' did not have exact match: Practice [$practice_id]"
                     fi
