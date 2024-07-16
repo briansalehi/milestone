@@ -65,6 +65,7 @@ create table flashback.resources (
 insert into flashback.resources (name, reference, type) values
       ('https://www.youtube.com',                                               'https://youtube.com',        'video')
     , ('https://www.youtu.be',                                                  'https://youtube.com',        'video')
+    , ('https://www.boost.org',                                                 'https://boost.org',          'website')
     , ('https://www.latex-tutorial.com',                                        'https://latex-tutorial.com', 'website')
     , ('https://www.qt.io',                                                     'https://qt.io',              'website')
     , ('GDB Tips by Greg Law',                                                   null,                        'website')
@@ -86,12 +87,24 @@ create table flashback.resource_sections (
     constraint fk_resource_section foreign key (resource_id) references flashback.resources(id) on update cascade on delete cascade
 );
 
-create table flashback.practice_resources (
+create table flashback.notes (
     id int generated always as identity primary key,
-    practice_id int,
-    section_id int,
-    constraint fk_practice_resource foreign key (practice_id) references flashback.practices(id) on update cascade on delete cascade,
-    constraint fk_practice_section foreign key (section_id) references flashback.resource_sections(id) on update cascade on delete cascade
+    resource_id int,
+    heading varchar(400) not null,
+    state flashback.state not null default 'open',
+    creation timestamp not null default now(),
+    updated timestamp not null default now(),
+    constraint fk_resource_note foreign key (resource_id) references flashback.resources(id) on update cascade on delete set null
+);
+
+create table flashback.note_blocks (
+    id int generated always as identity primary key,
+    note_id int,
+    content text,
+    type flashback.block_type not null default 'text',
+    language varchar(10) not null,
+    updated timestamp not null default now(),
+    constraint fk_note_block foreign key (note_id) references flashback.notes(id) on update cascade on delete cascade
 );
 
 create table flashback.references (
@@ -101,5 +114,30 @@ create table flashback.references (
     type flashback.resource_type not null default 'unknown',
     updated timestamp not null default now(),
     constraint fk_practice_reference foreign key (practice_id) references flashback.practices(id) on update cascade on delete cascade
+);
+
+create table flashback.note_references (
+    id int generated always as identity primary key,
+    note_id int,
+    origin varchar(2000) not null,
+    type flashback.resource_type not null default 'unknown',
+    updated timestamp not null default now(),
+    constraint fk_note_reference foreign key (note_id) references flashback.notes(id) on update cascade on delete cascade
+);
+
+create table flashback.practice_resources (
+    id int generated always as identity primary key,
+    practice_id int,
+    section_id int,
+    constraint fk_practice_resource foreign key (practice_id) references flashback.practices(id) on update cascade on delete cascade,
+    constraint fk_practice_section foreign key (section_id) references flashback.resource_sections(id) on update cascade on delete cascade
+);
+
+create table flashback.note_resources (
+    id int generated always as identity primary key,
+    note_id int,
+    section_id int,
+    constraint fk_note_resource foreign key (note_id) references flashback.notes(id) on update cascade on delete cascade,
+    constraint fk_note_section foreign key (section_id) references flashback.resource_sections(id) on update cascade on delete cascade
 );
 

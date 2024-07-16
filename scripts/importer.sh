@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-error() { tput setaf 1; tput bold; echo "$@" >&2; tput sgr0; exit 1; }
+error() { tput setaf 1; tput bold; echo -e "[$checkpoint_steps] $CURRENT_FILE:$line_number => " "$@" >&2; tput sgr0; exit 1; }
 alert()
 {
     tput bold
@@ -38,14 +38,43 @@ checkpoint()
     read -rp "Continue? " response </dev/tty
     [ "${response}" != "y" ] && exit 1
 }
+detail_checkpoint()
+{
+    checkpoint_steps="$((checkpoint_steps + 1))"
+
+    [ "${DEBUG:-0}" -ge 3 ] || return
+    [ "${SKIP_DEBUG:-0}" -le "$checkpoint_steps" ] || return
+    checkpoint "$@"
+}
 notice()
 {
     [ "${DEBUG:-0}" -ge 1 ] || return
-    alert "$1" "$2"
+
+    if [ $# -eq 1 ]
+    then
+        alert "$1"
+    elif [ $# -eq 2 ]
+    then
+        alert "$1" "$2"
+    else
+        tput bold
+        tput setaf 4
+        echo -e "$1:"
+        shift
+
+        tput setaf 8
+        while [ $# -gt 0 ]
+        do
+            echo -e "\t$2"
+            shift
+        done
+        tput sgr0
+    fi
 }
 log()
 {
     [ "${DEBUG:-0}" -ge 4 ] || return
+    [ "${SKIP_DEBUG:-0}" -le "$checkpoint_steps" ] || return
 
     tput bold
     if [ $# -eq 1 ]
@@ -204,16 +233,17 @@ then
     error "Failed to store resources"
 fi
 
+resource_map_size="$(psql -U postgres -d flashback -Aqt -c 'select count(id) from flashback.resources;' || error "Cannot collect resources from database")"
 declare -A resources_mapping
 resource_index=1
 while read -r record
 do
-    report_progress $resource_index "Collecting Resource Identifiers" ${#resources[*]}
+    report_progress $resource_index "Collecting Resource Identifiers" "${resource_map_size}"
     [ -z "${record#*|}" ] && continue
     [ -z "${record%|*}" ] && continue
     resources_mapping["${record%|*}"]="${record#*|}"
     resource_index="$((resource_index + 1))"
-done <<< "$(psql -U postgres -d flashback -At -c 'select name, id from flashback.resources;' || error "Cannot collect resources from database")"
+done <<< "$(psql -U postgres -d flashback -Aqt -c 'select name, id from flashback.resources;' || error "Cannot collect resources from database")"
 checkpoint "Check Resource Mappings" "$(for pair in "${!resources_mapping[@]}"; do echo "$pair = ${resources_mapping[$pair]}"; done)"
 
 resource_section_index=1
@@ -229,264 +259,510 @@ do
     while read -r section
     do
         section="${section/\#\# }"
-        state="$(sed 's/.*<sup>(\(.*\))<\/sup>/\1/' <<< "$section")"
-        section="$(sed 's/^\(.*\)\([0-9]\+\)\/\([0-9]\+\)/\1\2/;{s/\s*<sup>.*//}' <<< "$section")"
-        case "${state,,}" in
-            ignored|ignore) state="ignored" ;;
-            writing|editing) state="writing" ;;
-            complete|completed) state="completed" ;;
-            published|publish|released) state="completed" ;;
-            *) state="open"
-        esac
-        sections+=( "$section" )
-        sections_query_values="${sections_query_values}${sections_query_values:+ , }($resource_id, '${section}', '$state')"
-    done <<< "$(grep '## ' "$resource_path")"
+            state="$(sed 's/.*<sup>(\(.*\))<\/sup>/\1/' <<< "$section")"
+                    section="$(sed 's/^\(.*\)\([0-9]\+\)\/\([0-9]\+\)/\1\2/;{s/\s*<sup>.*//}' <<< "$section")"
+                    case "${state,,}" in
+                        ignored|ignore) state="ignored" ;;
+                        writing|editing) state="writing" ;;
+                        complete|completed) state="completed" ;;
+                        published|publish|released) state="completed" ;;
+                        *) state="open"
+                    esac
+                    sections+=( "$section" )
+                    sections_query_values="${sections_query_values}${sections_query_values:+ , }($resource_id, '${section}', '$state')"
+                done <<< "$(grep '## ' "$resource_path")"
 
-    sections_query="insert into flashback.resource_sections (resource_id, headline, state) values $sections_query_values;"
-    [ "${DEBUG:-0}" -ge 3 ] && checkpoint "Check Resource Sections Query" "$sections_query"
+                sections_query="insert into flashback.resource_sections (resource_id, headline, state) values $sections_query_values;"
+                detail_checkpoint "Check Resource Sections Query" "$sections_query"
 
-    report_progress $resource_section_index "Storing Resource Sections" $((${#resources[*]} + 1))
-    psql -q -U postgres -d flashback -c "$sections_query" || error "Failed to insert resource sections for [$resource_id] $resource_name"
-    resource_section_index="$((resource_section_index + 1))"
-done
+                report_progress $resource_section_index "Storing Resource Sections" ${#resources[*]}
+                psql -q -U postgres -d flashback -c "$sections_query" || error "Failed to insert resource sections for [$resource_id] $resource_name"
+                resource_section_index="$((resource_section_index + 1))"
+            done
+
+#practice_index=1
+#declare -a blocks=()
+#declare -a practice_resources=()
+#declare -a references=()
+#total_practices="$(find /tmp/references/subjects/ -mindepth 2 -maxdepth 2 -type f -name '*.md' -not -name 'README.md' -exec grep '<details>' {} \; | wc -l)"
+#for subject in "${!subjects[@]}"
+#do
+#    log "Subject"
+#    subject_file="/tmp/references/subjects/${subject}/${subject}.md"
+#    CURRENT_FILE="${subject_file}"
+#    inside_block=0
+#    code_block=0
+#    current_topic=
+#    blocks=()
+#    practice_resources=()
+#    references=()
+#    related_resources=()
+#    related_resource=
+#    heading=
+#
+#    current_subject="${subjects[$subject]}"
+#    for related_resource in "${resources[@]}"
+#    do
+#        if grep -q "$current_subject" <<< "$related_resource"
+#        then
+#            related_resources+=( "$related_resource" )
+#        fi
+#    done
+#    checkpoint "Check Current Subject with Related Resources" "$current_subject" "<>" "${related_resources[@]}"
+#
+#    while read -r line
+#    do
+#        line="${line#> }"
+#        line="${line#>}"
+#        log "Line" "$line"
+#        if grep -q '## ' <<< "$line"
+#        then
+#            log "Topic Header"
+#            current_topic="${line/\#\# /}"
+#            elif [ "$line" == "---" ]
+#            then
+#                log "Horizontal Line"
+#                resources_block=0
+#                references_block=0
+#                code_block=0
+#                continue
+#            elif grep -q '<details>' <<< "$line"
+#            then
+#                log "Block Begin"
+#                inside_block=1
+#            elif grep -q '<summary>' <<< "$line"
+#            then
+#                log "Heading"
+#                heading="${line:9:-10}"
+#                read -r line
+#            elif grep -q '</details>' <<< "$line"
+#            then
+#                log "End of Block"
+#                inside_block=0
+#                resources_block=0
+#                references_block=0
+#                code_block=0
+#                topic_id="${topic_records[$current_topic]}"
+#                heading="${heading//\'/\'\'}"
+#
+#                report_progress $practice_index "Storing Practice" "$total_practices"
+#                practice_index=$((practice_index + 1))
+#
+#                query="insert into flashback.practices (heading, topic_id) values ('${heading}', $topic_id) returning id;"
+#                detail_checkpoint "Check Practices Query" "${query}"
+#
+#                practice_id="$(psql -U postgres -d flashback -Aqt -c "$query" || error "Practice failed to be inserted")"
+#
+#                for record in "${blocks[@]}"
+#                do
+#                    block_type="$(awk -F':::' 'NR == 1 {print $1}' <<< "$record")"
+#                    language="$(awk -F':::' 'NR == 2 {print $2}' <<< "$record")"
+#                    block="${record##*:::}"
+#                    block="${block//\'/\'\'}"
+#
+#                    query="insert into flashback.practice_blocks (content, type, language, practice_id) values ('${block}', '${block_type}', '${language:-txt}', ${practice_id});"
+#                    detail_checkpoint "Check Practice Blocks Query" "${query}"
+#
+#                    if ! psql -q -U postgres -d flashback -c "$query"
+#                    then
+#                        alert "\nPractice $practice_id"
+#                        alert "Query" "$query"
+#                        alert "Topic" "$topic_id $current_topic"
+#                        alert "Heading" "$heading"
+#                        alert "Block" "${blocks[*]}"
+#                        error "Practice block failed to be inserted"
+#                    fi
+#                done
+#
+#                for record in "${practice_resources[@]}"
+#                do
+#                    record="${record//\'/\'\'}"
+#                    resource_name="${record% - *}"
+#                    section_headline="${record##* - }"
+#                    resource_id="${resources_mapping[$resource_name]}"
+#                    detail_checkpoint "Check Resource Name and Section Headline Relation" "[$resource_id] $resource_name <> $section_headline"
+#
+#                    if [ -z "$section_headline" ]
+#                    then
+#                        alert "Section headline was not detected in '$record'"
+#                    fi
+#
+#                    #elif [ -z "${resource_id}" ]
+#                    #then
+#                    #    alert "Resource name '$resource_name' did not have exact match but there are similars: '$resource_name':"
+#                    #    select resource_name in "${related_resources[@]}"
+#                    #    do
+#                    #        resource_id="${resources_mapping[$resource_name]}"
+#                    #        [ -n "$resource_id" ] && break
+#                    #    done </dev/tty
+#                    #    detail_checkpoint "Check Selected Resource" "$resource_name $resource_id"
+#                    if [ -z "${resource_id}" ]
+#                    then
+#                        alert "Resource name '$record' did not have exact match: Practice [$practice_id]"
+#                    fi
+#
+#                    query="select id from flashback.resource_sections where resource_id = $resource_id and headline = '$section_headline';"
+#                    if [ -n "${resource_id}" ] && [ -n "$section_headline" ]
+#                    then
+#                        section_id="$(psql -U postgres -d flashback -Aqt -c "$query" || error "Failed to retrieve section id for $section_headline")"
+#                    fi
+#
+#                    query="insert into flashback.practice_resources (practice_id, section_id) values (${practice_id}, ${section_id});"
+#                    detail_checkpoint "Check Resource Sections Query" "$query"
+#
+#                    if [ -n "$section_id" ] && ! psql -q -U postgres -d flashback -c "$query"
+#                    then
+#                        alert "\nPractice $practice_id"
+#                        alert "Query" "$query"
+#                        alert "Topic" "$topic_id $current_topic"
+#                        alert "Heading" "$heading"
+#                        alert "Block" "${blocks[*]}"
+#                        alert "Resources" "${practice_resources[*]}"
+#                        error "practice resources failed to be inserted"
+#                    fi
+#                done
+#
+#                for record in "${references[@]}"
+#                do
+#                    record="${record//\'/\'\'}"
+#                    query="insert into flashback.references (origin, practice_id) values ('${record}', ${practice_id});"
+#                    detail_checkpoint "Check References Query" "$query"
+#
+#                    if ! psql -q -U postgres -d flashback -c "$query"
+#                    then
+#                        alert "\nPractice $practice_id"
+#                        alert "Query" "$query"
+#                        alert "Topic" "$topic_id $current_topic"
+#                        alert "Heading" "$heading"
+#                        alert "Block" "${blocks[*]}"
+#                        alert "Resources" "${practice_resources[*]}"
+#                        alert "References" "${references[*]}"
+#                        error "Practice references failed to be inserted"
+#                    fi
+#                done
+#
+#                notice "\nPractice $practice_id"
+#                notice "Topic" "$topic_id $current_topic"
+#                notice "Heading" "$heading"
+#                notice "Block" "${blocks[@]}"
+#                notice "Resources" "${practice_resources[@]}"
+#                notice "References" "${references[@]}"
+#
+#                blocks=()
+#                practice_resources=()
+#                references=()
+#            elif [ "$inside_block" -eq 1 ] && grep -Eq '^([*]+)?Description([*:]+)?' <<< "$line"
+#            then
+#                log "Description Ignored"
+#                continue
+#            elif [ "$inside_block" -eq 1 ] && grep -Eq '^([*]+)?Resources([*:]+)?' <<< "$line"
+#            then
+#                log "Resources Begin"
+#                code_block=0
+#                resources_block=1
+#                practice_resources=()
+#            elif [ "$inside_block" -eq 1 ] && grep -Eq '^([*]+)?References([*:]+)?' <<< "$line"
+#            then
+#                log "References Begin"
+#                code_block=0
+#                references_block=1
+#                references=()
+#            elif [ "$inside_block" -eq 1 ] && [ "${resources_block:-0}" -eq 1 ]
+#            then
+#                log "Resource Record"
+#                stripped="${line/- /}"
+#                log "Stripped Resource" "$stripped"
+#                if [ "${stripped/ /}" == "" ]
+#                then
+#                    log "Empty Resource Ignored"
+#                else
+#                    practice_resources+=( "$stripped" )
+#                fi
+#                stripped=
+#            elif [ "$inside_block" -eq 1 ] && [ "${references_block:-0}" -eq 1 ]
+#            then
+#                log "Reference Record"
+#                stripped="${line/- /}"
+#                log "Stripped Reference" "$stripped"
+#                if [ "${stripped/ /}" == "" ]
+#                then
+#                    log "Empty Reference Ignored"
+#                else
+#                    references+=( "$stripped" )
+#                fi
+#                stripped=
+#            elif [ "$inside_block" -eq 1 ] && grep -Eq '`+\w+$' <<< "$line"
+#            then
+#                log "Code Block Begin"
+#                code_block=1
+#                language="${line##*\`}"
+#                log "Detected Language" "$language"
+#            elif [ "$inside_block" -eq 1 ] && [ "$code_block" -eq 1 ] && grep -Eq '[`]{3,7}$' <<< "$line"
+#            then
+#                log "Code Block End"
+#                blocks+=( "code:::$language:::$buffer" )
+#                buffer=
+#                language=
+#                code_block=0
+#            elif [ "$inside_block" -eq 1 ] && [ -z "$line" ]
+#            then
+#                log "Text Block End"
+#                if [ -n "$buffer" ]
+#                then
+#                    blocks+=( "text::::::$buffer" )
+#                fi
+#                buffer=
+#            elif [ "$inside_block" -eq 1 ]
+#            then
+#                log "Buffer Line"
+#                buffer="$(echo -e "${buffer}${buffer:+\n}${line:-\n}")"
+#        fi
+#    done < "$subject_file"
+#done
+
+declare -a resource_files=()
+while read -r resource_file
+do
+    resource_files+=("$resource_file")
+done <<< "$(find /tmp/references/subjects/ -mindepth 3 -maxdepth 3 -type f -name '*.md' -not -name 'README.md')"
+checkpoint "Check Resource Files" "${resource_files[@]}"
+total_resource_practices="$(find /tmp/references/subjects/ -mindepth 3 -maxdepth 3 -type f -name '*.md' -not -name 'README.md' -exec grep '^## ' {} \; | wc -l)"
 
 practice_index=1
 declare -a blocks=()
-declare -a practice_resources=()
+declare -a note_resources=()
 declare -a references=()
-total_practices="$(find /tmp/references/subjects/ -mindepth 2 -maxdepth 2 -type f -name '*.md' -not -name 'README.md' -exec grep '<details>' {} \; | wc -l)"
-for subject in "${!subjects[@]}"
+for resource_file in "${resource_files[@]}"
 do
-    log "Subject"
-    subject_file="/tmp/references/subjects/${subject}/${subject}.md"
+    CURRENT_FILE="$resource_file"
+    line_number=0
+    log "Resource"
     inside_block=0
     code_block=0
-    current_topic=
+    current_chapter=
     blocks=()
-    practice_resources=()
+    note_resources=()
     references=()
-    related_resources=()
-    related_resource=
     heading=
 
-    current_subject="${subjects[$subject]}"
-    for related_resource in "${resources[@]}"
-    do
-        if grep -q "$current_subject" <<< "$related_resource"
-        then
-            related_resources+=( "$related_resource" )
-        fi
-    done
-    [ "${DEBUG:-0}" -ge 2 ] && checkpoint "Check Current Subject with Related Resources" "$current_subject" "<>" "${related_resources[@]}"
+    resource_name="$(sed -n '1s/^#\s*\(.*\)/\1/p' "$resource_file")"
+    resource_id="${resources_mapping[$resource_name]}"
+    checkpoint "Check Resource Name and ID" "$resource_name <> $resource_id"
 
     while read -r line
     do
+        line_number="$((line_number + 1))"
         line="${line#> }"
         line="${line#>}"
         log "Line" "$line"
+
         if grep -q '## ' <<< "$line"
         then
-            log "Topic Header"
-            current_topic="${line/\#\# /}"
-            elif [ "$line" == "---" ]
+            log "Chapter"
+            current_chapter="$(sed -n '1{s/^##\s*\(.*\)/\1/p}' <<< "${line}" | cut -d'/' -f1 | cut -d'<' -f1)"
+            checkpoint "Check Chapter Retrieval: '$current_chapter' <> '$line'"
+        elif [ "$line" == "---" ]
+        then
+            log "Horizontal Line"
+            resources_block=0
+            references_block=0
+            code_block=0
+            continue
+        elif grep -q '<details>' <<< "$line"
+        then
+            log "Block Begin"
+            inside_block=1
+        elif grep -q '<summary>' <<< "$line"
+        then
+            log "Heading"
+            heading="${line:9:-10}"
+            read -r line
+        elif grep -q '</details>' <<< "$line"
+        then
+            log "End of Block"
+            inside_block=0
+            resources_block=0
+            references_block=0
+            code_block=0
+            heading="${heading//\'/\'\'}"
+
+            query="select id from flashback.resource_sections where resource_id = $resource_id and headline = '$current_chapter';"
+            section_id="$(psql -U postgres -d flashback -Aqt -c "$query" || error "Resource ID is not available for '$current_chapter'")"
+
+            if [ -z "$section_id" ]
             then
-                log "Horizontal Line"
-                resources_block=0
-                references_block=0
-                code_block=0
-                continue
-            elif grep -q '<details>' <<< "$line"
-            then
-                log "Block Begin"
-                inside_block=1
-            elif grep -q '<summary>' <<< "$line"
-            then
-                log "Heading"
-                heading="${line:9:-10}"
-                read -r line
-            elif grep -q '</details>' <<< "$line"
-            then
-                log "End of Block"
-                inside_block=0
-                resources_block=0
-                references_block=0
-                code_block=0
-                topic_id="${topic_records[$current_topic]}"
-                heading="${heading//\'/\'\'}"
+                alert "\nNote ${note_id:-?}"
+                alert "Query" "$query"
+                alert "Chapter" "[$section_id] '$current_chapter'"
+                alert "Heading" "$heading"
+                alert "Block" "${blocks[*]}"
+                error "Section could not be retrieved with resource: [$resource_id] '$resource_name' <> Current Chapter: '$current_chapter' Query: '$query'"
+            fi
 
-                report_progress $practice_index "Storing Practice" "$total_practices"
-                practice_index=$((practice_index + 1))
+            report_progress $practice_index "Storing Notes" "$total_resource_practices"
+            practice_index=$((practice_index + 1))
 
-                query="insert into flashback.practices (heading, topic_id) values ('${heading}', $topic_id) returning id;"
-                [ "${DEBUG:-0}" -ge 3 ] && checkpoint "Check Practices Query" "${query}"
+            query="insert into flashback.notes (heading, resource_id) values ('${heading}', $resource_id) returning id;"
+            detail_checkpoint "Check Notes Query" "${query}"
 
-                practice_id="$(psql -U postgres -d flashback -Aqt -c "$query" || error "Practice failed to be inserted")"
+            note_id="$(psql -U postgres -d flashback -Aqt -c "$query" || error "Practice failed to be inserted")"
+            checkpoint "Check Note ID after creation: '$note_id' on query '$query'"
 
-                for record in "${blocks[@]}"
-                do
-                    block_type="${record%%:*}"
-                    record="${record#*:}"
-                    language="${record%%:*}"
-                    block="${record#*:}"
-                    block="${block//\'/\'\'}"
+            for record in "${blocks[@]}"
+            do
+                block_type="$(awk -F':::' 'NR == 1 {print $1}' <<< "$record")"
+                language="$(awk -F':::' 'NR == 2 {print $2}' <<< "$record")"
+                block="${record##*:::}"
+                block="${block//\'/\'\'}"
 
-                    query="insert into flashback.practice_blocks (content, type, language, practice_id) values ('${block}', '${block_type}', '${language:-txt}', ${practice_id});"
-                    [ "${DEBUG:-0}" -ge 3 ] && checkpoint "Check Practice Blocks Query" "${query}"
+                query="insert into flashback.note_blocks (content, type, language, note_id) values ('${block}', '${block_type}', '${language:-txt}', ${note_id});"
+                detail_checkpoint "Check Practice Blocks Query" "${query}"
 
-                    if ! psql -q -U postgres -d flashback -c "$query"
-                    then
-                        alert "\nPractice $practice_id"
-                        alert "Query" "$query"
-                        alert "Topic" "$topic_id $current_topic"
-                        alert "Heading" "$heading"
-                        alert "Block" "${blocks[*]}"
-                        error "Practice block failed to be inserted"
-                    fi
-                done
-
-                for record in "${practice_resources[@]}"
-                do
-                    record="${record//\'/\'\'}"
-                    resource_name="${record% - *}"
-                    section_headline="${record##* - }"
-                    resource_id="${resources_mapping[$resource_name]}"
-                    [ "${DEBUG:-0}" -ge 3 ] && checkpoint "Check Resource Name and Section Headline Relation" "[$resource_id] $resource_name <> $section_headline"
-
-                    if [ -z "$section_headline" ]
-                    then
-                        alert "Section headline was not detected in '$record'"
-                    fi
-
-                    #elif [ -z "${resource_id}" ]
-                    #then
-                    #    alert "Resource name '$resource_name' did not have exact match but there are similars: '$resource_name':"
-                    #    select resource_name in "${related_resources[@]}"
-                    #    do
-                    #        resource_id="${resources_mapping[$resource_name]}"
-                    #        [ -n "$resource_id" ] && break
-                    #    done </dev/tty
-                    #    [ "${DEBUG:-0}" -ge 3 ] && checkpoint "Check Selected Resource" "$resource_name $resource_id"
-                    if [ -z "${resource_id}" ]
-                    then
-                        alert "Resource name '$record' did not have exact match: Practice [$practice_id]"
-                    fi
-
-                    query="select id from flashback.resource_sections where resource_id = $resource_id and headline = '$section_headline';"
-                    if [ -n "${resource_id}" ] && [ -n "$section_headline" ]
-                    then
-                        section_id="$(psql -U postgres -d flashback -Aqt -c "$query" || error "Failed to retrieve section id for $section_headline")"
-                    fi
-
-                    query="insert into flashback.practice_resources (practice_id, section_id) values (${practice_id}, ${section_id});"
-                    [ "${DEBUG:-0}" -ge 3 ] && checkpoint "Check Resource Sections Query" "$query"
-
-                    if [ -n "$section_id" ] && ! psql -q -U postgres -d flashback -c "$query"
-                    then
-                        alert "\nPractice $practice_id"
-                        alert "Query" "$query"
-                        alert "Topic" "$topic_id $current_topic"
-                        alert "Heading" "$heading"
-                        alert "Block" "${blocks[*]}"
-                        alert "Resources" "${practice_resources[*]}"
-                        error "practice resources failed to be inserted"
-                    fi
-                done
-
-                for record in "${references[@]}"
-                do
-                    record="${record//\'/\'\'}"
-                    query="insert into flashback.references (origin, practice_id) values ('${record}', ${practice_id});"
-                    [ "${DEBUG:-0}" -ge 3 ] && checkpoint "Check References Query" "$query"
-
-                    if ! psql -q -U postgres -d flashback -c "$query"
-                    then
-                        alert "\nPractice $practice_id"
-                        alert "Query" "$query"
-                        alert "Topic" "$topic_id $current_topic"
-                        alert "Heading" "$heading"
-                        alert "Block" "${blocks[*]}"
-                        alert "Resources" "${practice_resources[*]}"
-                        alert "References" "${references[*]}"
-                        error "Practice references failed to be inserted"
-                    fi
-                done
-
-                notice "\nPractice $practice_id"
-                notice "Topic" "$topic_id $current_topic"
-                notice "Heading" "$heading"
-                notice "Block" "${blocks[*]}"
-                notice "Resources" "${practice_resources[*]}"
-                notice "References" "${references[*]}"
-
-                blocks=()
-                practice_resources=()
-                references=()
-            elif [ "$inside_block" -eq 1 ] && grep -Eq '^([*]+)?Description([*:]+)?' <<< "$line"
-            then
-                log "Description Ignored"
-                continue
-            elif [ "$inside_block" -eq 1 ] && grep -Eq '^([*]+)?Resources([*:]+)?' <<< "$line"
-            then
-                log "Resources Begin"
-                code_block=0
-                resources_block=1
-                practice_resources=()
-            elif [ "$inside_block" -eq 1 ] && grep -Eq '^([*]+)?References([*:]+)?' <<< "$line"
-            then
-                log "References Begin"
-                code_block=0
-                references_block=1
-                references=()
-            elif [ "$inside_block" -eq 1 ] && [ "${resources_block:-0}" -eq 1 ]
-            then
-                log "Resource Record"
-                stripped="${line/- /}"
-                log "Stripped Resource" "$stripped"
-                if [ "${stripped/ /}" == "" ]
+                if ! psql -q -U postgres -d flashback -c "$query"
                 then
-                    log "Empty Resource Ignored"
-                else
-                    practice_resources+=( "$stripped" )
+                    alert "\nNote $note_id"
+                    alert "Query" "$query"
+                    alert "Chapter" "$section_id $current_chapter"
+                    alert "Heading" "$heading"
+                    alert "Block" "${blocks[*]}"
+                    error "Practice block failed to be inserted"
                 fi
-                stripped=
-            elif [ "$inside_block" -eq 1 ] && [ "${references_block:-0}" -eq 1 ]
-            then
-                log "Reference Record"
-                stripped="${line/- /}"
-                log "Stripped Reference" "$stripped"
-                if [ "${stripped/ /}" == "" ]
+            done
+
+            for record in "${note_resources[@]}"
+            do
+                record="${record//\'/\'\'}"
+                section_headline="${record##* - }"
+                resource_id="${resources_mapping[$resource_name]}"
+                detail_checkpoint "Check Resource Name and Section Headline Relation from Record" "[$resource_id] $resource_name <> $section_headline = $record"
+
+                if [ -z "$section_headline" ]
                 then
-                    log "Empty Reference Ignored"
-                else
-                    references+=( "$stripped" )
+                    alert "Section headline was not detected in '$record'"
                 fi
-                stripped=
-            elif [ "$inside_block" -eq 1 ] && grep -Eq '`+\w+$' <<< "$line"
-            then
-                log "Code Block Begin"
-                code_block=1
-                language="${line##*\`}"
-                log "Detected Language" "$language"
-            elif [ "$inside_block" -eq 1 ] && [ "$code_block" -eq 1 ] && grep -Eq '[`]{3,7}$' <<< "$line"
-            then
-                log "Code Block End"
-                blocks+=( "code:$language:$buffer" )
-                buffer=
-                language=
-                code_block=0
-            elif [ "$inside_block" -eq 1 ] && [ -z "$line" ]
-            then
-                log "Text Block End"
-                if [ -n "$buffer" ]
+
+                if [ -z "${resource_id}" ]
                 then
-                    blocks+=( "text::$buffer" )
+                    alert "Resource name '$record' did not have exact match: Note [$note_id]"
                 fi
-                buffer=
-            elif [ "$inside_block" -eq 1 ]
+
+                query="select id from flashback.resource_sections where resource_id = $resource_id and headline = '$section_headline';"
+                if [ -n "${resource_id}" ] && [ -n "$section_headline" ]
+                then
+                    section_id="$(psql -U postgres -d flashback -Aqt -c "$query" || error "Failed to retrieve section id for $section_headline")"
+                fi
+
+                query="insert into flashback.note_resources (note_id, section_id) values (${note_id}, ${section_id});"
+                detail_checkpoint "Check Resource Sections Query" "$query"
+
+                if [ -n "$section_id" ] && ! psql -q -U postgres -d flashback -c "$query"
+                then
+                    alert "\nNote $note_id"
+                    alert "Query" "$query"
+                    alert "Heading" "$heading"
+                    alert "Chapter" "[$section_id] $current_chapter"
+                    alert "Blocks" "${blocks[*]}"
+                    alert "Resources" "${note_resources[*]}"
+                    alert "References" "${references[*]}"
+                    error "practice resources failed to be inserted"
+                fi
+            done
+
+            for record in "${references[@]}"
+            do
+                record="${record//\'/\'\'}"
+                query="insert into flashback.note_references (origin, note_id) values ('${record}', ${note_id});"
+                detail_checkpoint "Check References Query" "$query"
+
+                if ! psql -q -U postgres -d flashback -c "$query"
+                then
+                    alert "\nNote $note_id"
+                    alert "Query" "$query"
+                    alert "Chapter" "$section_id $current_chapter"
+                    alert "Heading" "$heading"
+                    alert "Blocks" "${blocks[*]}"
+                    alert "Resources" "${note_resources[*]}"
+                    alert "References" "${references[*]}"
+                    error "Practice references failed to be inserted"
+                fi
+            done
+
+            notice "\nNote $note_id"
+            notice "Heading" "$heading"
+            notice "Chapter" "[$section_id] $current_chapter"
+            notice "Blocks" "${blocks[@]}"
+            notice "Resources" "${note_resources[@]}"
+            notice "References" "${references[@]}"
+
+            blocks=()
+            note_resources=()
+            references=()
+        elif [ "$inside_block" -eq 1 ] && grep -Eq '^([*]+)?Description([*:]+)?' <<< "$line"
+        then
+            log "Description Ignored"
+            continue
+        elif [ "$inside_block" -eq 1 ] && grep -Eq '^([*]+)?Resources([*:]+)?' <<< "$line"
+        then
+            log "Resources Begin"
+            code_block=0
+            resources_block=1
+            note_resources=()
+        elif [ "$inside_block" -eq 1 ] && grep -Eq '^([*]+)?References([*:]+)?' <<< "$line"
+        then
+            log "References Begin"
+            code_block=0
+            references_block=1
+            references=()
+        elif [ "$inside_block" -eq 1 ] && [ "${resources_block:-0}" -eq 1 ]
+        then
+            log "Resource Record"
+            stripped="$(sed 's/^- //' <<< "${line}")"
+            log "Stripped Resource" "$stripped"
+            if [ "$(sed 's/^\s*//' <<< "${stripped}")" == "" ]
             then
-                log "Buffer Line"
-                buffer="$(echo -e "${buffer}${buffer:+\n}${line:-\n}")"
+                log "Empty Resource Ignored"
+            else
+                note_resources+=( "$stripped" )
+            fi
+            stripped=
+        elif [ "$inside_block" -eq 1 ] && [ "${references_block:-0}" -eq 1 ]
+        then
+            log "Reference Record"
+            stripped="$(sed 's/^- //' <<< "${line}")"
+            log "Stripped Reference" "$stripped"
+            if [ "$(sed 's/^\s*//' <<< "${stripped}")" == "" ]
+            then
+                log "Empty Reference Ignored"
+            else
+                references+=( "$stripped" )
+            fi
+            stripped=
+        elif [ "$inside_block" -eq 1 ] && grep -Eq '`+\w+$' <<< "$line"
+        then
+            log "Code Block Begin"
+            code_block=1
+            language="${line##*\`}"
+            log "Detected Language" "$language"
+        elif [ "$inside_block" -eq 1 ] && [ "$code_block" -eq 1 ] && grep -Eq '[`]{3,7}$' <<< "$line"
+        then
+            log "Code Block End"
+            blocks+=( "code:::$language:::$buffer" )
+            buffer=
+            language=
+            code_block=0
+        elif [ "$inside_block" -eq 1 ] && [ -z "$line" ]
+        then
+            log "Text Block End"
+            if [ -n "$buffer" ]
+            then
+                blocks+=( "text::::::$buffer" )
+            fi
+            buffer=
+        elif [ "$inside_block" -eq 1 ]
+        then
+            log "Buffer Line"
+            buffer="$(echo -e "${buffer}${buffer:+\n}${line:-\n}")"
         fi
-    done < "$subject_file"
+    done < "$resource_file"
 done
 
