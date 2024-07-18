@@ -6,7 +6,7 @@ drop role if exists flashback;
 
 create role flashback login;
 create schema flashback authorization flashback;
-create database flashback template template1;
+create database flashback with template template1 owner flashback;
 
 set role to flashback;
 
@@ -75,6 +75,7 @@ insert into flashback.resources (name, reference, type) values
     , ('https://en.cppreference.com',                                           'https://www.cppstories.com', 'website')
     , ('LinkedIn Course: C++ Design Patterns: Creational by Olivia Chiu Stone', 'https://www.linkedin.com',   'video')
     , ('mdadm(1)',                                                              'Unix Manual',                'manual')
+    , ('Kevin Dankwardt''s Linux Device Drivers',                               null,                         'website')
     , ('LinkedIn Course: Linux Device Drivers',                                 'https://linkedin.com',       'video');
 
 create table flashback.resource_sections (
