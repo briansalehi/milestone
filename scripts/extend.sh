@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
-psql -U flashback -d flashback -i design/modify.sql
-psql -U flashback -d flashback -i design/users.sql
+psql -U flashback -d flashback -f design/modify.sql
+psql -U flashback -d flashback -f design/users.sql
