@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 
+number="$RANDOM"
+read -rp "Enter the random number to proceed: " input
+
 error() { tput setaf 1; tput bold; echo -e "[$checkpoint_steps] $CURRENT_FILE +$line_number => " "$@" >&2; tput sgr0; exit 1; }
+
+[ "$input" == "$number" ] || error "Input does not match."
+
 alert()
 {
     [ "${QUIET:-0}" -eq 1 ] && return
