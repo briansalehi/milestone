@@ -19,6 +19,7 @@ create table flashback.credentials (
     id int generated always as identity primary key,
     user_id int,
     hash varchar(4096) not null,
+    updated timestamp not null default now(),
     constraint fk_user_credential_id foreign key (user_id) references flashback.users(id) on update cascade on delete cascade
 );
 
@@ -26,6 +27,7 @@ create table flashback.progress (
     id int generated always as identity primary key,
     user_id int,
     topic_id int,
+    creation timestamp not null default now(),
     constraint fk_user_progress_id foreign key (user_id) references flashback.users(id) on update cascade on delete cascade,
     constraint fk_user_topic_id foreign key (topic_id) references flashback.topics(id) on update cascade on delete cascade
 );
@@ -34,6 +36,7 @@ create table flashback.studies (
     id int generated always as identity primary key,
     user_id int,
     section_id int,
+    creation timestamp not null default now(),
     constraint fk_user_studies_id foreign key (user_id) references flashback.users(id) on update cascade on delete cascade,
     constraint fk_user_section_id foreign key (section_id) references flashback.sections(id) on update cascade on delete cascade
 );
