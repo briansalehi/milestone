@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 number="$RANDOM"
-read -rp "Enter the random number to proceed: " input
+read -rp "Enter the number $number to proceed: " input
 
 error() { tput setaf 1; tput bold; echo -e "[$checkpoint_steps] $CURRENT_FILE +$line_number => " "$@" >&2; tput sgr0; exit 1; }
 
@@ -157,7 +157,7 @@ for subject in /tmp/references/subjects/*
 do
     report_progress $subject_index "Importing Subjects" "$total_subjects"
     subject_path="$(basename "$subject")"
-    subject_name="$(sed -n '1{s/#\s*\(.*\)/\1/p;{s/\s*<sup>.*//p}}' "/tmp/references/subjects/${subject_path}/${subject_path}.md")"
+    subject_name="$(sed -n '1{s/^#\s*\(.*\)/\1/p;{s/\s*<sup>.*//p}}' "/tmp/references/subjects/${subject_path}/${subject_path}.md" | sed 's/\s*$//')"
     subject_entries+=( "${subject_entries:+, }('${subject_name}')" )
     subjects["${subject_path}"]="${subject_name}"
     subject_index=$((subject_index + 1))
@@ -199,30 +199,6 @@ topics_query="insert into flashback.topics (name, subject_id) values ${topic_ent
 checkpoint "Check Topics Query" "${topics_query}"
 psql -q -U postgres -d flashback -c "${topics_query}" || error "Cannot store topics"
 
-declare -A topic_records
-topic_record_index=1
-while read -r record
-do
-    report_progress $topic_record_index "Collecting Topic Indexes" $topic_index
-    [ -z "${record#*|}" ] && continue
-    [ -z "${record%|*}" ] && continue
-    topic_records["${record#*|}"]="${record%|*}"
-    topic_record_index="$((topic_record_index + 1))"
-done <<< "$(psql -U postgres -d flashback -At -c 'select id, name from flashback.topics;' || error "Cannot collect topics")"
-checkpoint "Check Topic Records with IDs" "$(for pair in "${!topic_records[@]}"; do echo "$pair = ${topic_records[$pair]}"; done)"
-
-declare -A topic_subject_mapping
-topic_subject_index=1
-while read -r record
-do
-    report_progress $topic_subject_index "Collecting Topic-Subject Relation Maps" $topic_index
-    [ -z "${record#*|}" ] && continue
-    [ -z "${record%|*}" ] && continue
-    topic_subject_mapping["${record%|*}"]="${record#*|}"
-    topic_subject_index="$((topic_subject_index + 1))"
-done <<< "$(psql -U postgres -d flashback -At -c 'select t.id, s.id from flashback.subjects s join flashback.topics t on t.subject_id = s.id;' || error "Cannot collect subject and topic identifiers")"
-checkpoint "Check Subject-Topic Mappings" "$(for pair in "${!topic_subject_mapping[@]}"; do echo "$pair = ${topic_subject_mapping[$pair]}"; done)"
-
 report_progress 1 "Importing Resources" 1
 declare -A resources
 while read -r resource_dir
@@ -255,19 +231,6 @@ then
     error "Failed to store resources"
 fi
 
-resource_map_size="$(psql -U postgres -d flashback -Aqt -c 'select count(id) from flashback.resources;' || error "Cannot collect resources from database")"
-declare -A resources_mapping
-resource_index=1
-while read -r record
-do
-    report_progress $resource_index "Collecting Resource Indexes" "${resource_map_size}"
-    [ -z "${record#*|}" ] && continue
-    [ -z "${record%|*}" ] && continue
-    resources_mapping["${record%|*}"]="${record#*|}"
-    resource_index="$((resource_index + 1))"
-done <<< "$(psql -U postgres -d flashback -Aqt -c 'select name, id from flashback.resources;' || error "Cannot collect resources from database")"
-checkpoint "Check Resource Mappings" "$(for pair in "${!resources_mapping[@]}"; do echo "$pair = ${resources_mapping[$pair]}"; done)"
-
 resource_section_index=1
 declare -a sections
 for resource_path in "${!resources[@]}"
@@ -275,7 +238,11 @@ do
     sections=()
     sections_query_values=
     resource_name="${resources[$resource_path]}"
-    resource_id="${resources_mapping[$resource_name]}"
+    resource_name="${resource_name//\\/\\\\}"
+    resource_name="${resource_name//\'/\'\'}"
+
+    query="select id from flashback.resources where name = '$resource_name';"
+    resource_id="$(psql -U postgres -d flashback -Aqt -c "$query")"
     detail_checkpoint "Check Resource Section Entries" "$(grep '^## ' "$resource_path")"
 
     while read -r section
@@ -283,6 +250,8 @@ do
         section="${section#### }"
         state="$(sed 's/.*<sup>(\(.*\))<\/sup>.*/\1/' <<< "$section")"
         section="$(sed 's/^\(.*\)\([0-9]\+\)\/\([0-9]\+\).*/\1\2/;{s/\s*<sup>.*//}' <<< "$section")"
+        [ -z "$section" ] && continue
+
         case "${state,,}" in
             ignored|ignore) state="ignored" ;;
             writing|editing) state="writing" ;;
@@ -294,12 +263,15 @@ do
         sections_query_values="${sections_query_values}${sections_query_values:+ , }($resource_id, '${section}', '$state')"
     done <<< "$(grep '^## ' "$resource_path")"
 
+
     sections_query="insert into flashback.resource_sections (resource_id, headline, state) values $sections_query_values;"
     detail_checkpoint "Check Resource Sections Query" "$sections_query"
 
     report_progress $resource_section_index "Inserting Sections" ${#resources[*]}
-    psql -q -U postgres -d flashback -c "$sections_query" || error "Failed to insert resource sections for [$resource_id] $resource_name"
     resource_section_index="$((resource_section_index + 1))"
+    [ -z "$sections_query_values" ] && continue
+
+    psql -q -U postgres -d flashback -c "$sections_query" || error "Failed to insert resource sections for [$resource_id] $resource_name"
 done
 
 practice_index=1
@@ -318,19 +290,12 @@ do
     blocks=()
     practice_resources=()
     references=()
-    related_resources=()
-    related_resource=
     heading=
-
     current_subject="${subjects[$subject]}"
-    for related_resource in "${resources[@]}"
-    do
-        if grep -q "$current_subject" <<< "$related_resource"
-        then
-            related_resources+=( "$related_resource" )
-        fi
-    done
-    checkpoint "Check Current Subject with Related Resources" "$current_subject" "<>" "${related_resources[@]}"
+
+    query="select id from flashback.subjects where name = '$current_subject';"
+    subject_id="$(psql -U postgres -d flashback -Aqt -c "$query")"
+    checkpoint "Check Current Subject Query" "$query"
 
     while read -r line
     do
@@ -341,9 +306,8 @@ do
         then
             log "Topic Header"
             line="${line//\\/\\\\}"
-            #line="${line//\//\\/}"
             line="${line//\'/\'\'}"
-            current_topic="$(sed -n '1{s/^##\s*//p}' <<< "${line}" | cut -d'<' -f1)"
+            current_topic="$(sed -n '1{s/^##\s*//p}' <<< "${line}" | cut -d'<' -f1 | sed 's/\s*$//')"
         elif [ "$line" == "---" ]
         then
             log "Horizontal Line"
@@ -367,8 +331,11 @@ do
             resources_block=0
             references_block=0
             code_block=0
-            topic_id="${topic_records[$current_topic]}"
             heading="${heading//\'/\'\'}"
+
+            query="select id from flashback.topics where name = '$current_topic' and subject_id = $subject_id;"
+            detail_checkpoint "Check Topic Index Query" "${query}"
+            topic_id="$(psql -U postgres -d flashback -Aqt -c "$query")"
 
             report_progress $practice_index "Inserting Practice" "$total_practices"
             practice_index=$((practice_index + 1))
@@ -377,6 +344,8 @@ do
             detail_checkpoint "Check Practices Query" "${query}"
 
             practice_id="$(psql -U postgres -d flashback -Aqt -c "$query" || error "Practice failed to be inserted")"
+
+            [ -z "$practice_id" ] && error "Practice index empty: $query <> subject: [$subject_id] $current_subject <> topic: [$topic_id]"
 
             for record in "${blocks[@]}"
             do
@@ -406,7 +375,9 @@ do
                 record="${record//\\/\\\\}"
                 resource_name="${record% - *}"
                 section_headline="${record##* - }"
-                resource_id="${resources_mapping[$resource_name]}"
+
+                query="select id from flashback.resources where name = '$resource_name';"
+                resource_id="$(psql -U postgres -d flashback -Aqt -c "$query")"
                 detail_checkpoint "Check Resource Name and Section Headline Relation" "[$resource_id] $resource_name <> $section_headline"
 
                 if [ -z "$section_headline" ]
@@ -576,9 +547,15 @@ do
     references=()
     heading=
 
-    resource_name="$(sed -n '1s/^#\s*\(.*\)/\1/p' "$resource_file" | sed 's/<sup>.*//')"
-    resource_id="${resources_mapping[$resource_name]}"
+    resource_name="$(sed -n '1s/^#\s*\(.*\)/\1/p' "$resource_file" | sed 's/<sup>.*//' | sed 's/\s*//')"
+    query="select id from flashback.resources where name = '$resource_name';"
+    resource_id="$(psql -U postgres -d flashback -Aqt -c "$query")"
     checkpoint "Check Resource Name and ID" "$resource_name <> $resource_id"
+
+    if [ -z "${resource_id}" ]
+    then
+        alert "Resource name '$record' did not have exact match: Note [$note_id]"
+    fi
 
     while read -r line
     do
@@ -590,7 +567,7 @@ do
         if grep -q '^## ' <<< "$line"
         then
             log "Chapter"
-            current_chapter="$(sed -n '1{s/^##\s*\(.*\)/\1/p}' <<< "${line}" | cut -d'/' -f1 | cut -d'<' -f1)"
+            current_chapter="$(sed -n '1{s/^##\s*\(.*\)/\1/p}' <<< "${line}" | cut -d'/' -f1 | cut -d'<' -f1 | sed 's/\s*$//')"
             checkpoint "Check Chapter Retrieval: '$current_chapter' <> '$line'"
         elif [ "$line" == "---" ]
         then
@@ -666,17 +643,11 @@ do
                 record="${record//\'/\'\'}"
                 record="${record//\\/\\\\}"
                 section_headline="${record##* - }"
-                resource_id="${resources_mapping[$resource_name]}"
                 detail_checkpoint "Check Resource Name and Section Headline Relation from Record" "[$resource_id] $resource_name <> $section_headline = $record"
 
                 if [ -z "$section_headline" ]
                 then
                     alert "Section headline was not detected in '$record'"
-                fi
-
-                if [ -z "${resource_id}" ]
-                then
-                    alert "Resource name '$record' did not have exact match: Note [$note_id]"
                 fi
 
                 query="select id from flashback.resource_sections where resource_id = $resource_id and headline = '$section_headline';"
@@ -687,6 +658,11 @@ do
 
                 query="insert into flashback.note_resources (note_id, section_id) values (${note_id}, ${section_id});"
                 detail_checkpoint "Check Resource Sections Query" "$query"
+
+                if [ -z "$section_id" ]
+                then
+                    alert "Section index was not detected by '$query'"
+                fi
 
                 if [ -n "$section_id" ] && ! psql -q -U postgres -d flashback -c "$query"
                 then
