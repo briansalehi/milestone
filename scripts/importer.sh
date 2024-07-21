@@ -794,5 +794,5 @@ source "$(dirname "$0")/extend.sh"
 
 while read -r extension
 do
-    psql -U postgres -d flashback -i "$extension"
+    psql -U postgres -d flashback -f "$extension"
 done <<< "$(find /tmp/references/records/ -type f -name '*.sql')"
