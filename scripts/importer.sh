@@ -390,9 +390,9 @@ do
                     alert "Resource name '$record' did not have exact match: Practice [$practice_id]"
                 fi
 
-                query="select id from flashback.resource_sections where resource_id = $resource_id and headline = '$section_headline';"
                 if [ -n "${resource_id}" ] && [ -n "$section_headline" ]
                 then
+                    query="select id from flashback.resource_sections where resource_id = $resource_id and headline = '$section_headline';"
                     section_id="$(psql -U postgres -d flashback -Aqt -c "$query" || error "Failed to retrieve section id for $section_headline")"
                 fi
 
@@ -548,6 +548,8 @@ do
     heading=
 
     resource_name="$(sed -n '1s/^#\s*\(.*\)/\1/p' "$resource_file" | sed 's/<sup>.*//' | sed 's/\s*//')"
+    resource_name="${resource_name//\\/\\\\}"
+    resource_name="${resource_name//\'/\'\'}"
     query="select id from flashback.resources where name = '$resource_name';"
     resource_id="$(psql -U postgres -d flashback -Aqt -c "$query")"
     checkpoint "Check Resource Name and ID" "$resource_name <> $resource_id"
@@ -610,7 +612,7 @@ do
             report_progress $practice_index "Inserting Notes" "$total_resource_practices"
             practice_index=$((practice_index + 1))
 
-            query="insert into flashback.notes (heading, resource_id) values ('${heading}', $resource_id) returning id;"
+            query="insert into flashback.notes (heading, resource_id) values ('$heading', $resource_id) returning id;"
             detail_checkpoint "Check Notes Query" "${query}"
 
             note_id="$(psql -U postgres -d flashback -Aqt -c "$query" || error "Practice failed to be inserted")"
@@ -650,9 +652,9 @@ do
                     alert "Section headline was not detected in '$record'"
                 fi
 
-                query="select id from flashback.resource_sections where resource_id = $resource_id and headline = '$section_headline';"
                 if [ -n "${resource_id}" ] && [ -n "$section_headline" ]
                 then
+                    query="select id from flashback.resource_sections where resource_id = $resource_id and headline = '$section_headline';"
                     section_id="$(psql -U postgres -d flashback -Aqt -c "$query" || error "Failed to retrieve section id for $section_headline")"
                 fi
 
@@ -788,3 +790,9 @@ do
     done < "$resource_file"
 done
 
+source "$(dirname "$0")/extend.sh"
+
+while read -r extension
+do
+    psql -U postgres -d flashback -i "$extension"
+done <<< "$(find /tmp/references/records/ -type f -name '*.sql')"
