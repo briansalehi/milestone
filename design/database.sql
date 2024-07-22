@@ -78,6 +78,7 @@ insert into flashback.resources (name, reference, type) values
     , ('Kevin Dankwardt''s Linux Device Drivers',                               null,                         'website')
     , ('LinkedIn Course: Linux Device Drivers',                                 'https://linkedin.com',       'video');
 
+-- state: ('open', 'writing', 'completed', 'approved', 'released', 'ignored');
 create table flashback.resource_sections (
     id int generated always as identity primary key,
     resource_id int,

@@ -16,7 +16,7 @@ begin
     insert into flashback.notes (resource_id, heading) values (resource_index, heading) returning id into note_index;
     insert into flashback.note_resources (note_id, section_id) values (note_index, section_index);
     raise notice 'New note % in section % from resource % created', note_index, section_index, resource_index;
-    insert into flashback.note_blocks (note_id, content, type, language) select note_index, content, type, language from temp_note_blocks;
+    insert into flashback.note_blocks (note_id, content, type, language) select note_index, t_content, t_type, t_language from temp_note_blocks;
     delete from temp_note_blocks;
 end;
 $$;
