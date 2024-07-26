@@ -51,7 +51,7 @@ create table flashback.practice_blocks (
     constraint fk_practice_block foreign key (practice_id) references flashback.practices(id) on update cascade on delete cascade
 );
 
-create type flashback.resource_type as enum ('unknown', 'book', 'website', 'video', 'mailing list', 'manual');
+create type flashback.resource_type as enum ('unknown', 'book', 'website', 'course', 'video', 'mailing list', 'manual');
 
 create table flashback.resources (
     id int generated always as identity primary key,
@@ -63,20 +63,20 @@ create table flashback.resources (
 );
 
 insert into flashback.resources (name, reference, type) values
-      ('https://www.youtube.com',                                               'https://youtube.com',        'video')
-    , ('https://www.youtu.be',                                                  'https://youtube.com',        'video')
-    , ('https://www.boost.org',                                                 'https://boost.org',          'website')
-    , ('https://www.latex-tutorial.com',                                        'https://latex-tutorial.com', 'website')
-    , ('https://www.qt.io',                                                     'https://qt.io',              'website')
-    , ('GDB Tips by Greg Law',                                                   null,                        'website')
-    , ('Daily C++ Bites',                                                        null,                        'mailing list')
-    , ('C++ Daily Bites',                                                        null,                        'mailing list')
-    , ('https://www.cppstories.com',                                            'https://www.cppstories.com', 'website')
-    , ('https://en.cppreference.com',                                           'https://www.cppstories.com', 'website')
-    , ('LinkedIn Course: C++ Design Patterns: Creational by Olivia Chiu Stone', 'https://www.linkedin.com',   'video')
-    , ('mdadm(1)',                                                              'Unix Manual',                'manual')
-    , ('Kevin Dankwardt''s Linux Device Drivers',                               null,                         'website')
-    , ('LinkedIn Course: Linux Device Drivers',                                 'https://linkedin.com',       'video');
+      ('https://www.youtube.com', 'https://youtube.com', 'video')
+    , ('https://www.youtu.be', 'https://youtube.com', 'video')
+    , ('https://www.boost.org', 'https://boost.org', 'website')
+    , ('https://www.latex-tutorial.com', 'https://latex-tutorial.com', 'website')
+    , ('https://www.qt.io', 'https://qt.io', 'website')
+    , ('GDB Tips by Greg Law', null, 'website')
+    , ('Daily C++ Bites', null, 'mailing list')
+    , ('C++ Daily Bites', null, 'mailing list')
+    , ('https://www.cppstories.com', 'https://www.cppstories.com', 'website')
+    , ('https://en.cppreference.com', 'https://www.cppstories.com', 'website')
+    , ('mdadm(1)', 'Unix Manual', 'manual')
+    , ('LinkedIn Course: C++ Design Patterns: Creational by Olivia Chiu Stone', 'https://www.linkedin.com', 'course')
+    , ('Kevin Dankwardt''s Linux Device Drivers', 'https://www.linkedin.com/learning/linux-device-drivers', 'course')
+    , ('LinkedIn Course: Linux Device Drivers', 'https://linkedin.com', 'course');
 
 -- state: ('open', 'writing', 'completed', 'approved', 'released', 'ignored');
 create table flashback.sections (
