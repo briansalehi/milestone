@@ -79,11 +79,12 @@ insert into flashback.resources (name, reference, type) values
     , ('LinkedIn Course: Linux Device Drivers',                                 'https://linkedin.com',       'video');
 
 -- state: ('open', 'writing', 'completed', 'approved', 'released', 'ignored');
-create table flashback.resource_sections (
+create table flashback.sections (
     id int generated always as identity primary key,
     resource_id int,
     headline varchar(100) not null,
     state flashback.state not null default 'open',
+    reference varchar(2000) default null,
     created timestamp not null default now(),
     updated timestamp not null default now(),
     constraint fk_resource_section foreign key (resource_id) references flashback.resources(id) on update cascade on delete cascade
@@ -91,12 +92,12 @@ create table flashback.resource_sections (
 
 create table flashback.notes (
     id int generated always as identity primary key,
-    resource_id int,
+    section_id int,
     heading varchar(400) not null,
     state flashback.state not null default 'open',
     creation timestamp not null default now(),
     updated timestamp not null default now(),
-    constraint fk_resource_note foreign key (resource_id) references flashback.resources(id) on update cascade on delete set null
+    constraint fk_resource_note foreign key (section_id) references flashback.sections(id) on update cascade on delete set null
 );
 
 create table flashback.note_blocks (
@@ -132,14 +133,6 @@ create table flashback.practice_resources (
     practice_id int,
     section_id int,
     constraint fk_practice_resource foreign key (practice_id) references flashback.practices(id) on update cascade on delete cascade,
-    constraint fk_practice_section foreign key (section_id) references flashback.resource_sections(id) on update cascade on delete cascade
-);
-
-create table flashback.note_resources (
-    id int generated always as identity primary key,
-    note_id int,
-    section_id int,
-    constraint fk_note_resource foreign key (note_id) references flashback.notes(id) on update cascade on delete cascade,
-    constraint fk_note_section foreign key (section_id) references flashback.resource_sections(id) on update cascade on delete cascade
+    constraint fk_practice_section foreign key (section_id) references flashback.sections(id) on update cascade on delete cascade
 );
 
