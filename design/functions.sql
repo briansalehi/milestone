@@ -17,8 +17,7 @@ declare record record;
 begin
     select r.id into resource_index from flashback.resources r where r.name = resource_name;
     select s.id into section_index from flashback.sections s where s.headline = section_name and s.resource_id = resource_index;
-    insert into flashback.notes (resource_id, heading) values (resource_index, heading) returning id into note_index;
-    insert into flashback.note_resources (note_id, section_id) values (note_index, section_index);
+    insert into flashback.notes (section_id, heading) values (section_index, heading) returning id into note_index;
     insert into flashback.note_blocks (note_id, content, type, language) select note_index, t_content, t_type, t_language from temp_note_blocks;
     delete from temp_note_blocks;
 end; $$ language plpgsql;
