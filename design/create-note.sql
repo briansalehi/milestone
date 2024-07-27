@@ -1,5 +1,6 @@
 drop procedure if exists create_note;
-drop procedure if exists create_resource;
+
+create temp table if not exists temp_note_blocks ();
 
 -- pre: there should be a temp_note_blocks temporary table
 -- post: temp_note_blocks temporary table will be cleared
@@ -20,20 +21,5 @@ begin
     insert into flashback.notes (section_id, heading) values (section_index, heading) returning id into note_index;
     insert into flashback.note_blocks (note_id, content, type, language) select note_index, t_content, t_type, t_language from temp_note_blocks;
     delete from temp_note_blocks;
-end; $$ language plpgsql;
-
--- pre: there should be a temp_sections temporary table
--- post: temp_sections temporary table will be cleared
-create or replace procedure create_resource(
-    name_string varchar(2000),
-    type_string flashback.resource_type,
-    resource_reference varchar(2000) default null
-)
-as $$
-declare resource_index integer;
-begin
-    insert into flashback.resources (name, reference, type) values (name_string, resource_reference, type_string) returning id into resource_index;
-    insert into flashback.sections (resource_id, headline, reference) select resource_index, headline_string, reference_string from temp_sections;
-    delete from temp_sections;
 end; $$ language plpgsql;
 
