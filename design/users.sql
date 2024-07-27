@@ -42,3 +42,4 @@ create table flashback.studies (
 );
 
 insert into flashback.users (username, first_name, last_name) values ('briansalehi', 'Brian', 'Salehi');
+

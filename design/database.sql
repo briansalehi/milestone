@@ -136,3 +136,6 @@ create table flashback.practice_resources (
     constraint fk_practice_section foreign key (section_id) references flashback.sections(id) on update cascade on delete cascade
 );
 
+create temp table if not exists temp_blocks (t_content text, t_type flashback.block_type, t_language varchar(10));
+create temp table if not exists temp_sections (t_heading varchar(100), t_reference varchar(2000));
+
