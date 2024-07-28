@@ -21,7 +21,7 @@ psql -U postgres -d flashback -f "$( readlink -f "$(dirname "$0")/.." )/design/c
 
 #---
 psql -U postgres -d flashback -f "$( readlink -f "$(dirname "$0")/.." )/design/set-section-as-complete.sql"
-#psql -U postgres -d flashback -c "call set_section_as_compelete('Resource Test', 'Section Test'); select state from flashback.resources r join flashback.sections s on s.resource_id = r.id where r.name = 'Resource Test' and s.headline = 'Section Test';"
+#psql -U postgres -d flashback -c "call set_section_as_complete('Resource Test', 'Section Test'); select state from flashback.resources r join flashback.sections s on s.resource_id = r.id where r.name = 'Resource Test' and s.headline = 'Section Test';"
 #---
 
 exit

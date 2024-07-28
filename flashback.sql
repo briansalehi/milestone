@@ -146,10 +146,10 @@ end; $$;
 ALTER PROCEDURE flashback.create_resource(IN name_string character varying, IN type_string flashback.resource_type, IN resource_reference character varying) OWNER TO flashback;
 
 --
--- Name: set_section_as_compelete(character varying, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
+-- Name: set_section_as_complete(character varying, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
 --
 
-CREATE PROCEDURE flashback.set_section_as_compelete(IN resource_name character varying, IN section_headline character varying)
+CREATE PROCEDURE flashback.set_section_as_complete(IN resource_name character varying, IN section_headline character varying)
     LANGUAGE plpgsql
     AS $$
 declare resource_index integer;
@@ -161,7 +161,7 @@ begin
 end; $$;
 
 
-ALTER PROCEDURE flashback.set_section_as_compelete(IN resource_name character varying, IN section_headline character varying) OWNER TO flashback;
+ALTER PROCEDURE flashback.set_section_as_complete(IN resource_name character varying, IN section_headline character varying) OWNER TO flashback;
 
 SET default_tablespace = '';
 
