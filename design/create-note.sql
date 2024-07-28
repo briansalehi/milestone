@@ -24,3 +24,4 @@ begin
     delete from temp_blocks;
 end; $$ language plpgsql;
 
+alter procedure flashback.create_note owner to flashback;

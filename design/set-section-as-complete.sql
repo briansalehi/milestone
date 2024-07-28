@@ -1,6 +1,6 @@
 drop procedure if exists flashback.set_section_as_complete;
 
-create or replace procedure flashback.set_section_as_compelete (
+create or replace procedure flashback.set_section_as_complete (
     resource_name varchar(1000),
     section_headline varchar(100)
 )
@@ -12,3 +12,5 @@ begin
     select id into section_index from flashback.sections where resource_id = resource_index and headline = section_headline;
     update flashback.sections set state = 'completed' where id = section_index;
 end; $$ language plpgsql;
+
+alter procedure flashback.set_section_as_complete owner to flashback;

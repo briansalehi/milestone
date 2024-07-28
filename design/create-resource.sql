@@ -18,3 +18,4 @@ begin
     delete from temp_sections;
 end; $$ language plpgsql;
 
+alter procedure flashback.create_resource owner to flashback;
