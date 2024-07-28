@@ -1,10 +1,10 @@
-drop function get_user_resources;
-drop function get_user_sections;
-drop function get_user_notes;
-drop function get_user_note_blocks;
+drop function if exists flashback.get_user_resources;
+drop function if exists flashback.get_user_sections;
+drop function if exists flashback.get_user_notes;
+drop function if exists flashback.get_user_note_blocks;
 
 -- resources that user is studying
-create or replace function get_user_resources(user_index integer)
+create or replace function flashback.get_user_resources(user_index integer)
 returns table (id integer, resource varchar(1000), incomplete_sections bigint, updated timestamp)
 as $$
 begin
@@ -15,9 +15,10 @@ begin
     left join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
     group by r.id, r.name;
 end; $$ language plpgsql;
+alter function flashback.get_user_resources owner to flashback;
 
 -- writing resource sections which user is writing notes for
-create or replace function get_user_sections(user_index integer, resource_index integer)
+create or replace function flashback.get_user_sections(user_index integer, resource_index integer)
 returns table (id integer, headline varchar(100), notes bigint, updated timestamp)
 as $$
 begin
@@ -29,9 +30,10 @@ begin
     where sc.resource_id = resource_index and sc.state in ('open', 'writing')
     group by sc.id, sc.headline, st.updated;
 end; $$ language plpgsql;
+alter function get_user_sections owner to flashback;
 
 -- heading only notes written by user under a writing section
-create or replace function get_user_notes(user_index integer, section_index integer)
+create or replace function flashback.get_user_notes(user_index integer, section_index integer)
 returns table (id integer, heading varchar(400), state flashback.state, updated timestamp, creation timestamp)
 as $$
 begin
@@ -41,9 +43,10 @@ begin
     join flashback.notes n on n.section_id = sc.id
     where sc.id = section_index and sc.state in ('open', 'writing');
 end; $$ language plpgsql;
+alter function flashback.get_user_notes owner to flashback;
 
 -- The full body of notes by which user is writing under a section
-create or replace function get_user_note_blocks(user_index integer, section_index integer)
+create or replace function flashback.get_user_note_blocks(user_index integer, section_index integer)
 returns table (note_id integer, block_id integer, content text, type flashback.block_type, language varchar(10), updated timestamp)
 as $$
 begin
@@ -54,3 +57,4 @@ begin
     join flashback.note_blocks nb on nb.note_id = n.id
     where sc.id = section_index and sc.state in ('open', 'writing');
 end; $$ language plpgsql;
+alter function flashback.get_user_note_blocks owner to flashback;
