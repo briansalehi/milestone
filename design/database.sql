@@ -20,6 +20,7 @@ create table flashback.subjects (
     creation timestamp not null default now(),
     updated timestamp not null default now()
 );
+alter table flashback.subjects owner to flashback;
 
 create table flashback.topics (
     id int generated always as identity primary key,
@@ -29,6 +30,7 @@ create table flashback.topics (
     update timestamp not null default now(),
     constraint fk_subject foreign key (subject_id) references flashback.subjects(id) on update cascade on delete set null
 );
+alter table flashback.topics owner to flashback;
 
 create table flashback.practices (
     id int generated always as identity primary key,
@@ -38,6 +40,7 @@ create table flashback.practices (
     updated timestamp not null default now(),
     constraint fk_topics foreign key (topic_id) references flashback.topics(id) on update cascade on delete set null
 );
+alter table flashback.practices owner to flashback;
 
 create type flashback.block_type as enum ('text', 'code') owner flashback;
 
@@ -50,6 +53,7 @@ create table flashback.practice_blocks (
     updated timestamp not null default now(),
     constraint fk_practice_block foreign key (practice_id) references flashback.practices(id) on update cascade on delete cascade
 );
+alter table flashback.practcie_blocks owner to flashback;
 
 create type flashback.resource_type as enum ('unknown', 'book', 'website', 'course', 'video', 'mailing list', 'manual') owner flashback;
 
@@ -61,6 +65,7 @@ create table flashback.resources (
     created timestamp not null default now(),
     updated timestamp not null default now()
 );
+alter table flashback.resources owner to flashback;
 
 insert into flashback.resources (name, reference, type) values
       ('https://www.youtube.com', 'https://youtube.com', 'video')
@@ -89,6 +94,7 @@ create table flashback.sections (
     updated timestamp not null default now(),
     constraint fk_resource_section foreign key (resource_id) references flashback.resources(id) on update cascade on delete cascade
 );
+alter table flashback.sections owner to flashback;
 
 create table flashback.notes (
     id int generated always as identity primary key,
@@ -99,6 +105,7 @@ create table flashback.notes (
     updated timestamp not null default now(),
     constraint fk_resource_note foreign key (section_id) references flashback.sections(id) on update cascade on delete set null
 );
+create table flashback.notes owner to flashback;
 
 create table flashback.note_blocks (
     id int generated always as identity primary key,
@@ -109,6 +116,7 @@ create table flashback.note_blocks (
     updated timestamp not null default now(),
     constraint fk_note_block foreign key (note_id) references flashback.notes(id) on update cascade on delete cascade
 );
+create table flashback.note_blocks owner to flashback;
 
 create table flashback.references (
     id int generated always as identity primary key,
@@ -118,6 +126,7 @@ create table flashback.references (
     updated timestamp not null default now(),
     constraint fk_practice_reference foreign key (practice_id) references flashback.practices(id) on update cascade on delete cascade
 );
+alter table flashback.references owner to flashback;
 
 create table flashback.note_references (
     id int generated always as identity primary key,
@@ -127,6 +136,7 @@ create table flashback.note_references (
     updated timestamp not null default now(),
     constraint fk_note_reference foreign key (note_id) references flashback.notes(id) on update cascade on delete cascade
 );
+alter table flashback.note_references owner to flashback;
 
 create table flashback.practice_resources (
     id int generated always as identity primary key,
@@ -135,7 +145,4 @@ create table flashback.practice_resources (
     constraint fk_practice_resource foreign key (practice_id) references flashback.practices(id) on update cascade on delete cascade,
     constraint fk_practice_section foreign key (section_id) references flashback.sections(id) on update cascade on delete cascade
 );
-
-create temp table if not exists temp_blocks (t_content text, t_type flashback.block_type, t_language varchar(10));
-create temp table if not exists temp_sections (t_heading varchar(100), t_reference varchar(2000));
-
+alter table flashback.practice_resources owner to flashback;
