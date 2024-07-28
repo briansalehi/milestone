@@ -52,4 +52,5 @@ psql -U flashback -d flashback -f "$( readlink -f "$(dirname "$0")/.." )/design/
 psql -U flashback -d flashback -f "$( readlink -f "$(dirname "$0")/.." )/design/rename-topic.sql"
 psql -U flashback -d flashback -f "$( readlink -f "$(dirname "$0")/.." )/design/split-note-block.sql"
 psql -U flashback -d flashback -f "$( readlink -f "$(dirname "$0")/.." )/design/split-practice-block.sql"
-psql -U flashback -d flashback -f "$( readlink -f "$(dirname "$0")/.." )/design/users.sql"
+psql -U flashback -d flashback -f "$( readlink -f "$(dirname "$0")/.." )/esign/search_resource.sql"
+psql -U flashback -d flashback -f "$( readlink -f "$(dirname "$0")/.." )/esign/search_subject.sql"

@@ -146,6 +146,163 @@ end; $$;
 ALTER PROCEDURE flashback.create_resource(IN name_string character varying, IN type_string flashback.resource_type, IN resource_reference character varying) OWNER TO flashback;
 
 --
+-- Name: get_user_note_blocks(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_user_note_blocks(user_index integer, section_index integer) RETURNS TABLE(note_id integer, block_id integer, content text, type flashback.block_type, language character varying, updated timestamp without time zone)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select n.id, nb.id, nb.content, nb.type, nb.language, nb.updated
+    from flashback.sections sc
+    join flashback.notes n on n.section_id = sc.id
+    join flashback.note_blocks nb on nb.note_id = n.id
+    where sc.id = section_index and sc.state in ('open', 'writing');
+end; $$;
+
+
+ALTER FUNCTION flashback.get_user_note_blocks(user_index integer, section_index integer) OWNER TO flashback;
+
+--
+-- Name: get_user_notes(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_user_notes(user_index integer, section_index integer) RETURNS TABLE(id integer, heading character varying, state flashback.state, updated timestamp without time zone, creation timestamp without time zone)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select n.id, n.heading, n.state, n.updated, n.creation
+    from flashback.sections sc
+    join flashback.notes n on n.section_id = sc.id
+    where sc.id = section_index and sc.state in ('open', 'writing');
+end; $$;
+
+
+ALTER FUNCTION flashback.get_user_notes(user_index integer, section_index integer) OWNER TO flashback;
+
+--
+-- Name: get_user_practice_blocks(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_user_practice_blocks(user_index integer, topic_index integer) RETURNS TABLE(practice_id integer, block_id integer, heading character varying, block text, type flashback.block_type, language character varying, updated timestamp without time zone)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select pr.id as practice_id, b.id as block_id, pr.heading, b.content, b.type, b.language, p.updated
+    from flashback.practices pr
+    join flashback.practice_blocks b on b.practice_id = pr.id
+    left join flashback.progress p on p.topic_id = pr.topic_id and p.user_id = user_index
+    where pr.topic_id = topic_index
+    order by p.updated desc nulls first, pr.id, b.id;
+end; $$;
+
+
+ALTER FUNCTION flashback.get_user_practice_blocks(user_index integer, topic_index integer) OWNER TO flashback;
+
+--
+-- Name: get_user_practices(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_user_practices(user_index integer, topic_index integer) RETURNS TABLE(id integer, heading character varying, updated timestamp without time zone)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select pr.id, pr.heading, p.updated
+    from flashback.practices pr
+    left join flashback.progress p on p.topic_id = pr.topic_id and p.user_id = user_index
+    where pr.topic_id = topic_index
+    order by p.updated desc nulls first, pr.id;
+end; $$;
+
+
+ALTER FUNCTION flashback.get_user_practices(user_index integer, topic_index integer) OWNER TO flashback;
+
+--
+-- Name: get_user_resources(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_user_resources(user_index integer) RETURNS TABLE(id integer, resource character varying, incomplete_sections bigint, updated timestamp without time zone)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select r.id, r.name, count(sc.id), max(st.updated)
+    from flashback.resources r
+    join flashback.sections sc on sc.resource_id = r.id and sc.state in ('open', 'writing')
+    left join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
+    group by r.id, r.name;
+end; $$;
+
+
+ALTER FUNCTION flashback.get_user_resources(user_index integer) OWNER TO flashback;
+
+--
+-- Name: get_user_sections(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_user_sections(user_index integer, resource_index integer) RETURNS TABLE(id integer, headline character varying, notes bigint, updated timestamp without time zone)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select sc.id, sc.headline, count(n.id), st.updated
+    from flashback.sections sc
+    join flashback.notes n on n.section_id = sc.id
+    left join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
+    where sc.resource_id = resource_index and sc.state in ('open', 'writing')
+    group by sc.id, sc.headline, st.updated;
+end; $$;
+
+
+ALTER FUNCTION flashback.get_user_sections(user_index integer, resource_index integer) OWNER TO flashback;
+
+--
+-- Name: get_user_subjects(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_user_subjects(user_index integer) RETURNS TABLE(id integer, name character varying, topics bigint, updated timestamp without time zone)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select s.id, s.name, count(t.*) as topics, p.updated
+    from flashback.subjects s
+    join flashback.topics t on t.subject_id = s.id
+    left join flashback.progress p on p.topic_id = t.id and p.user_id = user_index
+    group by s.id, s.name, p.updated
+    order by p.updated desc nulls first, count(t.*) desc, s.id;
+end; $$;
+
+
+ALTER FUNCTION flashback.get_user_subjects(user_index integer) OWNER TO flashback;
+
+--
+-- Name: get_user_topics(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_user_topics(user_index integer, subject_index integer) RETURNS TABLE(subject_id integer, topic_id integer, name character varying, practices bigint, updated timestamp without time zone)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select s.id as subject_id, t.id as topic_id, t.name, count(pr.*) as practices, p.updated
+    from flashback.subjects s
+    join flashback.topics t on t.subject_id = s.id
+    join flashback.practices pr on pr.topic_id = t.id
+    left join flashback.progress p on p.topic_id = t.id and p.user_id = user_index
+    where s.id = subject_index
+    group by s.id, t.id, t.name, p.updated
+    order by p.updated desc nulls first, count(pr.*) desc, s.id, t.id;
+end; $$;
+
+
+ALTER FUNCTION flashback.get_user_topics(user_index integer, subject_index integer) OWNER TO flashback;
+
+--
 -- Name: set_section_as_complete(character varying, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
 --
 
