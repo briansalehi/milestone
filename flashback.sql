@@ -7364,7 +7364,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated) FROM 
 
 
 --
--- Data for Name: note_references; Type: TABLE DATA; Schema: flashback; Owner: postgres
+-- Data for Name: note_references; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
 COPY flashback.note_references (id, note_id, origin, type, updated) FROM stdin;
@@ -7576,7 +7576,7 @@ COPY flashback.note_references (id, note_id, origin, type, updated) FROM stdin;
 
 
 --
--- Data for Name: notes; Type: TABLE DATA; Schema: flashback; Owner: postgres
+-- Data for Name: notes; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
 COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM stdin;
@@ -9758,7 +9758,7 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 
 
 --
--- Data for Name: practice_blocks; Type: TABLE DATA; Schema: flashback; Owner: postgres
+-- Data for Name: practice_blocks; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
 COPY flashback.practice_blocks (id, practice_id, content, type, language, updated) FROM stdin;
@@ -13588,7 +13588,7 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 
 
 --
--- Data for Name: practice_resources; Type: TABLE DATA; Schema: flashback; Owner: postgres
+-- Data for Name: practice_resources; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
 COPY flashback.practice_resources (id, practice_id, section_id) FROM stdin;
@@ -14415,7 +14415,7 @@ COPY flashback.practice_resources (id, practice_id, section_id) FROM stdin;
 
 
 --
--- Data for Name: practices; Type: TABLE DATA; Schema: flashback; Owner: postgres
+-- Data for Name: practices; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
 COPY flashback.practices (id, topic_id, heading, creation, updated) FROM stdin;
@@ -15615,7 +15615,7 @@ COPY flashback.practices (id, topic_id, heading, creation, updated) FROM stdin;
 
 
 --
--- Data for Name: progress; Type: TABLE DATA; Schema: flashback; Owner: postgres
+-- Data for Name: progress; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
 COPY flashback.progress (id, user_id, topic_id, updated) FROM stdin;
@@ -15623,7 +15623,7 @@ COPY flashback.progress (id, user_id, topic_id, updated) FROM stdin;
 
 
 --
--- Data for Name: references; Type: TABLE DATA; Schema: flashback; Owner: postgres
+-- Data for Name: references; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
 COPY flashback."references" (id, practice_id, origin, type, updated) FROM stdin;
@@ -15822,7 +15822,7 @@ COPY flashback."references" (id, practice_id, origin, type, updated) FROM stdin;
 
 
 --
--- Data for Name: resources; Type: TABLE DATA; Schema: flashback; Owner: postgres
+-- Data for Name: resources; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
 COPY flashback.resources (id, name, reference, type, created, updated) FROM stdin;
@@ -15927,7 +15927,7 @@ COPY flashback.resources (id, name, reference, type, created, updated) FROM stdi
 
 
 --
--- Data for Name: sections; Type: TABLE DATA; Schema: flashback; Owner: postgres
+-- Data for Name: sections; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
 COPY flashback.sections (id, resource_id, headline, state, reference, created, updated) FROM stdin;
@@ -17380,7 +17380,7 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 
 
 --
--- Data for Name: studies; Type: TABLE DATA; Schema: flashback; Owner: postgres
+-- Data for Name: studies; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
 COPY flashback.studies (id, user_id, section_id, updated) FROM stdin;
@@ -17388,7 +17388,7 @@ COPY flashback.studies (id, user_id, section_id, updated) FROM stdin;
 
 
 --
--- Data for Name: subjects; Type: TABLE DATA; Schema: flashback; Owner: postgres
+-- Data for Name: subjects; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
 COPY flashback.subjects (id, name, creation, updated) FROM stdin;
@@ -17419,7 +17419,7 @@ COPY flashback.subjects (id, name, creation, updated) FROM stdin;
 
 
 --
--- Data for Name: topics; Type: TABLE DATA; Schema: flashback; Owner: postgres
+-- Data for Name: topics; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
 COPY flashback.topics (id, subject_id, name, creation, update) FROM stdin;
