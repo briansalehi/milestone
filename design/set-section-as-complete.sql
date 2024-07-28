@@ -1,4 +1,6 @@
-create or replace procedure set_section_as_compelete (
+drop procedure if exists flashback.set_section_as_complete;
+
+create or replace procedure flashback.set_section_as_compelete (
     resource_name varchar(1000),
     section_headline varchar(100)
 )

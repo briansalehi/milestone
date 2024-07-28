@@ -1,11 +1,11 @@
-drop procedure if exists create_resource;
+drop procedure if exists flashback.create_resource;
 
 --drop table if exists temp_sections;
 --create temp table temp_sections (t_headline varchar(100), t_reference varchar(2000));
 
 -- pre: there should be a temp_sections temporary table
 -- post: temp_sections temporary table will be cleared
-create or replace procedure create_resource (
+create or replace procedure flashback.create_resource (
     name_string varchar(2000),
     type_string flashback.resource_type,
     resource_reference varchar(2000) default null

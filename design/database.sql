@@ -12,7 +12,7 @@ set role to flashback;
 
 \c flashback;
 
-create type flashback.state as enum ('open', 'writing', 'completed', 'approved', 'released', 'ignored');
+create type flashback.state as enum ('open', 'writing', 'completed', 'approved', 'released', 'ignored') owner flashback;
 
 create table flashback.subjects (
     id int generated always as identity primary key,
@@ -39,7 +39,7 @@ create table flashback.practices (
     constraint fk_topics foreign key (topic_id) references flashback.topics(id) on update cascade on delete set null
 );
 
-create type flashback.block_type as enum ('text', 'code');
+create type flashback.block_type as enum ('text', 'code') owner flashback;
 
 create table flashback.practice_blocks (
     id int generated always as identity primary key,
@@ -51,7 +51,7 @@ create table flashback.practice_blocks (
     constraint fk_practice_block foreign key (practice_id) references flashback.practices(id) on update cascade on delete cascade
 );
 
-create type flashback.resource_type as enum ('unknown', 'book', 'website', 'course', 'video', 'mailing list', 'manual');
+create type flashback.resource_type as enum ('unknown', 'book', 'website', 'course', 'video', 'mailing list', 'manual') owner flashback;
 
 create table flashback.resources (
     id int generated always as identity primary key,

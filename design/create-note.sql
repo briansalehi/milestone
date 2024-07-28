@@ -1,11 +1,11 @@
-drop procedure if exists create_note;
+drop procedure if exists flashback.create_note;
 
 --drop table if exists temp_blocks;
 --create temp table temp_blocks (t_content text, t_type flashback.block_type, t_language varchar(10));
 
 -- pre: there should be a temp_blocks temporary table
 -- post: temp_blocks temporary table will be cleared
-create or replace procedure create_note (
+create or replace procedure flashback.create_note (
     resource_name varchar(1000),
     section_name varchar(100),
     heading varchar(400)
