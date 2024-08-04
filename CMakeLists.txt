@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.30)
 project(Milestone VERSION 0.4 LANGUAGES CXX DESCRIPTION "Knowledge Training Application")
 
 enable_testing()

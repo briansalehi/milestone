@@ -11,8 +11,4 @@ qt_add_qml_module(milestone URI Milestone VERSION 1.0 QML_FILES Main.qml)
 target_link_libraries(milestone PRIVATE Qt6::Core Qt6::Quick)
 target_include_directories(milestone PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-install(TARGETS milestone
-    BUNDLE DESTINATION .
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
+install(TARGETS milestone)
