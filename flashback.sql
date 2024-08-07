@@ -225,16 +225,18 @@ ALTER FUNCTION flashback.get_user_practices(user_index integer, topic_index inte
 -- Name: get_user_resources(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_user_resources(user_index integer) RETURNS TABLE(id integer, resource character varying, incomplete_sections bigint, updated timestamp without time zone)
+CREATE FUNCTION flashback.get_user_resources(user_index integer) RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, incomplete_sections bigint, updated timestamp without time zone)
     LANGUAGE plpgsql
     AS $$
 begin
     return query
-    select r.id, r.name, count(sc.id), max(st.updated)
+    select r.id, rs.subject_id, r.name, count(sc.id), max(st.updated)
     from flashback.resources r
+    join flashback.resource_subjects rs on r.id = rs.resource_id
     join flashback.sections sc on sc.resource_id = r.id and sc.state in ('open', 'writing')
     join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
-    group by r.id, r.name;
+    group by r.id, rs.subject_id, r.name
+    order by rs.subject_id, count(sc.id), r.name;
 end; $$;
 
 
