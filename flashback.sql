@@ -38,6 +38,22 @@ CREATE TYPE flashback.block_type AS ENUM (
 ALTER TYPE flashback.block_type OWNER TO flashback;
 
 --
+-- Name: publication_state; Type: TYPE; Schema: flashback; Owner: flashback
+--
+
+CREATE TYPE flashback.publication_state AS ENUM (
+    'open',
+    'writing',
+    'completed',
+    'approved',
+    'released',
+    'ignored'
+);
+
+
+ALTER TYPE flashback.publication_state OWNER TO flashback;
+
+--
 -- Name: resource_type; Type: TYPE; Schema: flashback; Owner: flashback
 --
 
@@ -53,22 +69,6 @@ CREATE TYPE flashback.resource_type AS ENUM (
 
 
 ALTER TYPE flashback.resource_type OWNER TO flashback;
-
---
--- Name: state; Type: TYPE; Schema: flashback; Owner: flashback
---
-
-CREATE TYPE flashback.state AS ENUM (
-    'open',
-    'writing',
-    'completed',
-    'approved',
-    'released',
-    'ignored'
-);
-
-
-ALTER TYPE flashback.state OWNER TO flashback;
 
 --
 -- Name: user_state; Type: TYPE; Schema: flashback; Owner: flashback
@@ -168,7 +168,7 @@ ALTER FUNCTION flashback.get_user_note_blocks(user_index integer, section_index 
 -- Name: get_user_notes(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_user_notes(user_index integer, section_index integer) RETURNS TABLE(id integer, heading character varying, state flashback.state, updated timestamp without time zone, creation timestamp without time zone)
+CREATE FUNCTION flashback.get_user_notes(user_index integer, section_index integer) RETURNS TABLE(id integer, heading character varying, state flashback.publication_state, updated timestamp without time zone, creation timestamp without time zone)
     LANGUAGE plpgsql
     AS $$
 begin
@@ -420,7 +420,7 @@ CREATE TABLE flashback.notes (
     id integer NOT NULL,
     section_id integer,
     heading character varying(400) NOT NULL,
-    state flashback.state DEFAULT 'open'::flashback.state NOT NULL,
+    state flashback.publication_state DEFAULT 'open'::flashback.publication_state NOT NULL,
     creation timestamp without time zone DEFAULT now() NOT NULL,
     updated timestamp without time zone DEFAULT now() NOT NULL
 );
@@ -624,7 +624,7 @@ CREATE TABLE flashback.sections (
     id integer NOT NULL,
     resource_id integer,
     headline character varying(100) NOT NULL,
-    state flashback.state DEFAULT 'open'::flashback.state NOT NULL,
+    state flashback.publication_state DEFAULT 'open'::flashback.publication_state NOT NULL,
     reference character varying(2000) DEFAULT NULL::character varying,
     created timestamp without time zone DEFAULT now() NOT NULL,
     updated timestamp without time zone DEFAULT now() NOT NULL
