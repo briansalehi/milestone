@@ -254,7 +254,7 @@ begin
     select sc.id, sc.headline, count(n.id), st.updated
     from flashback.sections sc
     join flashback.notes n on n.section_id = sc.id
-    left join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
+    join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
     where sc.resource_id = resource_index and sc.state in ('open', 'writing')
     group by sc.id, sc.headline, st.updated;
 end; $$;
@@ -303,6 +303,17 @@ end; $$;
 
 
 ALTER FUNCTION flashback.get_user_topics(user_index integer, subject_index integer) OWNER TO flashback;
+
+--
+-- Name: search_subject(character varying); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.search_subject(pattern character varying) RETURNS TABLE(id integer, name character varying)
+    LANGUAGE plpgsql
+    AS $$ begin return query select s.id, s.name from flashback.subjects s where s.name like format('%%%s%%', pattern); end; $$;
+
+
+ALTER FUNCTION flashback.search_subject(pattern character varying) OWNER TO flashback;
 
 --
 -- Name: set_section_as_complete(character varying, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
