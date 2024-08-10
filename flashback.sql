@@ -148,6 +148,36 @@ end; $$;
 ALTER PROCEDURE flashback.create_resource(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN resource_reference character varying) OWNER TO flashback;
 
 --
+-- Name: create_resource_with_sequenced_sections(integer, character varying, flashback.resource_type, integer, integer, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
+--
+
+CREATE PROCEDURE flashback.create_resource_with_sequenced_sections(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN section_pattern_index integer, IN sections integer, IN resource_reference character varying DEFAULT NULL::character varying)
+    LANGUAGE plpgsql
+    AS $$
+declare resource_index integer;
+declare section_pattern varchar(50);
+begin
+    insert into flashback.resources (name, reference, type) values (name_string, resource_reference, type_string) returning id into resource_index;
+    insert into flashback.resource_subjects (subject_id, resource_id) values (subject_index, resource_index);
+    select pattern into section_pattern from flashback.section_name_patterns where id = section_pattern_index;
+    insert into flashback.sections (resource_id, headline) select resource_index, format('%s %I', section_pattern, generate_series(1, sections));
+end; $$;
+
+
+ALTER PROCEDURE flashback.create_resource_with_sequenced_sections(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN section_pattern_index integer, IN sections integer, IN resource_reference character varying) OWNER TO flashback;
+
+--
+-- Name: get_section_name_patterns(); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_section_name_patterns() RETURNS TABLE(id integer, pattern character varying)
+    LANGUAGE plpgsql
+    AS $$ begin return query select p.id, p.pattern from flashback.section_name_patterns p; end; $$;
+
+
+ALTER FUNCTION flashback.get_section_name_patterns() OWNER TO flashback;
+
+--
 -- Name: get_user_note_blocks(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
@@ -649,6 +679,32 @@ ALTER TABLE flashback.resources OWNER TO flashback;
 
 ALTER TABLE flashback.resources ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME flashback.resources_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: section_name_patterns; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.section_name_patterns (
+    id integer NOT NULL,
+    pattern character varying(20) NOT NULL
+);
+
+
+ALTER TABLE flashback.section_name_patterns OWNER TO flashback;
+
+--
+-- Name: section_types_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE flashback.section_name_patterns ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME flashback.section_types_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -16234,6 +16290,17 @@ COPY flashback.resources (id, name, reference, type, created, updated) FROM stdi
 
 
 --
+-- Data for Name: section_name_patterns; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.section_name_patterns (id, pattern) FROM stdin;
+1	Chapter
+2	Page
+3	Course
+\.
+
+
+--
 -- Data for Name: sections; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
@@ -18469,6 +18536,13 @@ SELECT pg_catalog.setval('flashback.resources_id_seq', 97, true);
 
 
 --
+-- Name: section_types_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
+--
+
+SELECT pg_catalog.setval('flashback.section_types_id_seq', 3, true);
+
+
+--
 -- Name: sections_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
@@ -18589,6 +18663,22 @@ ALTER TABLE ONLY flashback.resource_subjects
 
 ALTER TABLE ONLY flashback.resources
     ADD CONSTRAINT resources_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: section_name_patterns section_types_pattern_key; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.section_name_patterns
+    ADD CONSTRAINT section_types_pattern_key UNIQUE (pattern);
+
+
+--
+-- Name: section_name_patterns section_types_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.section_name_patterns
+    ADD CONSTRAINT section_types_pkey PRIMARY KEY (id);
 
 
 --
