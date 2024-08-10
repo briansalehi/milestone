@@ -85,10 +85,29 @@ CREATE TYPE flashback.user_state AS ENUM (
 ALTER TYPE flashback.user_state OWNER TO flashback;
 
 --
--- Name: create_note(character varying, character varying, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
+-- Name: create_note(integer, integer, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
 --
 
-CREATE PROCEDURE flashback.create_note(IN resource_name character varying, IN section_name character varying, IN heading character varying)
+CREATE PROCEDURE flashback.create_note(IN resource_index integer, IN section_index integer, IN heading character varying)
+    LANGUAGE plpgsql
+    AS $$
+declare note_index integer;
+declare block_index integer;
+declare record record;
+begin
+    insert into flashback.notes (section_id, heading) values (section_index, heading) returning id into note_index;
+    insert into flashback.note_blocks (note_id, content, type, language, position) select note_index, t_content, t_type, t_language, row_number() over () from temp_blocks;
+    delete from temp_blocks;
+end; $$;
+
+
+ALTER PROCEDURE flashback.create_note(IN resource_index integer, IN section_index integer, IN heading character varying) OWNER TO flashback;
+
+--
+-- Name: create_note_with_name(character varying, character varying, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
+--
+
+CREATE PROCEDURE flashback.create_note_with_name(IN resource_name character varying, IN section_name character varying, IN heading character varying)
     LANGUAGE plpgsql
     AS $$
 declare resource_index integer;
@@ -105,7 +124,7 @@ begin
 end; $$;
 
 
-ALTER PROCEDURE flashback.create_note(IN resource_name character varying, IN section_name character varying, IN heading character varying) OWNER TO flashback;
+ALTER PROCEDURE flashback.create_note_with_name(IN resource_name character varying, IN section_name character varying, IN heading character varying) OWNER TO flashback;
 
 --
 -- Name: create_practice(character varying, character varying, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
@@ -948,6 +967,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 71	16	* `O(1)`\n* `O(log N)`\n* `O(N)`\n* `O(N²)`\n* `O(N³)`\n* `O(2ⁿ)`	text	txt	2024-07-28 09:55:57.099122	0
 72	17	It's enough to identify them by their general category.	text	txt	2024-07-28 09:55:57.275161	0
 73	18	When two algorithms fall under the same classification of Big O, it doesn't necessarily mean that both algorithms have the same speed.\nFurther analysis is required to determine which algorithm is faster.	text	txt	2024-07-28 09:55:57.495168	0
+358	92	; assign initial value\nmov rcx, [initial]	text	txt	2024-07-28 09:56:42.914831	0
+359	92	; print initial value\nxor rax, rax\nmov rdi, fmt\nmov rsi, rcx\ncall printf	text	txt	2024-07-28 09:56:42.937096	0
 74	19	1. In the first pass-through, remove the value at index 1 and store it in a temporary variable. This will leave a gap at that index.\n2. Begin shifting by taking each value to the left of the gap and compare it to the value in the temporary variable. If the value to the left of the gap is greater from the temporary variable, we shift that value to the right. As soon as a value with lower order than the temporary value encountered in the array, shifting is over.\n3. Insert the temporarily removed value into the gap.\n4. Repeat all steps from 1 to 3 until the pass-through begins at the final index of the array.	text	txt	2024-07-28 09:55:59.987655	0
 75	19	Initial array:	text	txt	2024-07-28 09:56:00.008311	0
 76	19	```\n 4  2  7  1  3\n``````	text	txt	2024-07-28 09:56:00.028419	0
@@ -985,6 +1006,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 111	29	It's a kind of data structure that is a set of theoretical rules that revolve around some other basic data structures.\nThe set, stack, and queue are examples of abstract data types.\nSome implementations of sets use arrays under the hood while other implementations actually use hash tables.\nThe set itself, though, is simply a theoertical concept, it's a list of non-duplicated data elements.	text	txt	2024-07-28 09:56:02.714372	0
 112	30	* The first data added to a queue is the first item to be removed.\n* Data can be inserted only at the end of a queue, similar to stacks.\n* Data can be deleted only from the front of a queue, in opposite behavior of the stacks.\n* Only the element at the front of a queue can be read.	text	txt	2024-07-28 09:56:02.974833	0
 113	31	* `enqueue()`\n* `dequeue()`\n* `front()`	text	txt	2024-07-28 09:56:03.176209	0
+360	92	; printf modified rcx\nmov rcx, [initial]	text	txt	2024-07-28 09:56:42.958305	0
+361	92	repeat:\n; decrement rcx until reached zero\nloop repeat	text	txt	2024-07-28 09:56:42.978694	0
 114	32	In recursion terminology, the case in which a function will not recurse is known as the base case.\nAll recursive functions should have at least one base case. They will keep recalling themselves infinitely otherwise.	text	txt	2024-07-28 09:56:03.427165	0
 115	33	1. Identify the base case.\n2. Walk through the function for the base case.\n3. Identify the next-to-last case.\n4. Walk through function for the next-to-last case.\n5. Repeat this process by identifying before the case you just analyzed, and walking through the function for that case.	text	txt	2024-07-28 09:56:04.252884	0
 116	33	def factorial(number)\n    if number == 1\n        return 1\n    else\n        return number * factorial(number-1)\n    end\nend	code	txt	2024-07-28 09:56:04.274547	0
@@ -1048,6 +1071,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 172	44	However, even were we to use a fast sorting algorithm like **Quicksort**, this algorithm would take at least `O(N log N)` for average cases.\nAnd while that isn’t bad, we can do even better with a brilliant little algorithm known as **Quickselect**.	text	txt	2024-07-28 09:56:12.990262	0
 173	44	Like **Quicksort**, **Quickselect** relies on partitioning, and can be thought of as a hybrid of **Quicksort** and binary search.	text	txt	2024-07-28 09:56:13.00999	0
 174	44	After a partition, the *pivot* value ends up in the appropriate spot in the array.\n**Quickselect** takes advantage of this in the following way:	text	txt	2024-07-28 09:56:13.030323	0
+362	92	; print result\nxor rax, rax\nmov rdi, fmt\nmov rsi, rcx\ncall printf	text	txt	2024-07-28 09:56:42.999398	0
+363	92	; remove stack frame\nmov rsp, rbp\npop rbp	text	txt	2024-07-28 09:56:43.021789	0
 175	44	Let’s say we have an array of eight values, and we want to find the second-to-lowest value within the array.\nFirst, we partition the entire array.\nAfter the partition, the *pivot* will hopefully end up somewhere toward the middle of the array.\nThis pivot is now in its correct spot.\nFor example, since it’s in the fifth cell, we now know which value is the *fifth-lowest* value within the array.\nWe know that the *second-lowest* value is somewhere to the left of the *pivot*.\nWe can now ignore everything to the right of the *pivot* and focus on the left subarray.\nIt is in this respect that **Quickselect** is similar to binary search.	text	txt	2024-07-28 09:56:13.053527	0
 176	44	With **Quicksort**, each time we halved the array, we needed to re-partition every single element again, giving us `O(N log N)`.\nWith **Quickselect**, on the other hand, each time we cut the array in half, we only had to partition the one half we cared about.	text	txt	2024-07-28 09:56:13.074072	0
 177	44	When analyzing the efficiency of **Quickselect**, we’ll see that it’s `O(N)` for average scenarios.	text	txt	2024-07-28 09:56:13.094181	0
@@ -1232,12 +1257,6 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 355	92	section .data\nfmt db "%i", 10, 0\ninitial dq 3	text	txt	2024-07-28 09:56:42.852723	0
 356	92	section .text\nglobal main	text	txt	2024-07-28 09:56:42.874395	0
 357	92	main:\n; make stack frame\npush rbp\nmov rbp, rsp	text	txt	2024-07-28 09:56:42.894534	0
-358	92	; assign initial value\nmov rcx, [initial]	text	txt	2024-07-28 09:56:42.914831	0
-359	92	; print initial value\nxor rax, rax\nmov rdi, fmt\nmov rsi, rcx\ncall printf	text	txt	2024-07-28 09:56:42.937096	0
-360	92	; printf modified rcx\nmov rcx, [initial]	text	txt	2024-07-28 09:56:42.958305	0
-361	92	repeat:\n; decrement rcx until reached zero\nloop repeat	text	txt	2024-07-28 09:56:42.978694	0
-362	92	; print result\nxor rax, rax\nmov rdi, fmt\nmov rsi, rcx\ncall printf	text	txt	2024-07-28 09:56:42.999398	0
-363	92	; remove stack frame\nmov rsp, rbp\npop rbp	text	txt	2024-07-28 09:56:43.021789	0
 364	92	; return value\nxor rax, rax\nxor rdi, rdi\nret	code	txt	2024-07-28 09:56:43.043916	0
 365	93	section .data\n    word_array times 5 dw 0 ; array of 5 words containing 0	code	txt	2024-07-28 09:56:43.305327	0
 366	94	section .bss\n    bvar resb 10\n    wvar resw 5\n    dvar resd 1\n    qvar resq 100	code	txt	2024-07-28 09:56:43.687924	0
@@ -1558,6 +1577,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 682	142	section .text\n    global main	text	txt	2024-07-28 09:57:26.310517	0
 683	142	main:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:57:26.330861	0
 684	142	    ; copy buffer1 to buffer2 without a loop\n    mov rsi, buffer1    ; source\n    mov rdi, buffer2    ; destination\n    mov rcx, length\n    rep movsb	text	txt	2024-07-28 09:57:26.351954	0
+1790	408	    std::ranges::pop_heap(range.begin(), std::prev(range.end()));\n    // 5 4 3 1 2 6 7\n}	code	txt	2024-07-28 10:00:37.129404	0
 685	142	    ; reverse copy the buffer1 into buffer2 without a loop\n    mov rax, 48         ; fill buffer2 with ascii 0\n    mov rdi, buffer2    ; we don't increment rdi with stosb\n    mov rcx, length     ; we don't decrement rcx or loop with stosb\n    rep stosb	text	txt	2024-07-28 09:57:26.373775	0
 686	142	    lea rsi, [buffer1 + length - 4]\n    lea rdi, [buffer2 + length]\n    mov rcx, 27         ; copy only 27 characters\n    std                 ; std sets DF, cld clears DF\n    rep movsb	text	txt	2024-07-28 09:57:26.393745	0
 687	142	    leave\n    ret	code	txt	2024-07-28 09:57:26.414178	0
@@ -1652,6 +1672,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 776	157	The server application uses an endpoint to specify a local IP address and a\nport number on which it wants to receive incoming messages from clients. If\nthere is more than one IP address on the host, the server application will\nwant to create a special endpoint representing all IP addresses at once.	text	txt	2024-07-28 09:57:38.730345	0
 777	157	1. Obtain the protocol port number on which the server will listen for\n   incoming requests.\n2. Create a special instance of the `asio::ip::address` object representing\n   all IP addresses available on the host running the server.\n3. Instantiate an object of the `asio::ip::tcp::endpoint` class from the\n   address object created in step 2 and a port number.\n4. The endpoint is ready to be used to specify to the operating system that\n   the server wants to listen for incoming messages on all IP addresses and a\n   particular protocol port number.	text	txt	2024-07-28 09:57:38.751767	0
 778	157	#include <string>\n#include <boost/asio.hpp>	text	txt	2024-07-28 09:57:38.773008	0
+2088	483	class box\n{\nprivate:\n    std::string first;\n    std::array<std::string, 1000> values;	text	txt	2024-07-28 10:01:28.267582	0
 779	157	int main()\n{\n    boost::asio::ip::address address{boost::asio::ip::address::from_string("localhost")};\n    boost::asio::ip::port_type port{80};\n    boost::asio::ip::tcp::endpoint endpoint{address, port};\n}	code	txt	2024-07-28 09:57:38.794229	0
 780	158	#include <boost/asio.hpp>	text	txt	2024-07-28 09:57:39.284294	0
 781	158	int main()\n{\n    unsigned short port{8080};\n    auto address{boost::asio::ip::address_v6::any()};\n    boost::asio::ip::tcp::endpoint endpoint{address, port};\n}	code	txt	2024-07-28 09:57:39.306029	0
@@ -1762,6 +1783,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 884	175	    boost::asio::async_write(\n        socket,\n        boost::asio::buffer(send_buffer.front()),\n        std::bind(on_send, boost::asio::placeholders::error, send_buffer.begin())\n    );\n}	text	txt	2024-07-28 09:57:56.664208	0
 885	175	void on_receive(boost::asio::ip::tcp::socket& socket, std::size_t bytes_transferred)\n{\n    receive_buffer_index += bytes_transferred;	text	txt	2024-07-28 09:57:56.685739	0
 992	214	struct stat filestat;\nif (stat(filepath, &filestat) == -1)\n{\nperror(NULL);\nreturn errno;\n}	text	txt	2024-07-28 09:58:14.591336	0
+6332	1984	select root from bt_metap('users_username_idx');	code	txt	2024-07-28 10:12:32.049805	0
 886	175	    for (std::size_t index{}; index < receive_buffer_index; ++index)\n    {\n        std::cout << (char)receive_buffer[index] << " ";\n    }\n    std::cout << std::endl;\n    receive_buffer_index = 0;	text	txt	2024-07-28 09:57:56.706771	0
 887	175	    receive(socket);\n}	text	txt	2024-07-28 09:57:56.727287	0
 888	175	void receive(boost::asio::ip::tcp::socket& socket)\n{\n    socket.async_read_some(\n        boost::asio::buffer(\n            &receive_buffer[receive_buffer_index],\n            receive_buffer.size() - receive_buffer_index\n        ),\n        std::bind(on_receive, std::ref(socket), 1)\n    );\n}	text	txt	2024-07-28 09:57:56.747909	0
@@ -2234,6 +2256,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1358	294	Here, level can be any of the following:	text	txt	2024-07-28 09:59:10.435413	0
 1359	294	* `ERROR`\n* `WARNING`\n* `NOTICE`\n* `STATUS`\n* `VERBOSE`\n* `DEBUG`\n* `TRACE`	text	txt	2024-07-28 09:59:10.455995	0
 1360	295	You can specify this setting permanently in the `CMAKE_MESSAGE_LOG_LEVEL`\ncache variable.	text	txt	2024-07-28 09:59:10.642577	0
+1791	409	| `std::sort_heap` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:37.720946	0
 1361	296	To debug very complex projects, the `CMAKE_MESSAGE_CONTEXT` variable can be\nused like a stack. Whenever your code enters a specific context, you can add\na descriptive name to the stack and remove it when leaving. By doing this,\nour messages will be decorated with the current `CMAKE_MESSAGE_CONTEXT`\nvariable like so:	text	txt	2024-07-28 09:59:11.121332	0
 1362	296	```\n[some.context.example] Debug message\n``````	text	txt	2024-07-28 09:59:11.142176	0
 1363	296	The option to enable this kind of log output is as follows:	text	txt	2024-07-28 09:59:11.162733	0
@@ -2286,6 +2309,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1411	320	cmake_minimum_required(VERSION <x.xx>)\nproject(<name> <OPTIONS>)	code	txt	2024-07-28 09:59:18.583282	0
 1412	320	We also have an `add_subdirectory(api)` command to include another\n`CMakeListst.txt` file from the api directory to perform steps that are\nspecific to the API part of our application.	text	txt	2024-07-28 09:59:18.603647	0
 1413	321	Users can choose presets through the GUI or use the command line to\n`--list-presets` and select a preset for the buildsystem with the\n`--preset=<preset>` option.	text	txt	2024-07-28 09:59:18.829881	0
+1792	409	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 10:00:37.743103	0
 1414	322	Not that many: a script can be as complex as you like or an empty file.\nHowever, it is recommended that you call the `cmake_minimum_required()`\ncommand at the beginning of the script. This command tells CMake which\npolicies should be applied to subsequent commands in this project	text	txt	2024-07-28 09:59:19.135655	0
 1415	322	When running scripts, CMake won't execute any of the usual stages (such as\nconfiguration or generation), and it won't use the cache.	text	txt	2024-07-28 09:59:19.156908	0
 1416	323	Since there is no concept of a source/build tree in scripts, variables that\nusually hold references to these paths will contain the current working\ndirectory instead: `CMAKE_BINARY_DIR`, `CMAKE_SOURCE_DIR`,\n`CMAKE_CURRENT_BINARY_DIR`, and `CMAKE_CURRENT_SOURCE_DIR`.	text	txt	2024-07-28 09:59:19.379449	0
@@ -2371,6 +2395,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1495	341	| feature | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:59:49.539787	0
 1496	341	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:59:49.561313	0
 1497	341	int main()\n{\n    std::vector<long> range1{1, 2, 3};\n    std::vector<long> range2{1, 3};\n    std::vector<long> range3{1, 3, 1};	text	txt	2024-07-28 09:59:49.581171	0
+6333	1985	The `ctid` column holds the indexes of leaf nodes in the index.	text	txt	2024-07-28 10:12:32.320117	0
 1498	341	    bool cmp1 = std::lexicographical_compare(range1.cbegin(), range1.cend(), range2.cbegin(), range2.cend());\n    // same as\n    bool cmp2 = range1 < range2;\n    // cmp1 = cmp2 = true	text	txt	2024-07-28 09:59:49.60174	0
 1499	341	    bool cmp3 = std::lexicographical_compare(range2.cbegin(), range2.cend(), range3.cbegin(), range3.cend());\n    // same as\n    bool cmp4 = range2 < range3;\n    // cmp3 = cmp4 = true\n}	code	txt	2024-07-28 09:59:49.623329	0
 1500	341	#include <algorithm>\n#include <ranges>\n#include <vector>\n#include <string>	text	txt	2024-07-28 09:59:49.645863	0
@@ -2543,6 +2568,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1662	374	    std::shift_right(range.begin(), range.end(), 3);\n    // {N,N,N,4,5}\n}	code	txt	2024-07-28 10:00:13.932444	0
 1663	375	| `std::shuffle` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | N/A |\n| constexpr | N/A |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:14.519129	0
 1664	375	#include <algorithm>\n#include <vector>\n#include <ranges>\n#include <random>	text	txt	2024-07-28 10:00:14.539674	0
+6334	1985	select * from bt_page_itesm('users_username_idx', 3);	code	txt	2024-07-28 10:12:32.34147	0
 1665	375	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::random_device rd{};\n    std::mt19937 generator{rd()};\n    std::ranges::shuffle(range, generator);\n}	code	txt	2024-07-28 10:00:14.559971	0
 1666	376	| `std::next_permutation` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:15.181148	0
 1667	376	#include <algorithm>\n#include <vector>\n#include <ranges>	text	txt	2024-07-28 10:00:15.201915	0
@@ -2585,6 +2611,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3045	721	    std::size_t size() const { return S; }\n};	text	txt	2024-07-28 10:03:53.903695	0
 1704	385	| `std::transform_exclusive_scan` | standard |\n| --- | --- |\n| introduced | C++17 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | N/A |	text	txt	2024-07-28 10:00:21.621807	0
 1705	385	#include <algorithm>\n#include <numeric>\n#include <vector>	text	txt	2024-07-28 10:00:21.642062	0
+1793	409	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::make_heap(range);\n    // 5 4 3 1 2\n    std::ranges::sort_heap(range);\n    // 1 2 3 4 5\n}	code	txt	2024-07-28 10:00:37.764032	0
 1706	385	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::vector<long> inclusive;\n    std::transform_inclusive_scan(range.begin(), range.end(), std::back_inserter(inclusive), std::plus<>{});\n    std::transform_inclusive_scan(range.begin(), range.end(), std::back_inserter(inclusive), std::plus<>{}, [](long v) { return std::abs(v); });	text	txt	2024-07-28 10:00:21.663331	0
 1707	385	    std::vector<long> exclusive;\n    std::transform_exclusive_scan(range.begin(), range.end(), std::back_inserter(exclusive), 0);\n    std::transform_exclusive_scan(range.begin(), range.end(), std::back_inserter(exclusive), 0, std::plus<>{}, [](long v) { return std::abs(v); });\n}	code	txt	2024-07-28 10:00:21.685047	0
 1708	386	| `std::all_of` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:22.246309	0
@@ -2669,11 +2696,6 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1787	408	    range.push_back(7);\n    std::ranges::push_heap(range);\n    // 7 4 5 1 2 3	text	txt	2024-07-28 10:00:37.066323	0
 1788	408	    range.push_back(6);\n    std::ranges::push_heap(range);\n    // 7 4 6 1 2 3 5	text	txt	2024-07-28 10:00:37.087218	0
 1789	408	    std::ranges::pop_heap(range);\n    // 6 4 5 1 2 3 7	text	txt	2024-07-28 10:00:37.108895	0
-1790	408	    std::ranges::pop_heap(range.begin(), std::prev(range.end()));\n    // 5 4 3 1 2 6 7\n}	code	txt	2024-07-28 10:00:37.129404	0
-2088	483	class box\n{\nprivate:\n    std::string first;\n    std::array<std::string, 1000> values;	text	txt	2024-07-28 10:01:28.267582	0
-1791	409	| `std::sort_heap` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:37.720946	0
-1792	409	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 10:00:37.743103	0
-1793	409	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::make_heap(range);\n    // 5 4 3 1 2\n    std::ranges::sort_heap(range);\n    // 1 2 3 4 5\n}	code	txt	2024-07-28 10:00:37.764032	0
 1794	410	| `std::is_heap` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:38.313259	0
 1795	410	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 10:00:38.333658	0
 1796	410	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::make_heap(range);\n    std::ranges::is_heap(range);\n    // true\n}	code	txt	2024-07-28 10:00:38.355437	0
@@ -2716,6 +2738,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1833	424	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(std::views::counted(std::next(range.begin()), 3), std::ostream_iterator<long>(std::cout, " "));\n    // 2 3 4\n}	code	txt	2024-07-28 10:00:45.894397	0
 1834	425	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 10:00:46.348707	0
 3621	857	MovableType m;	text	txt	2024-07-28 10:05:16.545741	0
+3377	800	    // member functions through pointer to member function\n    base object;\n    std::invoke(&base::add, object, 3);	text	txt	2024-07-28 10:04:40.868077	0
 1835	425	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    auto common = range | std::views::take(3) | std::views::common;\n    std::copy(common.begin(), common.end(), std::ostream_iterator<long>(std::cout, " "));\n    // 1 2 3\n}	code	txt	2024-07-28 10:00:46.369838	0
 1836	426	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 10:00:46.804068	0
 1837	426	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(std::views::all(range), std::ostream_iterator<long>(std::cout, " "));\n    // 1 2 3 4 5\n}	code	txt	2024-07-28 10:00:46.824803	0
@@ -2844,6 +2867,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1957	452	As the discussion of `top()` and `pop()` shows, problematic race conditions\nin interfaces arise because of locking at too small a granularity; the\nprotection doesn’t cover the entirety of the desired operation. Problems with\nmutexes can also arise from locking at too large a granularity; the extreme\nsituation is a single global mutex that protects all shared data. In a system\nwhere there’s a significant amount of shared data, this can eliminate any\nperformance benefits of concurrency, because the threads are forced to run\none at a time, even when they’re accessing different bits of data. The first\nversions of the Linux kernel that were designed to handle multi-processor\nsystems used a single global kernel lock. Although this worked, it meant that\na two-processor system typically had much worse performance than two\nsingle-processor systems, and performance on a four-processor system was\nnowhere near that of four single-processor systems. There was too much\ncontention for the kernel, so the threads running on the additional\nprocessors were unable to perform useful work. Later revisions of the Linux\nkernel have moved to a more fine-grained locking scheme, so the performance\nof a four-processor system is much nearer the ideal of four times that of a\nsingle-processor system, because there’s far less contention.	text	txt	2024-07-28 10:01:06.927558	0
 1958	453	One issue with fine-grained locking schemes is that sometimes you need more\nthan one mutex locked in order to protect all the data in an operation. such\nas when the mutexes are protecting separate instances of a class.	text	txt	2024-07-28 10:01:07.194294	0
 1959	453	If you end up having to lock two or more mutexes for a given operation,\nthere’s another potential problem lurking in the wings, **deadlock**.	text	txt	2024-07-28 10:01:07.215746	0
+3378	800	    // data members\n    int r3 = std::invoke(&base::x, object);	text	txt	2024-07-28 10:04:40.889102	0
+3379	800	    // function objects\n    int r4 = std::invoke(std::plus<>(), std::invoke(&base::x, object), 3);	text	txt	2024-07-28 10:04:40.910307	0
 1960	454	The common advice for avoiding deadlock is to always lock the two mutexes in\nthe same order: if you always lock mutex A before mutex B, then you’ll never\ndeadlock. Sometimes this is straightforward, because the mutexes are serving\ndifferent purposes, but other times it’s not so simple, such as when the\nmutexes are each protecting a separate instance of the same class.	text	txt	2024-07-28 10:01:08.528742	0
 1961	454	Thankfully, the C++ Standard Library has a cure for this in the form of\n`std::lock`, a function that can lock two or more mutexes at once without\nrisk of deadlock.	text	txt	2024-07-28 10:01:08.550637	0
 1962	454	class some_big_object;	text	txt	2024-07-28 10:01:08.571153	0
@@ -2873,6 +2898,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1985	458	    bag(bag const& other): _count{other._count}\n    {\n        _storage = new int{*other._storage};\n    }	text	txt	2024-07-28 10:01:12.169418	0
 1986	458	    bag(bag&& other): _count{other._count}, _storage{other._storage}\n    {\n        other._count = 0;\n        other._storage = nullptr;\n    }\n};	text	txt	2024-07-28 10:01:12.190919	0
 1987	458	int main()\n{\n    bag a{1};\n    bag b{std::move(a)};\n}	code	txt	2024-07-28 10:01:12.212572	0
+3380	800	    // lambda expressions\n    auto lambda = [](auto a, auto b) { return a + b; }\n    int r5 = std::invoke(lambda, 1, 2);\n}	code	txt	2024-07-28 10:04:40.931323	0
+3381	801	#include <functional>\n#include <tuple>	text	txt	2024-07-28 10:04:42.116862	0
 1988	459	The rule is that for a temporary object or an object marked with\n`std::move()`, if available, a function declaring parameters as an rvalue\nreference is preferred. However, if no such function exists, the usual copy\nsemantics is used as a fallback.	text	txt	2024-07-28 10:01:12.489004	0
 1989	460	The objects declared with const cannot be moved because any optimizing\nimplementation requires that the passed argument can be modified.	text	txt	2024-07-28 10:01:12.889704	0
 1990	460	std::vector<std::string> coll;\nconst std::string s{"data"};	text	txt	2024-07-28 10:01:12.910317	0
@@ -2950,6 +2977,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2064	482	Returning a local object by value automatically uses move semantics if\nsupported. On the other hand, `std::move` is just a `static_cast` to an\nrvalue reference, therefore disables **return value optimization**, which\nusually allows the returned object to be used as a return value instead.	text	txt	2024-07-28 10:01:24.505502	0
 2065	482	std::string foo()\n{\n    std::string s;\n    return std::move(s); // BAD, returns std::string&&\n}	code	txt	2024-07-28 10:01:24.526784	0
 2066	483	Constructing an object only by const lvalue references will allocate four\nmemory spaces which two of them are unnecessary. Also move operation does not\nwork here because parameters are const.	text	txt	2024-07-28 10:01:27.805884	0
+6335	1986	All tables have a hidden `ctid` column which we can query.	text	txt	2024-07-28 10:12:32.651557	0
 2067	483	When passing string literals to const lvalue references, compiler creates two\ntemporary objects of `std::string`, which then will be used to initialize\nmembers while this also makes two copies.	text	txt	2024-07-28 10:01:27.826892	0
 2068	483	#include <string>	text	txt	2024-07-28 10:01:27.84808	0
 2069	483	class box\n{\nprivate:\n    std::string first;\n    std::string last;	text	txt	2024-07-28 10:01:27.869482	0
@@ -2993,6 +3021,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2109	486	This will fail when object is an rvalue reference:	text	txt	2024-07-28 10:01:31.123996	0
 2110	486	for (std::string name: returnRecipients().names()) // undefined behavior\n{\n    if (name == "manager")\n        ...\n};	code	txt	2024-07-28 10:01:31.143974	0
 2111	486	Using move semantics we can return by reference if it is safe to do so, and\nreturn by value if we might run into lifetime issues:	text	txt	2024-07-28 10:01:31.163919	0
+3382	801	namespace details\n{\n    template<typename F, typename P, std::size_t ...I>\n    auto apply(F&& callable, T&& parameter, std::index_sequence<I...>)\n    {\n        return std::invoke(std::forward<F>(callable), std::get<I>(std::forward<P>(paramter))...);\n    }\n}	text	txt	2024-07-28 10:04:42.138321	0
 2112	486	class Recipients\n{\nprivate:\n    std::vector<std::string> _names;\npublic:\n    std::vector<std::string> names() && { // where we no longer need the value\n        return std::move(_names); // we steal and return by value\n    }\n    std::vector<std::string> const& names() const& { // in all other cases\n        return _names; // we give access to the member\n    }\n};	code	txt	2024-07-28 10:01:31.185151	0
 2113	486	We overload the getter with different reference qualifiers in the same way as\nwhen overloading a function for `&&` and `const&` parameters.	text	txt	2024-07-28 10:01:31.205435	0
 2114	486	The version with the `&&` qualifier is used when we have an object where we\nno longer need the value, an object that is about to die or that we have\nmarked with `std::move()`.	text	txt	2024-07-28 10:01:31.225474	0
@@ -3031,6 +3060,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2145	491	Person(Person&& p) noexcept(std::is_nothrow_move_constructible_v<std::string>\n        && noexcept(std::cout << name)\n   : name{std::move(p.name)} { std::cout << "MOVE " << name << '\\\\n'; }	code	txt	2024-07-28 10:01:36.132944	0
 2146	491	This still fails because the move constructor for strings does guarantee not\nto throw but the output operator does not.	text	txt	2024-07-28 10:01:36.153342	0
 2147	491	Person(Person&& p) = default;	code	txt	2024-07-28 10:01:36.174536	0
+3383	801	template<typename F, typename P>\nauto apply(F&& callable, P&& parameter)\n{\n    return details::apply(std::forward<F>(callable), std::forward<P>(parameter), std::make_index_sequence<std::tuple_size_v<std::decay_t<P>>>{});\n}	text	txt	2024-07-28 10:04:42.158435	0
 2148	491	The compiler will detect `noexcept` guarantees for you if you do not\nimplement the move constructor yourself. For classes where all members\nguarantee not to throw in the move constructor, a generated or defaulted move\nconstructor will give the guarantee as a whole.	text	txt	2024-07-28 10:01:36.196114	0
 2149	492	The `noexcept` condition must be a compile-time expression that yields a value convertible to `bool`.	text	txt	2024-07-28 10:01:36.39575	0
 2150	493	You cannot overload functions that have only different `noexcept` conditions.	text	txt	2024-07-28 10:01:36.565784	0
@@ -3112,6 +3142,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2227	514	std::string s3;\ns3 = std::move(s2);	code	txt	2024-07-28 10:01:49.251462	0
 2228	514	Sometimes source destination shrinks, but neither is guaranteed.	text	txt	2024-07-28 10:01:49.270811	0
 2229	515	All containers support move semantics when:	text	txt	2024-07-28 10:01:49.878133	0
+3384	801	int add(int const a, int const b) { return a + b; }	text	txt	2024-07-28 10:04:42.178181	0
 2230	515	* Copying the containers\n* Assigning the containers\n* Inserting elements into the container	text	txt	2024-07-28 10:01:49.89899	0
 2231	515	However, there is one exception: `std::array<>` does not allocate memory on\nthe heap, hense it operates element-by-element and making move operations\nequivalent to copy.	text	txt	2024-07-28 10:01:49.920141	0
 2232	515	std::list<std::string> createAndInsert()\n{\n    std::list<std::string> coll;\n    ...\n    return coll; // move constructor if not optimized away\n}	text	txt	2024-07-28 10:01:49.941449	0
@@ -3381,6 +3412,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2497	573	#include <iostream>\n#include <filesystem>	text	txt	2024-07-28 10:02:27.92106	0
 2498	573	int main()\n{\n    std::filesystem::path p1{"/lib/modules"};\n    std::filesystem::path p2{"/usr/lib/modules"};\n    std::cout << std::boolalpha << std::filesystem::equivalent(p1, p2) << std::endl;\n    // true\n}	code	txt	2024-07-28 10:02:27.942543	0
 2499	574	#include <filesystem>	text	txt	2024-07-28 10:02:28.371727	0
+3385	801	struct base\n{\n    int x = 0;	text	txt	2024-07-28 10:04:42.198605	0
 2500	574	std::filesystem::is_directory("/usr/bin"); // true\nstd::filesystem::is_regular_file("/usr/bin/bash"); // true\nstd::filesystem::is_symlink("/lib"); // true\nstd::filesystem::is_character_file("/dev/random"); // true\nstd::filesystem::is_block_file("/dev/sda"); // true\nstd::filesystem::is_fifo("/dev/null"); // false\nstd::filesystem::is_socket("/dev/null"); // false\nstd::filesystem::other("/dev/null"); // false	code	txt	2024-07-28 10:02:28.394042	0
 2501	575	#include <filesystem>	text	txt	2024-07-28 10:02:28.881441	0
 2502	575	std::filesystem::path executables_path{"/usr/local/bin"};\nstd::filesystem::file_status executables_status{std::filesystem::file_status(executables_path)};	text	txt	2024-07-28 10:02:28.903436	0
@@ -3425,6 +3457,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2541	588	asInt("42");           // std::optional<int>(42)\nasInt("077");          // std::optional<int>(42)\nasInt("forty two");    // std::nullopt\nasInt("0x33");         // std::optional<int>(42)	code	txt	2024-07-28 10:02:35.421836	0
 2542	589	It consists of an optional *root name*, an optional *root directory*, and a\nsequence of filenames separated by *directory separators*.	text	txt	2024-07-28 10:02:35.78677	0
 2543	589	```\n[root name] [root directory] [filenames]\n/home/brian/\nC:\\\\Windows\\\\Users\\\\Brian\\\\Desktop\n``````	text	txt	2024-07-28 10:02:35.807365	0
+3386	801	    void add(int const n) { x += n; }\n};	text	txt	2024-07-28 10:04:42.218708	0
 2544	590	The path can be **relative**, so that the file location depends on the current directory, or **absolute**.	text	txt	2024-07-28 10:02:36.299938	0
 2545	590	Two formats are possible for path objects:	text	txt	2024-07-28 10:02:36.321196	0
 2546	590	- A generic format, which is portable.\n- A native format, which is specific to the underlying file system.	text	txt	2024-07-28 10:02:36.342723	0
@@ -3646,6 +3679,9 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2761	671	class Value\n{\n    long id;	text	txt	2024-07-28 10:03:12.355756	0
 2762	671	public:\n    auto operator<=>(Value const& rhs) const\n    {\n        return id <=> rhs.id;\n    }\n};	code	txt	2024-07-28 10:03:12.377306	0
 2763	671	The member function has to take the second parameter as `const` lvalue\nreference with `=default`. A friend function might also take both parameters\nby value.	text	txt	2024-07-28 10:03:12.398305	0
+3387	801	int main()\n{\n    // direct call\n    int r1 = add(1, 2);	text	txt	2024-07-28 10:04:42.238389	0
+3388	801	    // call through function pointer\n    int(*fadd)(int const, int const) = &add;\n    int r2 = fadd(1, 2);	text	txt	2024-07-28 10:04:42.259234	0
+3389	801	    // direct member function call\n    base object;\n    object.add(3);\n    int r3 = object.x;	text	txt	2024-07-28 10:04:42.279452	0
 2764	672	- **strong ordering**: any value of a given type is either *less than* or\n  *equal to* or *greater than* any other value of this type. If a value is\n  neither less nor greater is has to be equal.\n  + `std::strong_ordering:less`\n  + `std::strong_ordering:equal` or `std::strong_ordering::equivalent`\n  + `std::strong_ordering:greater`\n- **weak ordering**: any value of a given type is either *less than*,\n  *equivalent to* or *greater than* any other value of this type. However,\n  equivalent values do not have to be equal (have the same value).\n  + `std::weak_ordering::less`\n  + `std::weak_ordering::equivalent`\n  + `std::weak_ordering::less`\n- **partial ordering**: any value of a given type could either be *less\n  than*, *equivalent to* or *greater than* any other value of this type.\n  However it could also happen that you cannot specify a specific order\n  between two values.\n  + `std::partial_ordering::less`\n  + `std::partial_ordering::equivalent`\n  + `std::partial_ordering::less`\n  + `std::partial_ordering::unordered`	text	txt	2024-07-28 10:03:13.256044	0
 2765	672	As an example, a floating-point type has a special value `NaN`. Any\ncomparison with `NaN` yields `false`. So in this case a comparison might\nyield that two values are unordered and the comparison operator might return\none of four values.	text	txt	2024-07-28 10:03:13.276564	0
 2766	672	Stronger comparison types have implicit type conversions to weaker comparison\ntypes.	text	txt	2024-07-28 10:03:13.297485	0
@@ -3822,6 +3858,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2933	705	        appt_book.cancel_appointment(prev_date, prev_time)\n    }\n}\nelse\n{\n    write("you do not have an appointment at", prev_time, " on ", prev_date)\n}	code	txt	2024-07-28 10:03:36.099393	0
 2934	706	1. Specify what data the problem operates on: **bag**	text	txt	2024-07-28 10:03:38.604967	0
 2935	706	2. Specify what operations does the problem requires:	text	txt	2024-07-28 10:03:38.625708	0
+3390	801	    // member function call through function pointer\n    void(base::*fadd)(int const) = &base::add;\n    (object.*fadd)(3);\n    int r4 = object.x;\n}	code	txt	2024-07-28 10:04:42.299647	0
 2936	706	* Get the number of items currently in the bag.\n* See whether the bag is empty.\n* Add a given object to the bag.\n* Remove an occurence of a specific object from the bag, if possible.\n* Remove all objects from the bag.\n* Count the number of times a certain object occurs in the bag.\n* Test whether the bag contains a particular object.\n* Look at all objects that are in the bag.	text	txt	2024-07-28 10:03:38.647513	0
 2937	706	3. Specify ADT operations using the **Unified Modeling Language**:	text	txt	2024-07-28 10:03:38.667708	0
 2938	706	class bag {\n    // return the current number of entries in the bag\n    + size(): integer	text	txt	2024-07-28 10:03:38.689476	0
@@ -3952,6 +3989,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3067	723	namespace\n{\n    void print()\n    {\n        std::cout << "file1" << std::endl;\n    }\n}	text	txt	2024-07-28 10:03:55.83698	0
 3070	723	namespace\n{\n    void print()\n    {\n        std::cout << "file2" << std::endl;\n    }\n}	text	txt	2024-07-28 10:03:55.898029	0
 3072	724	* Prior to C++11, non-type template arguments could not be named with internal linkage, so `static` variables were not allowed. VC++ compiler still doesn't support it.	text	txt	2024-07-28 10:03:56.426901	0
+3391	802	#if !defined(HEADER_NAME)\n#define HEADER_NAME\n/* ... */\n#endif	code	txt	2024-07-28 10:04:42.589063	0
+3392	803	#include <iostream>	text	txt	2024-07-28 10:04:43.063399	0
 4909	1390	Wait queues are higher-level mechanism essentially used to process blocking input/output, to wait for a condition to be true, to wait for a given event to occur, or to sense data or resource availability.	text	txt	2024-07-28 10:08:53.238408	0
 4912	1390	A wait queue is nothing but a list with sleeping processes in it waiting to be awakened and a spinlock to protect access to this list.	text	txt	2024-07-28 10:08:53.301772	0
 4916	1392	Any process that wants to sleep waiting for `some_event` to occur can invoke either `wait_event_interruptible()` or `wait_event()`.	text	txt	2024-07-28 10:08:54.104053	0
@@ -4027,6 +4066,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3119	735	template<typename T, typename Iter>\nT minimum(Iter const start, Iter const end)\n{\n    T latest_minimum = std::numeric_limits<T>::max();	text	txt	2024-07-28 10:04:03.430807	0
 3120	735	    for (autp i = start; i < end; ++i)\n        if (*i < latest_minimum)\n            latest_minimum = *i;	text	txt	2024-07-28 10:04:03.452088	0
 3121	735	    return latest_minimum;\n}	code	txt	2024-07-28 10:04:03.472174	0
+6336	1986	select ctid, * from users where username = 'briansalehi';	code	txt	2024-07-28 10:12:32.673181	0
 3122	736	`digits` represents the number of bits (excluding the sign bit if present) and padding bits (if any) for integral types and the number of bits of the mantissa for floating-point types.	text	txt	2024-07-28 10:04:03.842481	0
 3123	736	#include <limits>	text	txt	2024-07-28 10:04:03.864137	0
 3124	736	auto s = std::numeric_limits<short>::digits;\nauto d = std::numeric_limits<double>::digits;	code	txt	2024-07-28 10:04:03.885078	0
@@ -4205,6 +4245,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3333	792	int main()\n{\n    int result = add(0,1,2,3,4,5,6,7,8,9);\n}	code	txt	2024-07-28 10:04:34.218573	0
 3334	793	template<typename ...Ts>\nauto add(Ts ...args) { return (... + args); }	text	txt	2024-07-28 10:04:34.666262	0
 3335	793	template<typename ...Ts>\nauto add(Ts ...args) { return ( 1 + ... + args); }	text	txt	2024-07-28 10:04:34.687745	0
+3393	803	void show_compiler()\n{\n#if defined _MSC_VER_\n    std::cout << "Visual C++\\\\n";\n#elif defined __clang__\n    std::cout << "Clang\\\\n";\n#elif defined __GNUG__\n    std::cout << "GCC\\\\n";\n#else\n    std::cout << "Unknown compiler\\\\n";\n#endif\n}	code	txt	2024-07-28 10:04:43.083954	0
+3394	804	void show_architecture()\n{\n#if defined _MSC_VER	text	txt	2024-07-28 10:04:43.948745	0
 3296	783	* `[](){}`: does not capture.\n* `[&](){}`: capture everything by reference.\n* `[=](){}`: capture everything by copy, except `this`. <span style="color:green">(c++20)</span>\n* `[&x](){}`: capture only `x` by reference.\n* `[x](){}`: capture only `x` by copy.\n* `[&x...](){}`: capture pack extension `x` by reference.\n* `[x...](){}`: capture pack extension `x` by copy.\n* `[&, x](){}`: capture everything by reference except for `x` that is captured by copy.\n* `[=, &x](){}`: capture everything by copy except for `x` that is captured by reference.\n* `[&, this](){}`: capture everything by reference except for pointer `this` that is always captured by copy.\n* `[x, x](){}`: **error**, `x` is captured twice.\n* `[&, &x](){}`: **error**, everything is captured by reference, `x` cannot be captured again.\n* `[=, =x](){}`: everything is captured by copy, `x` cannot be captured again.\n* `[&this](){}`: **error**, the pointer `this` is always captured by copy.\n* `[&, =](){}`: **error**, cannot capture everything both by copy and by reference.\n* `[x=expr](){}`: `x` is a data member of the lambda's closure initialized from the expression `expr` suited for move-semantics. <span style="color:green">(c++14)</span>\n* `[&x=expr](){}`: `x` is a reference data member of the lambda's closure initialized from the expression `expr` suited for move-semantics. <span style="color:green">(c++14)</span>	text	txt	2024-07-28 10:04:29.049012	0
 3297	784	* `capture-list` can be empty.\n* `parameters` can be empty.\n* `ret` value of the function can be obmitted.\n* `body` can be empty.\n* `mutable` specifier is optional and removes the `const`ness of function call operator in lambda closure and makes the lambda stateful.\n* `constexpr` specifier is optional and tells the compiler to generate a `constexpr` call operator.\n* `noexcept` specifier is optional and tells the compiler to generate a `nothrow` call operator.\n* `attributes` are optional.	text	txt	2024-07-28 10:04:29.46829	0
 3298	784	[capture-list](params) mutable constexpr exception attr -> ret { body; }	code	txt	2024-07-28 10:04:29.488215	0
@@ -4282,24 +4324,6 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3374	800	    void add(int const n) { x += n; }\n};	text	txt	2024-07-28 10:04:40.803236	0
 3375	800	int main()\n{\n    // free function\n    int r1 = std::invoke(add, 1, 2);	text	txt	2024-07-28 10:04:40.825324	0
 3376	800	    // free function through pointer to function\n    int r2 = std::invoke(&add, 1, 2);	text	txt	2024-07-28 10:04:40.846437	0
-3377	800	    // member functions through pointer to member function\n    base object;\n    std::invoke(&base::add, object, 3);	text	txt	2024-07-28 10:04:40.868077	0
-3378	800	    // data members\n    int r3 = std::invoke(&base::x, object);	text	txt	2024-07-28 10:04:40.889102	0
-3379	800	    // function objects\n    int r4 = std::invoke(std::plus<>(), std::invoke(&base::x, object), 3);	text	txt	2024-07-28 10:04:40.910307	0
-3380	800	    // lambda expressions\n    auto lambda = [](auto a, auto b) { return a + b; }\n    int r5 = std::invoke(lambda, 1, 2);\n}	code	txt	2024-07-28 10:04:40.931323	0
-3381	801	#include <functional>\n#include <tuple>	text	txt	2024-07-28 10:04:42.116862	0
-3382	801	namespace details\n{\n    template<typename F, typename P, std::size_t ...I>\n    auto apply(F&& callable, T&& parameter, std::index_sequence<I...>)\n    {\n        return std::invoke(std::forward<F>(callable), std::get<I>(std::forward<P>(paramter))...);\n    }\n}	text	txt	2024-07-28 10:04:42.138321	0
-3383	801	template<typename F, typename P>\nauto apply(F&& callable, P&& parameter)\n{\n    return details::apply(std::forward<F>(callable), std::forward<P>(parameter), std::make_index_sequence<std::tuple_size_v<std::decay_t<P>>>{});\n}	text	txt	2024-07-28 10:04:42.158435	0
-3384	801	int add(int const a, int const b) { return a + b; }	text	txt	2024-07-28 10:04:42.178181	0
-3385	801	struct base\n{\n    int x = 0;	text	txt	2024-07-28 10:04:42.198605	0
-3386	801	    void add(int const n) { x += n; }\n};	text	txt	2024-07-28 10:04:42.218708	0
-3387	801	int main()\n{\n    // direct call\n    int r1 = add(1, 2);	text	txt	2024-07-28 10:04:42.238389	0
-3388	801	    // call through function pointer\n    int(*fadd)(int const, int const) = &add;\n    int r2 = fadd(1, 2);	text	txt	2024-07-28 10:04:42.259234	0
-3389	801	    // direct member function call\n    base object;\n    object.add(3);\n    int r3 = object.x;	text	txt	2024-07-28 10:04:42.279452	0
-3390	801	    // member function call through function pointer\n    void(base::*fadd)(int const) = &base::add;\n    (object.*fadd)(3);\n    int r4 = object.x;\n}	code	txt	2024-07-28 10:04:42.299647	0
-3391	802	#if !defined(HEADER_NAME)\n#define HEADER_NAME\n/* ... */\n#endif	code	txt	2024-07-28 10:04:42.589063	0
-3392	803	#include <iostream>	text	txt	2024-07-28 10:04:43.063399	0
-3393	803	void show_compiler()\n{\n#if defined _MSC_VER_\n    std::cout << "Visual C++\\\\n";\n#elif defined __clang__\n    std::cout << "Clang\\\\n";\n#elif defined __GNUG__\n    std::cout << "GCC\\\\n";\n#else\n    std::cout << "Unknown compiler\\\\n";\n#endif\n}	code	txt	2024-07-28 10:04:43.083954	0
-3394	804	void show_architecture()\n{\n#if defined _MSC_VER	text	txt	2024-07-28 10:04:43.948745	0
 3395	804	#if defined _M_X64\n    std::cout << "AMD64\\\\n";\n#elif defined _M_IX86\n    std::cout << "INTEL x86\\\\n";\n#elif defined _M_ARM\n    std::cout << "ARM\\\\n";\n#else\n    std::cout << "unknown\\\\n";\n#endif	text	txt	2024-07-28 10:04:43.970519	0
 3396	804	#elif defined __clang__ || __GNUG__	text	txt	2024-07-28 10:04:43.990706	0
 3397	804	#if defined __amd64__\n    std::cout << "AMD64\\\\n";\n#elif defined __i386__\n    std::cout << "INTEL x86\\\\n";\n#elif defined __arm__\n    std::cout << "ARM\\\\n";\n#else\n    std::cout << "unknown\\\\n";\n#endif	text	txt	2024-07-28 10:04:44.011796	0
@@ -4495,6 +4519,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3589	851	The first group of adapters are created from a container and are usually used\nas output iterators:	text	txt	2024-07-28 10:05:12.328504	0
 3694	889	template<typename T>\nusing vector = std::vector<T, std::allocator<T>>;	text	txt	2024-07-28 10:05:31.237718	0
 3590	851	- `std::back_insert_iterator`: Uses `push_back()` to insert elements into a\n  container\n- `std::front_insert_iterator`: Uses `push_front()` to insert elements into a\n  container\n- `std::insert_iterator`: Uses `insert()` to insert elements into a container	text	txt	2024-07-28 10:05:12.348679	0
+6337	1987	The first row points to the first item of the next page for performance\nreasons.	text	txt	2024-07-28 10:12:32.905731	0
 3591	851	The second group of adapters are created from another iterator, not a\ncontainer, and are usually used as input iterators:	text	txt	2024-07-28 10:05:12.369507	0
 3592	851	- `reverse_iterator`: reverse the iteration order of another iterator\n- `move_iterator`: the dereferencing operator for a `move_iterator`\n  automatically converts the value to an rvalue reference, so it can be moved\n  to a new destination.	text	txt	2024-07-28 10:05:12.390581	0
 3593	852	#include <iterator>\n#include <algorithm>\n#include <vector>	text	txt	2024-07-28 10:05:12.992316	0
@@ -4888,6 +4913,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3988	985	The always policy is the simplest. It always restarts a stopped container\nunless it has been explicitly stopped.\nHowever, if you restart the Docker daemon, the container will be\nautomatically restarted when the daemon comes back up.	text	txt	2024-07-28 10:06:19.691226	0
 3989	985	docker container run --interactive --tty --restart always alpine /bin/bash	code	txt	2024-07-28 10:06:19.711397	0
 3990	985	Be aware that Docker has restarted the same container and not created a new one.\nIn fact, if you inspect it you can see there **startCount** has been incremented.	text	txt	2024-07-28 10:06:19.732533	0
+6338	1988	1. Parsing (Parser)\n2. Rewriting\n3. Planning (Planner)\n4. Executing (Executor)	text	txt	2024-07-28 10:12:33.149115	0
 3991	986	The main difference between the **always** and **unless-stopped** policies is that\ncontainers with the **unless-stopped** policy will not be restarted when the\ndaemon restarts if they were in the **Stopped (Exited)** state.	text	txt	2024-07-28 10:06:20.012277	0
 3992	986	docker container run --interactive --tty --restart unless-stopped ubuntu /usr/bin	code	txt	2024-07-28 10:06:20.032692	0
 3993	987	The **on-failure** policy will restart a container if it exits with a non-zero\nexit code. It will also restart containers when the Docker daemon restarts,\neven containers that were in the stopped state.	text	txt	2024-07-28 10:06:20.3255	0
@@ -5059,6 +5085,9 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4123	1044	docker plugin ls\ndocker plugin list	code	txt	2024-07-28 10:06:38.931447	0
 4124	1045	docker plugin install purestorage/docker-plugin:latest --alias pure --grant-all-permissions\ndocker volume create --driver pure --opt size=25GB fast-volume	code	txt	2024-07-28 10:06:39.160296	0
 4125	1046	Assuming an application running on two nodes of a cluster and both have write access to the shared volume.	text	txt	2024-07-28 10:06:39.512077	0
+6339	1989	- `explain`: build a query plan and display info about it\n- `explain analyze`: build a query plan, run it, and info about it	text	txt	2024-07-28 10:12:33.381968	0
+6340	1990	select * from pg_stats where tablename = 'users';	code	txt	2024-07-28 10:12:33.631767	0
+6341	1991	```\n(# pages read sequencially) * seq_page_cost\n+ (# pages read at random) * random_page_cost\n+ (# rows scanned) * cpu_tuple_cost\n+ (# index entries scanned) + cpu_index_tuple_cost\n+ (# times function/operator evaluated) + cpu_operator_cost\n= cost\n``````	text	txt	2024-07-28 10:12:33.973589	0
 4126	1046	The application running on node-1 updates some data in the shared volume.\nHowever, instead of writing the update directly to the volume, it holds it in its local buﬀer for faster recall.\nAt this point, the application in node-1 thinks the data has been written to the volume.\nHowever, before node-1 flushes its buffers and commits the data to the volume, the app on node-2 updates the same data with a diﬀerent value and commits it directly to the volume.\nAt this point, both applications think they’ve updated the data in the volume, but in reality only the application in node-2 has.\nA few seconds later, on node-1 flushes the data to the volume, overwriting the changes made by the application in node-2.\nHowever, the application in node-2 is totally unaware of this! This is one of the ways data corruption happens.\nTo prevent this, you need to write your applications in a way to avoid things like this.	text	txt	2024-07-28 10:06:39.534972	0
 4127	1047	Docker Swarm Mode is secure by default. Image vulnerability scanning analyses\nimages, detects known vulnerabilities, and provides detailed reports and\nfixes.	text	txt	2024-07-28 10:06:39.888597	0
 4128	1047	Scanners work by building a list of all software in an image and then comparing the packages against databases of known vulnerabilities.\nMost vulnerability scanners will rank vulnerabilities and provide advice and help on fixes.	text	txt	2024-07-28 10:06:39.910188	0
@@ -5098,6 +5127,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4161	1059	You can force a Docker host to always sign and verify image push and pull\noperations by exporting the `DOCKER_CONTENT_TRUST` environment variable with\na value of 1. In the real world, you’ll want to make this a more permanent\nfeature of Docker hosts.	text	txt	2024-07-28 10:06:44.565939	0
 4162	1059	export DOCKER_CONTENT_TRUST=1	code	txt	2024-07-28 10:06:44.586018	0
 4163	1059	Once DCT is enabled like this, you’ll no longer be able to pull and work with\nunsigned images.	text	txt	2024-07-28 10:06:44.607043	0
+6342	1992	- Open source: qt.io/download-open-source\n- Commercial: qt.io/download	text	txt	2024-07-28 10:12:34.461276	0
+6343	1992	chmod u+x qt*.run\n./qt*.run	code	txt	2024-07-28 10:12:34.482798	0
 4164	1060	Many applications have sensitive data such as passwords, certificates, and\nSSH keys. Secrets require swarm as they leverage the cluster store. The\nsecret is shown as the key symbol and the container icons with the dashed\nline are not part of the service that has access to the secret.	text	txt	2024-07-28 10:06:45.009562	0
 4165	1060	You can create and manage secrets with the docker secret command. You can\nthen attach them to services by passing the `--secret` flag:	text	txt	2024-07-28 10:06:45.030102	0
 4166	1060	docker service create --secret	code	txt	2024-07-28 10:06:45.050644	0
@@ -5142,6 +5173,10 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4205	1073	docker container run --detach --restart=on-failure:10 --name daemon ubuntu /usr/bin/false\ndocker container logs daemon	code	txt	2024-07-28 10:06:50.717807	0
 4206	1074	socat -v UNIX-LISTEN:/tmp/dockerapi.sock,fork UNIX-CONNECT:/var/run/docker.sock &\ndocker -H unix:///tmp/dockerapi.sock ps -a	code	txt	2024-07-28 10:06:50.954686	0
 4207	1075	docker search node	code	txt	2024-07-28 10:06:51.183365	0
+6344	1993	You can select new components to download and install or unselect them to\nremove them from your installation.	text	txt	2024-07-28 10:12:34.804292	0
+6345	1993	${QT_DIR}/MaintenanceTool.exe	code	txt	2024-07-28 10:12:34.824645	0
+6346	1994	- `int`\n- `bool`\n- `real`\n- `list`	text	txt	2024-07-28 10:12:35.158753	0
+6347	1995	import QtQuick	code	txt	2024-07-28 10:12:37.281446	0
 4208	1076	Docker allocates the private subnet from an unused RFC 1918 private subnet\nblock. It detects which network blocks are unused on the host and allocates\none of those to the virtual network. That is bridged to the host’s local\nnetwork through an interface on the server called `docker0`. This means that,\nby default, all of the containers are on a network together and can talk to\neach other directly. But to get to the host or the outside world, they go\nover the `docker0` virtual bridge interface.	text	txt	2024-07-28 10:06:51.691932	0
 4209	1077	There is a wide ecosystem of tools to either improve or augment Docker’s\nfunctionality. Some good production tools leverage the Docker API, like\n**Prometheus** for monitoring and **Ansible** for simple orchestration.\nOthers leverage Docker’s plugin architecture.	text	txt	2024-07-28 10:06:51.971588	0
 4210	1077	**Plugins** are executable programs that conform to a specification for\nreceiving and returning data to Docker.	text	txt	2024-07-28 10:06:51.992497	0
@@ -5248,6 +5283,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4311	1136	The same way that Unix shell references variables using braces:	text	txt	2024-07-28 10:07:09.724226	0
 4312	1136	${variable-name}	code	txt	2024-07-28 10:07:09.743679	0
 4313	1137	When a command is used to load some file into RAM as follows:	text	txt	2024-07-28 10:07:10.098612	0
+6348	1996	`id` is a very special property-like value, it is used to reference elements\ninside a QML file (document). An `id` needs to be unique inside a document.	text	txt	2024-07-28 10:12:37.500287	0
 4315	1137	Then by executing `source` command, the contents within `boot.ini` file which\nwas recently loaded will be read. This file should obbey the syntax of U-Boot\nshell variables. By reading these variables, the boot sequence can be changed\naccordingly.	text	txt	2024-07-28 10:07:10.141753	0
 4316	1138	editenv bootcmd\nsaveenv	code	txt	2024-07-28 10:07:10.401459	0
 4317	1139	res	code	txt	2024-07-28 10:07:10.652091	0
@@ -5518,6 +5554,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4579	1276	Patched kernel source for Raspberry Pi:	text	txt	2024-07-28 10:07:58.085223	0
 4580	1276	https://github.com - https://github.com/raspberrypi/linux.git	text	txt	2024-07-28 10:07:58.105745	0
 4581	1276	cd ~\nwget [AArch64 GNU/Linux target (aarch64-none-linux-gnu)]\ntar xf archive.tar.xz\nmv gcc-executable gcc-arm-aarch32-none-linux-gnu\nsudo pacman -S subversion openssl\ngit clone --depth 1 -b rpi-4.5.y https://github.com - https://github.com/raspberrypi/linux.git\nsvn export https://github.com - https://github.com/raspberrypi/firmware/trunk/boot\nrm boot/kernel*\nrm boot/*.dtb\nrm boot/overlays/*.dtbo	text	txt	2024-07-28 10:07:58.127431	0
+6349	1997	A property can depend on one or many other properties. This is called\nbinding. A bound property is updated when its dependent properties change. It\nworks like a contract. For example the `height` should always be two times\nthe `width`.	text	txt	2024-07-28 10:12:37.8941	0
+6350	1997	Rectangle {\n    width: 100\n    height: width * 2\n}	code	txt	2024-07-28 10:12:37.914126	0
 4582	1276	PATH=~/gcc-arm-aarch64-none-linux-gnu/bin/:$PATH\ncd linux\nmake ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- bcm2711_defconfig\nmake -j $(($(nproc)/2)) ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu-\ncp arch/arm64/boot/Image ../boot/kernel8.img\ncp arch/arm64/boot/dts/overlays/*.dtbo ../boot/overlays/\ncp arch/arm64/boot/dts/broadcom/*.dtb ../boot\necho 'enable_uart=1' > ../boot/config.txt\necho 'arm_64bit=1' >> ../boot/config.txt\necho 'console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootwait' > ../boot/cmdline.txt	code	txt	2024-07-28 10:07:58.149162	0
 4583	1277	Prebuilt toolchain:\n[AArch32 target with hard float (arm-none-linux-gnueabihf)](AArch32 target with hard float (arm-none-linux-gnueabihf))	text	txt	2024-07-28 10:07:58.832085	0
 4584	1277	cd ~\nwget [AArch32 GNU/Linux target (aarch32-none-linux-gnu)]\ntar xf archive.tar.xz\nmv gcc-executable gcc-arm-aarch32-none-linux-gnu\nsudo pacman -S subversion openssl\ngit clone --depth 1 -b rpi-4.5.y https://github.com - https://github.com/raspberrypi/linux.git\nsvn export https://github.com - https://github.com/raspberrypi/firmware/trunk/boot\nrm boot/kernel*\nrm boot/*.dtb\nrm boot/overlays/*.dtbo	text	txt	2024-07-28 10:07:58.853843	0
@@ -5548,6 +5586,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4608	1287	DT_MACHINE_START(NOVA_DT, "Nova board (Flattened Device Tree)")\n    .reserve = omap_reserve,\n    .map_io = am33xx_map_io,\n    .init_early = am33xx_init_early,\n    .init_machine = omap_generic_init,\n    .init_late = am33xx_init_late,\n    .init_time = omap3_gptimer_timer_init,\n    .dt_compat = nova_compat,\n    .restart = am33xx_restart,\nMACHINE_END\n#endif	code	txt	2024-07-28 10:08:03.376832	0
 4609	1287	*drivers/net/ethernet/ti/cpsw-common.c*\nint ti_cm_get_macid(struct device *dev, int slave, u8 *mac_addr)\n{\n    […]\n    if (of_machine_is_compatible("ti,am33xx"))\n        return cpsw_am33xx_cm_get_macid(dev, 0x630, slave, mac_addr);\n    […]\n}	code	txt	2024-07-28 10:08:03.399058	0
 4610	1288	If your program is compiled with the GNU Compiler Collection (GCC), using the\n`-g3` and `-gdwarf-2` options, GDB understands references to C preprocessor\nmacros.	text	txt	2024-07-28 10:08:03.774799	0
+6351	1998	Some properties are grouped properties. This feature is used when a property\nis more structured and related properties should be grouped together. Another\nway of writing grouped properties is:	text	txt	2024-07-28 10:12:38.295483	0
 4611	1289	With `eBPF` we can add instrumentation into the kernel to observe application interactions with the kernel and intercept what would be involved if we wanted to modify the kernel, adding new code to create some kind of output whenever that system call is invoked.	text	txt	2024-07-28 10:08:13.29623	0
 4612	1290	The `eBPF` verifier, which ensures that an eBPF program is loaded only if it’s safe to run—it won’t crash the machine or lock it up in a hard loop, and it won’t allow data to be compromised.	text	txt	2024-07-28 10:08:13.460684	0
 4613	1291	`eBPF` programs can be loaded into and removed from the kernel dynamically.\nOnce they are attached to an event, they’ll be triggered by that event regardless of what caused that event to occur.\nThis is a huge advantage compared to upgrading the kernel and then having to reboot the machine to use its new functionality.	text	txt	2024-07-28 10:08:13.690536	0
@@ -5634,6 +5673,9 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4694	1324	However, this can be changed by specifying modules path with `INSTALL_MOD_PATH`:	text	txt	2024-07-28 10:08:25.183883	0
 4695	1324	ARCH=arm CROSS_COMPILE=armv6-unknown-linux-gnueabihf- INSTALL_MOD_PATH=<dir> make modules_install	code	txt	2024-07-28 10:08:25.205134	0
 4696	1325	Module files are installed in `/lib/modules/<version>/`:	text	txt	2024-07-28 10:08:25.508321	0
+6352	1998	font {\n    family: "Ubuntu"\n    pixelSize: 24\n}	code	txt	2024-07-28 10:12:38.317825	0
+6353	1999	Text {\n    id: label	text	txt	2024-07-28 10:12:38.842374	0
+6354	1999	    property int spacePresses: 0	text	txt	2024-07-28 10:12:38.863149	0
 4697	1325	* `modules.builtin`: This lists all the kernel objects (.ko) that are built into the kernel. It is used by the module loading utility (modprobe, for example) so that it does not fail when it's trying to load something that's already built in. `modules.builtin.bin` is its binary counterpart.\n* `modules.alias`: This contains the aliases for module loading utilities, which are used to match drivers and devices.\n* `modules.dep`: This lists modules, along with their dependencies. `modules.dep.bin` is its binary counterpart.\n* `modules.symbols`: This tells us which module a given symbol belongs to. They are in the form of `alias symbol:<symbol> <modulename>`. An example is `alias symbol:v4l2_async_notifier_register videodev`. `modules.symbols.bin` is the binary counterpart of this file.	text	txt	2024-07-28 10:08:25.530725	0
 4698	1325	And the rest of module files will be stored in `/lib/modules/<version>/kernel/` in the same directory structure as their corresponding source.	text	txt	2024-07-28 10:08:25.551684	0
 4699	1326	Static modules are available at any time in the kernel image and thus can't\nbe unloaded, at the cost of extra size to the final kernel image. A static\nmodule is also known as a built-in module, since it is part of the final\nkernel image output. Any change in its code will require the whole kernel to\nbe rebuilt.	text	txt	2024-07-28 10:08:25.921932	0
@@ -5786,6 +5828,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4843	1369	The Linux kernel does not implement conditional variables, but to achieve the same or even better, the kernel provides the following mechanisms:	text	txt	2024-07-28 10:08:44.372867	0
 4844	1369	* **Wait queue**: To wait for a change — designed to work in concert with locks.\n* **Completion queue**: To wait for the completion of a given computation, mostly used with DMAs.	text	txt	2024-07-28 10:08:44.394405	0
 4845	1370	A *spinlock* is a hardware-based locking primitive that depends on hardware capabilities to provide atomic operations (such as `test_and_set`, which in a non-atomic implementation would result in read, modify, and write operations).\nIt is the simplest and the base locking primitive.	text	txt	2024-07-28 10:08:44.693769	0
+6355	1999	    text: "Space pressed: " + spacePresses + " times"	text	txt	2024-07-28 10:12:38.88388	0
+6356	1999	    Keys.onSpacePressed: {\n        increment()\n    }	text	txt	2024-07-28 10:12:38.90451	0
 4846	1370	When *CPUB* is running, and task B wants to acquire the spinlock while *CPUA* has already called this spinlock's locking function, *CPUB* will simply spin around a `while` loop until the other CPU releases the lock.	text	txt	2024-07-28 10:08:44.714026	0
 4847	1370	This spinning will only happen on multi-core machines because, on a single-core machine, it cannot happen.	text	txt	2024-07-28 10:08:44.734564	0
 4848	1370	A *spinlock* is said to be a lock held by a CPU, in contrast to a *mutex* which is a lock held by a task.	text	txt	2024-07-28 10:08:44.755686	0
@@ -5815,6 +5859,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4869	1378	Thus, disabling interrupts protects you from kernel preemption only in cases where the protected code does not trigger preemption itself.\nThat said, code that locked a spinlock may not sleep as there would be no way to wake it up as timer interrupts and/or schedulers are disabled on the local CPU.	text	txt	2024-07-28 10:08:47.882671	0
 4870	1379	It behaves exactly like a *spinlock*, with the only difference being that your code can sleep.\nA spinlock is a lock held by a CPU, a mutex, on the other hand, is a lock held by a task.	text	txt	2024-07-28 10:08:48.378814	0
 4871	1379	A mutex is a simple data structure that embeds a wait queue to put contenders to sleep and a spinlock to protect access to this wait queue.	text	txt	2024-07-28 10:08:48.398354	0
+6357	1999	    function increment() {\n        spacePresses = spacePresses + 1\n    }\n}	code	txt	2024-07-28 10:12:38.926009	0
+6358	2000	import QtQuick	text	txt	2024-07-28 10:12:39.337544	0
 4872	1379	struct mutex {\n    atomic_long_t owner;\n    spinlock_t wait_lock;\n#ifdef CONFIG_MUTEX_SPIN_ON_OWNER\n    struct optimistic_spin_queue osq; /* Spinner MCS lock */\n#endif\n    struct list_head wait_list;\n    [...]\n};	code	txt	2024-07-28 10:08:48.41948	0
 4873	1379	The mutex APIs can be found in the `include/linux/mutex.h` header file.	text	txt	2024-07-28 10:08:48.440715	0
 4874	1380	As for other kernel core data structures, there is a static initialization:	text	txt	2024-07-28 10:08:49.058231	0
@@ -5979,6 +6025,10 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5104	1476	To achieve this, the kernel provides `_irqsave` variant functions that behave exactly like the `_irq` ones, with saving and restoring interrupts status features in addition.\nThese are `spin_lock_irqsave()` and `spin_lock_irqrestore()`, defined as follows:	text	txt	2024-07-28 10:09:23.422398	0
 5105	1476	spin_lock_irqsave(spinlock_t *lock, unsigned long flags)\nspin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)	code	txt	2024-07-28 10:09:23.442698	0
 5106	1476	`spin_lock()` and all its variants automatically call `preempt_disable()`, which disables preemption on the local CPU, while `spin_unlock()` and its variants call `preempt_enable()`, which tries to enable preemption, and which internally calls `schedule()` if enabled depending on the current value of the counter, whose current value should be 0.</br>\nIt tries because it depends on whether other spinlocks are locked, which would affect the value of the preemption counter.\n`spin_unlock()` is then a preemption point and might re-enable preemption.	text	txt	2024-07-28 10:09:23.464487	0
+6359	2000	Window {\n    id: root\n    width: 480\n    height: 600\n    title: qsTr('Milestone')\n    visible: true\n}	code	txt	2024-07-28 10:12:39.357973	0
+6360	2001	Rectangle {\n    x: 24\n    y: 16\n    width: 100\n    height: 100\n}	code	txt	2024-07-28 10:12:39.695611	0
+6361	2002	Rectangle {\n    property int max_text_length: 80\n}	code	txt	2024-07-28 10:12:39.976056	0
+6362	2003	Rectangle {	text	txt	2024-07-28 10:12:40.410943	0
 5107	1477	Though disabling interrupts may prevent kernel preemption nothing prevents the protected section from invoking the `schedule()` function.\nThe kernel disables or enables the scheduler, and thus preemtion, by increasing or decreasing a kernel global and per-CPU variable called `preempt_count` with 0 as default value.\nThis variable is checked by the `schedule()` function and when it is greater than 0, the scheduler simply returns and does nothing.\nThis variable is incremented at each invocation of a `spin_lock*()` family function.\nOn the other side, releasing a spinlock decrements it from 1, and whenever it reaches 0, the scheduler is invoked, meaning that your critical section would not be that atomic.	text	txt	2024-07-28 10:09:23.804257	0
 5108	1477	Thus, disabling interrupts protects you from kernel preemption only in cases where the protected code does not trigger preemption itself.\nThat said, code that locked a spinlock may not sleep as there would be no way to wake it up as timer interrupts and/or schedulers are disabled on the local CPU.	text	txt	2024-07-28 10:09:23.826654	0
 5109	1478	It behaves exactly like a *spinlock*, with the only difference being that your code can sleep.\nA spinlock is a lock held by a CPU, a mutex, on the other hand, is a lock held by a task.	text	txt	2024-07-28 10:09:24.393637	0
@@ -6123,6 +6173,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5248	1542	Defaults lecture_file = /etc/custom_lecture	code	txt	2024-07-28 10:09:45.626755	0
 5249	1543	Defaults:!/usr/bin/fdisk lecture = always, \\\\\n                         lecture_file = /etc/fdisk_lecture, \\\\\n                         timestamp_timeout = 0	code	txt	2024-07-28 10:09:45.892284	0
 5250	1544	Restrict users either through restricting the commands, or by prohibiting commands from running other commands.	text	txt	2024-07-28 10:09:46.308658	0
+6363	2003	    property alias text_length: label.length	text	txt	2024-07-28 10:12:40.43107	0
 5251	1544	On modern Unix-like operating systems, `sudo` can stop programs from executing other programs.\n`sudo` uses the `LD_LIBRARY_PRELOAD` environment variable to disable program execution.	text	txt	2024-07-28 10:09:46.330423	0
 5252	1544	The `EXEC` and `NOEXEC` tags control whether a command may execute further commands.\n`EXEC`, the unwritten default, permits execution of commands by other commands.\n`NOEXEC` forbids execution.	text	txt	2024-07-28 10:09:46.351595	0
 5253	1544	alexis ALL = NOEXEC: /usr/bin/visudo	code	txt	2024-07-28 10:09:46.372186	0
@@ -6326,6 +6377,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5451	1620	* `sudo needs-restarting`: This shows the services that need to be restarted, and the reasons why the system might need to be rebooted.\n* `sudo needs-restarting -s`: This only shows the services that need to be restarted.\n* `sudo needs-restarting -r`: This only shows the reasons why the system needs to be rebooted.	text	txt	2024-07-28 10:10:16.021298	0
 5452	1621	For the most part, you use `dnf` the same way that you’d use `yum`, with the same arguments and options.	text	txt	2024-07-28 10:10:16.689497	0
 5453	1621	sudo dnf upgrade	code	txt	2024-07-28 10:10:16.710663	0
+6364	2003	    Text {\n        id: label\n        text: 'sample text'\n        property int length: 40\n    }\n}	code	txt	2024-07-28 10:12:40.45153	0
+6365	2004		code	txt	2024-07-28 10:12:40.675654	0
 5454	1621	The main functional difference between `yum` and `dnf` is that `dnf` has a different automatic update mechanism.\nInstead of installing the `yum-cron` package, you’ll now install the `dnf-automatic` package:	text	txt	2024-07-28 10:10:16.731788	0
 5455	1621	sudo dnf install dnf-automatic	code	txt	2024-07-28 10:10:16.75332	0
 5456	1621	Configure the `/etc/dnf directory/automatic.conf` file the same way as you did the yum-cron.conf file for CentOS 7.	text	txt	2024-07-28 10:10:16.774758	0
@@ -6473,6 +6526,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5597	1650	The `adduser` utility is an interactive way to create user accounts and passwords with a single command, which is unique to the Debian family of Linux distros.	text	txt	2024-07-28 10:10:32.0583	0
 5598	1650	On Debian and Ubuntu 20.04, it creates user home directories with the wide-open 755 permissions value.\nFix it by overwriting the `DIR_MODE` directive in `/etc/adduser.conf` file:	text	txt	2024-07-28 10:10:32.08009	0
 5599	1650	DIR_MODE=700	code	txt	2024-07-28 10:10:32.101245	0
+6366	2005	The element should have the `focus` property set.	text	txt	2024-07-28 10:12:41.092081	0
 5600	1650	One thing that `adduser` can do that `useradd` can’t is to automatically encrypt a user’s home directory as you create the account.	text	txt	2024-07-28 10:10:32.12317	0
 5601	1651	You’ll first have to install the `ecryptfs-utils` package.	text	txt	2024-07-28 10:10:32.680279	0
 5602	1651	sudo apt install ecryptfs-utils	code	txt	2024-07-28 10:10:32.700209	0
@@ -6516,6 +6570,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5641	1654	To see the new configuration, you can either open the `useradd` file or just do `sudo useradd -D`.	text	txt	2024-07-28 10:10:35.878304	0
 5642	1654	`useradd` doesn’t do any safety checks to ensure that the default shell that you’ve assigned is installed on the system.	text	txt	2024-07-28 10:10:35.898531	0
 5643	1655	There are three ways that you can do this:	text	txt	2024-07-28 10:10:36.76775	0
+6367	2005	Text {\n    focus: true	text	txt	2024-07-28 10:12:41.113663	0
+6368	2005	    Keys.onEscapePressed: {\n        label.text = ''\n    }\n}	code	txt	2024-07-28 10:12:41.134655	0
 5644	1655	1. Use `useradd` with the appropriate option switches to set expiry data as you create the accounts.\n2. Use `usermod` to modify expiry data on existing accounts.\n3. Use `chage` to modify expiry data on existing accounts.	text	txt	2024-07-28 10:10:36.789019	0
 5645	1655	You can use `useradd` and `usermod` to set account expiry data, but not to set password expiry data.	text	txt	2024-07-28 10:10:36.809841	0
 5646	1655	* -e: Use this to set an expiration date for the account, in the form YYYY-MM-DD.\n* -f: Use this to set the number of days after the user’s password expires that you want for his or her account to get locked out.	text	txt	2024-07-28 10:10:36.830364	0
@@ -6598,6 +6654,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5724	1668	sudo iptables -I INPUT 1 -i lo -j ACCEPT	code	txt	2024-07-28 10:10:44.737649	0
 5858	1698	sudo firewall-cmd --new-zone corp --permanent	code	txt	2024-07-28 10:11:01.200723	0
 5725	1668	`sudo` needs to know the machine’s hostname so that it can know which rules are allowed to run on a particular machine.\nIt uses the loopback interface to help resolve the hostname.\nIf the lo interface is blocked, it takes longer for `sudo` to resolve the hostname.	text	txt	2024-07-28 10:10:44.75957	0
+6369	2006	`Item` is the base element for all visual elements as such all other visual\nelements inherits from `Item`. The `Item` element is often used as a\ncontainer for other elements, similar to the div element in HTML.	text	txt	2024-07-28 10:12:41.39022	0
 5726	1669	While blocking certain types of ICMP packets is good, blocking all ICMP packets is bad.\nThe harsh reality is that certain types of ICMP messages are necessary for the proper functionality of the network.\nSince the drop all that’s not allowed rule that we’ll eventually create also blocks ICMP packets, we’ll need to create some rules that allow the types of ICMP messages that we have to have.	text	txt	2024-07-28 10:10:45.304398	0
 5727	1669	sudo iptables -A INPUT -m conntrack -p icmp --icmp-type 3 --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT\nsudo iptables -A INPUT -m conntrack -p icmp --icmp-type 11 --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT\nsudo iptables -A INPUT -m conntrack -p icmp --icmp-type 12 --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT	code	txt	2024-07-28 10:10:45.32629	0
 5728	1669	* `-m conntrack`: Use the conntrack module to allow packets that are in a certain state. This time, though, instead of just allowing packets from a host to which our server has been connected (`ESTABLISHED`,`RELATED`), we’re also allowing `NEW` packets that other hosts are sending to our server.\n* `-p icmp`: This refers to the ICMP protocol.\n* `--icmp-type`: There are quite a few types of ICMP messages:\n    + **type 3**: These are the **“destination unreachable”** messages. Not only can they tell your server that it can’t reach a certain host, but they can also tell it why. For example, if the server has sent out a packet that’s too large for a network switch to handle, the switch will send back an ICMP message that tells the server to fragment that large packet. Without ICMP, the server would have connectivity problems every time it tries to send out a large packet that needs to be broken up into fragments.\n    + **type 11**: **Time-exceeded** messages let your server know that a packet that it has sent out has either exceeded its **Time-to-Live (TTL)** value before it could reach its destination, or that a fragmented packet couldn’t be reassembled before the **TTL** expiration date.\n    + **type 12**: **Parameter problem** messages indicate that the server had sent a packet with a bad IP header. In other words, the IP header is either missing an option flag or it’s of an invalid length.\n    + **type 0** and **type 8**: These are the infamous ping packets. Actually, type 8 is the **echo request** packet that you would send out to ping a host, while type 0 is the **echo reply** that the host would return to let you know that it’s alive. Of course, allowing ping packets to get through could be a big help when troubleshooting network problems. If that scenario ever comes up, you could just add a couple of iptables rules to temporarily allow pings.\n    + **type 5**: Now, we have the infamous **redirect messages**. Allowing these could be handy if you have a router that can suggest more efficient paths for the server to use, but hackers can also use them to redirect you to someplace that you don’t want to go. So, just block them.	text	txt	2024-07-28 10:10:45.354128	0
@@ -7203,44 +7260,6 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6329	1981	select relname from pg_class where relkind = 'i';	code	txt	2024-07-28 10:12:31.33171	0
 6330	1982	|`users_username_idx`|\n|Meta Page|\n|Leaf Page|\n|Leaf Page|\n|Root Page|\n|Leaf Page|	text	txt	2024-07-28 10:12:31.612933	0
 6331	1983	create extension pageinspect;	code	txt	2024-07-28 10:12:31.829762	0
-6332	1984	select root from bt_metap('users_username_idx');	code	txt	2024-07-28 10:12:32.049805	0
-6333	1985	The `ctid` column holds the indexes of leaf nodes in the index.	text	txt	2024-07-28 10:12:32.320117	0
-6334	1985	select * from bt_page_itesm('users_username_idx', 3);	code	txt	2024-07-28 10:12:32.34147	0
-6335	1986	All tables have a hidden `ctid` column which we can query.	text	txt	2024-07-28 10:12:32.651557	0
-6336	1986	select ctid, * from users where username = 'briansalehi';	code	txt	2024-07-28 10:12:32.673181	0
-6337	1987	The first row points to the first item of the next page for performance\nreasons.	text	txt	2024-07-28 10:12:32.905731	0
-6338	1988	1. Parsing (Parser)\n2. Rewriting\n3. Planning (Planner)\n4. Executing (Executor)	text	txt	2024-07-28 10:12:33.149115	0
-6339	1989	- `explain`: build a query plan and display info about it\n- `explain analyze`: build a query plan, run it, and info about it	text	txt	2024-07-28 10:12:33.381968	0
-6340	1990	select * from pg_stats where tablename = 'users';	code	txt	2024-07-28 10:12:33.631767	0
-6341	1991	```\n(# pages read sequencially) * seq_page_cost\n+ (# pages read at random) * random_page_cost\n+ (# rows scanned) * cpu_tuple_cost\n+ (# index entries scanned) + cpu_index_tuple_cost\n+ (# times function/operator evaluated) + cpu_operator_cost\n= cost\n``````	text	txt	2024-07-28 10:12:33.973589	0
-6342	1992	- Open source: qt.io/download-open-source\n- Commercial: qt.io/download	text	txt	2024-07-28 10:12:34.461276	0
-6343	1992	chmod u+x qt*.run\n./qt*.run	code	txt	2024-07-28 10:12:34.482798	0
-6344	1993	You can select new components to download and install or unselect them to\nremove them from your installation.	text	txt	2024-07-28 10:12:34.804292	0
-6345	1993	${QT_DIR}/MaintenanceTool.exe	code	txt	2024-07-28 10:12:34.824645	0
-6346	1994	- `int`\n- `bool`\n- `real`\n- `list`	text	txt	2024-07-28 10:12:35.158753	0
-6347	1995	import QtQuick	code	txt	2024-07-28 10:12:37.281446	0
-6348	1996	`id` is a very special property-like value, it is used to reference elements\ninside a QML file (document). An `id` needs to be unique inside a document.	text	txt	2024-07-28 10:12:37.500287	0
-6349	1997	A property can depend on one or many other properties. This is called\nbinding. A bound property is updated when its dependent properties change. It\nworks like a contract. For example the `height` should always be two times\nthe `width`.	text	txt	2024-07-28 10:12:37.8941	0
-6350	1997	Rectangle {\n    width: 100\n    height: width * 2\n}	code	txt	2024-07-28 10:12:37.914126	0
-6351	1998	Some properties are grouped properties. This feature is used when a property\nis more structured and related properties should be grouped together. Another\nway of writing grouped properties is:	text	txt	2024-07-28 10:12:38.295483	0
-6352	1998	font {\n    family: "Ubuntu"\n    pixelSize: 24\n}	code	txt	2024-07-28 10:12:38.317825	0
-6353	1999	Text {\n    id: label	text	txt	2024-07-28 10:12:38.842374	0
-6354	1999	    property int spacePresses: 0	text	txt	2024-07-28 10:12:38.863149	0
-6355	1999	    text: "Space pressed: " + spacePresses + " times"	text	txt	2024-07-28 10:12:38.88388	0
-6356	1999	    Keys.onSpacePressed: {\n        increment()\n    }	text	txt	2024-07-28 10:12:38.90451	0
-6357	1999	    function increment() {\n        spacePresses = spacePresses + 1\n    }\n}	code	txt	2024-07-28 10:12:38.926009	0
-6358	2000	import QtQuick	text	txt	2024-07-28 10:12:39.337544	0
-6359	2000	Window {\n    id: root\n    width: 480\n    height: 600\n    title: qsTr('Milestone')\n    visible: true\n}	code	txt	2024-07-28 10:12:39.357973	0
-6360	2001	Rectangle {\n    x: 24\n    y: 16\n    width: 100\n    height: 100\n}	code	txt	2024-07-28 10:12:39.695611	0
-6361	2002	Rectangle {\n    property int max_text_length: 80\n}	code	txt	2024-07-28 10:12:39.976056	0
-6362	2003	Rectangle {	text	txt	2024-07-28 10:12:40.410943	0
-6363	2003	    property alias text_length: label.length	text	txt	2024-07-28 10:12:40.43107	0
-6364	2003	    Text {\n        id: label\n        text: 'sample text'\n        property int length: 40\n    }\n}	code	txt	2024-07-28 10:12:40.45153	0
-6365	2004		code	txt	2024-07-28 10:12:40.675654	0
-6366	2005	The element should have the `focus` property set.	text	txt	2024-07-28 10:12:41.092081	0
-6367	2005	Text {\n    focus: true	text	txt	2024-07-28 10:12:41.113663	0
-6368	2005	    Keys.onEscapePressed: {\n        label.text = ''\n    }\n}	code	txt	2024-07-28 10:12:41.134655	0
-6369	2006	`Item` is the base element for all visual elements as such all other visual\nelements inherits from `Item`. The `Item` element is often used as a\ncontainer for other elements, similar to the div element in HTML.	text	txt	2024-07-28 10:12:41.39022	0
 6370	2007	- **Geometry:** `x` and `y`, `width` and `height`, and `z` for stacking order\n  of lift elements up or down from their natural ordering.\n- **Layout Handling:** `anchors` (left, right, top, bottom, vertical,\n  horizontal, center), and optional `margins`.\n- **Key Handling:** attached `Key` and `KeyNavigation` properties and the\n  `focus` property to enable key handling in the first place.\n- **Transformation:** `scale` and `rotate` transformation and the generic\n  `transform` property list for x,y,x transformation, as well as\n  `transformOrigin` point.\n- **Visual:** `opacity` to control transparency, `visible` to control\n  visibility, `clip` to restrain paint operations to the element boundary,\n  `smooth` to enhance the rendeing quality.\n- **State Definition:** `states` list property with the supported list of\n  states, current `state` property, and the `transitions` list property to\n  animate state changes.	text	txt	2024-07-28 10:12:41.842087	0
 6371	2008	Rectangle extends `Item` and adds a fill color to it. Additionally it\nsupports borders defined by `border.color` and `border.width`. To create\nrounded rectangles you can use the `radius` property.	text	txt	2024-07-28 10:12:42.258691	0
 6372	2008	Rectangle {\n    color: 'lightsteelblue'\n    border.color: 'gray'\n    border.width: 3\n}	code	txt	2024-07-28 10:12:42.278926	0
@@ -10375,6 +10394,9 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 354	190	cmake --list-presets	code	txt	2024-07-28 09:46:17.545908	0
 355	191	cmake --preset=<preset>	code	txt	2024-07-28 09:46:17.851878	0
 356	191	These values override the system defaults and the environment. However, at\nthe same time, they can be overridden with any arguments that are explicitly\npassed on the command line.	text	txt	2024-07-28 09:46:17.873128	0
+515	266	void do_something()\n{\n}	code	txt	2024-07-28 09:46:45.943087	0
+516	267	constexpr double get_pi()\n{\n    return 22.0 / 7;\n}	code	txt	2024-07-28 09:46:46.289198	0
+517	268	consteval double divide(double a, double b)\n{\n    return a / b;\n}	text	txt	2024-07-28 09:46:46.76329	0
 357	193	Since there is no concept of a source/build tree in scripts, variables that\nusually hold references to these paths will contain the current working\ndirectory instead: `CMAKE_BINARY_DIR`, `CMAKE_SOURCE_DIR`,\n`CMAKE_CURRENT_BINARY_DIR`, and `CMAKE_CURRENT_SOURCE_DIR`.\ncmake --build <dir> [<options>] [-- <build-tool-options>]	code	txt	2024-07-28 09:46:18.350787	0
 358	194	CMake allows you to specify key build parameters that work for every builder.\nIf you need to provide special arguments to your chosen, native builder, pass\nthem at the end of the command after the `--` token.	text	txt	2024-07-28 09:46:18.663427	0
 359	194	cmake --build <dir> -- <build-tool-options>	code	txt	2024-07-28 09:46:18.683814	0
@@ -10533,9 +10555,6 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 512	265	some_func({.label = config.label, .id = 42});	code	txt	2024-07-28 09:46:45.473004	0
 513	266	void do_something();	text	txt	2024-07-28 09:46:45.903451	0
 514	266	int main()\n{\n    do_something();\n}	text	txt	2024-07-28 09:46:45.923765	0
-515	266	void do_something()\n{\n}	code	txt	2024-07-28 09:46:45.943087	0
-516	267	constexpr double get_pi()\n{\n    return 22.0 / 7;\n}	code	txt	2024-07-28 09:46:46.289198	0
-517	268	consteval double divide(double a, double b)\n{\n    return a / b;\n}	text	txt	2024-07-28 09:46:46.76329	0
 518	268	consteval double get_pi()\n{\n    return divide(22.0, 7); // OK\n}	text	txt	2024-07-28 09:46:46.783456	0
 519	268	double dividen{22.0}, divisor{7.0};\ndivide(dividen, divisor); // ERROR: non-const arguments to consteval	code	txt	2024-07-28 09:46:46.805479	0
 520	269	C++23 brings `if consteval` conditional statement.	text	txt	2024-07-28 09:46:47.522905	0
@@ -10732,6 +10751,8 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 709	301	class Value\n{\n    long id;	text	txt	2024-07-28 09:47:15.47816	0
 710	301	public:\n    bool operator==(Value const& rhs) const { return id == rhs.id; }\n    bool operator!=(Value const& rhs) const { return !(*this == rhs); }\n    bool operator< (Value const& rhs) const { return id < rhs.id; }\n    bool operator<=(Value const& rhs) const { return !(*this < rhs); }\n    bool operator> (Value const& rhs) const { return rhs < *this; }\n    bool operator>=(Value const& rhs) const { return !(rhs < *this); }\n};	code	txt	2024-07-28 09:47:15.500633	0
 711	301	In addition, for a well implemented type, you might need:	text	txt	2024-07-28 09:47:15.521732	0
+972	357	To specialize a class template, you have to declare the class with a leading\n`template<>` and a specialization of the types for which the class template\nis specialized. The types are used as a template argument and must be\nspecified directly forwarding the name of the class:	text	txt	2024-07-28 09:47:55.246144	0
+973	357	template<typename T>\nclass Stack\n{\n    void push(T const&);\n};	text	txt	2024-07-28 09:47:55.266304	0
 712	301	- Declare the operators with `noexcept` if they cannot throw.\n- Declare the operators with `constexpr` if they can be used at compile time.\n- Declare the operators as hidden friends (declare them with `friend` inside\n  the class structure so that both operands become parameters and support\n  implicit conversions if the constructors are not `explicit`).\n- Declare the operators with `[[nodiscard]]` to warn if the return value is\n  not used.	text	txt	2024-07-28 09:47:15.545241	0
 713	301	class Value\n{\n    long id;	text	txt	2024-07-28 09:47:15.566017	0
 714	301	public:\n    [[nodiscard]] friend constexpr bool operator==(Value const& lhs, Value const& rhs) noexcept { return lhs.id == rhs.id; }\n    [[nodiscard]] friend constexpr bool operator!=(Value const& lhs, Value const& rhs) noexcept { return !(lhs == rhs); }\n    [[nodiscard]] friend constexpr bool operator< (Value const& lhs, Value const& rhs) noexcept { return lhs.id < rhs.id; }\n    [[nodiscard]] friend constexpr bool operator<=(Value const& lhs, Value const& rhs) noexcept { return !(lhs < rhs); }\n    [[nodiscard]] friend constexpr bool operator> (Value const& lhs, Value const& rhs) noexcept { return rhs < lhs; }\n    [[nodiscard]] friend constexpr bool operator>=(Value const& lhs, Value const& rhs) noexcept { return !(rhs < lhs); }\n};	code	txt	2024-07-28 09:47:15.587697	0
@@ -10900,6 +10921,7 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 874	339	#include <type_traits>	text	txt	2024-07-28 09:47:40.490299	0
 2013	597		code	txt	2024-07-28 09:50:45.122231	0
 878	339	int i = 42;\nint coust& ir = i;\nauto a = ir;  // a is declared as new object of type int	code	txt	2024-07-28 09:47:40.574171	0
+974	357	template<typename T>\nvoid Stack<T>::push(T const&) { }	text	txt	2024-07-28 09:47:55.285633	0
 879	340	`std::common_type` is a type trait, defined in `<type_traits>`, which yields\na structure having a `type` static member for the resulting type. Thus, it\nneeds a `typename` beforehand in order to access its type.	text	txt	2024-07-28 09:47:41.212027	0
 880	340	#include <type_traits>	text	txt	2024-07-28 09:47:41.231796	0
 881	340	template<typename T1, typename T2>\ntypename std::common_type<T1, T2>::type max(T1 a, T2 b);	code	txt	2024-07-28 09:47:41.252837	0
@@ -10994,9 +11016,6 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 969	356	template<typename T>\nclass Stack\n{\npublic:\n    Stack(Stack const&);	text	txt	2024-07-28 09:47:54.502528	0
 970	356	    friend std::ostream& operator<<<T>(std::ostream&, Stack<T> const&);\n};	code	txt	2024-07-28 09:47:54.524669	0
 971	356	Note the `<T>` behind the function name `operator<<`. Thus, we declare a\nspecialization of the nonmember function template as friend. Without `<T>` we\nwould declare a new nontemplate function.	text	txt	2024-07-28 09:47:54.544082	0
-972	357	To specialize a class template, you have to declare the class with a leading\n`template<>` and a specialization of the types for which the class template\nis specialized. The types are used as a template argument and must be\nspecified directly forwarding the name of the class:	text	txt	2024-07-28 09:47:55.246144	0
-973	357	template<typename T>\nclass Stack\n{\n    void push(T const&);\n};	text	txt	2024-07-28 09:47:55.266304	0
-974	357	template<typename T>\nvoid Stack<T>::push(T const&) { }	text	txt	2024-07-28 09:47:55.285633	0
 975	357	template<>\nStack<std::string>\n{\n    void push(std::string const&);\n};	text	txt	2024-07-28 09:47:55.30628	0
 976	357	void Stack<std::string>::push(std::string const&) { }	code	txt	2024-07-28 09:47:55.326268	0
 2024	600		code	txt	2024-07-28 09:50:47.321231	0
@@ -11138,6 +11157,7 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 1110	374	struct foo3         // size = 8, alignment = 4\n{                   // foo1:    +----+----+\n    char a;         // members: |a...|bbbb|\n    int  b;\n};	text	txt	2024-07-28 09:48:14.857759	0
 1111	374	struct foo3_\n{\n    char a;         // 1 byte\n    char _pad0[3];  // 3 bytes\n    int  b;         // 4 byte\n};	text	txt	2024-07-28 09:48:14.880231	0
 1112	374	struct foo4         // size = 24, alignment = 8\n{                   // foo4:    +--------+--------+--------+--------+\n    int a;          // members: |aaaa....|cccc....|dddddddd|e.......|\n    char b;\n    float c;\n    double d;\n    bool e;\n};	text	txt	2024-07-28 09:48:14.902044	0
+1804	532	| `std::shuffle` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | N/A |\n| constexpr | N/A |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:07.514883	0
 1113	374	struct foo4_\n{\n    int a;          // 4 bytes\n    char b;         // 1 byte\n    char _pad0[3];  // 3 bytes\n    float c;        // 4 bytes\n    char _pad1[4];  // 4 bytes\n    double d;       // 8 bytes\n    bool e;         // 1 byte\n    char _pad2[7];  // 7 bytes\n};	code	txt	2024-07-28 09:48:14.922269	0
 1114	375	`alignof` can only be applied to type-ids, and not to variables or class data\nmembers.	text	txt	2024-07-28 09:48:15.569202	0
 1115	375	struct alignas(4) foo     // size: 4, alignment: 4\n{                         // foo:     +----+\n    char a;               // members: |ab..|\n    char b;\n};	text	txt	2024-07-28 09:48:15.592877	0
@@ -11221,6 +11241,7 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 1192	395	The copy constructor is automatically generated when all of the following\nconditions are met:	text	txt	2024-07-28 09:48:29.595002	0
 1193	395	* No <b>move constructor</b> is user-declared\n* No <b>move assignment operator</b> is user-declared	text	txt	2024-07-28 09:48:29.614833	0
 1194	396	The move constructor is automatically generated when all of the following\nconditions are met:	text	txt	2024-07-28 09:48:29.98766	0
+1805	532	#include <algorithm>\n#include <vector>\n#include <ranges>\n#include <random>	text	txt	2024-07-28 09:50:07.534921	0
 1195	396	* No <b>copy constructor</b> is user-declared\n* No <b>copy assignment operator</b> is user-declared\n* No another <b>move operation</b> is user-declared\n* No <b>destructor</b> is user-declared	text	txt	2024-07-28 09:48:30.009595	0
 1196	397	Declaring destructors in anyway disables the automatic generation of move\noperations.	text	txt	2024-07-28 09:48:30.301132	0
 1197	398	By default, both copying and moving special member functions are generated\nfor class.	text	txt	2024-07-28 09:48:30.897685	0
@@ -11255,6 +11276,7 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 1224	406	Invoice i;\nInvoice i1{std::move(i)}; // OK, moves id, copies cust	code	txt	2024-07-28 09:48:36.66584	0
 1225	407	Usually, in polymorphic derived classes there is no need to declare special\nmember functions, especially virtual destructor.	text	txt	2024-07-28 09:48:37.379986	0
 1226	407	class Base\n{\npublic:\n    virtual void do_something() const = 0;\n    virtual ~Base() = default;\n};	text	txt	2024-07-28 09:48:37.401074	0
+3643	1167	*main.asm*\nextern sum\nextern difference\nextern area	text	txt	2024-07-28 09:55:24.546414	0
 1227	407	class Derived: public Base\n{\npublic:\n    virtual void do_something() const override;\n    virtual ~Derived() = default; // BAD, redundant, disables move\n};	code	txt	2024-07-28 09:48:37.422308	0
 1228	408	With move semantics call-by-value can become cheap if a temporary object is\npassed or the passed argument is marked with `std::move()`. Retuurning a\nlocal object by value can be optimized away. However, if it is not optimized\naway, the call is guaranteed to be cheap now.	text	txt	2024-07-28 09:48:38.240365	0
 1229	408	void fooByVal(std::string str);\nvoid fooByRRef(std::string&& str);;	text	txt	2024-07-28 09:48:38.260688	0
@@ -11347,6 +11369,7 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 1319	421	bool org_domain(std::string_view url)\n{\n    if (url.ends_with(".org"))\n        return true;	text	txt	2024-07-28 09:48:51.616325	0
 1320	421	    return false;\n}	code	txt	2024-07-28 09:48:51.636754	0
 1321	422	auto si  = std::to_string(42); // "42"\nauto sl  = std::to_string(42L); // "42"\nauto su  = std::to_string(42u); // "42"\nauto sd  = std::to_wstring(42.0); // "42.000000"\nauto sld = std::to_wstring(42.0L); // "42.000000"	code	txt	2024-07-28 09:48:51.997505	0
+1806	532	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::random_device rd{};\n    std::mt19937 generator{rd()};\n    std::ranges::shuffle(range, generator);\n}	code	txt	2024-07-28 09:50:07.555294	0
 1322	423	auto i1 = std::stoi("42");\nauto i2 = std::stoi("101010", nullptr, 2);\nauto i3 = std::stoi("052", nullptr, 8);\nauto i7 = std::stoi("052", nullptr, 0);\nauto i4 = std::stoi("0x2A", nullptr, 16);\nauto i9 = std::stoi("0x2A", nullptr, 0);\nauto i10 = std::stoi("101010", nullptr, 2);\nauto i11 = std::stoi("22", nullptr, 20);\nauto i12 = std::stoi("-22", nullptr, 20);	text	txt	2024-07-28 09:48:52.863448	0
 1323	423	auto d1 = std::stod("123.45"); // d1 = 123.45000000000000\nauto d2 = std::stod("1.2345e+2"); // d2 = 123.45000000000000\nauto d3 = std::stod("0xF.6E6666p3"); // d3 = 123.44999980926514	code	txt	2024-07-28 09:48:52.883242	0
 1324	423	1. The first parameter is the input string.\n2. The second parameter is a pointer that, when not null, will receive the\n   number of characters that were processed. This can include any leading\n   whitespaces that were discarded, the sign, and the base prefix, so it\n   should not be confused with the number of digits the integral value has.\n3. A number indicating the base; by default, this is 10. Valid numbers of 2\n   to 36.	text	txt	2024-07-28 09:48:52.904194	0
@@ -11416,6 +11439,7 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 1359	433	std::string_view sv{ "demo" };\nstd::string s{ sv };	code	txt	2024-07-28 09:48:58.839474	0
 1360	434	C++20 added prefix and suffix checking methods: starts_with and ends_with to both std::string and std::string_view.	text	txt	2024-07-28 09:48:59.47241	0
 1361	434	#include <string>\n#include <string_view>	text	txt	2024-07-28 09:48:59.493116	0
+1807	533	| `std::prev_permutation` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:08.383081	0
 1362	434	std::string str("the quick brown fox jumps over the lazy dog");\nbool t1 = str.starts_with("the quick"); // const char* overload\n                                        // t1 == true\nbool t2 = str.ends_with('g'); // char overload\n                              // t2 == true	text	txt	2024-07-28 09:48:59.513794	0
 1363	434	std::string_view needle = "lazy dog";\nbool t3 = str.ends_with(needle); // string_view overload\n                                 // t3 == true	text	txt	2024-07-28 09:48:59.53471	0
 1364	434	std::string_view haystack = "you are a lazy cat";\n// both starts_with and ends_with also available for string_view\nbool t4 = haystack.ends_with(needle);\n// t4 == false	code	txt	2024-07-28 09:48:59.555859	0
@@ -11864,10 +11888,6 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 1801	531	int main()\n{\n    std::vector<long> range{1,2,3,4,5};	text	txt	2024-07-28 09:50:06.870738	0
 1802	531	    std::shift_left(range.begin(), range.end(), 3);\n    // {4,5,N,N,N}	text	txt	2024-07-28 09:50:06.890784	0
 1803	531	    std::shift_right(range.begin(), range.end(), 3);\n    // {N,N,N,4,5}\n}	code	txt	2024-07-28 09:50:06.910129	0
-1804	532	| `std::shuffle` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | N/A |\n| constexpr | N/A |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:07.514883	0
-1805	532	#include <algorithm>\n#include <vector>\n#include <ranges>\n#include <random>	text	txt	2024-07-28 09:50:07.534921	0
-1806	532	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::random_device rd{};\n    std::mt19937 generator{rd()};\n    std::ranges::shuffle(range, generator);\n}	code	txt	2024-07-28 09:50:07.555294	0
-1807	533	| `std::prev_permutation` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:08.383081	0
 1808	533	The `std::next_permutation` and `std::prev_permutation` algorithms reorder\nelements of a range into the next/previous lexicographical permutation.	text	txt	2024-07-28 09:50:08.404218	0
 1809	533	If no such permutation exists, both algorithms roll over and return `false`.	text	txt	2024-07-28 09:50:08.424584	0
 1810	533	#include <algorithm>\n#include <vector>\n#include <bitset>	text	txt	2024-07-28 09:50:08.443951	0
@@ -12095,6 +12115,7 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 3044	1000	*/etc/udev/rules.d/70-persistent-ipoib.rules*\nSUBSYSTEM="net", ACTION="add", DRIVERS="?*", ATTR{address}="" ATTR{type}="1", KERNEL="enp33", NAME="eth0"	code	txt	2024-07-28 09:53:53.142202	0
 3048	1001	1. **Locks**: Used for mutual exclusion. When one contender holds the lock,\n   no other can hold it (others are excluded). The most known locks in the\n   kernel are **spinlocks** and **mutexes**.	text	txt	2024-07-28 09:53:53.983219	0
 3051	1001	2. **Conditional variables**: For waiting for a change. These are implemented\n   differently in the kernel as **wait queues** and **completion queues**.	text	txt	2024-07-28 09:53:54.045878	0
+3644	1167	section .data\n    format_integral db "%i", 10, 0\n    format_floating db "%f", 10, 0	text	txt	2024-07-28 09:55:24.56675	0
 3054	1001	* **Wait queue**: To wait for a change — designed to work in concert with\n  locks.\n* **Completion queue**: To wait for the completion of a given computation,\n  mostly used with DMAs.	text	txt	2024-07-28 09:53:54.108336	0
 3057	1002	This spinning will only happen on multi-core machines because, on a\nsingle-core machine, it cannot happen.	text	txt	2024-07-28 09:53:54.662686	0
 3060	1003	This also means that a task currently running on that CPU cannot be preempted\nexcept by **interrupt requests (IRQs)** if they are not disabled on the local\nCPU. In other words, spinlocks protect resources that only one CPU can\ntake/access at a time.	text	txt	2024-07-28 09:53:55.100014	0
@@ -12220,6 +12241,7 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 2151	632	    /* expose ImplIface as any other PIMPL */\nprivate:\n    static std::once_flag flag_;\n    static std::unique_ptr<ImplIface> impl_;\n};	text	txt	2024-07-28 09:51:10.434327	0
 2152	632	std::once_flag MonoPIMPL::flag_;\nstd::unique_ptr<ImplIface> MonoPIMPL::impl_;	code	txt	2024-07-28 09:51:10.454765	0
 2153	633	It consists of an optional *root name*, an optional *root directory*, and a\nsequence of filenames separated by *directory separators*.	text	txt	2024-07-28 09:51:10.845115	0
+3645	1167	section .text\n    global main	text	txt	2024-07-28 09:55:24.588638	0
 2154	633	```\n[root name] [root directory] [filenames]\n/home/brian/\nC:\\\\Windows\\\\Users\\\\Brian\\\\Desktop\n``````	text	txt	2024-07-28 09:51:10.865614	0
 2155	634	The path can be **relative**, so that the file location depends on the current directory, or **absolute**.	text	txt	2024-07-28 09:51:11.402844	0
 2156	634	Two formats are possible for path objects:	text	txt	2024-07-28 09:51:11.423709	0
@@ -12363,6 +12385,7 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 2293	688	#include <fstream>	text	txt	2024-07-28 09:51:36.850335	0
 2294	688	std::fstream file{"/tmp/non-existing-file"};	code	txt	2024-07-28 09:51:36.870479	0
 2295	689	std::filesystem::create_directory(p);\nstd::filesystem::create_directory(p, attributes);	code	txt	2024-07-28 09:51:37.404998	0
+3646	1167	main:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:55:24.608549	0
 2296	689	The functions to create one or more directories return whether a new\ndirectory was created. Thus, finding a directory that is already there is not\nan error. However, finding a file there that is not a directory is also not\nan error.	text	txt	2024-07-28 09:51:37.425163	0
 2297	689	if (!create_directory(p) && !is_directory(p))\n{\n    std::cerr << p << " already exists as a non-directory\\\\n";\n}	code	txt	2024-07-28 09:51:37.445216	0
 2298	690	std::filesystem::create_directories(p);	code	txt	2024-07-28 09:51:37.705673	0
@@ -12464,6 +12487,7 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 2393	725	mdadm --assemble /dev/md0 /dev/sda /dev/sdb /dev/sdc	code	txt	2024-07-28 09:51:55.640065	0
 2394	726	mdadm --manage /dev/md0 --fail /dev/sdX\nmdadm --manage /dev/md0 --remove /dev/sdX\nmdadm --zero-superblock /dev/sdX\nmdadm --detail --scan >> /etc/mdadm.conf	code	txt	2024-07-28 09:51:56.026757	0
 2395	727	fdisk /dev/sdd\nmdadm --manage /dev/md0 --add /dev/sdd	code	txt	2024-07-28 09:51:56.34044	0
+3647	1167	    ; use and print the results of sum function\n    mov rdi, 1\n    mov rsi, 3\n    call sum	text	txt	2024-07-28 09:55:24.629689	0
 2396	728	- **Atomicity**: Complex database operations is proccessed as a single\n  instruction.\n- **Consistency**: Data within the database will not be corrupted due to\n  partially performed operations.\n- **Isolation**: Allows database to handle concurrency, without interleaved\n  changes.\n- **Durability**: Database engine is supposed to protect the data it\n  contains, even in the case of software and hardware failures.	text	txt	2024-07-28 09:51:56.771381	0
 2397	729	PostgreSQL stores its data on storage system in binary format and this format\ncould possibly change between major versions.	text	txt	2024-07-28 09:51:57.041011	0
 2398	730	PostgreSQL provides support and upgrades for 5 years after a new release is\nissued; after this length of time, a major release will reach its end of life\n(EOL) and PostgreSQL developers will no longer maintain it.	text	txt	2024-07-28 09:51:57.311781	0
@@ -12566,6 +12590,7 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 2494	780	docker trust key generate brian	code	txt	2024-07-28 09:52:15.016344	0
 2495	780	If you already have a key-pair, you can import and load it with:	text	txt	2024-07-28 09:52:15.037101	0
 2496	780	docker trust key load key.pem --name brian	code	txt	2024-07-28 09:52:15.058158	0
+3648	1167	    mov rdi, format_integral\n    mov rsi, rax\n    xor rax, rax\n    call printf	text	txt	2024-07-28 09:55:24.650697	0
 2497	780	Now that we’ve loaded a valid key-pair, we’ll associate it with the image\nrepository we’ll push signed images to. This example uses the\nnigelpoulton/ddd-trust repo on Docker Hub and the brian.pub key that was\ncreated in the previous step.	text	txt	2024-07-28 09:52:15.079455	0
 2498	780	docker trust signer add --key brian.pub brian briansalehi/ddd-trust	code	txt	2024-07-28 09:52:15.100315	0
 2499	780	The following command will sign the briansalehi/ddd-trust:signed image and\npush it to Docker Hub. You’ll need to tag an image on your system with the\nname of the repo you just associated your key-pair with.	text	txt	2024-07-28 09:52:15.121889	0
@@ -12741,6 +12766,8 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 2666	856	docker service create --name my-service --mount source=bizvol,target=/vol alpine sleep 1d	code	txt	2024-07-28 09:52:44.599852	0
 2667	856	`--replica` flag was not set, so only a single service replica was deployed.	text	txt	2024-07-28 09:52:44.619613	0
 2668	856	Running service can be found in cluster by following command:	text	txt	2024-07-28 09:52:44.639646	0
+3649	1167	    ; use and print the results of difference function\n    mov rdi, 7\n    mov rsi, 5\n    call difference	text	txt	2024-07-28 09:55:24.67062	0
+3650	1167	    mov rdi, format_integral\n    mov rsi, rax\n    xor rax, rax\n    call printf	text	txt	2024-07-28 09:55:24.690243	0
 2671	857	The application running on node-1 updates some data in the shared volume.\nHowever, instead of writing the update directly to the volume, it holds it in\nits local buﬀer for faster recall. At this point, the application in node-1\nthinks the data has been written to the volume. However, before node-1\nflushes its buffers and commits the data to the volume, the app on node-2\nupdates the same data with a diﬀerent value and commits it directly to the\nvolume. At this point, both applications think they’ve updated the data in\nthe volume, but in reality only the application in node-2 has. A few seconds\nlater, on node-1 flushes the data to the volume, overwriting the changes made\nby the application in node-2. However, the application in node-2 is totally\nunaware of this! This is one of the ways data corruption happens. To prevent\nthis, you need to write your applications in a way to avoid things like this.	text	txt	2024-07-28 09:52:45.176005	0
 2672	858	Docker allocates the private subnet from an unused RFC 1918 private subnet\nblock. It detects which network blocks are unused on the host and allocates\none of those to the virtual network. That is bridged to the host’s local\nnetwork through an interface on the server called `docker0`. This means that,\nby default, all of the containers are on a network together and can talk to\neach other directly. But to get to the host or the outside world, they go\nover the `docker0` virtual bridge interface.	text	txt	2024-07-28 09:52:45.51037	0
 2673	859	1. Preprocessing\n2. Compilation\n3. Assembly\n4. Linking	text	txt	2024-07-28 09:52:45.899165	0
@@ -12901,6 +12928,17 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 2824	901	git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git	code	txt	2024-07-28 09:53:11.523736	0
 2825	901	To use long-term releases of the kernel, below repository should be used\ninstead:	text	txt	2024-07-28 09:53:11.545432	0
 2826	901	git clone git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git	code	txt	2024-07-28 09:53:11.565299	0
+3651	1167	    ; use and print the results of area function\n    mov xmm0, qword[radius]\n    call area	text	txt	2024-07-28 09:55:24.710791	0
+3652	1167	    mov rdi, format_floating\n    mov rax, 1\n    call printf	text	txt	2024-07-28 09:55:24.731554	0
+3653	1167	    mov rsp, rbp\n    pop rbp\n    ret	code	txt	2024-07-28 09:55:24.751974	0
+3654	1168	*header.nasm*\nglobal pi	text	txt	2024-07-28 09:55:25.319097	0
+3655	1168	section .data\n    pi dq 3.141592	text	txt	2024-07-28 09:55:25.341036	0
+3656	1168	section .text\n    ...	code	txt	2024-07-28 09:55:25.36245	0
+3657	1168	*main.nasm*>\nextern pi	text	txt	2024-07-28 09:55:25.382183	0
+3658	1168	section .text\n    ...	code	txt	2024-07-28 09:55:25.402949	0
+3659	1169	section .text\n\tglobal sum	text	txt	2024-07-28 09:55:26.298778	0
+3660	1169	sum:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:55:26.31814	0
+3661	1169	    mov rax, rdi\n    add rax, rsi	text	txt	2024-07-28 09:55:26.339305	0
 2827	902	- `arch/`: To be as generic as possible, architecture-specific code.\n- `block/`: Codes for block storage devices.\n- `crypto/`: Cryptographic API and the encryption algorithm's code.\n- `certs/`: Certificates and sign files to enable a module signature to make\n  the kernel load signed modules.\n- `documentation/`: Descriptions of the APIs that are used for different\n  kernel frameworks and subsystems.\n- `drivers/`: Device driver, organized into various subdirectories.\n- `fs/`: Implementations of different filesystems that the kernel supports,\n  such as NTFS, FAT, ETX{2,3,4}, sysfs, procfs, NFS, and so on.\n- `include/`: Kernel header files.\n- `init/`: Initialization and startup code.\n- `ipc/`: Implementation of the inter-process communication (IPC) mechanisms,\n  such as message queues, semaphores, and shared memory.\n- `kernel/`: Architecture-independent portions of the base kernel.\n- `lib/`: Library routines and some helper functions including generic\n  **kernel object (kobject)** handlers and **cyclic redundancy code (CRC)**\n  computation functions.\n- `mm/`: Memory management code.\n- `net/`: Networking (whatever network type it is) protocol code.\n- `samples/`: Device driver samples for various subsystems.\n- `scripts/`: Scripts and tools that are used alongside the kernel.\n- `security/`: Security framework code.\n- `sound/`: Audio subsystem code.\n- `tools/`: Linux kernel development and testing tools for various\n  subsystems, such as USB, vhost test modules, GPIO, IIO, and SPI, among\n  others.\n- `usr/`: `initramfs` implementation.\n- `virt/`: Virtualization directory, which contains the kernel virtual\n  machine (KVM) module for a hypervisor.	text	txt	2024-07-28 09:53:12.344873	0
 2828	903	The configuration mechanism is called `Kconfig`, and the build system that it\nintegrates with it is called `Kbuild`.	text	txt	2024-07-28 09:53:12.592945	0
 2829	904	Cross-compiler prefix and the architecture of the target must be specified.	text	txt	2024-07-28 09:53:13.133941	0
@@ -13074,6 +13112,8 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 3000	980	/dts-v1/;\n{\n    intc: interrupt-controller@48200000 {\n        compatible = "ti,am33xx-intc";\n        interrupt-controller;\n        #interrupt-cells = <1>;\n        reg = <0x48200000 0x1000>;\n    };\n    lcdc: lcdc@48200000 {\n        compatible = "ti,am33xx-tilcdc";\n        reg = <0x4830e000 0x1000>;\n        interrupt-parent = <&intc>;\n        interrupts = <36>;\n        ti,hwmods = "lcdc";\n        status = "disabled";\n    };\n};	code	txt	2024-07-28 09:53:43.37679	0
 3001	981	/include/ "vexpress-v2m.dtsi"	code	txt	2024-07-28 09:53:43.629547	0
 3002	982	- The **status** is disabled, meaning that no device driver should be bound\n  to it.	text	txt	2024-07-28 09:53:44.611829	0
+3662	1169	    leave\n    ret	code	txt	2024-07-28 09:55:26.361773	0
+3663	1169	nasm -f elf64 -g -F dwarf sum.asm	code	txt	2024-07-28 09:55:26.381314	0
 3003	982	mmc1: mmc@48060000 {\n    compatible = "ti,omap4-hsmmc";\n    t.hwmods = "mmc1";\n    ti,dual-volt;\n    ti,needs-special-reset;\n    ti,needs-special-hs-handling;\n    dmas = <&edma_xbar 24 0 0 &edma_xbar 25 0 0>;\n    dma_names = "tx", "rx";\n    interrupts = <64>;\n    reg = <0x48060000 0x1000>;\n    status = "disabled";\n};	code	txt	2024-07-28 09:53:44.633126	0
 3004	982	- The **status** property is set to *okay*, which causes the MMC device\n  driver to bind with this interface.	text	txt	2024-07-28 09:53:44.655177	0
 3005	982	&mmc1 {\n    status = "okay";\n    bus-width = <0x4>;\n    pinctrl-names = "default";\n    pinctrl-0 = <&mmc1_pins>;\n    cd-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;\n};	code	txt	2024-07-28 09:53:44.676121	0
@@ -13109,6 +13149,7 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 3033	994	setenv bootcmd nand read 82000000 400000 200000\\\\;bootm 82000000	code	txt	2024-07-28 09:53:50.752082	0
 3034	995	fatload mmc 0:1 0x80200000 zImage\nfatload mmc 0:1 0x80f00000 am335x-boneblack.dtb\nsetenv bootargs console=ttyo0\nbootz 0x80200000 - 0x80f00000	code	txt	2024-07-28 09:53:51.062903	0
 3035	996	QEMU_AUDIO_DRV=none qemu-system-arm -m 256M -nographic -M versatilepb -kernel zImage -apend "console=ttyAMA0,115200" -dtb versatile-pb.dts"	code	txt	2024-07-28 09:53:51.316467	0
+3664	1169	#include <stdio.h>	text	txt	2024-07-28 09:55:26.401303	0
 3036	997	- `debug`: set console log level.\n- `init`: the `init` program to run from a mounted root filesystem which\n  defaults to `/sbin/init`.\n- `lpj`: sets `loops_per_jiffy` to a given constant.\n- `panic`: behavior when the kernel panics. above zero is number of seconds\n  before reboot, zero waits forever, and below zero reboots instantly.\n- `quiet`: no log levels.\n- `rdinit`: the `init` program to run from a ramdisk. defaults to `/init`.\n- `ro`: mounts root device as read-only.\n- `root`: the device on which to mount the root filesystem.\n- `rootdelay`: number of seconds to wait before mounting root device.\n- `rootfstype`: filesystem type for the root device.\n- `rootwait`: wait indefinitely for the root device to be detected.\n- `rw`: mounts root device as read-write (default).	text	txt	2024-07-28 09:53:51.780195	0
 3037	998	By setting `lpj=4980736` to the kernel parameter.\nThe number should be different on each device.	text	txt	2024-07-28 09:53:52.029946	0
 3038	999	The kernel has to mount a root filesystem and execute the first user space\nprocess via a ramdisk or by mounting a real filesystem on a block device.	text	txt	2024-07-28 09:53:52.540501	0
@@ -13139,6 +13180,7 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 3111	1021	- **Sleeping APIs:** simple sleeping consist of a task sleeping and being\n  awakened after a given duration to passively delay an operation.\n- **Wait queues:** conditional sleeping mechanism based on external events\n  such as data availability.	text	txt	2024-07-28 09:54:05.09441	0
 3112	1021	Simple sleeps are implemented in the kernel using dedicated APIs; waking up\nfrom such sleeps is implicit and handled by the kernel itself after the\nduration expires.	text	txt	2024-07-28 09:54:05.116052	0
 3113	1021	The other sleeping mechanism is conditioned on an event and the waking up is\nexplicit unless a sleeping timeout is specified. When timeout is not\nspecified, another task must explicitly wake us up based on a condition, else\nwe sleep forever.	text	txt	2024-07-28 09:54:05.13726	0
+3665	1169	extern int sum(int, int);	text	txt	2024-07-28 09:55:26.420978	0
 3114	1022	Both sleeping APIs and wait queues implement what we can call **passive\nwaiting**. The difference between the two is how the waking up process\noccurs.\nThe kernel scheduler manages a list of tasks in a `TASK_RUNNING` state to\nrun, known as a **runqueue**.	text	txt	2024-07-28 09:54:05.434422	0
 3115	1022	On the other hand, sleeping tasks, whether interruptible or not (in a\n`TASK_INTERRUPTIBLE` or `TASK_UNINTERRUPTIBLE` state), have their own queues,\nknown as **waitqueues**.	text	txt	2024-07-28 09:54:05.455167	0
 3116	1023	Wait queues are higher-level mechanism essentially used to process blocking\ninput/output, to wait for a condition to be true, to wait for a given event\nto occur, or to sense data or resource availability.	text	txt	2024-07-28 09:54:05.985907	0
@@ -13660,29 +13702,6 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 3640	1167	    section .text\n        push rbp\n        mov rbp, rsp	text	txt	2024-07-28 09:55:24.484269	0
 3641	1167	        movsd xmm1, qword[.pi]\n        mulsd xmm0, xmm0\n        mulsd xmm0, xmm1	text	txt	2024-07-28 09:55:24.505658	0
 3642	1167	        mov rsp, rbp\n        pop rbp\n        ret	code	txt	2024-07-28 09:55:24.526176	0
-3643	1167	*main.asm*\nextern sum\nextern difference\nextern area	text	txt	2024-07-28 09:55:24.546414	0
-3644	1167	section .data\n    format_integral db "%i", 10, 0\n    format_floating db "%f", 10, 0	text	txt	2024-07-28 09:55:24.56675	0
-3645	1167	section .text\n    global main	text	txt	2024-07-28 09:55:24.588638	0
-3646	1167	main:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:55:24.608549	0
-3647	1167	    ; use and print the results of sum function\n    mov rdi, 1\n    mov rsi, 3\n    call sum	text	txt	2024-07-28 09:55:24.629689	0
-3648	1167	    mov rdi, format_integral\n    mov rsi, rax\n    xor rax, rax\n    call printf	text	txt	2024-07-28 09:55:24.650697	0
-3649	1167	    ; use and print the results of difference function\n    mov rdi, 7\n    mov rsi, 5\n    call difference	text	txt	2024-07-28 09:55:24.67062	0
-3650	1167	    mov rdi, format_integral\n    mov rsi, rax\n    xor rax, rax\n    call printf	text	txt	2024-07-28 09:55:24.690243	0
-3651	1167	    ; use and print the results of area function\n    mov xmm0, qword[radius]\n    call area	text	txt	2024-07-28 09:55:24.710791	0
-3652	1167	    mov rdi, format_floating\n    mov rax, 1\n    call printf	text	txt	2024-07-28 09:55:24.731554	0
-3653	1167	    mov rsp, rbp\n    pop rbp\n    ret	code	txt	2024-07-28 09:55:24.751974	0
-3654	1168	*header.nasm*\nglobal pi	text	txt	2024-07-28 09:55:25.319097	0
-3655	1168	section .data\n    pi dq 3.141592	text	txt	2024-07-28 09:55:25.341036	0
-3656	1168	section .text\n    ...	code	txt	2024-07-28 09:55:25.36245	0
-3657	1168	*main.nasm*>\nextern pi	text	txt	2024-07-28 09:55:25.382183	0
-3658	1168	section .text\n    ...	code	txt	2024-07-28 09:55:25.402949	0
-3659	1169	section .text\n\tglobal sum	text	txt	2024-07-28 09:55:26.298778	0
-3660	1169	sum:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:55:26.31814	0
-3661	1169	    mov rax, rdi\n    add rax, rsi	text	txt	2024-07-28 09:55:26.339305	0
-3662	1169	    leave\n    ret	code	txt	2024-07-28 09:55:26.361773	0
-3663	1169	nasm -f elf64 -g -F dwarf sum.asm	code	txt	2024-07-28 09:55:26.381314	0
-3664	1169	#include <stdio.h>	text	txt	2024-07-28 09:55:26.401303	0
-3665	1169	extern int sum(int, int);	text	txt	2024-07-28 09:55:26.420978	0
 3666	1169	int main(void)\n{\n    int result = sum(4, 2);\n    printf("%i\\\\n", result);\n}	code	txt	2024-07-28 09:55:26.442235	0
 3667	1169	gcc -g -o program main.c sum.o\n./program	code	txt	2024-07-28 09:55:26.463256	0
 3668	1170	There are two types of inline assembly: **basic** and **extended**.	text	txt	2024-07-28 09:55:26.738942	0
