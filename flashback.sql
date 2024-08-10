@@ -64,7 +64,8 @@ CREATE TYPE flashback.resource_type AS ENUM (
     'course',
     'video',
     'mailing list',
-    'manual'
+    'manual',
+    'slides'
 );
 
 
@@ -129,21 +130,22 @@ end; $$;
 ALTER PROCEDURE flashback.create_practice(IN subject_name character varying, IN topic_name character varying, IN practice_heading character varying) OWNER TO flashback;
 
 --
--- Name: create_resource(character varying, flashback.resource_type, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
+-- Name: create_resource(integer, character varying, flashback.resource_type, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
 --
 
-CREATE PROCEDURE flashback.create_resource(IN name_string character varying, IN type_string flashback.resource_type, IN resource_reference character varying DEFAULT NULL::character varying)
+CREATE PROCEDURE flashback.create_resource(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN resource_reference character varying DEFAULT NULL::character varying)
     LANGUAGE plpgsql
     AS $$
 declare resource_index integer;
 begin
     insert into flashback.resources (name, reference, type) values (name_string, resource_reference, type_string) returning id into resource_index;
+    insert into flashback.resource_subjects (subject_id, resource_id) values (subject_index, resource_index);
     insert into flashback.sections (resource_id, headline, reference) select resource_index, t_headline, t_reference from temp_sections;
     delete from temp_sections;
 end; $$;
 
 
-ALTER PROCEDURE flashback.create_resource(IN name_string character varying, IN type_string flashback.resource_type, IN resource_reference character varying) OWNER TO flashback;
+ALTER PROCEDURE flashback.create_resource(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN resource_reference character varying) OWNER TO flashback;
 
 --
 -- Name: get_user_note_blocks(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
