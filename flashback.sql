@@ -385,6 +385,30 @@ end; $$;
 ALTER PROCEDURE flashback.set_section_as_complete(IN resource_name character varying, IN section_headline character varying) OWNER TO flashback;
 
 --
+-- Name: user_login(character varying, character varying); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.user_login(identifier character varying, passphrase character varying) RETURNS character varying
+    LANGUAGE plpgsql
+    AS $$
+declare user_index integer := 0;
+declare hash_string varchar(5000) := null;
+declare session_string varchar(1000) := null;
+begin
+    select u.id into user_index from flashback.users u where u.username = identifier or u.email = identifier;
+    select c.hash into hash_string from credentials c where c.user_id = user_index;
+    if hash_string is not null then
+        select encode(sha512(random()::text::bytea), 'hex') into session_string;
+        raise notice 'User % logged in using identifier %.', user_index, identifier;
+        insert into logins (user_id, session, updated, valid) values (user_index, session_string, now(), true);
+    end if;
+    return session_string;
+end $$;
+
+
+ALTER FUNCTION flashback.user_login(identifier character varying, passphrase character varying) OWNER TO flashback;
+
+--
 -- Name: user_starts_reading(integer, integer); Type: PROCEDURE; Schema: flashback; Owner: flashback
 --
 
@@ -397,6 +421,22 @@ end $$;
 
 
 ALTER PROCEDURE flashback.user_starts_reading(IN user_index integer, IN section_index integer) OWNER TO flashback;
+
+--
+-- Name: validate_user_session(integer, character varying); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.validate_user_session(user_index integer, session_string character varying) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+declare is_valid boolean := false;
+begin
+    select exists (select coalesce(l.valid, false) from flashback.logins l where l.user_id = user_index and valid = true and l.session = session_string) into is_valid;
+    return is_valid;
+end $$;
+
+
+ALTER FUNCTION flashback.validate_user_session(user_index integer, session_string character varying) OWNER TO flashback;
 
 SET default_tablespace = '';
 
@@ -422,6 +462,35 @@ ALTER TABLE flashback.credentials OWNER TO flashback;
 
 ALTER TABLE flashback.credentials ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME flashback.credentials_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: logins; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.logins (
+    id integer NOT NULL,
+    user_id integer,
+    session character varying(1000) NOT NULL,
+    updated timestamp with time zone DEFAULT now() NOT NULL,
+    valid boolean DEFAULT false
+);
+
+
+ALTER TABLE flashback.logins OWNER TO flashback;
+
+--
+-- Name: logins_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE flashback.logins ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME flashback.logins_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -845,7 +914,8 @@ CREATE TABLE flashback.users (
     first_name character varying(30),
     middle_name character varying(30),
     last_name character varying(30),
-    state flashback.user_state DEFAULT 'active'::flashback.user_state NOT NULL
+    state flashback.user_state DEFAULT 'active'::flashback.user_state NOT NULL,
+    email character varying(100) DEFAULT NULL::character varying
 );
 
 
@@ -870,6 +940,18 @@ ALTER TABLE flashback.users ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 --
 
 COPY flashback.credentials (id, user_id, hash, updated) FROM stdin;
+1	1	1cfea2a4b1e9d0ad61aaa97d23f0338233538ecbb858d196c3be1142f22c4b21e4419ae1706ab34ab42013a499a67edb85b1d75aa80eb23bc31b57e53c5e1c32	2024-08-11 03:13:54.980249
+\.
+
+
+--
+-- Data for Name: logins; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.logins (id, user_id, session, updated, valid) FROM stdin;
+1	1	b6e90657b0390c2f17170140de87c9f19c4eaf882a4f9fb3b65292c093e3fef7f9d807eeec0cf8ee773723ccc6c7790b8a4df6f82e7efdcc681e3e57415daf58	2024-08-11 03:12:43.341393+02	f
+2	1	067c7d68caf127743291f56d1791d1944ed9c16c414b934913e88ad52e3e474b8d654e20ab1858e2c73e7aef17c1c696fcd1b5da313a6e0842efc96ce47765aa	2024-08-11 11:18:14.335912+02	f
+3	1	9cfac9f64b7aff5e0c80fdaa4c231a8f25af48adbb0dde266bdf149a00a1f2c130ff05f46dae68ea7278b278090a353ce53b8c4fc2d10b4bac06fef5ed0f8e24	2024-08-11 11:18:40.857472+02	t
 \.
 
 
@@ -18486,8 +18568,8 @@ COPY flashback.topics (id, subject_id, name, creation, update, "position") FROM 
 -- Data for Name: users; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
-COPY flashback.users (id, username, first_name, middle_name, last_name, state) FROM stdin;
-1	briansalehi	Brian	\N	Salehi	active
+COPY flashback.users (id, username, first_name, middle_name, last_name, state, email) FROM stdin;
+1	briansalehi	Brian	\N	Salehi	active	briansalehi@proton.me
 \.
 
 
@@ -18495,7 +18577,14 @@ COPY flashback.users (id, username, first_name, middle_name, last_name, state) F
 -- Name: credentials_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.credentials_id_seq', 1, false);
+SELECT pg_catalog.setval('flashback.credentials_id_seq', 1, true);
+
+
+--
+-- Name: logins_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
+--
+
+SELECT pg_catalog.setval('flashback.logins_id_seq', 3, true);
 
 
 --
@@ -18602,6 +18691,14 @@ SELECT pg_catalog.setval('flashback.users_id_seq', 1, true);
 
 ALTER TABLE ONLY flashback.credentials
     ADD CONSTRAINT credentials_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: logins logins_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.logins
+    ADD CONSTRAINT logins_pkey PRIMARY KEY (id);
 
 
 --
@@ -18741,6 +18838,14 @@ ALTER TABLE ONLY flashback.progress
 
 
 --
+-- Name: users users_email_key; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.users
+    ADD CONSTRAINT users_email_key UNIQUE (email);
+
+
+--
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
 --
 
@@ -18874,6 +18979,14 @@ ALTER TABLE ONLY flashback.studies
 
 ALTER TABLE ONLY flashback.progress
     ADD CONSTRAINT fk_user_topic_id FOREIGN KEY (topic_id) REFERENCES flashback.topics(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: logins logins_user_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.logins
+    ADD CONSTRAINT logins_user_fk FOREIGN KEY (user_id) REFERENCES flashback.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
