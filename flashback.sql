@@ -78,7 +78,8 @@ ALTER TYPE flashback.resource_type OWNER TO flashback;
 CREATE TYPE flashback.user_state AS ENUM (
     'active',
     'deactivated',
-    'removed'
+    'removed',
+    'unverified'
 );
 
 
@@ -184,6 +185,26 @@ end; $$;
 
 
 ALTER PROCEDURE flashback.create_resource_with_sequenced_sections(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN section_pattern_index integer, IN sections integer, IN resource_reference character varying) OWNER TO flashback;
+
+--
+-- Name: create_user(character varying, character varying, character varying, character varying, character varying); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.create_user(username_string character varying, email_string character varying, first_name_string character varying, middle_name_string character varying, last_name_string character varying) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+declare user_index integer;
+begin
+    if username_string is null and email_string is null then
+        raise exception '%', "At least username or email must be given";
+    end if;
+    insert into users(username, email, first_name, middle_name, last_name) values (username_string, email_string, first_name_string, middle_name_string, last_name_string) returning id into user_index;
+    return user_index;
+end;
+$$;
+
+
+ALTER FUNCTION flashback.create_user(username_string character varying, email_string character varying, first_name_string character varying, middle_name_string character varying, last_name_string character varying) OWNER TO flashback;
 
 --
 -- Name: get_section_name_patterns(); Type: FUNCTION; Schema: flashback; Owner: flashback
