@@ -180,7 +180,7 @@ begin
     insert into flashback.resources (name, reference, type) values (name_string, resource_reference, type_string) returning id into resource_index;
     insert into flashback.resource_subjects (subject_id, resource_id) values (subject_index, resource_index);
     select pattern into section_pattern from flashback.section_name_patterns where id = section_pattern_index;
-    insert into flashback.sections (resource_id, headline) select resource_index, format('%s %I', section_pattern, generate_series(1, sections));
+    insert into flashback.sections (resource_id, headline) select resource_index, format('%s %s', section_pattern, generate_series(1, sections));
 end; $$;
 
 
