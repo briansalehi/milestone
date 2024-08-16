@@ -12,7 +12,7 @@ set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 
 find_package(Boost CONFIG REQUIRED COMPONENTS program_options)
 find_package(PostgreSQL REQUIRED)
-find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick)
+find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Network)
 find_package(GTest REQUIRED)
 
 add_subdirectory(importer)
