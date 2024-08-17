@@ -1,0 +1,33 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 30,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "release",
+            "displayName": "Release Configuration",
+            "description": "Configures the project for release; you should most probably want to run this preset.",
+            "generator": "Unix Makefiles",
+            "architecture": "x86_64",
+            "binaryDir": "build-release",
+            "installDir": "/home/brian/.local",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "debug",
+            "displayName": "Debug Confguration",
+            "description": "Configures the project for debug.",
+            "generator": "Unix Makefiles",
+            "binaryDir": "build-debug",
+            "installDir": "/home/brian/.local",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        }
+    ]
+}
