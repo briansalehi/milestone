@@ -97,8 +97,9 @@ declare block_index integer;
 declare record record;
 begin
     insert into flashback.notes (section_id, heading) values (section_index, heading) returning id into note_index;
-    insert into flashback.note_blocks (note_id, content, type, language, position) select note_index, t_content, t_type, t_language, row_number() over w from temp_blocks window w as (partition by t_content);
+    insert into flashback.note_blocks (note_id, content, type, language, position) select note_index, t_content, t_type, t_language, row_number from temp_blocks;
     delete from temp_blocks;
+    alter sequence temp_block_row_number_seq restart with 1;
 end; $$;
 
 
@@ -120,8 +121,9 @@ begin
     select r.id into resource_index from flashback.resources r where r.name = resource_name;
     select s.id into section_index from flashback.sections s where s.headline = section_name and s.resource_id = resource_index;
     insert into flashback.notes (section_id, heading) values (section_index, heading) returning id into note_index;
-    insert into flashback.note_blocks (note_id, content, type, language) select note_index, t_content, t_type, t_language from temp_blocks;
+    insert into flashback.note_blocks (note_id, content, type, language, position) select note_index, t_content, t_type, t_language, row_number from temp_blocks;
     delete from temp_blocks;
+    alter sequence temp_blocks_row_number_seq restart with 1;
 end; $$;
 
 
