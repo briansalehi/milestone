@@ -86,6 +86,21 @@ CREATE TYPE flashback.user_state AS ENUM (
 ALTER TYPE flashback.user_state OWNER TO flashback;
 
 --
+-- Name: add_block(text, flashback.block_type, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
+--
+
+CREATE PROCEDURE flashback.add_block(IN content text, IN type flashback.block_type, IN language character varying)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    insert into temp_blocks (t_content, t_type, t_language) values (content, type, language);
+end;
+$$;
+
+
+ALTER PROCEDURE flashback.add_block(IN content text, IN type flashback.block_type, IN language character varying) OWNER TO flashback;
+
+--
 -- Name: create_note(integer, integer, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
 --
 
@@ -4257,6 +4272,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3219	764	If there is no match, then `std::match_results` is empty and its size is 0. Otherwise, its size is 1, plus the number of matched subexpressions.	text	txt	2024-07-28 10:04:18.418189	0
 3220	764	The class template `std::sub_match` represents a sequence of characters that matches a capture group; this class is actually derived from std::pair, and its first and second members represent iterators to the first and the one- past-end characters in the match sequence. If there is no match sequence, the two iterators are equal:	text	txt	2024-07-28 10:04:18.439055	0
 3221	764	* `typedef sub_match<const char *> csub_match;`\n* `typedef sub_match<const wchar_t *> wcsub_match;`\n* `typedef sub_match<string::const_iterator> ssub_match;`\n* `typedef sub_match<wstring::const_iterator> wssub_match;`	text	txt	2024-07-28 10:04:18.459542	0
+6745	2175	-Configuration\n- Generation\n- Building	text	list	2024-08-18 14:51:01.213425	1
 3222	764	The class template `std::match_results` is a collection of matches; the first element is always a full match in the target, while the other elements are matches of subexpressions:	text	txt	2024-07-28 10:04:18.480756	0
 3223	764	* `typedef match_results<const char *> cmatch;`\n* `typedef match_results<const wchar_t *> wcmatch;`\n* `typedef match_results<string::const_iterator> smatch;`\n* `typedef match_results<wstring::const_iterator> wsmatch;`	text	txt	2024-07-28 10:04:18.502105	0
 3224	764	#include <string>\n#include <regex>	text	txt	2024-07-28 10:04:18.523812	0
@@ -7094,6 +7110,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6071	1820	They are the inverse functions of the exponential functions.	text	txt	2024-07-28 10:11:35.815848	0
 6072	1821	These are functions that are not algebraic.	text	txt	2024-07-28 10:11:36.112257	0
 6073	1821	They include the trigonometric, inverse trigonometric, exponential, and logarithmic functions, and many other functions as well.	text	txt	2024-07-28 10:11:36.132869	0
+6822	2224	External CMake packages provide libraries and tools platform independently.	text	txt	2024-08-18 14:51:01.272828	1
 6074	1821	The catenary is one example of a transcendental function.\nIts graph has the shape of a cable, like a telephone line or electric cable, strung from one support to another and hanging freely under its own weight.	text	txt	2024-07-28 10:11:36.154375	0
 6075	1822	- Template class `cv::Point<>` with aliases in form of `cv::Point{2,3}{i,f,d}`\n- Class `cv::Scalar<>` a four dimensional point derived from `cv::Vec<double, 4>`\n- Template class `cv::Vec<>` known as *fixed vector classes* with aliases in form of `cv::Vec{2,3,4,6}{b,w,s,i,f,d}`\n- Template class `cv::Matx<>` known as *fixed matrix classes* with aliases in form of `cv::Matx{1,2,3,4,6}{1,2,3,4,6}{f,d}`\n- Template class `cv::Size<>` with aliases in form of `cv::Size{2,3}{i,f,d}`\n- Class `cv::Rect<>`\n- Class `cv::RotatedRect<>`	text	txt	2024-07-28 10:11:36.693643	0
 6076	1823	The point class is a container of two or three values of one of the primitive\ntypes and are derived from their own template.	text	txt	2024-07-28 10:11:37.098435	0
@@ -7727,6 +7744,155 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6742	2173	* (`quickfix.txt`)::(`error-file-format`)::(`errorformat`)\n* (`options`)::(`set-options`)::(`local-options`)::(`setglobal`)	text	txt	2024-07-28 10:13:48.888507	0
 6743	2174	compiler gcc	code	txt	2024-07-28 10:13:49.161841	0
 6744	2174	* (`quickfix.txt`)::(`compiler-select`)::(`compiler`)	text	txt	2024-07-28 10:13:49.182656	0
+6746	2176	CMake checks wether the project was configured before by reaching `CMakeCache.txt` file in build directory.	text	txt	2024-08-18 14:51:01.215727	1
+6747	2177	cmake_minimum_required(VERSION 3.20)\nproject(Name VERSION 0.1 LANGUAGE CXX C DESCRIPTION "Template")\nadd_executable(binary source)	code	cmake	2024-08-18 14:51:01.218323	1
+6748	2178	cmake -S <source_path> -B <build_path>	code	sh	2024-08-18 14:51:01.220381	1
+6749	2179	cmake --build <build_path>	code	sh	2024-08-18 14:51:01.221813	1
+6750	2180	git clone https://github.com/kitware/cmake.git ~/.local/src/cmake\ncd ~/.local/src/cmake\ngit checkout v3.30.2\n./bootstrap\nmake --prefix ~/.local\nmake install	code	sh	2024-08-18 14:51:01.22286	1
+6751	2181	- `cmake`: main executable\n- `ctest`: test driver program\n- `cpack`: packaging program\n- `cmake-gui`: graphical interface\n- `ccmake`: ncurses graphical interface	text	txt	2024-08-18 14:51:01.223983	1
+6752	2182	cmake -S <source_path> -B <build_path> -G "Unix Makefiles"	code	sh	2024-08-18 14:51:01.225156	1
+6753	2182	cmake -S <source_path> -B <build_path> -G "Ninja"	code	sh	2024-08-18 14:51:01.225156	2
+6754	2183	cmake --help	code	sh	2024-08-18 14:51:01.227189	1
+6755	2184	cmake --help-manual-list\ncmake --help-command-list\ncmake --help-module-list\ncmake --help-policy-list\ncmake --help-property-list\ncmake --help-variable-list	code	sh	2024-08-18 14:51:01.228976	1
+6756	2185	cmake -C <CMakeCache.txt> -S <source_path> -B <build_path>	code	sh	2024-08-18 14:51:01.230911	1
+6757	2186	cmake -S <source_path> -B <build_path> -D <variable=value>	code	sh	2024-08-18 14:51:01.231923	1
+6758	2187	cmake -S <source_path> -B <build_path> -D CMAKE_BUILD_TYPE=<type>	code	sh	2024-08-18 14:51:01.232887	1
+6759	2187	Possible build type values are:	text	txt	2024-08-18 14:51:01.232887	2
+6760	2187	- `Debug`\n- `Release`\n- `MinSizeRel`\n- `RelWithDebInfo`	text	list	2024-08-18 14:51:01.232887	3
+6761	2188	cmake -S <source_path> -B <build_path> -L	code	sh	2024-08-18 14:51:01.233953	1
+6762	2188	Sometimes, project authors may provide insightful help messages with variables:	text	txt	2024-08-18 14:51:01.233953	2
+6763	2188	cmake -S <source_path> -B <build_path> -LH	code	sh	2024-08-18 14:51:01.233953	3
+6764	2188	Custom variables added with `-D` will not be visible in this list, unless running:	text	txt	2024-08-18 14:51:01.233953	4
+6765	2188	cmake -S <source_path> -B <build_path> -LHA	code	sh	2024-08-18 14:51:01.233953	5
+6766	2189	cmake -S <source_path> -B <build_path> -U <variable>	code	sh	2024-08-18 14:51:01.234763	1
+6767	2190	cmake --system-information [file]	code	sh	2024-08-18 14:51:01.235644	1
+6768	2191	cmake --log-level <level>	code	sh	2024-08-18 14:51:01.236728	1
+6769	2191	Possible values for levels are:	text	txt	2024-08-18 14:51:01.236728	2
+6770	2191	- `ERROR`\n- `WARNING`\n- `NOTICE`\n- `STATUS`\n- `VERBOSE`\n- `DEBUG`\n- `TRACE`	text	list	2024-08-18 14:51:01.236728	3
+6771	2192	message()	code	cmake	2024-08-18 14:51:01.237656	1
+6772	2193	To debug complex projects, the `CMAKE_MESSAGE_CONTEXT` variable can be used like a stack. Whenever execution enters to a context, you can name it descriptively. By doing so messages will be decorated with the current `CMAKE_MESSAGE_CONTEXT` variable.	text	txt	2024-08-18 14:51:01.238573	1
+6773	2194	cmake --log-context <source_path>	code	sh	2024-08-18 14:51:01.239566	1
+6774	2195	cmake --trace	code	sh	2024-08-18 14:51:01.240557	1
+6775	2196	Developers can simplify how users interact with their projects and provide a `CMakePresets.json` file that specifies some defaults.	text	txt	2024-08-18 14:51:01.241709	1
+6776	2197	cmake --list-presets	code	sh	2024-08-18 14:51:01.243463	1
+6777	2198	cmake --preset <preset> -S <source_path> -B <build_path>	code	sh	2024-08-18 14:51:01.245492	1
+6778	2199	cmake -S <source_path> -B <build_path> --fresh	code	sh	2024-08-18 14:51:01.247484	1
+6779	2199	CMake will then erase `CMakeCache.txt` and `CMakeFiles/` in the build directory.	text	txt	2024-08-18 14:51:01.247484	2
+6780	2200	cmake --build <build_path> --parallel <jobs>	code	sh	2024-08-18 14:51:01.248754	1
+6781	2200	cmake --build <build_path> -j <jobs>	code	sh	2024-08-18 14:51:01.248754	2
+6782	2200	An alternative is to set it with `CMAKE_BUILD_PARALLEL_LEVEL` environment variable.	text	txt	2024-08-18 14:51:01.248754	3
+6783	2201	cmake --build <build_path> --parallel <jobs> --target <target>	code	sh	2024-08-18 14:51:01.249676	1
+6784	2202	cmake --build <build_path> --target clean	code	sh	2024-08-18 14:51:01.250652	1
+6785	2203	cmake --build <build_path> --parallel <jobs> --target all --clean-first	code	sh	2024-08-18 14:51:01.25157	1
+6786	2204	cmake --build <build_path> --parallel <jobs> --config <type> --target all	code	sh	2024-08-18 14:51:01.25248	1
+6787	2205	cmake --build <build_path> --verbose	code	sh	2024-08-18 14:51:01.253435	1
+6788	2205	cmake --build <build_path> -v	code	sh	2024-08-18 14:51:01.253435	2
+6789	2206	cmake --install <build_path>	code	sh	2024-08-18 14:51:01.254336	1
+6790	2207	cmake --install <build_path> --install-prefix <prefix>	code	sh	2024-08-18 14:51:01.255289	1
+6791	2208	cmake --install <build_path> --component <name>	code	sh	2024-08-18 14:51:01.25621	1
+6792	2209	cmake --install <build_path> --default-directory-permissions <perms>	code	sh	2024-08-18 14:51:01.25716	1
+6793	2210	cmake --install <build_path> --verbose	code	sh	2024-08-18 14:51:01.258216	1
+6794	2210	cmake --install <build_path> -v	code	sh	2024-08-18 14:51:01.258216	2
+6795	2210	The same effect can be achieved if the `VERBOSE` environment variable is set.	text	txt	2024-08-18 14:51:01.258216	3
+6796	2211	cmake -D <variables...> -P <cmake script> -- args...	code	sh	2024-08-18 14:51:01.25999	1
+6797	2211	Running a script won't run any **configuration** or **generate** stages, and it won't affect cache.	text	txt	2024-08-18 14:51:01.25999	2
+6798	2212	cmake -E <command>	code	cmake	2024-08-18 14:51:01.261806	1
+6799	2213	cmake -E md5sum	code	sh	2024-08-18 14:51:01.263784	1
+6800	2213	cmake -E sha1sum	code	sh	2024-08-18 14:51:01.263784	2
+6801	2213	cmake -E sha224sum	code	sh	2024-08-18 14:51:01.263784	3
+6802	2213	cmake -E sha256sum	code	sh	2024-08-18 14:51:01.263784	4
+6803	2213	cmake -E sha384sum	code	sh	2024-08-18 14:51:01.263784	5
+6804	2213	cmake -E sha512sum	code	sh	2024-08-18 14:51:01.263784	6
+6805	2214	Advanced projects can specify workflow presets that bundle multiple steps into one.	text	txt	2024-08-18 14:51:01.264861	1
+6806	2215	cmake --workflow --list-presets	code	sh	2024-08-18 14:51:01.265667	1
+6807	2216	cmake --workflow --preset <name>	code	sh	2024-08-18 14:51:01.266414	1
+6808	2217	ctest --testdir <build_path>	code	sh	2024-08-18 14:51:01.26714	1
+6809	2218	cmake-gui	code	sh	2024-08-18 14:51:01.267901	1
+6810	2218	ccmake	code	sh	2024-08-18 14:51:01.267901	2
+6811	2219	The directory where the project resides, containing all of the source files and cmake project files.	text	txt	2024-08-18 14:51:01.2687	1
+6812	2219	The path to this directory is given to `-S` argument of `cmake`.	text	txt	2024-08-18 14:51:01.2687	2
+6813	2220	Build configuration and project artifacts will be created here.	text	txt	2024-08-18 14:51:01.269489	1
+6814	2220	The path to this directory is given to `-B` argument of `cmake`.	text	txt	2024-08-18 14:51:01.269489	2
+6815	2221	Files that contain the CMake language are called listfiles and they can be included with `include()` and `find_package()` functions or indirectly with `add_subdirectory()`.	text	txt	2024-08-18 14:51:01.270258	1
+6816	2222	CMake projects are configured with `CMakeLists.txt` listfile.	text	txt	2024-08-18 14:51:01.271129	1
+6817	2222	This file is required on the top of the source tree of every project.	text	txt	2024-08-18 14:51:01.271129	2
+6818	2222	A top-level listfile should contain at least two commands:	text	txt	2024-08-18 14:51:01.271129	3
+6819	2222	cmake_minimum_required(VERSION <x,xx>)\nproject(<name> <options>)	code	cmake	2024-08-18 14:51:01.271129	4
+6820	2223	Cache entries are divided into external and internal sections into `CMakeCache.txt` file on top of the build directory.	text	txt	2024-08-18 14:51:01.271899	1
+6821	2223	The external entries are meant for users to modify, while the internal entries are managed by CMake.	text	txt	2024-08-18 14:51:01.271899	2
+6823	2224	Project authors that want to provide CMake support will ship with a CMake package configuration file.	text	txt	2024-08-18 14:51:01.272828	2
+6824	2224	Config files are named `<package>-config.cmake` or <Package>Config.cmake` and can be used as follows:	text	txt	2024-08-18 14:51:01.272828	3
+6825	2224	find_package(<package>)	code	cmake	2024-08-18 14:51:01.272828	4
+6826	2225	- `cmake_install.cmake`\n- `CTestTestFiles.cmake`\n- `CPackConfig.cmake`	text	txt	2024-08-18 14:51:01.273662	1
+6827	2225		code	cmake	2024-08-18 14:51:01.273662	2
+6828	2225	CMake uses them as a configuration for the `cmake` install action, `ctest`, and `cpack`.	text	txt	2024-08-18 14:51:01.273662	3
+6829	2226	Since CMake 3.25, presets allow us to configure **workflows**, which tie stages (configure, build, test, and package) into a named list of steps to execute.	text	txt	2024-08-18 14:51:01.274597	1
+6830	2226	cmake --list-presets	code	cmake	2024-08-18 14:51:01.274597	2
+6831	2226	cmake --preset <preset>	code	cmake	2024-08-18 14:51:01.274597	3
+6832	2226	Presets are stored in two files:`CMakePresets.json`	text	txt	2024-08-18 14:51:01.274597	4
+6833	2226	- `CMakePresets.json`: used by project authors to provide official presets.\n- `CMakeUserPresets.json`: dedicated to users who want to customize the project configuration to their liking.	text	list	2024-08-18 14:51:01.274597	5
+6834	2227	Often some tasks need to be run in complex projects. Naturally, authors write Bash scripts or use Python, Perl, or Ruby scripts, but that's an added dependency and will increase the complexity of your C/C++ projects. But with CMake scripts these tasks can be run platform independently in a simpler way.	text	txt	2024-08-18 14:51:01.27625	1
+6835	2227	cmake -P <name>.cmake	code	cmake	2024-08-18 14:51:01.27625	2
+6836	2228	It is recommended to call the `cmake_minimum_required()` command at the beginning of every script to specify which policies should be applied to subsequent commands in the project.	text	txt	2024-08-18 14:51:01.278419	1
+6837	2228	cmake_minimum_required(VERSION 3.30)\nmessage(STATUS "Running a script")\nfile(WRITE sample.txt "A script made this file")	code	cmake	2024-08-18 14:51:01.278419	2
+6838	2228	When running scripts, CMake won't execute any of the usual stages and it won't use the cache since there is no concept of source tree or build tree in scripts.	text	txt	2024-08-18 14:51:01.278419	3
+6839	2229	Modules are written in CMake language and contain macro definitions, variables and commands that perform all kinds of functions.	text	txt	2024-08-18 14:51:01.280803	1
+6840	2229	CMake comes packed with over 80 different utility modules.	text	txt	2024-08-18 14:51:01.280803	2
+6841	2229	You can also download modules from a curated list in https://github.com/onqtam/awesome-cmake.	text	txt	2024-08-18 14:51:01.280803	3
+6842	2230	include(<module>)	code	cmake	2024-08-18 14:51:01.281705	1
+6843	2231	CMake has a mechanism to find files belonging to external dependencies that don't support CMake and don't provide a CMake package config file.	text	txt	2024-08-18 14:51:01.282591	1
+6844	2231	CMake provides over 150 find modules that are able to locate those packages if they are installed in the system.	text	txt	2024-08-18 14:51:01.282591	2
+6845	2231	find_package(<module>)	code	cmake	2024-08-18 14:51:01.282591	3
+6846	2231	If the files are found, variables with their path will be defined so that CMake can build against that dependency.	text	txt	2024-08-18 14:51:01.282591	4
+6847	2231	For example, `FindCurl` module searches for a curl library and defines `CURL_FOUND`, `CURL_INCLUDE_DIRS`, `CURL_LIBRARIES`, `CURL_VERSION_STRING` variables.	text	txt	2024-08-18 14:51:01.282591	5
+6848	2232	cmake --help-module-list	code	sh	2024-08-18 14:51:01.283356	1
+6849	2233		text	txt	2024-08-18 14:51:01.284146	1
+6850	2233		code	cmake	2024-08-18 14:51:01.284146	2
+6851	2233		text	txt	2024-08-18 14:51:01.284146	3
+6852	2234	v3.16	text	txt	2024-08-18 14:51:01.284975	1
+6853	2235	Conditions and macro expressions, granting users greater control over the project.	text	txt	2024-08-18 14:51:01.285713	1
+6854	2236	Preset files must be placed in the top directory of the project for CMake to recongnize them.	text	txt	2024-08-18 14:51:01.286425	1
+6855	2237	Each preset file can define multiple presets for each of the `configure`, `generate`, `test`, `package` stages, and workflow presets that encompass multiple stages.	text	txt	2024-08-18 14:51:01.287113	1
+6856	2238	cmake --list-presets	code	sh	2024-08-18 14:51:01.28778	1
+6857	2239	cmake --build --list-presets	code	sh	2024-08-18 14:51:01.288526	1
+6858	2240	ctest --list-presets	code	sh	2024-08-18 14:51:01.289271	1
+6859	2241	cmake --workflow --list-presets	code	sh	2024-08-18 14:51:01.29001	1
+6860	2242	cmake --preset <name>	code	sh	2024-08-18 14:51:01.290683	1
+6861	2243	- `version`: an integer indicating the version of the preset JSON schema\n- `cmakeMinimumRequired`: an object holding the required cmake version\n- `include`: an array of strings that include external presets\n- `configurePresets`: an array of objects that define the configuration stage presets\n- `buildPresets`: an array of objects that define the build stage presets\n- `testPresets`: an array of objects that define the test stage presets\n- `packagePresets`: an array of objects that define the packgae stage presets\n- `workflowPresets`: an array of objects that define the workflow mode presets\n- `vendor`: an object containing custom settings defined by IDEs and vendors and not processed by CMake	text	txt	2024-08-18 14:51:01.29174	1
+6862	2243	{\n    "version": 6,\n    "cmakeMinimumRequired": {\n        "major": 3,\n        "minor": 30,\n        "patch": 2\n    },\n    "include": [],\n    "configurePresets": [],\n    "buildPresets": [],\n    "testPresets": [],\n    "packagePresets": [],\n    "workflowPresets": [],\n    "vendor": {\n    }\n}	code	json	2024-08-18 14:51:01.29174	2
+6863	2243	Entries other than `version` is opiona.	text	txt	2024-08-18 14:51:01.29174	3
+6864	2243	The appropriate schema version for CMake 3.26 is 6.	text	txt	2024-08-18 14:51:01.29174	4
+6865	2244	`name` fields.	text	txt	2024-08-18 14:51:01.293669	1
+6866	2244	`name` fields must be unique within each stage.	text	txt	2024-08-18 14:51:01.293669	2
+6867	2244	{\n    "version": 6,\n    "configurePresets": {\n        {\n            "name": "myPreset1"\n        },\n        {\n            "name": "myPreset2"\n        }\n    }\n}	code	json	2024-08-18 14:51:01.293669	3
+6868	2245	Every stage specific preset can have the same optional fields.	text	txt	2024-08-18 14:51:01.295344	1
+6889	2256	4. `matches`, `notMatches`: evaluates whether the `string` field align with the pattern defined in the `regex` field.	text	txt	2024-08-18 14:51:01.305316	7
+6890	2256	{\n    "condition": {\n        "type": "matches",\n        "string": "${projectVersion}",\n        "regex": "^([0-9]+.){2}.[0=9]+$"\n    }\n}	code	json	2024-08-18 14:51:01.305316	8
+6891	2256	5. `not`: boolean inversion of the condition provided in the `conditions` field.	text	txt	2024-08-18 14:51:01.305316	9
+6869	2245	{\n    "version": 6,\n    "packagePresets": [\n        {\n            "displayName": "A string that provides user friendly name for the preset",\n            "description": "A string that offers and explanation of what the preset does",\n            "inherits": "A string, or an array of strings, that copies the configuration of presets named in this field as a base, to be further extended or modified",\n            "hidden": "A boolean that hides the preset from the listing, making it suitable to be used through inheritance",\n            "environment": "An object that overrides ENV variables for this stage, each key identifies an individual variable, and values can be strings or null; macros also supported",\n            "condition": "An object that enables or disables this preset",\n            "vendor": "A custom object that contains vendor specific values and not interpreted by CMake",\n        }\n    ]\n}	code	json	2024-08-18 14:51:01.295344	2
+6870	2246	All stage specific presets must be associated with configuration stage preset as they need to know the location of the build tree. While the `configure` preset is inherently associated with itself, others need to explicitly define this association via the `configurePresets` field.	text	txt	2024-08-18 14:51:01.297165	1
+6871	2246	This association doesn't mean CMake will automatically run configuration preset with each subsequent presets. You still need to execute each preset manually, or use a workflow preset.	text	txt	2024-08-18 14:51:01.297165	2
+6872	2247	The configuration preset has common mandatory field like `name`, and also optional fields. But also some configuration specific fields exist:	text	txt	2024-08-18 14:51:01.29807	1
+6873	2247	{\n    "version": 6,\n    "configurePresets": [\n        {\n            "name": "custom",\n            "generator": "A string that specifies a generator to use for the preset; required by version < 3",\n            "architecture": "A string that configures generators supporting this architecture",\n            "toolset": "A string that configures generators supporting this architecture",\n            "binaryDir": "A string that provides a relative or absolute path to the build tree; required by version < 3; supports marcros",\n            "installDir": "A string that provides a relative or absolute path to the installation directory; required by version < 3; supports macros",\n            "cacheVariables": "A map that defines variables; values support macros",\n        }\n    ]\n}	code	json	2024-08-18 14:51:01.29807	2
+6874	2248	Command Line >overrides> Preset Variables >overrides> Cache	text	txt	2024-08-18 14:51:01.298839	1
+6875	2249	{\n    "version": 6,\n    "buildPresets": [\n        {\n            "name": "build",\n            "configurePreset": "custom",\n            "jobs": 8,\n            "targets": ["A string", "or array of strings", "that sets targets to build;", "also support macros"],\n            "configuration": "A string that determines the build type for multi-configuration generators (Debug, Release, etc.)",\n            "cleanFirst": true\n        }\n    ]\n}	code	json	2024-08-18 14:51:01.299685	1
+6876	2250	{\n    "version": 6,\n    "testPresets": [\n        {\n            "name": "test",\n            "configurePreset": "custom",\n            "configuration": "A string that determines the build type for multi-configuration generators (Debug, Release, etc.)",\n            "output": {\n                "shortProgress": true,\n                "verbosity": "A string that sets the output verbosity to one of the following levels: default, verbose, extra",\n                "outputOnFailure": true,\n                "quiet": true\n            },\n            "filter": {\n                "include": {\n                    "name": "A string that excludes tests with names matching a regex pattern; supports macros",\n                    "label": "A string that excludes tests with labels matching a regex pattern; supports macros",\n                    "index": "An object that selects tests to run with accepting start, end, and stride integers, and a specificTests",\n                    "useUnion": "A boolean that enables the usage of a union of tests determined by index and name, rather than the intersection"\n                },\n                "exclude": {\n                    "name": "A string that excludes tests with names matching a regex pattern; supports macros",\n                    "label": "A string that excludes tests with labels matching a regex pattern; supports macros",\n                    "fixtures": "An object that determines which fixtures to exclude from the test"\n                }\n            },\n            "execution": {\n                "outputLogFile": "A string that specifies the output log file; supports macros",\n                "stopOnFailure": true,\n                "enableFailover": true,\n                "jobs": 8,\n                "repeat": {\n                    "mode": "until-fail, until-pass, after-timeout",\n                    "count": 10\n                },\n                "scheduleRandom": "",\n                "timeout": 10,\n                "noTestsAction": "default, error, ignore"\n            }\n        }\n    ]\n}	code	json	2024-08-18 14:51:01.300642	1
+6877	2251	{\n    "version": 6,\n    "packagePresets": [\n        {\n            "name": "pack",\n            "configurePreset": "custom",\n            "generators": "ZIP, 7Z, DEB, RPM, etc.",\n            "configuration": "Debug, Release, etc.",\n            "filter": {\n                "include": {\n                    "name": "A string that excludes tests with names matching a regex pattern; supports macros",\n                    "label": "A string that excludes tests with labels matching a regex pattern; supports macros",\n                    "index": "An object that selects tests to run with accepting start, end, and stride integers, and a specificTests",\n                    "useUnion": "A boolean that enables the usage of a union of tests determined by index and name, rather than the intersection"\n                },\n                "exclude": {\n                    "name": "A string that excludes tests with names matching a regex pattern; supports macros",\n                    "label": "A string that excludes tests with labels matching a regex pattern; supports macros",\n                    "fixtures": "An object that determines which fixtures to exclude from the test"\n                }\n            },\n            "packageName": "program",\n            "packageVersion": "1.0.0",\n            "packageDirectory": "",\n            "vendorName": ""\n        }\n    ]\n}	code	json	2024-08-18 14:51:01.301403	1
+6878	2252	There is no `installPresets` in CMake so we have to use `buildPresets` but with the `target` set as `install`.	text	txt	2024-08-18 14:51:01.302148	1
+6879	2252	{\n    "version": 6,\n    "buildPresets" [\n        {\n            "name": "install",\n            "configurePreset": "custom",\n            "targets": "install"\n        }\n    ]\n}	code	json	2024-08-18 14:51:01.302148	2
+6880	2253	cmake --workflow --preset <name> --fresh	code	sh	2024-08-18 14:51:01.302849	1
+6881	2254	{\n    "workflowPresets": [\n        {\n            "name": "program",\n            "steps": [\n                {\n                    "type": "configure",\n                    "name": "release"\n                },\n                {\n                    "type": "build",\n                    "name": "build"\n                },\n                {\n                    "type": "test",\n                    "name": "test"\n                },\n                {\n                    "type": "package",\n                    "name": "pack"\n                },\n                {\n                    "type": "build",\n                    "name": "install"\n                },\n            ]\n        }\n    ]\n}	code	json	2024-08-18 14:51:01.303556	1
+6882	2255	{\n    "version": 6,\n    "packagePresets": [\n        {\n            "name": "pack"\n            "condition": {\n                "type": "condition type"\n            }\n        }\n    ]\n}	code	json	2024-08-18 14:51:01.304244	1
+6883	2256	1. `const`: checks if the value provided in `value` field is true.	text	txt	2024-08-18 14:51:01.305316	1
+6884	2256	{\n    "condition": {\n        "type": "const",\n        "value": "${testEnabled}"\n    }\n}	code	json	2024-08-18 14:51:01.305316	2
+6885	2256	2. `equals`, `notEquals`: compares the `lhs` and `rhs` fields.	text	txt	2024-08-18 14:51:01.305316	3
+6886	2256	{\n    "condition": {\n        "type": "equals",\n        "lhs": "${hostSystemName}"\n        "rhs": "Windows"\n    }\n}	code	json	2024-08-18 14:51:01.305316	4
+6887	2256	3. `inList`, `notInList`: checks for the presence of the value provided in the `string` field within the array in the `list` field.	text	txt	2024-08-18 14:51:01.305316	5
+6888	2256	{\n    "condition": {\n        "type": "inList",\n        "string": "${hostSystemName}",\n        "list": ["Windows", "Linux", "Mac"]\n    }\n}	code	json	2024-08-18 14:51:01.305316	6
+6892	2256	{\n    "condition": {\n        "type": "not",\n        "conditions": [\n            {\n                "type": "matches"\n                "string": "${projectVersion}",\n                "regex": "[a-z]*"\n            },\n            {\n                "type": "equals"\n                "string": "${hostSystemName}",\n                "regex": "Mac"\n            }\n        ]\n    }\n}	code	json	2024-08-18 14:51:01.305316	10
+6893	2256	6. `anyOf`, `allOf`: checks whether any of or all of the conditions in the `conditions` array are true.	text	txt	2024-08-18 14:51:01.305316	11
+6894	2256	{\n    "condition": {\n        "type": "anyOf",\n        "conditions": [\n            {\n                "type": "equals"\n                "lhs": "${hostSystemName}",\n                "rhs": "Linux"\n            },\n            {\n                "type": "equals"\n                "lhs": "${hostSystemName}",\n                "rhs": "Window"\n            }\n        ]\n    }\n}	code	json	2024-08-18 14:51:01.305316	12
+6895	2257	- `${sourceDir}`\n- `${sourceParentDIr}`\n- `${sourceDirName}`\n- `${presetName}`\n- `${generator}`\n- `${hostSystemName}`: `Linux`, `Windows`, `Darwin`\n- `${fileDir}`: name of the file holding preset\n- `${dollar}`\n- `${pathListSep}`\n- `$env{<var>}`\n- `$penv{<var>}`\n- `$vendor{<name>}`	text	txt	2024-08-18 14:51:01.306221	1
 \.
 
 
@@ -10121,6 +10287,89 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 2172	268	Configure :make to invoke another program:	open	2024-07-28 10:13:48.518085	2024-07-28 10:13:48.518085
 2173	268	Populate the quickfix list by program output:	open	2024-07-28 10:13:48.845251	2024-07-28 10:13:48.845251
 2174	268	Setup makeprg and errorformat using compiler command:	open	2024-07-28 10:13:49.139804	2024-07-28 10:13:49.139804
+2175	\N	How many stages does CMake have to build a project?	open	2024-08-18 14:51:01.213425	2024-08-18 14:51:01.213425
+2176	\N	What file does CMake use as cache in configuration stage?	open	2024-08-18 14:51:01.215727	2024-08-18 14:51:01.215727
+2177	\N	What are the crucial CMake commands needed in every project?	open	2024-08-18 14:51:01.218323	2024-08-18 14:51:01.218323
+2178	\N	Run CMake for configuration stage of a project?	open	2024-08-18 14:51:01.220381	2024-08-18 14:51:01.220381
+2179	\N	Run CMake for building stage of a project?	open	2024-08-18 14:51:01.221813	2024-08-18 14:51:01.221813
+2180	\N	Build latest CMake version from source?	open	2024-08-18 14:51:01.22286	2024-08-18 14:51:01.22286
+2181	\N	What commands are available after a clean installation of CMake?	open	2024-08-18 14:51:01.223983	2024-08-18 14:51:01.223983
+2182	\N	Specify generator when configuring a project with CMake?	open	2024-08-18 14:51:01.225156	2024-08-18 14:51:01.225156
+2183	\N	Get help from CMake on a shell?	open	2024-08-18 14:51:01.227189	2024-08-18 14:51:01.227189
+2184	\N	Get a list of detailed help from CMake on shell?	open	2024-08-18 14:51:01.228976	2024-08-18 14:51:01.228976
+2185	\N	Specify a cache when configuring a project with CMake?	open	2024-08-18 14:51:01.230911	2024-08-18 14:51:01.230911
+2186	\N	Initialize existing cache variables when configuring a project with CMake?	open	2024-08-18 14:51:01.231923	2024-08-18 14:51:01.231923
+2187	\N	Specify build type when configuring a project with CMake?	open	2024-08-18 14:51:01.232887	2024-08-18 14:51:01.232887
+2188	\N	List all the cache variables of a project?	open	2024-08-18 14:51:01.233953	2024-08-18 14:51:01.233953
+2189	\N	Remove a cache variable from the configuration of a project?	open	2024-08-18 14:51:01.234763	2024-08-18 14:51:01.234763
+2190	\N	Get project agnostic general information about variables, commands, marcros and other settings?	open	2024-08-18 14:51:01.235644	2024-08-18 14:51:01.235644
+2191	\N	Change the log level of CMake?	open	2024-08-18 14:51:01.236728	2024-08-18 14:51:01.236728
+2192	\N	What CMake command prints logs?	open	2024-08-18 14:51:01.237656	2024-08-18 14:51:01.237656
+2193	\N	What is a message context?	open	2024-08-18 14:51:01.238573	2024-08-18 14:51:01.238573
+2194	\N	Enable context in CMake logs?	open	2024-08-18 14:51:01.239566	2024-08-18 14:51:01.239566
+2195	\N	What is the most verbose option of loggin for CMake?	open	2024-08-18 14:51:01.240557	2024-08-18 14:51:01.240557
+2196	\N	What are CMake presets?	open	2024-08-18 14:51:01.241709	2024-08-18 14:51:01.241709
+2197	\N	List available CMake presets?	open	2024-08-18 14:51:01.243463	2024-08-18 14:51:01.243463
+2198	\N	Choose a CMake preset for a project?	open	2024-08-18 14:51:01.245492	2024-08-18 14:51:01.245492
+2199	\N	Run CMake to configure a project by erasiing previous configurations first?	open	2024-08-18 14:51:01.247484	2024-08-18 14:51:01.247484
+2200	\N	Run CMake in building stage with parallel jobs?	open	2024-08-18 14:51:01.248754	2024-08-18 14:51:01.248754
+2201	\N	Specify a target in building stage of a project?	open	2024-08-18 14:51:01.249676	2024-08-18 14:51:01.249676
+2202	\N	Clean the build tree?	open	2024-08-18 14:51:01.250652	2024-08-18 14:51:01.250652
+2203	\N	Build a project by first cleaning the build tree?	open	2024-08-18 14:51:01.25157	2024-08-18 14:51:01.25157
+2204	\N	Specify which configuration should be used in building stage by multi-configuration supported generators?	open	2024-08-18 14:51:01.25248	2024-08-18 14:51:01.25248
+2205	\N	Generate debugging logs on building stage?	open	2024-08-18 14:51:01.253435	2024-08-18 14:51:01.253435
+2206	\N	Use CMake to install build artifacts?	open	2024-08-18 14:51:01.254336	2024-08-18 14:51:01.254336
+2207	\N	Change the default installation path in installation stage?	open	2024-08-18 14:51:01.255289	2024-08-18 14:51:01.255289
+2208	\N	Explicitly specify which components you want to install on installation stage?	open	2024-08-18 14:51:01.25621	2024-08-18 14:51:01.25621
+2209	\N	Specify default directory permissions on installatino stage?	open	2024-08-18 14:51:01.25716	2024-08-18 14:51:01.25716
+2210	\N	Generate debugging logs on installation stage?	open	2024-08-18 14:51:01.258216	2024-08-18 14:51:01.258216
+2211	\N	Run a cmake script?	open	2024-08-18 14:51:01.25999	2024-08-18 14:51:01.25999
+2212	\N	Use CMake to run a platform independent command?	open	2024-08-18 14:51:01.261806	2024-08-18 14:51:01.261806
+2213	\N	Use CMake to run checksum?	open	2024-08-18 14:51:01.263784	2024-08-18 14:51:01.263784
+2214	\N	Where do workflows can be used?	open	2024-08-18 14:51:01.264861	2024-08-18 14:51:01.264861
+2215	\N	Get a list of presets in a workflow?	open	2024-08-18 14:51:01.265667	2024-08-18 14:51:01.265667
+2216	\N	Execute a workflow preset?	open	2024-08-18 14:51:01.266414	2024-08-18 14:51:01.266414
+2217	\N	Run all the tests in a project?	open	2024-08-18 14:51:01.26714	2024-08-18 14:51:01.26714
+2218	\N	What GUI interfaces does cmake have?	open	2024-08-18 14:51:01.267901	2024-08-18 14:51:01.267901
+2219	\N	Where is the source directory?	open	2024-08-18 14:51:01.2687	2024-08-18 14:51:01.2687
+2220	\N	Where is the build directory?	open	2024-08-18 14:51:01.269489	2024-08-18 14:51:01.269489
+2221	\N	What is Listfiles?	open	2024-08-18 14:51:01.270258	2024-08-18 14:51:01.270258
+2222	\N	What is the main CMake listfile in a project?	open	2024-08-18 14:51:01.271129	2024-08-18 14:51:01.271129
+2223	\N	What is the structure of a cache file?	open	2024-08-18 14:51:01.271899	2024-08-18 14:51:01.271899
+2224	\N	What is a CMake package configuration file?	open	2024-08-18 14:51:01.272828	2024-08-18 14:51:01.272828
+2225	\N	What are the common CMake artifacts resulted in generation stage?	open	2024-08-18 14:51:01.273662	2024-08-18 14:51:01.273662
+2226	\N	What are preset files?	open	2024-08-18 14:51:01.274597	2024-08-18 14:51:01.274597
+2227	\N	What are the advantages of running CMake scripts rather than external scripts?	open	2024-08-18 14:51:01.27625	2024-08-18 14:51:01.27625
+2228	\N	What is the minimum requirements of a CMake script file?	open	2024-08-18 14:51:01.278419	2024-08-18 14:51:01.278419
+2229	\N	What are the CMake utility modules?	open	2024-08-18 14:51:01.280803	2024-08-18 14:51:01.280803
+2230	\N	Use a CMake utility module?	open	2024-08-18 14:51:01.281705	2024-08-18 14:51:01.281705
+2231	\N	What are the CMake find modules?	open	2024-08-18 14:51:01.282591	2024-08-18 14:51:01.282591
+2232	\N	Get the list of CMake modules?	open	2024-08-18 14:51:01.283356	2024-08-18 14:51:01.283356
+2233	\N		open	2024-08-18 14:51:01.284146	2024-08-18 14:51:01.284146
+2234	\N	Which version of CMake does support presets?	open	2024-08-18 14:51:01.284975	2024-08-18 14:51:01.284975
+2235	\N	What features do CMake presets offer?	open	2024-08-18 14:51:01.285713	2024-08-18 14:51:01.285713
+2236	\N	Where should CMake preset files reside to be recognizable?	open	2024-08-18 14:51:01.286425	2024-08-18 14:51:01.286425
+2237	\N	What stages do CMake presets can be defined for?	open	2024-08-18 14:51:01.287113	2024-08-18 14:51:01.287113
+2238	\N	List CMake presets specific for configuration stage?	open	2024-08-18 14:51:01.28778	2024-08-18 14:51:01.28778
+2239	\N	List CMake presets specific for build stage?	open	2024-08-18 14:51:01.288526	2024-08-18 14:51:01.288526
+2240	\N	List CMake presets specific for test stage?	open	2024-08-18 14:51:01.289271	2024-08-18 14:51:01.289271
+2241	\N	List CMake workflow presets?	open	2024-08-18 14:51:01.29001	2024-08-18 14:51:01.29001
+2242	\N	Use a project defined CMake preset?	open	2024-08-18 14:51:01.290683	2024-08-18 14:51:01.290683
+2243	\N	What is the format of a CMake preset file?	open	2024-08-18 14:51:01.29174	2024-08-18 14:51:01.29174
+2244	\N	What is the common mandatory field in all CMake presets?	open	2024-08-18 14:51:01.293669	2024-08-18 14:51:01.293669
+2245	\N	What are the optional fields in all CMake presets?	open	2024-08-18 14:51:01.295344	2024-08-18 14:51:01.295344
+2246	\N	What common dependency exists in CMake stage specific presets?	open	2024-08-18 14:51:01.297165	2024-08-18 14:51:01.297165
+2247	\N	What are the CMake configuration stage specific preset fields?	open	2024-08-18 14:51:01.29807	2024-08-18 14:51:01.29807
+2248	\N	What is the precedence of preset variables in CMake?	open	2024-08-18 14:51:01.298839	2024-08-18 14:51:01.298839
+2249	\N	What are the CMake build stage specific preset fields?	open	2024-08-18 14:51:01.299685	2024-08-18 14:51:01.299685
+2250	\N	What are the CMake test stage specific preset fields?	open	2024-08-18 14:51:01.300642	2024-08-18 14:51:01.300642
+2251	\N	What are the CMake package stage specific preset fields?	open	2024-08-18 14:51:01.301403	2024-08-18 14:51:01.301403
+2252	\N	What is the work around for creating an install stage preset?	open	2024-08-18 14:51:01.302148	2024-08-18 14:51:01.302148
+2253	\N	Run a CMake workflow by first wiping the build tree and clearing cache?	open	2024-08-18 14:51:01.302849	2024-08-18 14:51:01.302849
+2254	\N	Define a CMake workflow in a project?	open	2024-08-18 14:51:01.303556	2024-08-18 14:51:01.303556
+2255	\N	What is the structure of a condition in CMake presets?	open	2024-08-18 14:51:01.304244	2024-08-18 14:51:01.304244
+2256	\N	What types of conditions exists in CMake presets?	open	2024-08-18 14:51:01.305316	2024-08-18 14:51:01.305316
+2257	\N	What are the available macros in CMake presets?	open	2024-08-18 14:51:01.306221	2024-08-18 14:51:01.306221
 \.
 
 
@@ -16312,6 +16561,7 @@ COPY flashback.resource_subjects (resource_id, subject_id) FROM stdin;
 97	6
 4	12
 3	3
+98	5
 \.
 
 
@@ -16417,6 +16667,7 @@ COPY flashback.resources (id, name, reference, type, created, updated) FROM stdi
 95	Boost.Asio C++ Network Programming 	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
 96	Embedded Linux using Yocto	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
 97	C++ Templates: The Complete Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
+98	Modern CMake for C++	https://subscription.packtpub.com/book/programming/9781805121800	book	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115
 \.
 
 
@@ -17881,6 +18132,24 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 1284	85	Chapter 4	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
 1398	93	Chapter 1	writing	\N	2024-07-28 09:45:10.333395	2024-07-28 09:45:10.333395	0
 1417	96	Chapter 1	writing	\N	2024-07-28 09:45:10.605868	2024-07-28 09:45:10.605868	0
+1446	98	Chapter 1	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1447	98	Chapter 2	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1448	98	Chapter 3	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1449	98	Chapter 4	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1450	98	Chapter 5	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1451	98	Chapter 6	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1452	98	Chapter 7	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1453	98	Chapter 8	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1454	98	Chapter 9	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1455	98	Chapter 10	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1456	98	Chapter 11	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1457	98	Chapter 12	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1458	98	Chapter 13	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1459	98	Chapter 14	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1460	98	Chapter 15	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1461	98	Chapter 16	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1462	98	Chapter 17	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+1463	98	Chapter 18	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
 \.
 
 
@@ -18614,7 +18883,7 @@ SELECT pg_catalog.setval('flashback.logins_id_seq', 3, true);
 -- Name: note_blocks_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.note_blocks_id_seq', 6744, true);
+SELECT pg_catalog.setval('flashback.note_blocks_id_seq', 6895, true);
 
 
 --
@@ -18628,7 +18897,7 @@ SELECT pg_catalog.setval('flashback.note_references_id_seq', 204, true);
 -- Name: notes_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.notes_id_seq', 2174, true);
+SELECT pg_catalog.setval('flashback.notes_id_seq', 2257, true);
 
 
 --
@@ -18663,7 +18932,7 @@ SELECT pg_catalog.setval('flashback.references_id_seq', 191, true);
 -- Name: resources_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.resources_id_seq', 97, true);
+SELECT pg_catalog.setval('flashback.resources_id_seq', 98, true);
 
 
 --
@@ -18677,7 +18946,7 @@ SELECT pg_catalog.setval('flashback.section_types_id_seq', 3, true);
 -- Name: sections_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.sections_id_seq', 1445, true);
+SELECT pg_catalog.setval('flashback.sections_id_seq', 1463, true);
 
 
 --
