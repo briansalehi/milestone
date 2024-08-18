@@ -113,6 +113,7 @@ declare record record;
 begin
     insert into flashback.notes (section_id, heading) values (section_index, heading) returning id into note_index;
     insert into flashback.note_blocks (note_id, content, type, language, position) select note_index, t_content, t_type, t_language, row_number from temp_blocks;
+    update flashback.sections set state = 'writing' where id = section_index;
     delete from temp_blocks;
     alter sequence temp_block_row_number_seq restart with 1;
 end; $$;
@@ -129,14 +130,17 @@ CREATE PROCEDURE flashback.create_note_with_name(IN resource_name character vary
     AS $$
 declare resource_index integer;
 declare section_index integer;
+declare section_state publication_state;
 declare note_index integer;
 declare block_index integer;
 declare record record;
 begin
     select r.id into resource_index from flashback.resources r where r.name = resource_name;
     select s.id into section_index from flashback.sections s where s.headline = section_name and s.resource_id = resource_index;
+    select s.state into section_state from flashback.sections s where s.id = section_index;
     insert into flashback.notes (section_id, heading) values (section_index, heading) returning id into note_index;
     insert into flashback.note_blocks (note_id, content, type, language, position) select note_index, t_content, t_type, t_language, row_number from temp_blocks;
+    update flashback.sections set state = 'writing' where id = section_index;
     delete from temp_blocks;
     alter sequence temp_blocks_row_number_seq restart with 1;
 end; $$;
@@ -2332,95 +2336,9 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1329	284	cmake_dependent_option(MAKE_STATIC_LIBRARY "Compile sources into a static library" OFF "USE_LIBRARY" ON)\ncmake_dependent_option(MAKE_SHARED_LIBRARY "Compile sources into a shared library" ON "USE_LIBRARY" ON)	code	txt	2024-07-28 09:59:06.454584	0
 1330	284	If `USE_LIBRARY` is `ON`, `MAKE_SHARED_LIBRARY` defaults to `OFF`, while\n`MAKE_STATIC_LIBRARY` defaults to `ON`. So we can run this:	text	txt	2024-07-28 09:59:06.474901	0
 1331	284	cmake -S <source> -B <build> -D USE_LIBRARY=ON -D MAKE_SHARED_LIBRARY=ON	code	txt	2024-07-28 09:59:06.49531	0
-1332	285	cmake -S ./project -B ./build	code	txt	2024-07-28 09:59:06.933221	0
-1333	286	Selecting and configuring a generator decides which build tool from our\nsystem will be used for building. This can be overridden by the\n`CMAKE_GENERATOR` environment variable or by specifying the generator\ndirectly on the command line.	text	txt	2024-07-28 09:59:07.276683	0
-1334	286	cmake -G <generator-name> <path-to-source>	code	txt	2024-07-28 09:59:07.297093	0
-1389	310	cmake --install <dir> --component <comp>	code	txt	2024-07-28 09:59:15.279148	0
 2087	483	#include <string>\n#include <array>	text	txt	2024-07-28 10:01:28.245848	0
-1335	287	Some generators (such as Visual Studio) support a more in-depth specification\nof a toolset (compiler) and platform (compiler or SDK). Additionally, these\nhave respective environment variables that override the default values:\n`CMAKE_GENERATOR_TOOLSET` and `CMAKE_GENERATOR_PLATFORM`.	text	txt	2024-07-28 09:59:07.611361	0
-1336	287	cmake -G <generator-name> -T <toolset-spec> -A <platform-name> <path-to-source>	code	txt	2024-07-28 09:59:07.632085	0
-1337	288	We can provide a path to the CMake script, which (only) contains a list of\n`set()` commands to specify variables that will be used to initialize an\nempty build tree.	text	txt	2024-07-28 09:59:07.922848	0
-1338	288	cmake -C <initial-cache-script> <path-to-source>	code	txt	2024-07-28 09:59:07.943462	0
-1339	289	The initialization and modification of existing cache variables can be done\nin command line, as follows:	text	txt	2024-07-28 09:59:08.32102	0
-1340	289	cmake -D <var>[:<type>]=<value> <path-to-source>	code	txt	2024-07-28 09:59:08.341163	0
-1341	289	The `:<type>` section is optional (it is used by GUIs); you can use `BOOL`,\n`FILEPATH`, `PATH`, `STRING`, or `INTERNAL`.	text	txt	2024-07-28 09:59:08.361733	0
-1342	289	If you omit the type, it will be set to the type of an already existing\nvariable; otherwise, it will be set to `UNINITIALIZED`.	text	txt	2024-07-28 09:59:08.381821	0
-1343	290	For single-configuration generators (such as Make and Ninja), you'll need to\nspecify it during the configuration phase with the `CMAKE_BUILD_TYPE`\nvariable and generate a separate build tree for each type of config:	text	txt	2024-07-28 09:59:08.840371	0
-1344	290	* `Debug`\n* `Release`\n* `MinSizeRel`\n* `RelWithDebInfo`	text	txt	2024-07-28 09:59:08.860361	0
-1345	290	cmake -S . -B build -D CMAKE_BUILD_TYPE=Release	code	txt	2024-07-28 09:59:08.879863	0
-1346	290	Custom variables that are added manually with the `-D` option won't be\nvisible in cache variables list unless you specify one of the supported\ntypes.	text	txt	2024-07-28 09:59:08.900345	0
-1347	291	cmake -L[A][H] <path-to-source>	code	txt	2024-07-28 09:59:09.276342	0
-1348	291	Such a list will contain cache variables that aren't marked as `ADVANCED`. We\ncan change that by adding the `A` modifier.	text	txt	2024-07-28 09:59:09.296696	0
-1349	291	To print help messages with variables, add the `H` modifier.	text	txt	2024-07-28 09:59:09.317305	0
-1350	291	Custom variables that are added manually with the `-D` option won't be\nvisible unless you specify one of the supported types.	text	txt	2024-07-28 09:59:09.338125	0
-1351	292	cmake -U <globbing_expr> <path-to-source>	code	txt	2024-07-28 09:59:09.604411	0
-1352	292	Here, the globbing expression supports the `*` wildcard and any `?` character\nsymbols. Both of the `-U` and `-D` options can be repeated multiple times.	text	txt	2024-07-28 09:59:09.624951	0
-1353	293	cmake --system-information [file]	code	txt	2024-07-28 09:59:09.919434	0
-1354	293	The optional file argument allows you to store the output in a file.	text	txt	2024-07-28 09:59:09.939217	0
-1355	293	Running it in the build tree directory will print additional information\nabout the cache variables and build messages from the log files.	text	txt	2024-07-28 09:59:09.959559	0
-1356	294	By default, the log level is `STATUS`.	text	txt	2024-07-28 09:59:10.393597	0
-1357	294	cmake --log-level=<level>	code	txt	2024-07-28 09:59:10.414669	0
-1358	294	Here, level can be any of the following:	text	txt	2024-07-28 09:59:10.435413	0
-1359	294	* `ERROR`\n* `WARNING`\n* `NOTICE`\n* `STATUS`\n* `VERBOSE`\n* `DEBUG`\n* `TRACE`	text	txt	2024-07-28 09:59:10.455995	0
-1360	295	You can specify this setting permanently in the `CMAKE_MESSAGE_LOG_LEVEL`\ncache variable.	text	txt	2024-07-28 09:59:10.642577	0
 1791	409	| `std::sort_heap` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:37.720946	0
-1361	296	To debug very complex projects, the `CMAKE_MESSAGE_CONTEXT` variable can be\nused like a stack. Whenever your code enters a specific context, you can add\na descriptive name to the stack and remove it when leaving. By doing this,\nour messages will be decorated with the current `CMAKE_MESSAGE_CONTEXT`\nvariable like so:	text	txt	2024-07-28 09:59:11.121332	0
-1362	296	```\n[some.context.example] Debug message\n``````	text	txt	2024-07-28 09:59:11.142176	0
-1363	296	The option to enable this kind of log output is as follows:	text	txt	2024-07-28 09:59:11.162733	0
-1364	296	cmake --log-context <path-to-source>	code	txt	2024-07-28 09:59:11.183803	0
-1365	297	If all logging options fail there is always trace mode.	text	txt	2024-07-28 09:59:11.507548	0
-1366	297	Trace mode will print every command with the filename and exact line number\nit is called from alongside its arguments.	text	txt	2024-07-28 09:59:11.528677	0
-1367	297	cmake --trace	code	txt	2024-07-28 09:59:11.54916	0
-1368	298	Developers can simplify how users interact with their projects and provide a\n`CMakePresets.json` file that specifies some defaults.	text	txt	2024-07-28 09:59:11.736447	0
-1369	299	cmake --list-presets	code	txt	2024-07-28 09:59:11.941564	0
-1370	300	cmake --preset=<preset>	code	txt	2024-07-28 09:59:12.218153	0
-1371	300	These values override the system defaults and the environment. However, at\nthe same time, they can be overridden with any arguments that are explicitly\npassed on the command line.	text	txt	2024-07-28 09:59:12.238347	0
-1372	301	cmake --build <dir> [<options>] [-- <build-tool-options>]	code	txt	2024-07-28 09:59:12.457823	0
-1373	302	CMake allows you to specify key build parameters that work for every builder.\nIf you need to provide special arguments to your chosen, native builder, pass\nthem at the end of the command after the `--` token.	text	txt	2024-07-28 09:59:12.795687	0
-1374	302	cmake --build <dir> -- <build-tool-options>	code	txt	2024-07-28 09:59:12.816058	0
-1375	303	Builders know the structure of project dependencies, so they can\nsimultaneously process steps that have their dependencies met to save time.	text	txt	2024-07-28 09:59:13.157154	0
-1376	303	cmake --build <dir> --parallel [<number-of-jobs>]\ncmake --build <dir> -j [<number-of-jobs>]	code	txt	2024-07-28 09:59:13.178109	0
-1377	303	The alternative is to set it with the `CMAKE_BUILD_PARALLEL_LEVEL`\nenvironment variable.	text	txt	2024-07-28 09:59:13.199248	0
-1378	304	Every project is made up of one or more parts, called targets. Usually, we'll\nwant to build all of them; However, on occasion, we might be interested in\nskipping some or explicitly building a target that was deliberately excluded\nfrom normal builds.	text	txt	2024-07-28 09:59:13.525019	0
-1379	304	cmake --build <dir> --target <target1> -t <target2> ...	code	txt	2024-07-28 09:59:13.544588	0
-1380	305	cmake --build <dir> -t clean\ncmake --build <dir> --target clean	code	txt	2024-07-28 09:59:13.778123	0
-1381	306	cmake --build <dir> --clean-first	code	txt	2024-07-28 09:59:14.03436	0
-1382	307	cmake --build <dir> --verbose\ncmake --build <dir> -v	code	txt	2024-07-28 09:59:14.318225	0
-1383	307	The same effect can be achieved by setting the `CMAKE_VERBOSE_MAKEFILE`\ncached variable.	text	txt	2024-07-28 09:59:14.340497	0
-1384	308	cmake --install <dir> [<options>]	code	txt	2024-07-28 09:59:14.550273	0
-1385	309	We can specify which build type we want to use for our installation. The\navailable types include:	text	txt	2024-07-28 09:59:14.912506	0
-1386	309	* `Debug`\n* `Release`\n* `MinSizeRel`\n* `RelWithDebInfo`	text	txt	2024-07-28 09:59:14.934652	0
-1387	309	cmake --install <dir> --config <cfg>	code	txt	2024-07-28 09:59:14.95588	0
-1388	310	As a developer, you might choose to split your project into components that\ncan be installed independently. This might be something like application,\ndocs, and extra-tools.	text	txt	2024-07-28 09:59:15.257656	0
-1390	311	If installation is carried on a Unix-like platform, you can specify default\npermissions for the installed directories, with the following option, using\nthe format of `u=rwx,g=rx,o=rx`:	text	txt	2024-07-28 09:59:15.595301	0
-1391	311	cmake --install <dir>  --default-directory-permissions <permissions>	code	txt	2024-07-28 09:59:15.616052	0
-1392	312	We can prepend the installation path specified in the project configuration\nwith a prefix of our choice:	text	txt	2024-07-28 09:59:15.884579	0
-1393	312	cmake --install <dir> --prefix <prefix>	code	txt	2024-07-28 09:59:15.906205	0
-1394	313	cmake --build <dir> -v\ncmake --build <dir> --verbose	code	txt	2024-07-28 09:59:16.249541	0
-1395	313	The same effect can be achieved if the `VERBOSE` environment variable is set.	text	txt	2024-07-28 09:59:16.271005	0
-1396	313	VERBOSE=1 cmake --build <dir>	code	txt	2024-07-28 09:59:16.291769	0
-1397	314	cmake -D <var>=<value> -P <cmake-script-file> -- <unparsed options>...	code	txt	2024-07-28 09:59:16.498094	0
-1398	315	There are two ways you can pass values to scripts:	text	txt	2024-07-28 09:59:16.886953	0
-1399	315	* Through variables defined with the `-D` option.\n* Through arguments that can be passed after a `--` token.	text	txt	2024-07-28 09:59:16.908078	0
-1400	315	cmake [{-D <var>=<value>}...] -P <cmake-script-file>  [-- <unparsed-options>...]\ncmake -D CMAKE_BUILD_TYPE=Release -P script.cmake  -- --verbose	code	txt	2024-07-28 09:59:16.928742	0
-1401	315	CMake will create `CMAKE_ARGV<n>` variables for all arguments passed to the\nscript (including the `--` token).	text	txt	2024-07-28 09:59:16.948939	0
-1402	316	On rare occasions, we might need to run a single command in a\nplatform-independent way – perhaps copy a file or compute a checksum.	text	txt	2024-07-28 09:59:17.252291	0
-1403	316	cmake -E <command> [<options>]	code	txt	2024-07-28 09:59:17.272776	0
-1404	317	cmake -E	code	txt	2024-07-28 09:59:17.519948	0
-1405	318	cmake ––help[-<topic>]\ncmake --help-commands file	code	txt	2024-07-28 09:59:17.769815	0
-1406	319	The simplest way to run tests for a built project is to call ctest in the\ngenerated build tree:	text	txt	2024-07-28 09:59:18.037095	0
-1407	319	ctest	code	txt	2024-07-28 09:59:18.057226	0
-1408	320	Files that contain the CMake language are called listfiles and can be\nincluded one in another, by calling `include()` and `find_package()`, or\nindirectly with `add_subdirectory()`	text	txt	2024-07-28 09:59:18.519192	0
-1409	320	CMake projects are configured with `CMakeLists.txt` listfiles.	text	txt	2024-07-28 09:59:18.540508	0
-1410	320	It should contain at least two commands:	text	txt	2024-07-28 09:59:18.561495	0
-1411	320	cmake_minimum_required(VERSION <x.xx>)\nproject(<name> <OPTIONS>)	code	txt	2024-07-28 09:59:18.583282	0
-1412	320	We also have an `add_subdirectory(api)` command to include another\n`CMakeListst.txt` file from the api directory to perform steps that are\nspecific to the API part of our application.	text	txt	2024-07-28 09:59:18.603647	0
-1413	321	Users can choose presets through the GUI or use the command line to\n`--list-presets` and select a preset for the buildsystem with the\n`--preset=<preset>` option.	text	txt	2024-07-28 09:59:18.829881	0
 1792	409	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 10:00:37.743103	0
-1414	322	Not that many: a script can be as complex as you like or an empty file.\nHowever, it is recommended that you call the `cmake_minimum_required()`\ncommand at the beginning of the script. This command tells CMake which\npolicies should be applied to subsequent commands in this project	text	txt	2024-07-28 09:59:19.135655	0
-1415	322	When running scripts, CMake won't execute any of the usual stages (such as\nconfiguration or generation), and it won't use the cache.	text	txt	2024-07-28 09:59:19.156908	0
-1416	323	Since there is no concept of a source/build tree in scripts, variables that\nusually hold references to these paths will contain the current working\ndirectory instead: `CMAKE_BINARY_DIR`, `CMAKE_SOURCE_DIR`,\n`CMAKE_CURRENT_BINARY_DIR`, and `CMAKE_CURRENT_SOURCE_DIR`.	text	txt	2024-07-28 09:59:19.379449	0
-1417	324	To use a utility module, we need to call an `include(<MODULE>)` command.	text	txt	2024-07-28 09:59:19.572946	0
 1418	325	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:59:37.446672	0
 1419	325	template<typename T, typename S = std::size_t>\nstruct sum_predicate\n{\n    S count;\n    T sum;\n    void operator()(T const& e)\n    {\n        count++;\n        sum += e;\n    }\n};	text	txt	2024-07-28 09:59:37.468002	0
 1420	325	int main()\n{\n    std::vector<long> numbers{1, 2, 3, 4, 5};\n    auto [count, sum] = std::for_each(numbers.begin(), numbers.end(), sum_predicate<long>{});\n    // count: 5, sum: 15\n}	code	txt	2024-07-28 09:59:37.489835	0
@@ -7846,9 +7764,6 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6846	2231	If the files are found, variables with their path will be defined so that CMake can build against that dependency.	text	txt	2024-08-18 14:51:01.282591	4
 6847	2231	For example, `FindCurl` module searches for a curl library and defines `CURL_FOUND`, `CURL_INCLUDE_DIRS`, `CURL_LIBRARIES`, `CURL_VERSION_STRING` variables.	text	txt	2024-08-18 14:51:01.282591	5
 6848	2232	cmake --help-module-list	code	sh	2024-08-18 14:51:01.283356	1
-6849	2233		text	txt	2024-08-18 14:51:01.284146	1
-6850	2233		code	cmake	2024-08-18 14:51:01.284146	2
-6851	2233		text	txt	2024-08-18 14:51:01.284146	3
 6852	2234	v3.16	text	txt	2024-08-18 14:51:01.284975	1
 6853	2235	Conditions and macro expressions, granting users greater control over the project.	text	txt	2024-08-18 14:51:01.285713	1
 6854	2236	Preset files must be placed in the top directory of the project for CMake to recongnize them.	text	txt	2024-08-18 14:51:01.286425	1
@@ -8397,46 +8312,6 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 282	1362	What is the better alternative to making variables optional for user than using if expressions?	open	2024-07-28 09:59:05.638759	2024-07-28 09:59:05.638759
 283	1362	What is the common way to pass source files to targets?	open	2024-07-28 09:59:05.972292	2024-07-28 09:59:05.972292
 284	1362	Make an option dependent to another?	open	2024-07-28 09:59:06.411024	2024-07-28 09:59:06.411024
-285	873	Execute the CMake configuration stage?	open	2024-07-28 09:59:06.910762	2024-07-28 09:59:06.910762
-286	873	Specify the generator used for building the project?	open	2024-07-28 09:59:07.253068	2024-07-28 09:59:07.253068
-287	873	Externally specify the toolset and platform in configuration stage?	open	2024-07-28 09:59:07.588305	2024-07-28 09:59:07.588305
-288	873	Prepopulate cached information by providing the initial cache script?	open	2024-07-28 09:59:07.90061	2024-07-28 09:59:07.90061
-289	873	Specify cached information by providing command line arguments?	open	2024-07-28 09:59:08.29937	2024-07-28 09:59:08.29937
-290	873	Specify the build configuration?	open	2024-07-28 09:59:08.818266	2024-07-28 09:59:08.818266
-291	873	List cache variables?	open	2024-07-28 09:59:09.25538	2024-07-28 09:59:09.25538
-292	873	Remove one or more cache variables?	open	2024-07-28 09:59:09.582926	2024-07-28 09:59:09.582926
-293	873	Get general information about variables, commands, macros, and other settings?	open	2024-07-28 09:59:09.898213	2024-07-28 09:59:09.898213
-294	873	Filter the CMake log output by log level in the command line?	open	2024-07-28 09:59:10.371904	2024-07-28 09:59:10.371904
-295	873	Permanently specify the log level in project configuration?	open	2024-07-28 09:59:10.61983	2024-07-28 09:59:10.61983
-296	873	Display log context with each <code>message()</code> call?	open	2024-07-28 09:59:11.09975	2024-07-28 09:59:11.09975
-297	873	Enable trace mode?	open	2024-07-28 09:59:11.48673	2024-07-28 09:59:11.48673
-298	873	Where to write project presets?	open	2024-07-28 09:59:11.714082	2024-07-28 09:59:11.714082
-299	873	List all of the available presets?	open	2024-07-28 09:59:11.919705	2024-07-28 09:59:11.919705
-300	873	Use one of the available presets in the project?	open	2024-07-28 09:59:12.196168	2024-07-28 09:59:12.196168
-301	873	Execute the build stage of the project?	open	2024-07-28 09:59:12.435895	2024-07-28 09:59:12.435895
-302	873	Provide special arguments to the native builder?	open	2024-07-28 09:59:12.772392	2024-07-28 09:59:12.772392
-303	873	Specify the number of jobs that should build the project simultaneously?	open	2024-07-28 09:59:13.13594	2024-07-28 09:59:13.13594
-304	873	Explicitly specify targets to build?	open	2024-07-28 09:59:13.502533	2024-07-28 09:59:13.502533
-305	873	Remove all artifacts from the build directory?	open	2024-07-28 09:59:13.755685	2024-07-28 09:59:13.755685
-306	873	Execute build stage by first cleaning the build directory?	open	2024-07-28 09:59:14.012735	2024-07-28 09:59:14.012735
-307	873	Instruct CMake to be verbose in build stage?	open	2024-07-28 09:59:14.295267	2024-07-28 09:59:14.295267
-308	873	Execute CMake to install targets?	open	2024-07-28 09:59:14.5282	2024-07-28 09:59:14.5282
-309	873	Execute CMake to install targets with a specific build type?	open	2024-07-28 09:59:14.891098	2024-07-28 09:59:14.891098
-310	873	Execute CMake to install specific components within a project?	open	2024-07-28 09:59:15.235778	2024-07-28 09:59:15.235778
-311	873	Set default permissions of installed files?	open	2024-07-28 09:59:15.572588	2024-07-28 09:59:15.572588
-312	873	Modify the installation path?	open	2024-07-28 09:59:15.861265	2024-07-28 09:59:15.861265
-313	873	Instruct CMake to log a detailed output of the installation stage?	open	2024-07-28 09:59:16.227513	2024-07-28 09:59:16.227513
-314	873	Run CMake scripts?	open	2024-07-28 09:59:16.475522	2024-07-28 09:59:16.475522
-315	873	Pass values to CMake scripts?	open	2024-07-28 09:59:16.864076	2024-07-28 09:59:16.864076
-316	873	Execute external commands with CMake?	open	2024-07-28 09:59:17.230736	2024-07-28 09:59:17.230736
-317	873	List all the available external commands in CMake?	open	2024-07-28 09:59:17.498209	2024-07-28 09:59:17.498209
-318	873	Get help from CMake documentation?	open	2024-07-28 09:59:17.747231	2024-07-28 09:59:17.747231
-319	873	Run test on a built project?	open	2024-07-28 09:59:18.015259	2024-07-28 09:59:18.015259
-320	873	Include another listfile in `CMakeLists.txt`?	open	2024-07-28 09:59:18.497436	2024-07-28 09:59:18.497436
-321	873	Choose a preset for a project?	open	2024-07-28 09:59:18.806876	2024-07-28 09:59:18.806876
-322	873	What are the actual requirements for the script file provided?	open	2024-07-28 09:59:19.114264	2024-07-28 09:59:19.114264
-323	873	What preset paths are available in scripts?	open	2024-07-28 09:59:19.355744	2024-07-28 09:59:19.355744
-324	873	Use a utility in script?	open	2024-07-28 09:59:19.550564	2024-07-28 09:59:19.550564
 325	1261	How to use <code>std::for_each</code> algorithm with a predicate to sum values of a container?	open	2024-07-28 09:59:37.425501	2024-07-28 09:59:37.425501
 326	1261	How to use <code>std::for_each</code> algorithm with a capturing lambda to sum values of a container?	open	2024-07-28 09:59:37.891289	2024-07-28 09:59:37.891289
 327	1261	How to use <code>std::for_each</code> algorithm with unsequenced parallel execution model to sum values of a container?	open	2024-07-28 09:59:38.43251	2024-07-28 09:59:38.43251
@@ -10287,89 +10162,88 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 2172	268	Configure :make to invoke another program:	open	2024-07-28 10:13:48.518085	2024-07-28 10:13:48.518085
 2173	268	Populate the quickfix list by program output:	open	2024-07-28 10:13:48.845251	2024-07-28 10:13:48.845251
 2174	268	Setup makeprg and errorformat using compiler command:	open	2024-07-28 10:13:49.139804	2024-07-28 10:13:49.139804
-2175	\N	How many stages does CMake have to build a project?	open	2024-08-18 14:51:01.213425	2024-08-18 14:51:01.213425
-2176	\N	What file does CMake use as cache in configuration stage?	open	2024-08-18 14:51:01.215727	2024-08-18 14:51:01.215727
-2177	\N	What are the crucial CMake commands needed in every project?	open	2024-08-18 14:51:01.218323	2024-08-18 14:51:01.218323
-2178	\N	Run CMake for configuration stage of a project?	open	2024-08-18 14:51:01.220381	2024-08-18 14:51:01.220381
-2179	\N	Run CMake for building stage of a project?	open	2024-08-18 14:51:01.221813	2024-08-18 14:51:01.221813
-2180	\N	Build latest CMake version from source?	open	2024-08-18 14:51:01.22286	2024-08-18 14:51:01.22286
-2181	\N	What commands are available after a clean installation of CMake?	open	2024-08-18 14:51:01.223983	2024-08-18 14:51:01.223983
-2182	\N	Specify generator when configuring a project with CMake?	open	2024-08-18 14:51:01.225156	2024-08-18 14:51:01.225156
-2183	\N	Get help from CMake on a shell?	open	2024-08-18 14:51:01.227189	2024-08-18 14:51:01.227189
-2184	\N	Get a list of detailed help from CMake on shell?	open	2024-08-18 14:51:01.228976	2024-08-18 14:51:01.228976
-2185	\N	Specify a cache when configuring a project with CMake?	open	2024-08-18 14:51:01.230911	2024-08-18 14:51:01.230911
-2186	\N	Initialize existing cache variables when configuring a project with CMake?	open	2024-08-18 14:51:01.231923	2024-08-18 14:51:01.231923
-2187	\N	Specify build type when configuring a project with CMake?	open	2024-08-18 14:51:01.232887	2024-08-18 14:51:01.232887
-2188	\N	List all the cache variables of a project?	open	2024-08-18 14:51:01.233953	2024-08-18 14:51:01.233953
-2189	\N	Remove a cache variable from the configuration of a project?	open	2024-08-18 14:51:01.234763	2024-08-18 14:51:01.234763
-2190	\N	Get project agnostic general information about variables, commands, marcros and other settings?	open	2024-08-18 14:51:01.235644	2024-08-18 14:51:01.235644
-2191	\N	Change the log level of CMake?	open	2024-08-18 14:51:01.236728	2024-08-18 14:51:01.236728
-2192	\N	What CMake command prints logs?	open	2024-08-18 14:51:01.237656	2024-08-18 14:51:01.237656
-2193	\N	What is a message context?	open	2024-08-18 14:51:01.238573	2024-08-18 14:51:01.238573
-2194	\N	Enable context in CMake logs?	open	2024-08-18 14:51:01.239566	2024-08-18 14:51:01.239566
-2195	\N	What is the most verbose option of loggin for CMake?	open	2024-08-18 14:51:01.240557	2024-08-18 14:51:01.240557
-2196	\N	What are CMake presets?	open	2024-08-18 14:51:01.241709	2024-08-18 14:51:01.241709
-2197	\N	List available CMake presets?	open	2024-08-18 14:51:01.243463	2024-08-18 14:51:01.243463
-2198	\N	Choose a CMake preset for a project?	open	2024-08-18 14:51:01.245492	2024-08-18 14:51:01.245492
-2199	\N	Run CMake to configure a project by erasiing previous configurations first?	open	2024-08-18 14:51:01.247484	2024-08-18 14:51:01.247484
-2200	\N	Run CMake in building stage with parallel jobs?	open	2024-08-18 14:51:01.248754	2024-08-18 14:51:01.248754
-2201	\N	Specify a target in building stage of a project?	open	2024-08-18 14:51:01.249676	2024-08-18 14:51:01.249676
-2202	\N	Clean the build tree?	open	2024-08-18 14:51:01.250652	2024-08-18 14:51:01.250652
-2203	\N	Build a project by first cleaning the build tree?	open	2024-08-18 14:51:01.25157	2024-08-18 14:51:01.25157
-2204	\N	Specify which configuration should be used in building stage by multi-configuration supported generators?	open	2024-08-18 14:51:01.25248	2024-08-18 14:51:01.25248
-2205	\N	Generate debugging logs on building stage?	open	2024-08-18 14:51:01.253435	2024-08-18 14:51:01.253435
-2206	\N	Use CMake to install build artifacts?	open	2024-08-18 14:51:01.254336	2024-08-18 14:51:01.254336
-2207	\N	Change the default installation path in installation stage?	open	2024-08-18 14:51:01.255289	2024-08-18 14:51:01.255289
-2208	\N	Explicitly specify which components you want to install on installation stage?	open	2024-08-18 14:51:01.25621	2024-08-18 14:51:01.25621
-2209	\N	Specify default directory permissions on installatino stage?	open	2024-08-18 14:51:01.25716	2024-08-18 14:51:01.25716
-2210	\N	Generate debugging logs on installation stage?	open	2024-08-18 14:51:01.258216	2024-08-18 14:51:01.258216
-2211	\N	Run a cmake script?	open	2024-08-18 14:51:01.25999	2024-08-18 14:51:01.25999
-2212	\N	Use CMake to run a platform independent command?	open	2024-08-18 14:51:01.261806	2024-08-18 14:51:01.261806
-2213	\N	Use CMake to run checksum?	open	2024-08-18 14:51:01.263784	2024-08-18 14:51:01.263784
-2214	\N	Where do workflows can be used?	open	2024-08-18 14:51:01.264861	2024-08-18 14:51:01.264861
-2215	\N	Get a list of presets in a workflow?	open	2024-08-18 14:51:01.265667	2024-08-18 14:51:01.265667
-2216	\N	Execute a workflow preset?	open	2024-08-18 14:51:01.266414	2024-08-18 14:51:01.266414
-2217	\N	Run all the tests in a project?	open	2024-08-18 14:51:01.26714	2024-08-18 14:51:01.26714
-2218	\N	What GUI interfaces does cmake have?	open	2024-08-18 14:51:01.267901	2024-08-18 14:51:01.267901
-2219	\N	Where is the source directory?	open	2024-08-18 14:51:01.2687	2024-08-18 14:51:01.2687
-2220	\N	Where is the build directory?	open	2024-08-18 14:51:01.269489	2024-08-18 14:51:01.269489
-2221	\N	What is Listfiles?	open	2024-08-18 14:51:01.270258	2024-08-18 14:51:01.270258
-2222	\N	What is the main CMake listfile in a project?	open	2024-08-18 14:51:01.271129	2024-08-18 14:51:01.271129
-2223	\N	What is the structure of a cache file?	open	2024-08-18 14:51:01.271899	2024-08-18 14:51:01.271899
-2224	\N	What is a CMake package configuration file?	open	2024-08-18 14:51:01.272828	2024-08-18 14:51:01.272828
-2225	\N	What are the common CMake artifacts resulted in generation stage?	open	2024-08-18 14:51:01.273662	2024-08-18 14:51:01.273662
-2226	\N	What are preset files?	open	2024-08-18 14:51:01.274597	2024-08-18 14:51:01.274597
-2227	\N	What are the advantages of running CMake scripts rather than external scripts?	open	2024-08-18 14:51:01.27625	2024-08-18 14:51:01.27625
-2228	\N	What is the minimum requirements of a CMake script file?	open	2024-08-18 14:51:01.278419	2024-08-18 14:51:01.278419
-2229	\N	What are the CMake utility modules?	open	2024-08-18 14:51:01.280803	2024-08-18 14:51:01.280803
-2230	\N	Use a CMake utility module?	open	2024-08-18 14:51:01.281705	2024-08-18 14:51:01.281705
-2231	\N	What are the CMake find modules?	open	2024-08-18 14:51:01.282591	2024-08-18 14:51:01.282591
-2232	\N	Get the list of CMake modules?	open	2024-08-18 14:51:01.283356	2024-08-18 14:51:01.283356
-2233	\N		open	2024-08-18 14:51:01.284146	2024-08-18 14:51:01.284146
-2234	\N	Which version of CMake does support presets?	open	2024-08-18 14:51:01.284975	2024-08-18 14:51:01.284975
-2235	\N	What features do CMake presets offer?	open	2024-08-18 14:51:01.285713	2024-08-18 14:51:01.285713
-2236	\N	Where should CMake preset files reside to be recognizable?	open	2024-08-18 14:51:01.286425	2024-08-18 14:51:01.286425
-2237	\N	What stages do CMake presets can be defined for?	open	2024-08-18 14:51:01.287113	2024-08-18 14:51:01.287113
-2238	\N	List CMake presets specific for configuration stage?	open	2024-08-18 14:51:01.28778	2024-08-18 14:51:01.28778
-2239	\N	List CMake presets specific for build stage?	open	2024-08-18 14:51:01.288526	2024-08-18 14:51:01.288526
-2240	\N	List CMake presets specific for test stage?	open	2024-08-18 14:51:01.289271	2024-08-18 14:51:01.289271
-2241	\N	List CMake workflow presets?	open	2024-08-18 14:51:01.29001	2024-08-18 14:51:01.29001
-2242	\N	Use a project defined CMake preset?	open	2024-08-18 14:51:01.290683	2024-08-18 14:51:01.290683
-2243	\N	What is the format of a CMake preset file?	open	2024-08-18 14:51:01.29174	2024-08-18 14:51:01.29174
-2244	\N	What is the common mandatory field in all CMake presets?	open	2024-08-18 14:51:01.293669	2024-08-18 14:51:01.293669
-2245	\N	What are the optional fields in all CMake presets?	open	2024-08-18 14:51:01.295344	2024-08-18 14:51:01.295344
-2246	\N	What common dependency exists in CMake stage specific presets?	open	2024-08-18 14:51:01.297165	2024-08-18 14:51:01.297165
-2247	\N	What are the CMake configuration stage specific preset fields?	open	2024-08-18 14:51:01.29807	2024-08-18 14:51:01.29807
-2248	\N	What is the precedence of preset variables in CMake?	open	2024-08-18 14:51:01.298839	2024-08-18 14:51:01.298839
-2249	\N	What are the CMake build stage specific preset fields?	open	2024-08-18 14:51:01.299685	2024-08-18 14:51:01.299685
-2250	\N	What are the CMake test stage specific preset fields?	open	2024-08-18 14:51:01.300642	2024-08-18 14:51:01.300642
-2251	\N	What are the CMake package stage specific preset fields?	open	2024-08-18 14:51:01.301403	2024-08-18 14:51:01.301403
-2252	\N	What is the work around for creating an install stage preset?	open	2024-08-18 14:51:01.302148	2024-08-18 14:51:01.302148
-2253	\N	Run a CMake workflow by first wiping the build tree and clearing cache?	open	2024-08-18 14:51:01.302849	2024-08-18 14:51:01.302849
-2254	\N	Define a CMake workflow in a project?	open	2024-08-18 14:51:01.303556	2024-08-18 14:51:01.303556
-2255	\N	What is the structure of a condition in CMake presets?	open	2024-08-18 14:51:01.304244	2024-08-18 14:51:01.304244
-2256	\N	What types of conditions exists in CMake presets?	open	2024-08-18 14:51:01.305316	2024-08-18 14:51:01.305316
-2257	\N	What are the available macros in CMake presets?	open	2024-08-18 14:51:01.306221	2024-08-18 14:51:01.306221
+2175	1446	How many stages does CMake have to build a project?	open	2024-08-18 14:51:01.213425	2024-08-18 14:51:01.213425
+2176	1446	What file does CMake use as cache in configuration stage?	open	2024-08-18 14:51:01.215727	2024-08-18 14:51:01.215727
+2177	1446	What are the crucial CMake commands needed in every project?	open	2024-08-18 14:51:01.218323	2024-08-18 14:51:01.218323
+2178	1446	Run CMake for configuration stage of a project?	open	2024-08-18 14:51:01.220381	2024-08-18 14:51:01.220381
+2179	1446	Run CMake for building stage of a project?	open	2024-08-18 14:51:01.221813	2024-08-18 14:51:01.221813
+2180	1446	Build latest CMake version from source?	open	2024-08-18 14:51:01.22286	2024-08-18 14:51:01.22286
+2181	1446	What commands are available after a clean installation of CMake?	open	2024-08-18 14:51:01.223983	2024-08-18 14:51:01.223983
+2182	1446	Specify generator when configuring a project with CMake?	open	2024-08-18 14:51:01.225156	2024-08-18 14:51:01.225156
+2183	1446	Get help from CMake on a shell?	open	2024-08-18 14:51:01.227189	2024-08-18 14:51:01.227189
+2184	1446	Get a list of detailed help from CMake on shell?	open	2024-08-18 14:51:01.228976	2024-08-18 14:51:01.228976
+2185	1446	Specify a cache when configuring a project with CMake?	open	2024-08-18 14:51:01.230911	2024-08-18 14:51:01.230911
+2186	1446	Initialize existing cache variables when configuring a project with CMake?	open	2024-08-18 14:51:01.231923	2024-08-18 14:51:01.231923
+2187	1446	Specify build type when configuring a project with CMake?	open	2024-08-18 14:51:01.232887	2024-08-18 14:51:01.232887
+2188	1446	List all the cache variables of a project?	open	2024-08-18 14:51:01.233953	2024-08-18 14:51:01.233953
+2193	1446	What is a message context?	open	2024-08-18 14:51:01.238573	2024-08-18 14:51:01.238573
+2234	1461	Which version of CMake does support presets?	open	2024-08-18 14:51:01.284975	2024-08-18 14:51:01.284975
+2235	1461	What features do CMake presets offer?	open	2024-08-18 14:51:01.285713	2024-08-18 14:51:01.285713
+2236	1461	Where should CMake preset files reside to be recognizable?	open	2024-08-18 14:51:01.286425	2024-08-18 14:51:01.286425
+2237	1461	What stages do CMake presets can be defined for?	open	2024-08-18 14:51:01.287113	2024-08-18 14:51:01.287113
+2238	1461	List CMake presets specific for configuration stage?	open	2024-08-18 14:51:01.28778	2024-08-18 14:51:01.28778
+2239	1461	List CMake presets specific for build stage?	open	2024-08-18 14:51:01.288526	2024-08-18 14:51:01.288526
+2240	1461	List CMake presets specific for test stage?	open	2024-08-18 14:51:01.289271	2024-08-18 14:51:01.289271
+2241	1461	List CMake workflow presets?	open	2024-08-18 14:51:01.29001	2024-08-18 14:51:01.29001
+2242	1461	Use a project defined CMake preset?	open	2024-08-18 14:51:01.290683	2024-08-18 14:51:01.290683
+2243	1461	What is the format of a CMake preset file?	open	2024-08-18 14:51:01.29174	2024-08-18 14:51:01.29174
+2244	1461	What is the common mandatory field in all CMake presets?	open	2024-08-18 14:51:01.293669	2024-08-18 14:51:01.293669
+2245	1461	What are the optional fields in all CMake presets?	open	2024-08-18 14:51:01.295344	2024-08-18 14:51:01.295344
+2246	1461	What common dependency exists in CMake stage specific presets?	open	2024-08-18 14:51:01.297165	2024-08-18 14:51:01.297165
+2247	1461	What are the CMake configuration stage specific preset fields?	open	2024-08-18 14:51:01.29807	2024-08-18 14:51:01.29807
+2248	1461	What is the precedence of preset variables in CMake?	open	2024-08-18 14:51:01.298839	2024-08-18 14:51:01.298839
+2249	1461	What are the CMake build stage specific preset fields?	open	2024-08-18 14:51:01.299685	2024-08-18 14:51:01.299685
+2250	1461	What are the CMake test stage specific preset fields?	open	2024-08-18 14:51:01.300642	2024-08-18 14:51:01.300642
+2251	1461	What are the CMake package stage specific preset fields?	open	2024-08-18 14:51:01.301403	2024-08-18 14:51:01.301403
+2252	1461	What is the work around for creating an install stage preset?	open	2024-08-18 14:51:01.302148	2024-08-18 14:51:01.302148
+2253	1461	Run a CMake workflow by first wiping the build tree and clearing cache?	open	2024-08-18 14:51:01.302849	2024-08-18 14:51:01.302849
+2254	1461	Define a CMake workflow in a project?	open	2024-08-18 14:51:01.303556	2024-08-18 14:51:01.303556
+2255	1461	What is the structure of a condition in CMake presets?	open	2024-08-18 14:51:01.304244	2024-08-18 14:51:01.304244
+2256	1461	What types of conditions exists in CMake presets?	open	2024-08-18 14:51:01.305316	2024-08-18 14:51:01.305316
+2257	1461	What are the available macros in CMake presets?	open	2024-08-18 14:51:01.306221	2024-08-18 14:51:01.306221
+2189	1446	Remove a cache variable from the configuration of a project?	open	2024-08-18 14:51:01.234763	2024-08-18 14:51:01.234763
+2190	1446	Get project agnostic general information about variables, commands, marcros and other settings?	open	2024-08-18 14:51:01.235644	2024-08-18 14:51:01.235644
+2191	1446	Change the log level of CMake?	open	2024-08-18 14:51:01.236728	2024-08-18 14:51:01.236728
+2192	1446	What CMake command prints logs?	open	2024-08-18 14:51:01.237656	2024-08-18 14:51:01.237656
+2194	1446	Enable context in CMake logs?	open	2024-08-18 14:51:01.239566	2024-08-18 14:51:01.239566
+2195	1446	What is the most verbose option of loggin for CMake?	open	2024-08-18 14:51:01.240557	2024-08-18 14:51:01.240557
+2196	1446	What are CMake presets?	open	2024-08-18 14:51:01.241709	2024-08-18 14:51:01.241709
+2197	1446	List available CMake presets?	open	2024-08-18 14:51:01.243463	2024-08-18 14:51:01.243463
+2198	1446	Choose a CMake preset for a project?	open	2024-08-18 14:51:01.245492	2024-08-18 14:51:01.245492
+2199	1446	Run CMake to configure a project by erasiing previous configurations first?	open	2024-08-18 14:51:01.247484	2024-08-18 14:51:01.247484
+2200	1446	Run CMake in building stage with parallel jobs?	open	2024-08-18 14:51:01.248754	2024-08-18 14:51:01.248754
+2201	1446	Specify a target in building stage of a project?	open	2024-08-18 14:51:01.249676	2024-08-18 14:51:01.249676
+2202	1446	Clean the build tree?	open	2024-08-18 14:51:01.250652	2024-08-18 14:51:01.250652
+2203	1446	Build a project by first cleaning the build tree?	open	2024-08-18 14:51:01.25157	2024-08-18 14:51:01.25157
+2204	1446	Specify which configuration should be used in building stage by multi-configuration supported generators?	open	2024-08-18 14:51:01.25248	2024-08-18 14:51:01.25248
+2205	1446	Generate debugging logs on building stage?	open	2024-08-18 14:51:01.253435	2024-08-18 14:51:01.253435
+2206	1446	Use CMake to install build artifacts?	open	2024-08-18 14:51:01.254336	2024-08-18 14:51:01.254336
+2207	1446	Change the default installation path in installation stage?	open	2024-08-18 14:51:01.255289	2024-08-18 14:51:01.255289
+2208	1446	Explicitly specify which components you want to install on installation stage?	open	2024-08-18 14:51:01.25621	2024-08-18 14:51:01.25621
+2209	1446	Specify default directory permissions on installatino stage?	open	2024-08-18 14:51:01.25716	2024-08-18 14:51:01.25716
+2210	1446	Generate debugging logs on installation stage?	open	2024-08-18 14:51:01.258216	2024-08-18 14:51:01.258216
+2211	1446	Run a cmake script?	open	2024-08-18 14:51:01.25999	2024-08-18 14:51:01.25999
+2212	1446	Use CMake to run a platform independent command?	open	2024-08-18 14:51:01.261806	2024-08-18 14:51:01.261806
+2213	1446	Use CMake to run checksum?	open	2024-08-18 14:51:01.263784	2024-08-18 14:51:01.263784
+2214	1446	Where do workflows can be used?	open	2024-08-18 14:51:01.264861	2024-08-18 14:51:01.264861
+2215	1446	Get a list of presets in a workflow?	open	2024-08-18 14:51:01.265667	2024-08-18 14:51:01.265667
+2216	1446	Execute a workflow preset?	open	2024-08-18 14:51:01.266414	2024-08-18 14:51:01.266414
+2217	1446	Run all the tests in a project?	open	2024-08-18 14:51:01.26714	2024-08-18 14:51:01.26714
+2218	1446	What GUI interfaces does cmake have?	open	2024-08-18 14:51:01.267901	2024-08-18 14:51:01.267901
+2219	1446	Where is the source directory?	open	2024-08-18 14:51:01.2687	2024-08-18 14:51:01.2687
+2220	1446	Where is the build directory?	open	2024-08-18 14:51:01.269489	2024-08-18 14:51:01.269489
+2221	1446	What is Listfiles?	open	2024-08-18 14:51:01.270258	2024-08-18 14:51:01.270258
+2222	1446	What is the main CMake listfile in a project?	open	2024-08-18 14:51:01.271129	2024-08-18 14:51:01.271129
+2223	1446	What is the structure of a cache file?	open	2024-08-18 14:51:01.271899	2024-08-18 14:51:01.271899
+2224	1446	What is a CMake package configuration file?	open	2024-08-18 14:51:01.272828	2024-08-18 14:51:01.272828
+2225	1446	What are the common CMake artifacts resulted in generation stage?	open	2024-08-18 14:51:01.273662	2024-08-18 14:51:01.273662
+2226	1446	What are preset files?	open	2024-08-18 14:51:01.274597	2024-08-18 14:51:01.274597
+2227	1446	What are the advantages of running CMake scripts rather than external scripts?	open	2024-08-18 14:51:01.27625	2024-08-18 14:51:01.27625
+2228	1446	What is the minimum requirements of a CMake script file?	open	2024-08-18 14:51:01.278419	2024-08-18 14:51:01.278419
+2229	1446	What are the CMake utility modules?	open	2024-08-18 14:51:01.280803	2024-08-18 14:51:01.280803
+2230	1446	Use a CMake utility module?	open	2024-08-18 14:51:01.281705	2024-08-18 14:51:01.281705
+2231	1446	What are the CMake find modules?	open	2024-08-18 14:51:01.282591	2024-08-18 14:51:01.282591
+2232	1446	Get the list of CMake modules?	open	2024-08-18 14:51:01.283356	2024-08-18 14:51:01.283356
 \.
 
 
@@ -14283,45 +14157,6 @@ COPY flashback.practice_resources (id, practice_id, section_id) FROM stdin;
 73	140	1281
 74	141	1281
 75	142	1281
-76	176	873
-77	177	873
-78	178	873
-79	179	873
-80	180	873
-81	181	873
-82	182	873
-83	183	873
-84	184	873
-85	185	873
-86	186	873
-87	187	873
-88	188	873
-89	189	873
-90	190	873
-91	191	873
-92	192	873
-93	193	873
-94	194	873
-95	195	873
-96	196	873
-97	197	873
-98	198	873
-99	199	873
-100	200	873
-101	201	873
-102	202	873
-103	203	873
-104	204	873
-105	205	873
-106	206	873
-107	207	873
-108	208	873
-109	209	873
-110	210	873
-111	211	873
-112	212	873
-113	213	873
-114	214	873
 115	257	65
 116	259	67
 117	260	67
@@ -16523,7 +16358,6 @@ COPY flashback.resource_subjects (resource_id, subject_id) FROM stdin;
 61	7
 62	3
 63	6
-64	6
 65	20
 66	20
 67	11
@@ -16633,7 +16467,6 @@ COPY flashback.resources (id, name, reference, type, created, updated) FROM stdi
 61	Learn Docker in a month of Lunches	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
 62	Boost.Asio C++ Network Programming Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
 63	C++17: The Complete Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-64	Modern CMake for C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
 65	Offensive Security Wireless Professional (OSWP)	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
 66	Kali Linux Penetration Testing Bible	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
 67	Linux Device Driver Development	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
@@ -16689,7 +16522,6 @@ COPY flashback.section_name_patterns (id, pattern) FROM stdin;
 COPY flashback.sections (id, resource_id, headline, state, reference, created, updated, "position") FROM stdin;
 1	15	Chapter 1	ignored	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
 2	15	Chapter 2	ignored	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-3	15	Chapter 3	completed	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
 4	15	Chapter 4	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
 5	15	Chapter 5	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
 6	15	Chapter 6	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
@@ -16732,10 +16564,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 43	17	CMake	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0
 44	17	String Literals	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0
 45	17	Signals	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0
-46	18	Chapter 1	completed	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-47	18	Chapter 2	completed	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-48	18	Chapter 3	completed	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-49	18	Chapter 4	completed	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
 50	18	Chapter 5	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
 51	18	Chapter 6	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
 52	18	Chapter 7	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
@@ -16751,9 +16579,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 62	18	Chapter 17	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
 63	18	Chapter 18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
 64	18	Chapter 19	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-65	19	Chapter 1	completed	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-66	19	Chapter 2	completed	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-67	19	Chapter 3	completed	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
 68	19	Chapter 4	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
 69	19	Chapter 5	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
 70	19	Chapter 6	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
@@ -16801,10 +16626,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 112	21	Chapter 6	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0
 119	22	Chapter 7	ignored	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
 123	22	Chapter 11	ignored	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-125	22	Chapter 13	completed	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-126	22	Chapter 14	completed	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-127	22	Chapter 15	completed	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-128	22	Chapter 16	completed	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
 129	22	Chapter 17	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
 130	22	Chapter 18	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
 131	22	Chapter 19	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
@@ -16863,8 +16684,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 184	24	Chapter 18	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
 185	24	Chapter 19	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
 186	24	Chapter 20	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-187	25	Chapter 1	completed	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-188	25	Chapter 2	completed	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
 189	25	Chapter 3	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
 190	25	Chapter 4	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
 191	25	Chapter 5	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
@@ -16881,7 +16700,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 202	25	Chapter 16	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
 203	25	Chapter 17	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
 204	25	Chapter 18	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-205	26	Chapter 1	completed	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
 206	26	Chapter 2	writing	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
 207	26	Chapter 3	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
 208	26	Chapter 4	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
@@ -16901,6 +16719,8 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 222	26	Chapter 18	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
 223	26	Chapter 19	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
 224	26	Chapter 20	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
+187	25	Chapter 1	writing	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
+188	25	Chapter 2	writing	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
 225	27	Chapter 1	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
 226	27	Chapter 2	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
 227	27	Chapter 3	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
@@ -16940,7 +16760,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 270	30	Chapter 19	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
 271	30	Chapter 20	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
 272	30	Chapter 21	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-273	31	Chapter 1	completed	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
 274	31	Chapter 2	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
 275	31	Chapter 3	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
 276	31	Chapter 4	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
@@ -16984,8 +16803,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 333	35	Chapter 10	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
 334	35	Chapter 11	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
 335	35	Chapter 12	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
-336	36	Chapter 1	completed	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-337	36	Chapter 2	completed	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
 338	36	Chapter 3	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
 339	36	Chapter 4	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
 341	36	Chapter 6	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
@@ -17002,31 +16819,17 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 352	36	Chapter 17	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
 353	36	Chapter 18	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
 354	36	Chapter 19	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-355	37	Chapter 1	completed	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-356	37	Chapter 2	completed	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-357	37	Chapter 3	completed	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-358	37	Chapter 4	completed	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-359	37	Chapter 5	completed	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 360	37	Chapter 6	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-361	37	Chapter 7	completed	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-362	37	Chapter 8	completed	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 363	37	Chapter 9	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 364	37	Chapter 10	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 365	37	Chapter 11	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 366	37	Chapter 12	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 367	37	Chapter 13	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-368	37	Chapter 14	completed	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-369	37	Chapter 15	completed	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-370	37	Chapter 16	completed	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 371	37	Chapter 17	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 372	37	Chapter 18	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 373	37	Chapter 19	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 374	37	Chapter 20	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 375	37	Chapter 21	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-376	37	Chapter 22	completed	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-377	37	Chapter 23	completed	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-378	37	Chapter 24	completed	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-379	37	Chapter 25	completed	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 380	37	Chapter 26	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 381	37	Chapter 27	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 382	37	Chapter 28	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
@@ -17040,7 +16843,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 390	37	Chapter 36	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 391	37	Chapter 37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
 392	38	Chapter 1	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-393	38	Chapter 2	completed	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
 394	38	Chapter 3	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
 395	38	Chapter 4	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
 396	38	Chapter 5	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
@@ -17113,30 +16915,9 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 467	43	Chapter 10	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
 468	43	Chapter 11	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
 469	43	Chapter 12	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
-471	44	Chapter 1	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-472	44	Chapter 2	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-473	44	Chapter 3	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-474	44	Chapter 4	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+393	38	Chapter 2	writing	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
 475	44	Chapter 5	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
 476	44	Chapter 6	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-477	44	Chapter 7	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-478	44	Chapter 8	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-479	44	Chapter 9	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-480	44	Chapter 10	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-481	44	Chapter 11	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-482	44	Chapter 12	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-483	44	Chapter 13	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-484	44	Chapter 14	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-485	44	Chapter 15	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-486	44	Chapter 16	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-487	44	Chapter 17	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-488	44	Chapter 18	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-489	44	Chapter 19	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-491	44	Chapter 21	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-492	44	Chapter 22	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-493	44	Chapter 23	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-495	44	Chapter 25	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-496	44	Chapter 26	completed	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
 498	44	Chapter 28	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
 499	44	Chapter 29	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
 500	44	Chapter 30	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
@@ -17154,8 +16935,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 512	44	Chapter 42	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
 513	44	Chapter 43	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
 514	45	Chapter 1	ignored	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-515	45	Chapter 2	completed	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-516	45	Chapter 3	completed	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
 517	45	Chapter 4	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
 518	45	Chapter 5	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
 519	45	Chapter 6	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
@@ -17311,7 +17090,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 672	52	Chapter 12	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
 673	52	Chapter 13	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
 674	52	Chapter 14	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-675	53	Chapter 1	completed	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
 676	53	Chapter 2	writing	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
 677	53	Chapter 3	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
 678	53	Chapter 4	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
@@ -17385,20 +17163,12 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 746	56	Chapter 1	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
 747	56	Chapter 2	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
 748	56	Chapter 3	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-749	56	Chapter 4	completed	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
 750	56	Chapter 5	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-751	56	Chapter 6	completed	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-752	56	Chapter 7	completed	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
 754	56	Chapter 9	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-755	56	Chapter 10	completed	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
 756	56	Chapter 11	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
 757	56	Chapter 12	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-758	56	Chapter 13	completed	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
 759	56	Chapter 14	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-760	56	Chapter 15	completed	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
 761	56	Chapter 16	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-762	57	Chapter 1	completed	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
-763	57	Chapter 2	completed	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
 764	57	Chapter 3	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
 765	57	Chapter 4	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
 766	57	Chapter 5	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
@@ -17421,7 +17191,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 783	58	Chapter 10	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
 784	58	Chapter 11	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
 785	58	Chapter 12	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
-786	59	Chapter 1	completed	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
 788	59	Chapter 3	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
 789	59	Chapter 4	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
 790	59	Chapter 5	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
@@ -17437,7 +17206,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 800	59	Chapter 15	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
 801	59	Chapter 16	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
 802	59	Chapter 17	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-803	60	Chapter 1	completed	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
 804	60	Chapter 2	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
 805	60	Chapter 3	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
 806	60	Chapter 4	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
@@ -17496,7 +17264,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 860	63	Chapter 17	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
 861	63	Chapter 18	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
 862	63	Chapter 19	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-863	63	Chapter 20	completed	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
 864	63	Chapter 21	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
 865	63	Chapter 22	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
 866	63	Chapter 23	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
@@ -17506,18 +17273,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 870	63	Chapter 27	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
 871	63	Chapter 28	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
 872	63	Chapter 29	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-874	64	Chapter 2	open	\N	2024-07-28 09:45:04.768073	2024-07-28 09:45:04.768073	0
-875	64	Chapter 3	open	\N	2024-07-28 09:45:04.768073	2024-07-28 09:45:04.768073	0
-876	64	Chapter 4	open	\N	2024-07-28 09:45:04.768073	2024-07-28 09:45:04.768073	0
-877	64	Chapter 5	open	\N	2024-07-28 09:45:04.768073	2024-07-28 09:45:04.768073	0
-878	64	Chapter 6	open	\N	2024-07-28 09:45:04.768073	2024-07-28 09:45:04.768073	0
-879	64	Chapter 7	open	\N	2024-07-28 09:45:04.768073	2024-07-28 09:45:04.768073	0
-880	64	Chapter 8	open	\N	2024-07-28 09:45:04.768073	2024-07-28 09:45:04.768073	0
-881	64	Chapter 9	open	\N	2024-07-28 09:45:04.768073	2024-07-28 09:45:04.768073	0
-882	64	Chapter 10	open	\N	2024-07-28 09:45:04.768073	2024-07-28 09:45:04.768073	0
-883	64	Chapter 11	open	\N	2024-07-28 09:45:04.768073	2024-07-28 09:45:04.768073	0
-884	64	Chapter 12	open	\N	2024-07-28 09:45:04.768073	2024-07-28 09:45:04.768073	0
-885	64	Chapter 13	open	\N	2024-07-28 09:45:04.768073	2024-07-28 09:45:04.768073	0
 887	66	Chapter 1	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
 888	66	Chapter 2	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
 889	66	Chapter 3	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
@@ -17532,9 +17287,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 898	66	Chapter 12	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
 899	66	Chapter 13	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
 900	66	Chapter 14	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-901	67	Chapter 1	completed	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-902	67	Chapter 2	completed	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-903	67	Chapter 3	completed	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
 904	67	Chapter 4	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
 905	67	Chapter 5	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
 906	67	Chapter 6	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
@@ -17656,15 +17408,11 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 1026	70	Chapter 49	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
 1027	70	Chapter 50	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
 1028	70	Chapter 51	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1029	71	Chapter 1	completed	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0
 1030	71	Chapter 2	ignored	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0
-1031	71	Chapter 3	completed	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0
 1032	71	Chapter 4	ignored	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0
 1033	72	Chapter 1	writing	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0
 1034	72	Chapter 2	open	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0
 1035	72	Chapter 3	open	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0
-1036	73	Chapter 1	completed	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
-1037	73	Chapter 2	completed	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
 1038	73	Chapter 3	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
 1039	73	Chapter 4	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
 1040	73	Chapter 5	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
@@ -17892,7 +17640,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 1278	84	Chapter 18	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
 1279	84	Chapter 19	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
 1280	84	Chapter 20	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1281	85	Chapter 1	completed	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
 1282	85	Chapter 2	ignored	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
 1283	85	Chapter 3	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
 1285	85	Chapter 5	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
@@ -17920,7 +17667,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 1307	86	Chapter 15	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
 1308	86	Chapter 16	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
 1309	86	Chapter 17	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1310	87	Chapter 1	completed	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
 1311	87	Chapter 2	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
 1312	87	Chapter 3	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
 1313	87	Chapter 4	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
@@ -17940,8 +17686,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 1327	88	Chapter 1	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
 1328	88	Chapter 2	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
 1329	88	Chapter 3	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1330	88	Chapter 4	completed	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1331	88	Chapter 5	completed	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
 1332	88	Chapter 6	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
 1333	88	Chapter 7	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
 1334	88	Chapter 8	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
@@ -17957,21 +17701,12 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 1344	88	Chapter 18	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
 1345	88	Chapter 19	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
 1346	88	Chapter 20	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1347	89	Chapter 1	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1348	89	Chapter 2	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1349	89	Chapter 3	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1350	89	Chapter 4	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1351	89	Chapter 5	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
 1352	89	Chapter 6	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1353	89	Chapter 7	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
 1354	89	Chapter 8	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
 1355	89	Chapter 9	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
 1356	89	Chapter 10	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
 1357	89	Chapter 11	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
 1358	89	Chapter 12	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1359	89	Chapter 13	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1360	89	Chapter 14	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1361	89	Chapter 15	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
 1362	90	Chapter 1	writing	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
 1363	90	Chapter 2	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
 1364	90	Chapter 3	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
@@ -18022,12 +17757,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 1410	95	Chapter 1	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
 1411	95	Chapter 2	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
 1412	95	Chapter 3	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
-1413	95	Chapter 4	completed	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
-1414	95	Chapter 5	completed	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
-1415	95	Chapter 6	completed	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
-1416	95	Chapter 7	completed	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
-1418	97	Chapter 1	completed	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1419	97	Chapter 2	completed	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
 1420	97	Chapter 3	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
 1421	97	Chapter 4	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
 1422	97	Chapter 5	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
@@ -18107,7 +17836,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 753	56	Chapter 8	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
 787	59	Chapter 2	writing	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
 838	62	Chapter 1	writing	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0
-873	64	Chapter 1	writing	\N	2024-07-28 09:45:04.768073	2024-07-28 09:45:04.768073	0
 886	65	Video 1	writing	\N	2024-07-28 09:45:04.811441	2024-07-28 09:45:04.811441	0
 962	69	Chapter 1	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
 963	69	Chapter 2	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
@@ -18150,6 +17878,98 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 1461	98	Chapter 16	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
 1462	98	Chapter 17	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
 1463	98	Chapter 18	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
+3	15	Chapter 3	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
+46	18	Chapter 1	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
+47	18	Chapter 2	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
+48	18	Chapter 3	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
+49	18	Chapter 4	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
+65	19	Chapter 1	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
+66	19	Chapter 2	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
+67	19	Chapter 3	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
+125	22	Chapter 13	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
+126	22	Chapter 14	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
+127	22	Chapter 15	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
+128	22	Chapter 16	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
+205	26	Chapter 1	writing	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
+273	31	Chapter 1	writing	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
+336	36	Chapter 1	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
+337	36	Chapter 2	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
+355	37	Chapter 1	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
+356	37	Chapter 2	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
+357	37	Chapter 3	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
+358	37	Chapter 4	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
+359	37	Chapter 5	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
+361	37	Chapter 7	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
+362	37	Chapter 8	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
+368	37	Chapter 14	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
+369	37	Chapter 15	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
+370	37	Chapter 16	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
+376	37	Chapter 22	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
+377	37	Chapter 23	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
+378	37	Chapter 24	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
+379	37	Chapter 25	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
+471	44	Chapter 1	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+472	44	Chapter 2	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+473	44	Chapter 3	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+474	44	Chapter 4	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+477	44	Chapter 7	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+478	44	Chapter 8	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+479	44	Chapter 9	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+480	44	Chapter 10	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+481	44	Chapter 11	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+482	44	Chapter 12	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+483	44	Chapter 13	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+484	44	Chapter 14	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+485	44	Chapter 15	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+486	44	Chapter 16	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+487	44	Chapter 17	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+488	44	Chapter 18	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+489	44	Chapter 19	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+491	44	Chapter 21	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+492	44	Chapter 22	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+493	44	Chapter 23	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+495	44	Chapter 25	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+496	44	Chapter 26	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+515	45	Chapter 2	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
+516	45	Chapter 3	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
+675	53	Chapter 1	writing	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
+749	56	Chapter 4	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
+751	56	Chapter 6	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
+752	56	Chapter 7	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
+755	56	Chapter 10	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
+758	56	Chapter 13	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
+760	56	Chapter 15	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
+762	57	Chapter 1	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
+763	57	Chapter 2	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
+786	59	Chapter 1	writing	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
+803	60	Chapter 1	writing	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
+863	63	Chapter 20	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
+901	67	Chapter 1	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
+902	67	Chapter 2	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
+903	67	Chapter 3	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
+1029	71	Chapter 1	writing	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0
+1031	71	Chapter 3	writing	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0
+1036	73	Chapter 1	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
+1037	73	Chapter 2	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
+1281	85	Chapter 1	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
+1310	87	Chapter 1	writing	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
+1330	88	Chapter 4	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
+1331	88	Chapter 5	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
+1347	89	Chapter 1	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
+1348	89	Chapter 2	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
+1349	89	Chapter 3	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
+1350	89	Chapter 4	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
+1351	89	Chapter 5	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
+1353	89	Chapter 7	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
+1359	89	Chapter 13	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
+1360	89	Chapter 14	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
+1361	89	Chapter 15	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
+1413	95	Chapter 4	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
+1414	95	Chapter 5	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
+1415	95	Chapter 6	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
+1416	95	Chapter 7	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
+1418	97	Chapter 1	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
+1419	97	Chapter 2	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
 \.
 
 
@@ -18306,7 +18126,6 @@ COPY flashback.studies (id, user_id, section_id, updated) FROM stdin;
 146	1	863	2024-08-07 22:44:43.138201
 147	1	858	2024-08-07 22:44:43.138201
 148	1	853	2024-08-07 22:44:43.138201
-149	1	873	2024-08-07 22:44:43.138201
 150	1	886	2024-08-07 22:44:43.138201
 151	1	902	2024-08-07 22:44:43.138201
 152	1	903	2024-08-07 22:44:43.138201
@@ -18365,6 +18184,8 @@ COPY flashback.studies (id, user_id, section_id, updated) FROM stdin;
 205	1	1419	2024-08-07 22:44:43.138201
 206	1	1418	2024-08-07 22:44:43.138201
 207	1	1420	2024-08-07 22:44:43.138201
+208	1	1446	2024-08-18 17:15:29.113219
+209	1	1461	2024-08-18 17:15:29.113219
 \.
 
 
@@ -18953,7 +18774,7 @@ SELECT pg_catalog.setval('flashback.sections_id_seq', 1463, true);
 -- Name: studies_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.studies_id_seq', 207, true);
+SELECT pg_catalog.setval('flashback.studies_id_seq', 209, true);
 
 
 --
