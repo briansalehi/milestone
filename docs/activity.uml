@@ -1,0 +1,72 @@
+@startuml
+start
+
+:Run Program;
+
+split
+    :Sign In;
+split again
+    :Sign Up;
+end split
+
+if (user has resources to study) then (yes)
+    :Show User Resources;
+else (no)
+    :Search Resources by Name;
+    :Search Resources by Subject;
+
+    if (found the resource?) then (yes)
+        :Start Using a Resource;
+    else (no)
+        :Add a Resource;
+    end if
+end if
+
+if (user follows any subjects) then (yes)
+    :Show User Following Subjects;
+else (no)
+    :Search Through Subjects by Name;
+
+    if (found the subject?) then (yes)
+        :Start Following a Subject;
+    else (no)
+        :Create a Subject;
+    end if
+end if
+
+split
+    :Begin Practice;
+    :Get the Last Recent Practiced Subject;
+    :Get the Last Recent Topic;
+    :Read Practices;
+split again
+    :Continue Studying;
+    :Select a Resource;
+    :Get the List of Completed Sections;
+    :Read Notes;
+split again
+    :Become Author;
+    :Add, Edit, Rename Resource;
+    :Select Resource;
+    :Add, Edit, Reorder, Merge, Split, Rename, Swap, Mark Sections;
+    :Select Section;
+    :Add, Edit, Reorder, Merge, Split, Rename, Swap, Mark, Publish Notes;
+    :Apply Changes;
+split again
+    :Practice a Specific Subject;
+    :Select a Subject;
+    :Get the Last Recent Topic;
+    :Read Practices;
+split again
+    :Become Maintainer;
+    :Add, Edit Subject;
+    :Select Subject;
+    :Add, Edit, Reorder, Merge, Split, Swap, Rename, Mark Topics;
+    :Select Topic;
+    :Add, Edit, Reorder, Merge, Split, Swap, Mark Practice;
+    :Apply Changes;
+end split
+
+:Close the Program;
+stop
+@enduml
