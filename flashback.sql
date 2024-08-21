@@ -328,8 +328,7 @@ begin
     join flashback.resource_subjects rs on r.id = rs.resource_id
     join flashback.sections sc on sc.resource_id = r.id and sc.state in ('open', 'writing')
     join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
-    group by r.id, rs.subject_id, r.name
-    order by rs.subject_id, count(sc.id), r.name;
+    group by r.id, rs.subject_id, r.name;
 end; $$;
 
 
@@ -339,17 +338,17 @@ ALTER FUNCTION flashback.get_user_resources(user_index integer) OWNER TO flashba
 -- Name: get_user_sections(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_user_sections(user_index integer, resource_index integer) RETURNS TABLE(id integer, headline character varying, notes bigint, updated timestamp without time zone)
+CREATE FUNCTION flashback.get_user_sections(user_index integer, resource_index integer) RETURNS TABLE(id integer, headline character varying, notes bigint, state flashback.publication_state, pos integer, reference character varying, updated timestamp without time zone)
     LANGUAGE plpgsql
     AS $$
 begin
     return query
-    select sc.id, sc.headline, count(n.id), st.updated
+    select sc.id, sc.headline, count(n.id), sc.state, sc.position, sc.reference, st.updated
     from flashback.sections sc
     join flashback.notes n on n.section_id = sc.id
     join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
     where sc.resource_id = resource_index and sc.state in ('open', 'writing')
-    group by sc.id, sc.headline, st.updated;
+    group by sc.id, sc.headline, sc.state, sc.position, sc.reference, st.updated;
 end; $$;
 
 
@@ -602,6 +601,35 @@ ALTER TABLE flashback.note_references ALTER COLUMN id ADD GENERATED ALWAYS AS ID
 
 
 --
+-- Name: note_usage; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.note_usage (
+    id integer NOT NULL,
+    user_id integer,
+    note_id integer,
+    duration integer NOT NULL,
+    updated timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE flashback.note_usage OWNER TO flashback;
+
+--
+-- Name: note_usage_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE flashback.note_usage ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME flashback.note_usage_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: notes; Type: TABLE; Schema: flashback; Owner: flashback
 --
 
@@ -681,6 +709,35 @@ ALTER TABLE flashback.practice_resources OWNER TO flashback;
 
 ALTER TABLE flashback.practice_resources ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME flashback.practice_resources_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: practice_usage; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.practice_usage (
+    id integer NOT NULL,
+    user_id integer,
+    practice_id integer,
+    duration integer NOT NULL,
+    updated timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE flashback.practice_usage OWNER TO flashback;
+
+--
+-- Name: practice_usage_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE flashback.practice_usage ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME flashback.practice_usage_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -8024,6 +8081,14 @@ COPY flashback.note_references (id, note_id, origin, type, updated) FROM stdin;
 
 
 --
+-- Data for Name: note_usage; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.note_usage (id, user_id, note_id, duration, updated) FROM stdin;
+\.
+
+
+--
 -- Data for Name: notes; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
@@ -14866,6 +14931,14 @@ COPY flashback.practice_resources (id, practice_id, section_id) FROM stdin;
 
 
 --
+-- Data for Name: practice_usage; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.practice_usage (id, user_id, practice_id, duration, updated) FROM stdin;
+\.
+
+
+--
 -- Data for Name: practices; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
@@ -17860,7 +17933,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 1284	85	Chapter 4	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
 1398	93	Chapter 1	writing	\N	2024-07-28 09:45:10.333395	2024-07-28 09:45:10.333395	0
 1417	96	Chapter 1	writing	\N	2024-07-28 09:45:10.605868	2024-07-28 09:45:10.605868	0
-1446	98	Chapter 1	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
 1447	98	Chapter 2	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
 1448	98	Chapter 3	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
 1449	98	Chapter 4	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
@@ -17875,7 +17947,6 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 1458	98	Chapter 13	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
 1459	98	Chapter 14	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
 1460	98	Chapter 15	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1461	98	Chapter 16	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
 1462	98	Chapter 17	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
 1463	98	Chapter 18	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
 3	15	Chapter 3	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
@@ -17913,6 +17984,8 @@ COPY flashback.sections (id, resource_id, headline, state, reference, created, u
 473	44	Chapter 3	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
 474	44	Chapter 4	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
 477	44	Chapter 7	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
+1446	98	Chapter 1	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	1
+1461	98	Chapter 16	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	16
 478	44	Chapter 8	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
 479	44	Chapter 9	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
 480	44	Chapter 10	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
@@ -18715,6 +18788,13 @@ SELECT pg_catalog.setval('flashback.note_references_id_seq', 204, true);
 
 
 --
+-- Name: note_usage_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
+--
+
+SELECT pg_catalog.setval('flashback.note_usage_id_seq', 1, false);
+
+
+--
 -- Name: notes_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
@@ -18733,6 +18813,13 @@ SELECT pg_catalog.setval('flashback.practice_blocks_id_seq', 3822, true);
 --
 
 SELECT pg_catalog.setval('flashback.practice_resources_id_seq', 819, true);
+
+
+--
+-- Name: practice_usage_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
+--
+
+SELECT pg_catalog.setval('flashback.practice_usage_id_seq', 1, false);
 
 
 --
@@ -18831,6 +18918,14 @@ ALTER TABLE ONLY flashback.note_references
 
 
 --
+-- Name: note_usage note_usage_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.note_usage
+    ADD CONSTRAINT note_usage_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: notes notes_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
 --
 
@@ -18852,6 +18947,14 @@ ALTER TABLE ONLY flashback.practice_blocks
 
 ALTER TABLE ONLY flashback.practice_resources
     ADD CONSTRAINT practice_resources_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: practice_usage practice_usage_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.practice_usage
+    ADD CONSTRAINT practice_usage_pkey PRIMARY KEY (id);
 
 
 --
@@ -19103,6 +19206,22 @@ ALTER TABLE ONLY flashback.logins
 
 
 --
+-- Name: note_usage note_note_usage_id; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.note_usage
+    ADD CONSTRAINT note_note_usage_id FOREIGN KEY (note_id) REFERENCES flashback.notes(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: practice_usage practice_practice_usage_id; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.practice_usage
+    ADD CONSTRAINT practice_practice_usage_id FOREIGN KEY (practice_id) REFERENCES flashback.practices(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
 -- Name: resource_subjects resource_subject_rid_pk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
 --
 
@@ -19116,6 +19235,22 @@ ALTER TABLE ONLY flashback.resource_subjects
 
 ALTER TABLE ONLY flashback.resource_subjects
     ADD CONSTRAINT resource_subject_sid_pk FOREIGN KEY (subject_id) REFERENCES flashback.subjects(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: note_usage user_note_usage_id; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.note_usage
+    ADD CONSTRAINT user_note_usage_id FOREIGN KEY (user_id) REFERENCES flashback.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: practice_usage user_note_usage_id; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.practice_usage
+    ADD CONSTRAINT user_note_usage_id FOREIGN KEY (user_id) REFERENCES flashback.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
