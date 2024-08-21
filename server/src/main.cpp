@@ -1,5 +1,6 @@
 #include <iostream>
 #include <flashback/options.hpp>
+#include <flashback/server.hpp>
 
 int main(int argc, char const** argv)
 {
