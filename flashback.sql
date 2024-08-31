@@ -484,6 +484,66 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: container_templates; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.container_templates (
+    id integer NOT NULL,
+    name character varying(40) NOT NULL,
+    content text,
+    creation timestamp without time zone DEFAULT now() NOT NULL,
+    updated timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE flashback.container_templates OWNER TO flashback;
+
+--
+-- Name: container_templates_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE flashback.container_templates ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME flashback.container_templates_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: containers; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.containers (
+    id integer NOT NULL,
+    template_id integer,
+    name character varying(40) NOT NULL,
+    content text,
+    description character varying(500),
+    creation timestamp without time zone DEFAULT now() NOT NULL,
+    updated timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE flashback.containers OWNER TO flashback;
+
+--
+-- Name: containers_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE flashback.containers ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME flashback.containers_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: credentials; Type: TABLE; Schema: flashback; Owner: flashback
 --
 
@@ -1092,6 +1152,23 @@ ALTER TABLE flashback.users ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     NO MAXVALUE
     CACHE 1
 );
+
+
+--
+-- Data for Name: container_templates; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.container_templates (id, name, content, creation, updated) FROM stdin;
+1	flashback	FROM ubuntu:24.04\n\n RUN apt update && apt upgrade --yes && apt install bash build-essential bzip2 ca-certificates chrpath cmake curl file gawk git locales lz4 make patch python3 vim wget zstd \n\n ENV LANG="en_US.UTF-8 UTF-8"\n RUN echo "$LANG" > /etc/locale.gen\n RUN echo "LANG=$LANG" > /etc/default/locale\n RUN echo "LC_ALL=$LANG" >> /etc/default/locale\n RUN locale-gen\n\n WORKDIR /src\n\n CMD /usr/bin/bash	2024-08-31 18:58:52.176345	2024-08-31 18:58:52.176345
+\.
+
+
+--
+-- Data for Name: containers; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.containers (id, template_id, name, content, description, creation, updated) FROM stdin;
+\.
 
 
 --
@@ -18836,6 +18913,20 @@ COPY flashback.users (id, username, first_name, middle_name, last_name, state, e
 
 
 --
+-- Name: container_templates_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
+--
+
+SELECT pg_catalog.setval('flashback.container_templates_id_seq', 1, true);
+
+
+--
+-- Name: containers_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
+--
+
+SELECT pg_catalog.setval('flashback.containers_id_seq', 1, false);
+
+
+--
 -- Name: credentials_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
@@ -18973,6 +19064,38 @@ SELECT pg_catalog.setval('flashback.topics_id_seq', 449, true);
 --
 
 SELECT pg_catalog.setval('flashback.users_id_seq', 1, true);
+
+
+--
+-- Name: container_templates container_templates_name_key; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.container_templates
+    ADD CONSTRAINT container_templates_name_key UNIQUE (name);
+
+
+--
+-- Name: container_templates container_templates_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.container_templates
+    ADD CONSTRAINT container_templates_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: containers containers_name_key; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.containers
+    ADD CONSTRAINT containers_name_key UNIQUE (name);
+
+
+--
+-- Name: containers containers_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.containers
+    ADD CONSTRAINT containers_pkey PRIMARY KEY (id);
 
 
 --
@@ -19181,6 +19304,14 @@ ALTER TABLE ONLY flashback.users
 
 ALTER TABLE ONLY flashback.users
     ADD CONSTRAINT users_username_key UNIQUE (username);
+
+
+--
+-- Name: containers containers_container_template_id; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.containers
+    ADD CONSTRAINT containers_container_template_id FOREIGN KEY (template_id) REFERENCES flashback.container_templates(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
