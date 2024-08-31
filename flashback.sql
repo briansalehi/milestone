@@ -974,6 +974,66 @@ ALTER TABLE flashback.subjects ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY 
 
 
 --
+-- Name: task_blocks; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.task_blocks (
+    id integer NOT NULL,
+    task_id integer,
+    solution text,
+    type flashback.block_type DEFAULT 'text'::flashback.block_type NOT NULL,
+    language character varying(10) NOT NULL,
+    creation timestamp without time zone DEFAULT now() NOT NULL,
+    updated timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE flashback.task_blocks OWNER TO flashback;
+
+--
+-- Name: task_blocks_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE flashback.task_blocks ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME flashback.task_blocks_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: tasks; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.tasks (
+    id integer NOT NULL,
+    topic_id integer,
+    heading character varying(400) NOT NULL,
+    creation timestamp without time zone DEFAULT now() NOT NULL,
+    updated timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE flashback.tasks OWNER TO flashback;
+
+--
+-- Name: tasks_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE flashback.tasks ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME flashback.tasks_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: topics; Type: TABLE; Schema: flashback; Owner: flashback
 --
 
@@ -18294,6 +18354,22 @@ COPY flashback.subjects (id, name, creation, updated) FROM stdin;
 
 
 --
+-- Data for Name: task_blocks; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.task_blocks (id, task_id, solution, type, language, creation, updated) FROM stdin;
+\.
+
+
+--
+-- Data for Name: tasks; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.tasks (id, topic_id, heading, creation, updated) FROM stdin;
+\.
+
+
+--
 -- Data for Name: topics; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
@@ -18872,6 +18948,20 @@ SELECT pg_catalog.setval('flashback.subjects_id_seq', 23, true);
 
 
 --
+-- Name: task_blocks_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
+--
+
+SELECT pg_catalog.setval('flashback.task_blocks_id_seq', 1, false);
+
+
+--
+-- Name: tasks_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
+--
+
+SELECT pg_catalog.setval('flashback.tasks_id_seq', 1, false);
+
+
+--
 -- Name: topics_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
@@ -19035,6 +19125,22 @@ ALTER TABLE ONLY flashback.subjects
 
 ALTER TABLE ONLY flashback.subjects
     ADD CONSTRAINT subjects_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: task_blocks task_blocks_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.task_blocks
+    ADD CONSTRAINT task_blocks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tasks tasks_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.tasks
+    ADD CONSTRAINT tasks_pkey PRIMARY KEY (id);
 
 
 --
@@ -19235,6 +19341,22 @@ ALTER TABLE ONLY flashback.resource_subjects
 
 ALTER TABLE ONLY flashback.resource_subjects
     ADD CONSTRAINT resource_subject_sid_pk FOREIGN KEY (subject_id) REFERENCES flashback.subjects(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: task_blocks task_block_task_id; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.task_blocks
+    ADD CONSTRAINT task_block_task_id FOREIGN KEY (task_id) REFERENCES flashback.tasks(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: tasks task_topic_id; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.tasks
+    ADD CONSTRAINT task_topic_id FOREIGN KEY (topic_id) REFERENCES flashback.topics(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
