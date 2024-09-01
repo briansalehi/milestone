@@ -299,16 +299,15 @@ ALTER FUNCTION flashback.get_user_practice_blocks(user_index integer, topic_inde
 -- Name: get_user_practices(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_user_practices(user_index integer, topic_index integer) RETURNS TABLE(id integer, heading character varying, updated timestamp without time zone)
+CREATE FUNCTION flashback.get_user_practices(user_index integer, topic_index integer) RETURNS TABLE(id integer, heading character varying, pos integer, updated timestamp without time zone)
     LANGUAGE plpgsql
     AS $$
 begin
     return query
-    select pr.id, pr.heading, p.updated
+    select pr.id, pr.heading, pr.position, p.updated
     from flashback.practices pr
     left join flashback.progress p on p.topic_id = pr.topic_id and p.user_id = user_index
-    where pr.topic_id = topic_index
-    order by p.updated desc nulls first, pr.id;
+    where pr.topic_id = topic_index;
 end; $$;
 
 
@@ -338,17 +337,17 @@ ALTER FUNCTION flashback.get_user_resources(user_index integer) OWNER TO flashba
 -- Name: get_user_sections(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_user_sections(user_index integer, resource_index integer) RETURNS TABLE(id integer, headline character varying, notes bigint, state flashback.publication_state, pos integer, reference character varying, updated timestamp without time zone)
+CREATE FUNCTION flashback.get_user_sections(user_index integer, resource_index integer) RETURNS TABLE(id integer, pattern_id integer, index integer, notes bigint, state flashback.publication_state, pos integer, reference character varying, updated timestamp without time zone)
     LANGUAGE plpgsql
     AS $$
 begin
     return query
-    select sc.id, sc.headline, count(n.id), sc.state, sc.position, sc.reference, st.updated
+    select sc.id, sc.name_pattern_id, sc.index, count(n.id), sc.state, sc.position, sc.reference, st.updated
     from flashback.sections sc
     join flashback.notes n on n.section_id = sc.id
     join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
     where sc.resource_id = resource_index and sc.state in ('open', 'writing')
-    group by sc.id, sc.headline, sc.state, sc.position, sc.reference, st.updated;
+    group by sc.id, sc.name_pattern_id, sc.index, sc.state, sc.position, sc.reference, st.updated;
 end; $$;
 
 
@@ -815,7 +814,8 @@ CREATE TABLE flashback.practices (
     topic_id integer,
     heading character varying(400) NOT NULL,
     creation timestamp without time zone DEFAULT now() NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
+    updated timestamp without time zone DEFAULT now() NOT NULL,
+    "position" integer DEFAULT 0 NOT NULL
 );
 
 
@@ -952,12 +952,13 @@ ALTER TABLE flashback.section_name_patterns ALTER COLUMN id ADD GENERATED ALWAYS
 CREATE TABLE flashback.sections (
     id integer NOT NULL,
     resource_id integer,
-    headline character varying(100) NOT NULL,
     state flashback.publication_state DEFAULT 'open'::flashback.publication_state NOT NULL,
     reference character varying(2000) DEFAULT NULL::character varying,
     created timestamp without time zone DEFAULT now() NOT NULL,
     updated timestamp without time zone DEFAULT now() NOT NULL,
-    "position" integer DEFAULT 0 NOT NULL
+    "position" integer DEFAULT 0 NOT NULL,
+    index integer DEFAULT 0 NOT NULL,
+    name_pattern_id integer
 );
 
 
@@ -15079,1199 +15080,1199 @@ COPY flashback.practice_usage (id, user_id, practice_id, duration, updated) FROM
 -- Data for Name: practices; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
-COPY flashback.practices (id, topic_id, heading, creation, updated) FROM stdin;
-1	1	What are the development stages of an embedded Linux system?	2024-07-28 09:45:11.194663	2024-07-28 09:45:11.194663
-2	1	What are the building blocks of an embedded Linux system?	2024-07-28 09:45:11.496136	2024-07-28 09:45:11.496136
-3	1	What are the minimum required hardware target to develop an Embedded Linux for?	2024-07-28 09:45:11.754399	2024-07-28 09:45:11.754399
-4	1	What toolchains are available to build cross-toolchains with?	2024-07-28 09:45:12.014434	2024-07-28 09:45:12.014434
-5	2	What C libraries are commonly used in toolchains?	2024-07-28 09:45:12.282889	2024-07-28 09:45:12.282889
-6	2	What components are used in the toolchain tuple?	2024-07-28 09:45:12.598923	2024-07-28 09:45:12.598923
-7	2	Print the tuple embedded in GNU GCC compiler?	2024-07-28 09:45:12.865624	2024-07-28 09:45:12.865624
-8	2	Get the version and configurations of a native or cross-compiled GCC compiler?	2024-07-28 09:45:13.117269	2024-07-28 09:45:13.117269
-9	2	Override the default processor for GCC compiler?	2024-07-28 09:45:13.352713	2024-07-28 09:45:13.352713
-10	2	List available architecture specific options in GCC compiler?	2024-07-28 09:45:13.595982	2024-07-28 09:45:13.595982
-11	2	Print the <code>sysroot</code> path of GCC compiler?	2024-07-28 09:45:13.833421	2024-07-28 09:45:13.833421
-12	2	What are prerequisites for communicating with an embedded device?	2024-07-28 09:45:14.237917	2024-07-28 09:45:14.237917
-13	2	How to connect to an embedded device using <code>picocom</code> through <code>/dev/ttyUSB0</code> device driver?	2024-07-28 09:45:14.638922	2024-07-28 09:45:14.638922
-14	2	How to list the GNU GCC compiler default configurations?	2024-07-28 09:45:14.922687	2024-07-28 09:45:14.922687
-15	2	How to inspect the detailed steps the GNU GCC takes to compile a source file?	2024-07-28 09:45:15.153662	2024-07-28 09:45:15.153662
-16	2	How to inspect the meta data of an executable file?	2024-07-28 09:45:15.39656	2024-07-28 09:45:15.39656
-17	2	How to remove symbol table from an executable file using binary utilities?	2024-07-28 09:45:15.633528	2024-07-28 09:45:15.633528
-18	2	How to use GNU GCC compiler to compile C source files separately?	2024-07-28 09:45:15.905137	2024-07-28 09:45:15.905137
-19	2	How to list the symbol paths within an executable file?	2024-07-28 09:45:16.139389	2024-07-28 09:45:16.139389
-20	2	Why do C libraries require kernel headers and how kernel headers can be installed?	2024-07-28 09:45:16.57231	2024-07-28 09:45:16.57231
-21	2	What is the GNU GCC compiler flag to specify processor architecture and processor specific optimization?	2024-07-28 09:45:16.935028	2024-07-28 09:45:16.935028
-22	3	What toolchains are available to use in kernel image build process?	2024-07-28 09:45:17.275438	2024-07-28 09:45:17.275438
-23	3	How to build <code>Crosstool-ng</code>?	2024-07-28 09:45:17.669406	2024-07-28 09:45:17.669406
-24	3	How to list <code>Crosstool-ng</code> sample configurations?	2024-07-28 09:45:17.922638	2024-07-28 09:45:17.922638
-25	3	How to use <code>Crosstool-ng</code> to show a brief info of current or specified configuration?	2024-07-28 09:45:18.348128	2024-07-28 09:45:18.348128
-26	3	How to use <code>Crosstool-ng</code> to load a target specific configuration sample?	2024-07-28 09:45:18.674765	2024-07-28 09:45:18.674765
-27	3	How to use <code>Crosstool-ng</code> to configure selected architecture specific cross-toolchain?	2024-07-28 09:45:19.024616	2024-07-28 09:45:19.024616
-28	3	How to use <code>Crosstool-ng</code> to print the tuple of the currently configured toolchain?	2024-07-28 09:45:19.286999	2024-07-28 09:45:19.286999
-29	3	How to use <code>Crosstool-ng</code> to separate downloading source files from building stage?	2024-07-28 09:45:19.520854	2024-07-28 09:45:19.520854
-30	3	How to use <code>Crosstool-ng</code> to build the desired architecture specific cross-toolchain?	2024-07-28 09:45:19.789951	2024-07-28 09:45:19.789951
-31	3	How to set library and headers path for a cross-compiled GNU GCC compiler?	2024-07-28 09:45:20.05671	2024-07-28 09:45:20.05671
-32	4	Build and install <i>crosstool-ng</i>?	2024-07-28 09:45:20.463785	2024-07-28 09:45:20.463785
-33	5	Print the list of crosstool-ng sample configurations?	2024-07-28 09:45:20.751587	2024-07-28 09:45:20.751587
-34	5	Inspect the configuration details of crosstool-ng targets?	2024-07-28 09:45:21.089651	2024-07-28 09:45:21.089651
-35	6	Build a cross-toolchain for Raspberry Pi Zero?	2024-07-28 09:45:21.778467	2024-07-28 09:45:21.778467
-36	6	Build a cross-toolchain for BeagleBone Black?	2024-07-28 09:45:22.429304	2024-07-28 09:45:22.429304
-37	6	Build a cross-toolchain for QEMU?	2024-07-28 09:45:22.971203	2024-07-28 09:45:22.971203
-38	7	What are the main C library components?	2024-07-28 09:45:23.32341	2024-07-28 09:45:23.32341
-39	7	Print the linked libraries of an executable using GNU toolchains?	2024-07-28 09:45:23.59281	2024-07-28 09:45:23.59281
-40	7	Print the runtime linker used for an executable using GNU toolchains?	2024-07-28 09:45:23.861669	2024-07-28 09:45:23.861669
-41	7	Compile by linking libraries statically using GNU GCC compiler?	2024-07-28 09:45:24.144163	2024-07-28 09:45:24.144163
-42	7	Where are static libraries located in <code>sysroot</code> directory used by GNU toolchains?	2024-07-28 09:45:24.475672	2024-07-28 09:45:24.475672
-43	7	Use GNU toolchains to create a static library containing two executable objects compiled from C source files?	2024-07-28 09:45:24.832122	2024-07-28 09:45:24.832122
-44	7	Use GNU toolchains to create a shared library containing two executable objects compiled from C source files?	2024-07-28 09:45:25.224549	2024-07-28 09:45:25.224549
-45	7	Use GNU cross-toolchains to print the <code>SONAME</code> of a shared library?	2024-07-28 09:45:25.507401	2024-07-28 09:45:25.507401
-46	7	Use GNU toolchains to cross-compile for a specific target?	2024-07-28 09:45:26.006447	2024-07-28 09:45:26.006447
-47	7	Override the toolchain in an autotools compatible project?	2024-07-28 09:45:26.35677	2024-07-28 09:45:26.35677
-48	7	Use <code>crosstool-ng</code> to cross compile <i>SQlite</i> and add it to an existing toolchain?	2024-07-28 09:45:26.73175	2024-07-28 09:45:26.73175
-49	7	Prepare <code>pkg-config</code> to look up library dependencies in a sysroot?	2024-07-28 09:45:27.099312	2024-07-28 09:45:27.099312
-50	7	Use CMake to cross compile a project?	2024-07-28 09:45:27.417131	2024-07-28 09:45:27.417131
-51	8	How to obtain U-Boot and configure it?	2024-07-28 09:45:27.961755	2024-07-28 09:45:27.961755
-52	9	Where to download the Raspberry Pi bootloader?	2024-07-28 09:45:28.423314	2024-07-28 09:45:28.423314
-53	9	What files are required to boot using a Raspberry Pi device?	2024-07-28 09:45:29.212878	2024-07-28 09:45:29.212878
-54	10	How to load a file from a filesystem to RAM within U-Boot shell?	2024-07-28 09:45:29.971908	2024-07-28 09:45:29.971908
-55	11	What command can be used within U-Boot shell to load a kernel image into RAM from network?	2024-07-28 09:45:30.313915	2024-07-28 09:45:30.313915
-56	11	What command can be used within U-Boot shell to test network conectivity?	2024-07-28 09:45:30.566379	2024-07-28 09:45:30.566379
-57	11	What utilities can be used within U-Boot shell to load a kernel image from serial line to RAM?	2024-07-28 09:45:30.783223	2024-07-28 09:45:30.783223
-58	11	What command can be used within U-Boot shell to control the USB subsystem?	2024-07-28 09:45:31.041607	2024-07-28 09:45:31.041607
-59	11	What command can be used within U-Boot shell to control MMC subsystem?	2024-07-28 09:45:31.308343	2024-07-28 09:45:31.308343
-60	11	What command can be used within U-Boot shell to read, write and erase contents to NAND flash?	2024-07-28 09:45:31.579825	2024-07-28 09:45:31.579825
-61	11	What commands can be used within U-Boot shell to erase, modify protection or write contents to NOR flash?	2024-07-28 09:45:31.911514	2024-07-28 09:45:31.911514
-62	11	What command can be used within U-Boot shell to display memory info?	2024-07-28 09:45:32.189234	2024-07-28 09:45:32.189234
-63	11	What command can be used within U-Boot shell to modify memory info?	2024-07-28 09:45:32.472715	2024-07-28 09:45:32.472715
-64	11	What command can be used within U-Boot shell to display board information?	2024-07-28 09:45:32.756022	2024-07-28 09:45:32.756022
-140	45	How many types of components are available?	2024-07-28 09:45:59.824579	2024-07-28 09:45:59.824579
-65	11	What command can be used within U-Boot shell to display environment variables?	2024-07-28 09:45:33.060719	2024-07-28 09:45:33.060719
-66	11	What command can be used within U-Boot shell to set environment variables?	2024-07-28 09:45:33.33417	2024-07-28 09:45:33.33417
-67	11	What command can be used within U-Boot shell to edit an environment variable?	2024-07-28 09:45:33.603088	2024-07-28 09:45:33.603088
-68	11	What command can be used within U-Boot shell to save environment variables permanently?	2024-07-28 09:45:33.895722	2024-07-28 09:45:33.895722
-69	11	What environment variable can be set within U-Boot shell to specify the boot command sequence that U-Boot should automatically execute at boot time?	2024-07-28 09:45:34.215169	2024-07-28 09:45:34.215169
-70	11	What environment variable can be set within U-Boot shell to be passed to the kernel as arguments?	2024-07-28 09:45:34.512493	2024-07-28 09:45:34.512493
-71	11	What environment variables should be set within U-Boot shell to load an image into RAM from network?	2024-07-28 09:45:34.789175	2024-07-28 09:45:34.789175
-72	11	What command can be used within U-Boot shell to see the size of the latest copy into memory?	2024-07-28 09:45:35.159107	2024-07-28 09:45:35.159107
-73	11	How to write conditional expressions within U-Boot shell?	2024-07-28 09:45:35.535356	2024-07-28 09:45:35.535356
-74	11	How to run a script within U-Boot shell?	2024-07-28 09:45:35.87535	2024-07-28 09:45:35.87535
-75	11	How to reference other variable within U-Boot shell?	2024-07-28 09:45:36.194345	2024-07-28 09:45:36.194345
-76	11	What does the <code>source</code> command do in U-Boot shell environment?	2024-07-28 09:45:36.604969	2024-07-28 09:45:36.604969
-77	12	How to list all available processors available to QEMU?	2024-07-28 09:45:36.884209	2024-07-28 09:45:36.884209
-78	12	How to use <code>qemu-system-arm</code> command to boot into <code>u-boot</code>?	2024-07-28 09:45:37.107054	2024-07-28 09:45:37.107054
-79	13	When are the release cycles of the Yocto Project?	2024-07-28 09:45:37.391224	2024-07-28 09:45:37.391224
-80	13	What are the input requirements for the Yocto Project?	2024-07-28 09:45:37.581846	2024-07-28 09:45:37.581846
-81	13	What are the expected outputs from the Yocto Project?	2024-07-28 09:45:37.770496	2024-07-28 09:45:37.770496
-82	13	What is the default referencing build system for the Yocto Project?	2024-07-28 09:45:37.942766	2024-07-28 09:45:37.942766
-83	13	What are the constituents of the Poky build tool?	2024-07-28 09:45:38.157809	2024-07-28 09:45:38.157809
-84	13	What are the constituents of the Poky build system?	2024-07-28 09:45:38.354097	2024-07-28 09:45:38.354097
-85	13	What is the role of BitBake in the Yocto Project?	2024-07-28 09:45:38.67952	2024-07-28 09:45:38.67952
-86	13	What is the role of OpenEmbedded Core in the Yocto Project?	2024-07-28 09:45:38.93503	2024-07-28 09:45:38.93503
-87	13	What is the role of Metadata in the Yocto Project?	2024-07-28 09:45:39.181268	2024-07-28 09:45:39.181268
-88	13	What are the building blocks of the Metadata component in the Poky build system?	2024-07-28 09:45:39.491623	2024-07-28 09:45:39.491623
-89	13	What are the different roles and their tasks in Linux-based software development teams?	2024-07-28 09:45:39.858636	2024-07-28 09:45:39.858636
-90	14	How to create a patch?	2024-07-28 09:45:40.034246	2024-07-28 09:45:40.034246
-91	21	What is the common method to write a document as a beginner?	2024-07-28 09:45:40.391582	2024-07-28 09:45:40.391582
-92	21	What is the best practice in naming tex files?	2024-07-28 09:45:40.60542	2024-07-28 09:45:40.60542
-93	21	How many document classes are available?	2024-07-28 09:45:40.841593	2024-07-28 09:45:40.841593
-94	21	Create an empty article document?	2024-07-28 09:45:41.251108	2024-07-28 09:45:41.251108
-95	21	Set default font for document?	2024-07-28 09:45:41.663726	2024-07-28 09:45:41.663726
-96	21	Make a title in document?	2024-07-28 09:45:42.189077	2024-07-28 09:45:42.189077
-97	23	What features does the blindtext package present?	2024-07-28 09:45:42.74319	2024-07-28 09:45:42.74319
-98	24	What package should be used when UTF8 characters are written in text?	2024-07-28 09:45:43.148693	2024-07-28 09:45:43.148693
-99	25	What is best method to separate consequent lines in tex document?	2024-07-28 09:45:43.505262	2024-07-28 09:45:43.505262
-100	26	Bold a text?	2024-07-28 09:45:43.817827	2024-07-28 09:45:43.817827
-101	26	Italic a text?	2024-07-28 09:45:44.059571	2024-07-28 09:45:44.059571
-102	26	Underline a text?	2024-07-28 09:45:44.319987	2024-07-28 09:45:44.319987
-103	26	Underline a text with double line?	2024-07-28 09:45:44.625682	2024-07-28 09:45:44.625682
-104	26	Underline a text with wavy line?	2024-07-28 09:45:44.9391	2024-07-28 09:45:44.9391
-105	26	Strikethrough a text?	2024-07-28 09:45:45.250086	2024-07-28 09:45:45.250086
-106	26	Slash through a text?	2024-07-28 09:45:45.561981	2024-07-28 09:45:45.561981
-107	26	Underline text with dashed line?	2024-07-28 09:45:45.861514	2024-07-28 09:45:45.861514
-108	26	Underline text with dotted line?	2024-07-28 09:45:46.162355	2024-07-28 09:45:46.162355
-109	27	Color text?	2024-07-28 09:45:46.559274	2024-07-28 09:45:46.559274
-110	28	What symbol is used to create an inline math block?	2024-07-28 09:45:46.8767	2024-07-28 09:45:46.8767
-111	28	Protect a piece of inline math block from breaking into two lines?	2024-07-28 09:45:47.204181	2024-07-28 09:45:47.204181
-112	29	Write a math equation to be shown in a new separate line?	2024-07-28 09:45:47.49675	2024-07-28 09:45:47.49675
-113	30	What are the basic data types in OpenCV?	2024-07-28 09:45:47.831866	2024-07-28 09:45:47.831866
-114	30	What operations are supported by <code>cv::Point<></code> template class?	2024-07-28 09:45:48.241589	2024-07-28 09:45:48.241589
-115	30	What operations are supported by <code>cv::Scalar</code> class?	2024-07-28 09:45:48.672664	2024-07-28 09:45:48.672664
-116	30	What operations are supported by <code>cv::Size</code> class?	2024-07-28 09:45:49.038913	2024-07-28 09:45:49.038913
-117	30	What operations are supported by <code>cv::Rect</code> class?	2024-07-28 09:45:49.655218	2024-07-28 09:45:49.655218
-118	30	What operations are supported by <code>cv::RotatedRect</code> class?	2024-07-28 09:45:50.119711	2024-07-28 09:45:50.119711
-119	30	What operations are supported by <code>cv::Matx</code> template class?	2024-07-28 09:45:50.946821	2024-07-28 09:45:50.946821
-120	30	What operations are supported by <code>cv::Vec</code> template class?	2024-07-28 09:45:51.350931	2024-07-28 09:45:51.350931
-121	30	What operations are supported by <code>cv::Complex<></code> class template?	2024-07-28 09:45:51.821708	2024-07-28 09:45:51.821708
-122	33	Where the Qt installer can be found?	2024-07-28 09:45:52.250237	2024-07-28 09:45:52.250237
-123	33	How to update Qt components after manual installation?	2024-07-28 09:45:52.588782	2024-07-28 09:45:52.588782
-124	35	What is the interpreter of QML?	2024-07-28 09:45:52.911818	2024-07-28 09:45:52.911818
-125	35	What is the base code for a QML app?	2024-07-28 09:45:53.313537	2024-07-28 09:45:53.313537
-126	36	What elements are grouped as core in QML?	2024-07-28 09:45:53.658893	2024-07-28 09:45:53.658893
-127	37	What element is an item?	2024-07-28 09:45:53.976591	2024-07-28 09:45:53.976591
-128	37	What properties does an item element define inherited by all other elements?	2024-07-28 09:45:54.282913	2024-07-28 09:45:54.282913
-129	38	What properties does a window element support?	2024-07-28 09:45:54.523488	2024-07-28 09:45:54.523488
-130	38	Changed the default size of the window?	2024-07-28 09:45:54.969712	2024-07-28 09:45:54.969712
-131	39	What properties does a rectangle support?	2024-07-28 09:45:55.300049	2024-07-28 09:45:55.300049
-132	39	Colorize the background of a window?	2024-07-28 09:45:55.723888	2024-07-28 09:45:55.723888
-133	40	Draw a text on the app?	2024-07-28 09:45:56.493747	2024-07-28 09:45:56.493747
-134	41	How does a property alias work?	2024-07-28 09:45:56.854793	2024-07-28 09:45:56.854793
-135	42	How do signals work in QML?	2024-07-28 09:45:57.11721	2024-07-28 09:45:57.11721
-136	42	Capture key signals in an element?	2024-07-28 09:45:57.740033	2024-07-28 09:45:57.740033
-137	43	Load an image into the app?	2024-07-28 09:45:58.587171	2024-07-28 09:45:58.587171
-138	43	What are the properties of an image component?	2024-07-28 09:45:58.952591	2024-07-28 09:45:58.952591
-139	44	Make an area of window clickable?	2024-07-28 09:45:59.497731	2024-07-28 09:45:59.497731
-141	45	Make a reusable element?	2024-07-28 09:46:00.050719	2024-07-28 09:46:00.050719
-142	45	Propegate clicked signal to root level component?	2024-07-28 09:46:00.749552	2024-07-28 09:46:00.749552
-143	46	What are the porcelain commands?	2024-07-28 09:46:01.199778	2024-07-28 09:46:01.199778
-144	47	What are the plumbing commands?	2024-07-28 09:46:01.560067	2024-07-28 09:46:01.560067
-145	48	Conditionally use different git config file based on your project directory?	2024-07-28 09:46:01.989266	2024-07-28 09:46:01.989266
-146	48	Configure git to sign commits by ssh?	2024-07-28 09:46:02.441546	2024-07-28 09:46:02.441546
-147	49	Use shell command as a git alias?	2024-07-28 09:46:02.756246	2024-07-28 09:46:02.756246
-148	50	List available branches?	2024-07-28 09:46:03.174788	2024-07-28 09:46:03.174788
-149	50	Enable column view of branches by default?	2024-07-28 09:46:03.538153	2024-07-28 09:46:03.538153
-150	51	What options can be used to stash all ignored and untracked files along unstaged files?	2024-07-28 09:46:03.930094	2024-07-28 09:46:03.930094
-151	52	Log only a part of a file?	2024-07-28 09:46:04.264083	2024-07-28 09:46:04.264083
-152	52	Search through the git history for a string that was removed?	2024-07-28 09:46:04.520459	2024-07-28 09:46:04.520459
-153	53	What is a safer mechanism to force push commits?	2024-07-28 09:46:04.883524	2024-07-28 09:46:04.883524
-154	53	Push your sign along with pushing changes?	2024-07-28 09:46:05.194487	2024-07-28 09:46:05.194487
-155	55	How cloning can become faster?	2024-07-28 09:46:05.567781	2024-07-28 09:46:05.567781
-156	55	What is the downside of partial cloning?	2024-07-28 09:46:05.922423	2024-07-28 09:46:05.922423
-157	56	List remote refs?	2024-07-28 09:46:06.229165	2024-07-28 09:46:06.229165
-158	57	Set fetch remotes to a project?	2024-07-28 09:46:06.523845	2024-07-28 09:46:06.523845
-159	58	Blame only a part of a file?	2024-07-28 09:46:06.792311	2024-07-28 09:46:06.792311
-160	58	Ignore white spaces in blame?	2024-07-28 09:46:07.044229	2024-07-28 09:46:07.044229
-161	58	Detect who moved or copied in the same commit in blame?	2024-07-28 09:46:07.29786	2024-07-28 09:46:07.29786
-162	58	Detect who created or changed the file in blame?	2024-07-28 09:46:07.551109	2024-07-28 09:46:07.551109
-163	58	Detect any commit that affects a line of code in blame?	2024-07-28 09:46:07.810364	2024-07-28 09:46:07.810364
-164	59	What is a reflog?	2024-07-28 09:46:08.154645	2024-07-28 09:46:08.154645
-165	60	Differentiate two commits by line?	2024-07-28 09:46:08.47528	2024-07-28 09:46:08.47528
-166	60	Differentiate two commits by word?	2024-07-28 09:46:08.734618	2024-07-28 09:46:08.734618
-167	61	What is the advantage of using Reused Recorded Resolution?	2024-07-28 09:46:08.996206	2024-07-28 09:46:08.996206
-168	61	Enable Reused Recorded Resolution feature?	2024-07-28 09:46:09.268388	2024-07-28 09:46:09.268388
-169	62	What does <code>maitainance start</code> command do?	2024-07-28 09:46:09.627146	2024-07-28 09:46:09.627146
-170	62	What is the use case of maintainance command?	2024-07-28 09:46:10.017831	2024-07-28 09:46:10.017831
-171	63	What is the use case of commit graph command?	2024-07-28 09:46:10.390928	2024-07-28 09:46:10.390928
-172	63	How often should we run commit graph command?	2024-07-28 09:46:10.724286	2024-07-28 09:46:10.724286
-173	64	What mechanism can be used to increase the status command performance on big repositories?	2024-07-28 09:46:11.166001	2024-07-28 09:46:11.166001
-174	65	What is the impact of using multipack index mechanism?	2024-07-28 09:46:11.4781	2024-07-28 09:46:11.4781
-175	68	Clone with no checkout?	2024-07-28 09:46:11.799272	2024-07-28 09:46:11.799272
-176	69	Initiate project configuration with cmake?	2024-07-28 09:46:12.104512	2024-07-28 09:46:12.104512
-177	69	Specify the generator used for building the project?	2024-07-28 09:46:12.428502	2024-07-28 09:46:12.428502
-178	69	Externally specify the toolset and platform in configuration stage?	2024-07-28 09:46:12.80758	2024-07-28 09:46:12.80758
-179	69	Initialize project configuration by providing a pre-cached configuration file?	2024-07-28 09:46:13.135882	2024-07-28 09:46:13.135882
-180	70	Modify project cache variables in configuration stage?	2024-07-28 09:46:13.580012	2024-07-28 09:46:13.580012
-181	70	Specify the path to build directory in configuration stage?	2024-07-28 09:46:14.108715	2024-07-28 09:46:14.108715
-182	70	Remove one or more of configuration cache variables?	2024-07-28 09:46:14.510926	2024-07-28 09:46:14.510926
-183	71	List configuration cache variables?	2024-07-28 09:46:14.924949	2024-07-28 09:46:14.924949
-184	72	Get general information about variables, commands, macros, and other settings?	2024-07-28 09:46:15.3347	2024-07-28 09:46:15.3347
-185	73	Filter the CMake log output by log level in the command line?	2024-07-28 09:46:15.86564	2024-07-28 09:46:15.86564
-186	73	Permanently specify the log level in project configuration?	2024-07-28 09:46:16.139136	2024-07-28 09:46:16.139136
-187	73	Display log context with each <code>message()</code> call?	2024-07-28 09:46:16.63339	2024-07-28 09:46:16.63339
-188	74	Enable trace mode?	2024-07-28 09:46:17.034442	2024-07-28 09:46:17.034442
-189	74	Where does cmake write project presets?	2024-07-28 09:46:17.293178	2024-07-28 09:46:17.293178
-190	75	List all of the available presets?	2024-07-28 09:46:17.524821	2024-07-28 09:46:17.524821
-191	75	Use one of the available presets in the project?	2024-07-28 09:46:17.83098	2024-07-28 09:46:17.83098
-192	75	What preset paths are available in scripts?	2024-07-28 09:46:18.083749	2024-07-28 09:46:18.083749
-193	76	Execute the build stage of the project?	2024-07-28 09:46:18.329405	2024-07-28 09:46:18.329405
-194	76	Provide special arguments to the native builder?	2024-07-28 09:46:18.641082	2024-07-28 09:46:18.641082
-195	76	Specify the number of jobs that should build the project simultaneously?	2024-07-28 09:46:19.052158	2024-07-28 09:46:19.052158
-196	76	Explicitly specify targets to build?	2024-07-28 09:46:19.428431	2024-07-28 09:46:19.428431
-197	77	Remove all artifacts from the build directory?	2024-07-28 09:46:19.73093	2024-07-28 09:46:19.73093
-198	77	Execute build stage by first cleaning the build directory?	2024-07-28 09:46:19.998345	2024-07-28 09:46:19.998345
-199	77	Instruct CMake to be verbose in build stage?	2024-07-28 09:46:20.339192	2024-07-28 09:46:20.339192
-200	78	Execute CMake to install targets?	2024-07-28 09:46:20.641362	2024-07-28 09:46:20.641362
-201	78	Execute CMake to install targets with a specific build type?	2024-07-28 09:46:21.053336	2024-07-28 09:46:21.053336
-202	78	Execute CMake to install specific components within a project?	2024-07-28 09:46:21.406375	2024-07-28 09:46:21.406375
-203	78	Set default permissions of installed files?	2024-07-28 09:46:21.77042	2024-07-28 09:46:21.77042
-204	78	Modify the installation path?	2024-07-28 09:46:22.08852	2024-07-28 09:46:22.08852
-205	78	Instruct CMake to log a detailed output of the installation stage?	2024-07-28 09:46:22.483882	2024-07-28 09:46:22.483882
-206	79	Run CMake scripts?	2024-07-28 09:46:22.795068	2024-07-28 09:46:22.795068
-207	79	Pass values to CMake scripts?	2024-07-28 09:46:23.206786	2024-07-28 09:46:23.206786
-208	80	Execute external commands with CMake?	2024-07-28 09:46:23.584526	2024-07-28 09:46:23.584526
-209	80	List all the available external commands in CMake?	2024-07-28 09:46:23.854197	2024-07-28 09:46:23.854197
-210	81	Get help from CMake documentation?	2024-07-28 09:46:24.149317	2024-07-28 09:46:24.149317
-211	82	Run test on a built project?	2024-07-28 09:46:24.504178	2024-07-28 09:46:24.504178
-212	83	Include another listfile in <code>CMakeLists.txt</code>?	2024-07-28 09:46:25.018262	2024-07-28 09:46:25.018262
-213	83	What are the actual requirements for the script file provided?	2024-07-28 09:46:25.43419	2024-07-28 09:46:25.43419
-214	83	Use a utility in script?	2024-07-28 09:46:25.652108	2024-07-28 09:46:25.652108
-215	84	Generate DWARF debugging information in an executable?	2024-07-28 09:46:26.176159	2024-07-28 09:46:26.176159
-216	85	Start the text user interface in gdb?	2024-07-28 09:46:26.750491	2024-07-28 09:46:26.750491
-217	85	Enter SingleKey mode?	2024-07-28 09:46:27.080983	2024-07-28 09:46:27.080983
-218	85	Cycle through assembly and source code windows in GDB TUI?	2024-07-28 09:46:27.265149	2024-07-28 09:46:27.265149
-219	85	Switch focus between GDB TUI windows?	2024-07-28 09:46:27.547839	2024-07-28 09:46:27.547839
-220	86	Navigate through command history?	2024-07-28 09:46:27.796269	2024-07-28 09:46:27.796269
-221	87	Begin debugging session of an executable?	2024-07-28 09:46:28.018575	2024-07-28 09:46:28.018575
-222	88	Start debugging an already running process?	2024-07-28 09:46:28.380741	2024-07-28 09:46:28.380741
-223	89	Detach debugger from a debugging process?	2024-07-28 09:46:28.757274	2024-07-28 09:46:28.757274
-224	90	Show source code in debugging session?	2024-07-28 09:46:29.012779	2024-07-28 09:46:29.012779
-225	91	How many breakpoints does GDB offer?	2024-07-28 09:46:29.28102	2024-07-28 09:46:29.28102
-226	91	Get information about breakpoints, watchpoints and catchpoints?	2024-07-28 09:46:29.530495	2024-07-28 09:46:29.530495
-227	92	Set breakpoints on a program?	2024-07-28 09:46:29.893506	2024-07-28 09:46:29.893506
-228	92	Run program with an immediate stop on main function?	2024-07-28 09:46:30.098814	2024-07-28 09:46:30.098814
-229	92	Use regex to select multiple breakpoints for an operation?	2024-07-28 09:46:30.312123	2024-07-28 09:46:30.312123
-230	93	Delete a breakpoint from a program?	2024-07-28 09:46:30.585771	2024-07-28 09:46:30.585771
-231	94	Set condition for a breakpoint?	2024-07-28 09:46:30.846409	2024-07-28 09:46:30.846409
-232	94	Conditionally break execution only when iteration index has increased to 3?	2024-07-28 09:46:31.100774	2024-07-28 09:46:31.100774
-233	95	Skip over a number of breakpoint hits?	2024-07-28 09:46:31.557411	2024-07-28 09:46:31.557411
-234	96	Disable an already existing breakpoint?	2024-07-28 09:46:31.895398	2024-07-28 09:46:31.895398
-235	96	Enable an already disabled breakpoint?	2024-07-28 09:46:32.142065	2024-07-28 09:46:32.142065
-236	97	Save breakpoints of a debugging session?	2024-07-28 09:46:32.417619	2024-07-28 09:46:32.417619
-237	97	Restore saved breakpoints on a debugging session?	2024-07-28 09:46:32.729816	2024-07-28 09:46:32.729816
-238	97	Manually write the content of a file in which breakpoints were saved?	2024-07-28 09:46:33.042194	2024-07-28 09:46:33.042194
-239	98	Watch changes of a variable only when a criteria is met?	2024-07-28 09:46:33.290319	2024-07-28 09:46:33.290319
-240	98	Track a particular location in memory rather than the value of an expression?	2024-07-28 09:46:33.679731	2024-07-28 09:46:33.679731
-241	99	Step through program execution in debugging session?	2024-07-28 09:46:34.049657	2024-07-28 09:46:34.049657
-242	100	Examine a memory address or register?	2024-07-28 09:46:34.397026	2024-07-28 09:46:34.397026
-243	101	Get information of threads?	2024-07-28 09:46:34.980041	2024-07-28 09:46:34.980041
-244	102	List the innermost or outermost frames of backtrace?	2024-07-28 09:46:35.454945	2024-07-28 09:46:35.454945
-245	103	Where the coredumps are stored?	2024-07-28 09:46:35.742274	2024-07-28 09:46:35.742274
-246	103	Store the core dump of your program into a file?	2024-07-28 09:46:35.998895	2024-07-28 09:46:35.998895
-247	103	Load the stored coredump into debugging session?	2024-07-28 09:46:36.279435	2024-07-28 09:46:36.279435
-248	103	Select a core section to inspect the cause of termination?	2024-07-28 09:46:36.580728	2024-07-28 09:46:36.580728
-249	104	Create a core dump from the state of an executable in debugging session?	2024-07-28 09:46:36.862272	2024-07-28 09:46:36.862272
-250	105	Print the value of an object?	2024-07-28 09:46:37.107335	2024-07-28 09:46:37.107335
-251	105	Inspect the type of a variable?	2024-07-28 09:46:37.345198	2024-07-28 09:46:37.345198
-252	106	Modify the value of a variable?	2024-07-28 09:46:37.585299	2024-07-28 09:46:37.585299
-253	107	Run shell commands in debugging session?	2024-07-28 09:46:37.854731	2024-07-28 09:46:37.854731
-254	108	Automatically run commands on GDB startup?	2024-07-28 09:46:38.361481	2024-07-28 09:46:38.361481
-255	109	Measure the processor events using perf?	2024-07-28 09:46:38.715851	2024-07-28 09:46:38.715851
-256	110	Visually analyze the output of perf?	2024-07-28 09:46:38.979613	2024-07-28 09:46:38.979613
-257	111	Build an executable from C++ source?	2024-07-28 09:46:39.339065	2024-07-28 09:46:39.339065
-258	112	What is the behavior of a fundamental data type when it's default initialized?	2024-07-28 09:46:40.160291	2024-07-28 09:46:40.160291
-259	113	Initialize scoped and global variables?	2024-07-28 09:46:40.847548	2024-07-28 09:46:40.847548
-260	114	How many constants are available in C++?	2024-07-28 09:46:41.284079	2024-07-28 09:46:41.284079
-261	114	Initialize a constant?	2024-07-28 09:46:41.525236	2024-07-28 09:46:41.525236
-262	115	Uniformly initialize objects of any type?	2024-07-28 09:46:42.665301	2024-07-28 09:46:42.665301
-263	115	What is the defect in auto rule for direct list initialization?	2024-07-28 09:46:43.264734	2024-07-28 09:46:43.264734
-264	116	What are the possible ways of initializing aggregate objects?	2024-07-28 09:46:44.244292	2024-07-28 09:46:44.244292
-265	117	What object types are able to initialize specific members explicitly?	2024-07-28 09:46:45.285257	2024-07-28 09:46:45.285257
-266	118	Declare and define a function separately?	2024-07-28 09:46:45.882124	2024-07-28 09:46:45.882124
-267	119	Declare a function evaluated at compile time?	2024-07-28 09:46:46.266782	2024-07-28 09:46:46.266782
-268	120	Ensure compile time evaluation of a function?	2024-07-28 09:46:46.741065	2024-07-28 09:46:46.741065
-269	121	What conditional statement can be used to separate a function into compiletime and runtime evaluation?	2024-07-28 09:46:47.502058	2024-07-28 09:46:47.502058
-270	121	What is the equivalent form of <code>if consteval</code> prior standard 23?	2024-07-28 09:46:47.980317	2024-07-28 09:46:47.980317
-271	121	What are the advantages of using <code>if consteval</code> compared to <code>std::is_constant_evaluated()</code>?	2024-07-28 09:46:48.34759	2024-07-28 09:46:48.34759
-272	125	Transfer ownership of a pointer without making a copy of it?	2024-07-28 09:46:49.356446	2024-07-28 09:46:49.356446
-273	128	Abbreviate namespaces to avoid repetition?	2024-07-28 09:46:49.961222	2024-07-28 09:46:49.961222
-274	129	Declare an object with internal linkage without being static?	2024-07-28 09:46:50.657686	2024-07-28 09:46:50.657686
-275	129	Initialize a non-type template argument with an object of internal linkage?	2024-07-28 09:46:51.358382	2024-07-28 09:46:51.358382
-276	130	Define symbol versioning of a library without breaking client code when implementing template specializations?	2024-07-28 09:46:53.841039	2024-07-28 09:46:53.841039
-277	131	What is the abbreviated way of declaring nested namespaces?	2024-07-28 09:46:54.836737	2024-07-28 09:46:54.836737
-278	132	What are the main module properties?	2024-07-28 09:46:55.115109	2024-07-28 09:46:55.115109
-279	132	Import a standard module in a translation unit?	2024-07-28 09:46:55.61067	2024-07-28 09:46:55.61067
-280	132	What are the constituents of a module?	2024-07-28 09:46:56.068395	2024-07-28 09:46:56.068395
-281	132	What C++ entities can be exported as module interface?	2024-07-28 09:46:56.401183	2024-07-28 09:46:56.401183
-282	132	What C++ entities cannot be exported as module interface?	2024-07-28 09:46:56.718678	2024-07-28 09:46:56.718678
-283	133	Express a module to be used within another translation unit?	2024-07-28 09:46:57.880571	2024-07-28 09:46:57.880571
-284	134	What is a module partition?	2024-07-28 09:46:58.607927	2024-07-28 09:46:58.607927
-285	134	What is a module interface partition?	2024-07-28 09:47:00.336753	2024-07-28 09:47:00.336753
-286	135	What is a module implementation partition?	2024-07-28 09:47:01.66626	2024-07-28 09:47:01.66626
-287	135	What is the difference between module partitions and submodules?	2024-07-28 09:47:03.792271	2024-07-28 09:47:03.792271
-288	136	Initialize objects using automatic compiler type deduction?	2024-07-28 09:47:05.570834	2024-07-28 09:47:05.570834
-289	136	When does auto type decays?	2024-07-28 09:47:06.178935	2024-07-28 09:47:06.178935
-290	137	Bind multiple returned values into existing objects?	2024-07-28 09:47:06.785821	2024-07-28 09:47:06.785821
-291	138	Define a new type based on predefined types?	2024-07-28 09:47:07.129858	2024-07-28 09:47:07.129858
-292	139	Create type aliases for objects and functions?	2024-07-28 09:47:07.652088	2024-07-28 09:47:07.652088
-293	140	Specify the underlying type for an enumeration type?	2024-07-28 09:47:08.344316	2024-07-28 09:47:08.344316
-294	140	Export enumerators of an enumeration in a local scope?	2024-07-28 09:47:09.131869	2024-07-28 09:47:09.131869
-295	141	Construct a variant to hold three different types?	2024-07-28 09:47:09.727335	2024-07-28 09:47:09.727335
-296	141	Change the active type of a variant?	2024-07-28 09:47:10.180659	2024-07-28 09:47:10.180659
-297	141	Retreive value of the active type within a variant?	2024-07-28 09:47:10.940786	2024-07-28 09:47:10.940786
-298	141	Access the content of a variant with visitor approach?	2024-07-28 09:47:11.650181	2024-07-28 09:47:11.650181
-299	141	Create a helper to be compatible with any of the variant types?	2024-07-28 09:47:12.541954	2024-07-28 09:47:12.541954
-300	143	Use <code>std::expected</code> to link possible outcomes of an operation?	2024-07-28 09:47:13.45524	2024-07-28 09:47:13.45524
-301	144	Enable all comparison operators for an object type?	2024-07-28 09:47:15.435984	2024-07-28 09:47:15.435984
-302	144	Implement an object comparable with all six comparison operators?	2024-07-28 09:47:17.006497	2024-07-28 09:47:17.006497
-303	144	What are the possible comparison categories?	2024-07-28 09:47:18.127749	2024-07-28 09:47:18.127749
-304	144	Compare two objects that might result any of the comparison categories?	2024-07-28 09:47:19.361323	2024-07-28 09:47:19.361323
-305	144	Compare two derived objects having a base class?	2024-07-28 09:47:21.034555	2024-07-28 09:47:21.034555
-306	144	What is the compatibility defect of comparison operators in C++20?	2024-07-28 09:47:22.682333	2024-07-28 09:47:22.682333
-307	145	Avoid implicit conversion of classes?	2024-07-28 09:47:23.77159	2024-07-28 09:47:23.77159
-308	146	Initialize non-static member variables of a class?	2024-07-28 09:47:24.504026	2024-07-28 09:47:24.504026
-309	147	Indicate error when a return value from a function is ignored?	2024-07-28 09:47:24.884322	2024-07-28 09:47:24.884322
-310	147	Add a message to discard attribute?	2024-07-28 09:47:25.143992	2024-07-28 09:47:25.143992
-311	147	Indicate error when a return value from lambda is ignored?	2024-07-28 09:47:25.440973	2024-07-28 09:47:25.440973
-312	147	Indicate error when a type is ignored when returned?	2024-07-28 09:47:25.833575	2024-07-28 09:47:25.833575
-313	147	Indicate error when a constructor is used without object name?	2024-07-28 09:47:26.361731	2024-07-28 09:47:26.361731
-314	148	Replace ref-quialified overloads of a method with one generic overload?	2024-07-28 09:47:27.250384	2024-07-28 09:47:27.250384
-315	148	What is the equivalent form of ref-quialified function?	2024-07-28 09:47:27.841506	2024-07-28 09:47:27.841506
-316	148	Access the object containing the lambda within a recursive lambda?	2024-07-28 09:47:28.336632	2024-07-28 09:47:28.336632
-317	149	What are the alternatives to templates which should be avoided by using templates?	2024-07-28 09:47:28.680401	2024-07-28 09:47:28.680401
-318	150	What are the alternatives to typename keyword?	2024-07-28 09:47:28.957044	2024-07-28 09:47:28.957044
-319	151	What are the translation phases of a template?	2024-07-28 09:47:29.49531	2024-07-28 09:47:29.49531
-320	151	What happens when a function template triggers its instantiation?	2024-07-28 09:47:29.878655	2024-07-28 09:47:29.878655
-321	152	What is the signature of a function template?	2024-07-28 09:47:30.320647	2024-07-28 09:47:30.320647
-322	152	What requirements should the type of a function template parameter meet?	2024-07-28 09:47:30.669129	2024-07-28 09:47:30.669129
-323	153	What is the alternative to writing function templates without having typenames?	2024-07-28 09:47:31.143015	2024-07-28 09:47:31.143015
-324	154	Use a function template with different types?	2024-07-28 09:47:31.599991	2024-07-28 09:47:31.599991
-325	155	How does the compile deduce the type of function template arguments?	2024-07-28 09:47:32.175944	2024-07-28 09:47:32.175944
-326	155	What are the limits of type conversion during type deduction of function template arguments?	2024-07-28 09:47:33.022209	2024-07-28 09:47:33.022209
-327	155	What are the common ways to handle type conversions during type deduction of function template arguments?	2024-07-28 09:47:33.854165	2024-07-28 09:47:33.854165
-328	155	How does the compiler deduce the default function template parameters?	2024-07-28 09:47:34.580258	2024-07-28 09:47:34.580258
-329	156	Declare a function template with multiple template parameters?	2024-07-28 09:47:35.089698	2024-07-28 09:47:35.089698
-330	156	What are the common ways of handling return type deduction for function templates having multiple function template parameters?	2024-07-28 09:47:35.381319	2024-07-28 09:47:35.381319
-331	156	What are the disadvantages of using additional template parameter for return types when having multiple function template parameters?	2024-07-28 09:47:36.123585	2024-07-28 09:47:36.123585
-332	157	What types are supported as non-type template arguments?	2024-07-28 09:47:36.7777	2024-07-28 09:47:36.7777
-333	158	Since when <code>template</code> keyword can be used instead of class in a template template parameter?	2024-07-28 09:47:37.457037	2024-07-28 09:47:37.457037
-334	159	What is a variadic template parameter?	2024-07-28 09:47:37.961061	2024-07-28 09:47:37.961061
-335	159	What operator can be used to retrieve the number of arguments in a variadic template parameter?	2024-07-28 09:47:38.397005	2024-07-28 09:47:38.397005
-336	160	What is the compact form of variadic templates?	2024-07-28 09:47:38.845289	2024-07-28 09:47:38.845289
-337	161	What are the disadvantages of using automatic deduction of return types when multiple function template parameters are used?	2024-07-28 09:47:39.260196	2024-07-28 09:47:39.260196
-338	161	Use trailing return type to deduce the return type of a function template?	2024-07-28 09:47:39.750061	2024-07-28 09:47:39.750061
-339	161	What is the drawback of using trailing return type?	2024-07-28 09:47:40.44985	2024-07-28 09:47:40.44985
-340	161	Use common type as the return type of a function template?	2024-07-28 09:47:41.190379	2024-07-28 09:47:41.190379
-341	162	What are the use cases of default template arguments?	2024-07-28 09:47:41.87969	2024-07-28 09:47:41.87969
-342	162	What ordering default template parameter can have?	2024-07-28 09:47:42.471393	2024-07-28 09:47:42.471393
-343	163	What are the rules of overload resolution for matching a function template overload by a compiler?	2024-07-28 09:47:43.482501	2024-07-28 09:47:43.482501
-344	163	What happens when there are two matching template overloads for a function call?	2024-07-28 09:47:44.118335	2024-07-28 09:47:44.118335
-345	163	What are the common use cases of overloading function templates?	2024-07-28 09:47:45.003836	2024-07-28 09:47:45.003836
-346	163	What is the drawback of overloading function templates?	2024-07-28 09:47:46.375882	2024-07-28 09:47:46.375882
-347	163	When a template function overload would be missed by a call?	2024-07-28 09:47:47.347476	2024-07-28 09:47:47.347476
-348	164	What is the use case of concepts?	2024-07-28 09:47:47.94318	2024-07-28 09:47:47.94318
-349	165	Write a custom concept?	2024-07-28 09:47:48.280669	2024-07-28 09:47:48.280669
-350	165	How can we have two different bodies of a function with the same signature and let compiler know which is best match?	2024-07-28 09:47:48.973659	2024-07-28 09:47:48.973659
-351	165	In how many ways can we apply a concept as a type constraint on a function template?	2024-07-28 09:47:49.867406	2024-07-28 09:47:49.867406
-352	167	Declare a class template?	2024-07-28 09:47:50.618117	2024-07-28 09:47:50.618117
-353	167	Declare copy constructor and copy assignment operator of a class template?	2024-07-28 09:47:51.508938	2024-07-28 09:47:51.508938
-354	167	Define the member functions of a class template outside of the scope of the class?	2024-07-28 09:47:52.210433	2024-07-28 09:47:52.210433
-355	168	What is the requirements of the type used as class template arguments?	2024-07-28 09:47:53.05042	2024-07-28 09:47:53.05042
-356	169	Declare a friend function template in a class template?	2024-07-28 09:47:54.329374	2024-07-28 09:47:54.329374
-357	170	Specialize a class template for a specific type?	2024-07-28 09:47:55.224206	2024-07-28 09:47:55.224206
-358	170	Partially specialize a class template for pointers?	2024-07-28 09:47:56.028315	2024-07-28 09:47:56.028315
-359	170	What are the possible template specializations of a class template with multiple template parameters?	2024-07-28 09:47:57.163708	2024-07-28 09:47:57.163708
-360	171	Define default values for class template parameters?	2024-07-28 09:47:58.382879	2024-07-28 09:47:58.382879
-361	172	Define an alias template?	2024-07-28 09:47:58.845129	2024-07-28 09:47:58.845129
-362	172	Use alias templates for member types of class templates?	2024-07-28 09:47:59.525661	2024-07-28 09:47:59.525661
-363	173	Under what condition class templates do not require specifying template parameters?	2024-07-28 09:48:00.071904	2024-07-28 09:48:00.071904
-427	202	Express all different string literals?	2024-07-28 09:48:55.599918	2024-07-28 09:48:55.599918
-364	173	How does compiler realize which constructor should be used as the result of arguments deduction?	2024-07-28 09:48:02.238464	2024-07-28 09:48:02.238464
-365	173	What is the common way of supporting type deduction for a class template?	2024-07-28 09:48:03.345357	2024-07-28 09:48:03.345357
-366	173	What is the drawback of supporting class template argument deduction by providing constructors passing initial argument?	2024-07-28 09:48:04.422647	2024-07-28 09:48:04.422647
-367	173	What is the drawback of passing arguments of a template type by reference when supporting class template argument deduction?	2024-07-28 09:48:05.517425	2024-07-28 09:48:05.517425
-368	174	Disable automatic deduction of raw character pointers using deduction guides instead of constructors passing arguments?	2024-07-28 09:48:06.286427	2024-07-28 09:48:06.286427
-369	174	Use deduction guides for the constructor of a class that takes two iterators to deduce the value type of iterators?	2024-07-28 09:48:07.362821	2024-07-28 09:48:07.362821
-370	174	Where are the edge cases where deduction guides do not work?	2024-07-28 09:48:08.074712	2024-07-28 09:48:08.074712
-371	174	Define deduction guides for aggregate class templates?	2024-07-28 09:48:08.982219	2024-07-28 09:48:08.982219
-372	175	Iterate over a range without invoking iterator functions?	2024-07-28 09:48:10.22186	2024-07-28 09:48:10.22186
-373	175	Enable iteration mechanism for custom types?	2024-07-28 09:48:13.033535	2024-07-28 09:48:13.033535
-374	176	Evaluate alignment of structures considering the size of their members?	2024-07-28 09:48:14.770063	2024-07-28 09:48:14.770063
-375	176	Query alignment of object types?	2024-07-28 09:48:15.547091	2024-07-28 09:48:15.547091
-376	176	Set alignment of object types?	2024-07-28 09:48:17.088137	2024-07-28 09:48:17.088137
-377	177	Determine the size of an expression?	2024-07-28 09:48:17.708407	2024-07-28 09:48:17.708407
-378	179	What types can be used to create a cooked user-defined literal?	2024-07-28 09:48:18.277066	2024-07-28 09:48:18.277066
-379	179	How to create a compile-time generated user-defined literal?	2024-07-28 09:48:19.014783	2024-07-28 09:48:19.014783
-380	180	What signatues can a literal operator or a literal operator template have to overload a user-defined literal?	2024-07-28 09:48:19.474256	2024-07-28 09:48:19.474256
-381	180	How literal operators or literal operator templates can be used to construct a numberic value by its binary representation?	2024-07-28 09:48:20.689941	2024-07-28 09:48:20.689941
-382	181	Where does move semantics apply optimizations compared to prior C++11 standard?	2024-07-28 09:48:21.578192	2024-07-28 09:48:21.578192
-383	181	How move semantics can be implemented for a class?	2024-07-28 09:48:22.772283	2024-07-28 09:48:22.772283
-384	181	When do compilers automatically switch to move semantics?	2024-07-28 09:48:23.193484	2024-07-28 09:48:23.193484
-385	181	What header file should be included when using move semantics?	2024-07-28 09:48:23.521703	2024-07-28 09:48:23.521703
-386	181	What is the equivallent form of <code>std::move()</code>?	2024-07-28 09:48:23.867019	2024-07-28 09:48:23.867019
-387	182	What happens to an object when move semantics is not available?	2024-07-28 09:48:24.233593	2024-07-28 09:48:24.233593
-388	182	What happens to an object declared with <code>const</code> when moved?	2024-07-28 09:48:24.691596	2024-07-28 09:48:24.691596
-389	182	Why return values should not be marked as <code>const</code>?	2024-07-28 09:48:25.280944	2024-07-28 09:48:25.280944
-390	183	What should be the state of an object after it has been moved?	2024-07-28 09:48:25.616559	2024-07-28 09:48:25.616559
-391	183	What is the moved-from object state?	2024-07-28 09:48:26.270278	2024-07-28 09:48:26.270278
-392	184	What is the behavior of a parameter that is declared as an rvalue reference?	2024-07-28 09:48:26.959325	2024-07-28 09:48:26.959325
-393	184	What are the major ways of call-by-reference and what kind of arguments does each take?	2024-07-28 09:48:28.425067	2024-07-28 09:48:28.425067
-394	185	Why does automatic move operations disable when user declares special member functions?	2024-07-28 09:48:29.19972	2024-07-28 09:48:29.19972
-395	185	Based on the exact rules for <i>generated special member functions</i> when would copy constructor and copy assignment operator automatically be generated?	2024-07-28 09:48:29.573103	2024-07-28 09:48:29.573103
-396	185	Based on the exact rules for <i>generated special member functions</i> when would move constructor and move assignment operator be automatically generated?	2024-07-28 09:48:29.964618	2024-07-28 09:48:29.964618
-397	185	Based on the exact rules for <i>generated special member functions</i> when would destructor disable automatic move operations?	2024-07-28 09:48:30.279157	2024-07-28 09:48:30.279157
-398	185	What special member functions are generated by default for a class?	2024-07-28 09:48:30.876613	2024-07-28 09:48:30.876613
-399	185	When do move operations become broken?	2024-07-28 09:48:31.312321	2024-07-28 09:48:31.312321
-400	185	What declarations does the <b>Rule of Five</b> formulate to simplify special member functions generation?	2024-07-28 09:48:31.647704	2024-07-28 09:48:31.647704
-401	186	What does it mean to say move semantics is not passed through?	2024-07-28 09:48:32.291874	2024-07-28 09:48:32.291874
-402	186	How to deal with moving an object to itself?	2024-07-28 09:48:33.02778	2024-07-28 09:48:33.02778
-403	186	Why deleting moving operations does not make semantic sence?	2024-07-28 09:48:34.411291	2024-07-28 09:48:34.411291
-404	186	Why should we avoid using move operations when returning a local object?	2024-07-28 09:48:35.051045	2024-07-28 09:48:35.051045
-405	187	How to properly disable move semantics in an object without disabling fallback mechanism?	2024-07-28 09:48:35.680862	2024-07-28 09:48:35.680862
-406	187	How does move operation work for a class containing a member with disabled move operations?	2024-07-28 09:48:36.578071	2024-07-28 09:48:36.578071
-407	187	Does <code>virtual</code> destructor in a base class disable automatic move operations in its derived classes?	2024-07-28 09:48:37.357857	2024-07-28 09:48:37.357857
-408	188	When does the call-by-value become cheap with move semantics?	2024-07-28 09:48:38.218555	2024-07-28 09:48:38.218555
-409	188	When would passing by value becomes cheaper than passing by const lvalue references?	2024-07-28 09:48:42.017278	2024-07-28 09:48:42.017278
-410	188	When to take arguments by value and when to take by references?	2024-07-28 09:48:43.126731	2024-07-28 09:48:43.126731
-411	189	Ensure correct virtual declaration of methods base and derived classes?	2024-07-28 09:48:43.88757	2024-07-28 09:48:43.88757
-412	189	Prevent derived classes from overriding virtual methods?	2024-07-28 09:48:44.831111	2024-07-28 09:48:44.831111
-413	190	Prevent inheritance of a class?	2024-07-28 09:48:45.589681	2024-07-28 09:48:45.589681
-414	195	Synchronize an stream to be flushed when went out of scope regarding RAII idiom?	2024-07-28 09:48:46.230359	2024-07-28 09:48:46.230359
-415	196	Take the string stream contents as an string?	2024-07-28 09:48:47.031415	2024-07-28 09:48:47.031415
-416	196	Use move semantics to avoid copies on string stream construction?	2024-07-28 09:48:47.763748	2024-07-28 09:48:47.763748
-417	197	Use a preallocated buffer as the internal memory for a stream object?	2024-07-28 09:48:48.662442	2024-07-28 09:48:48.662442
-418	198	Insert elements into containers by constructing them on insertion?	2024-07-28 09:48:49.503154	2024-07-28 09:48:49.503154
-419	200	Find a substring within another string?	2024-07-28 09:48:50.481073	2024-07-28 09:48:50.481073
-420	200	Check if a string has expected prefix?	2024-07-28 09:48:51.055454	2024-07-28 09:48:51.055454
-421	200	Check if a string has expected postfix?	2024-07-28 09:48:51.573406	2024-07-28 09:48:51.573406
-422	201	Convert integeral and floating-point types into strings?	2024-07-28 09:48:51.975756	2024-07-28 09:48:51.975756
-423	201	Convert string to numeric types?	2024-07-28 09:48:52.841429	2024-07-28 09:48:52.841429
-424	201	What are the valid input characters for integral type to string conversion functions?	2024-07-28 09:48:53.403639	2024-07-28 09:48:53.403639
-425	201	What exceptions are thrown by numeric to string conversion functions on failure?	2024-07-28 09:48:54.177429	2024-07-28 09:48:54.177429
-426	201	What are the valid input characters for floating-point type to string conversion functions?	2024-07-28 09:48:54.947429	2024-07-28 09:48:54.947429
-428	203	Create string literals containing special characters without escaping them?	2024-07-28 09:48:56.110026	2024-07-28 09:48:56.110026
-429	203	Express different types of strings that raw string literals can generate?	2024-07-28 09:48:56.723017	2024-07-28 09:48:56.723017
-430	204	Avoid string copies over function call?	2024-07-28 09:48:57.464768	2024-07-28 09:48:57.464768
-431	204	Find the first and last occurance of a character in a <code>string_view</code>?	2024-07-28 09:48:57.887842	2024-07-28 09:48:57.887842
-432	204	Remove tailing and trailing characters from a <code>string_view</code>?	2024-07-28 09:48:58.347103	2024-07-28 09:48:58.347103
-433	204	Construct a <code>std::string</code> from a <code>std::string_view</code>?	2024-07-28 09:48:58.794015	2024-07-28 09:48:58.794015
-434	205	Check existance of a substring at the beginning or the end of a string?	2024-07-28 09:48:59.446347	2024-07-28 09:48:59.446347
-435	206	What are the advantages of using format compared to printf?	2024-07-28 09:48:59.755642	2024-07-28 09:48:59.755642
-436	206	Format a text by positioning multiple values in a text in a specific order?	2024-07-28 09:49:00.132205	2024-07-28 09:49:00.132205
-437	206	Format a 2-digit integer in hexadecimal with zero padding?	2024-07-28 09:49:00.471265	2024-07-28 09:49:00.471265
-438	206	Enable formating of a custom type?	2024-07-28 09:49:01.110549	2024-07-28 09:49:01.110549
-439	206	Format the current date?	2024-07-28 09:49:01.50234	2024-07-28 09:49:01.50234
-440	207	Print a text to standard output?	2024-07-28 09:49:01.824701	2024-07-28 09:49:01.824701
-441	208	Construct a regex?	2024-07-28 09:49:02.281262	2024-07-28 09:49:02.281262
-442	208	Make regular expressions case insensitive?	2024-07-28 09:49:02.627235	2024-07-28 09:49:02.627235
-443	208	Verify existance of a pattern in a string?	2024-07-28 09:49:03.440991	2024-07-28 09:49:03.440991
-444	208	Retrieve submatches of a pattern matched within a string?	2024-07-28 09:49:04.712764	2024-07-28 09:49:04.712764
-445	208	How many regular expression engines are available in C++?	2024-07-28 09:49:05.439347	2024-07-28 09:49:05.439347
-446	208	Search for the first occurance of a pattern in a string?	2024-07-28 09:49:06.285399	2024-07-28 09:49:06.285399
-447	208	Find all occurences of a pattern in a given text?	2024-07-28 09:49:07.893762	2024-07-28 09:49:07.893762
-448	208	Replace the content of a string with a pattern?	2024-07-28 09:49:08.536939	2024-07-28 09:49:08.536939
-449	208	Reposition submatches of a string?	2024-07-28 09:49:09.077129	2024-07-28 09:49:09.077129
-450	209	Get the smallest and largest finite numbers of a type?	2024-07-28 09:49:10.022137	2024-07-28 09:49:10.022137
-451	209	Retrieve the maximum number of digits for integral and floating-point types?	2024-07-28 09:49:10.672179	2024-07-28 09:49:10.672179
-452	209	Retrieve the longest possible digits of a decimal type that can be represented without a change?	2024-07-28 09:49:11.101842	2024-07-28 09:49:11.101842
-453	209	Verify if a numeric type is signed?	2024-07-28 09:49:11.482015	2024-07-28 09:49:11.482015
-454	209	Verify if a numeric type is an integer?	2024-07-28 09:49:11.856668	2024-07-28 09:49:11.856668
-455	209	Verify if a floating-point value is exact?	2024-07-28 09:49:12.239018	2024-07-28 09:49:12.239018
-456	209	Verify if a floating-point value holds infinity value?	2024-07-28 09:49:12.588427	2024-07-28 09:49:12.588427
-457	210	Express all different <code>std::complex</code> literals?	2024-07-28 09:49:13.014154	2024-07-28 09:49:13.014154
-458	211	Get the minimum and maximum value that a random engine can generate?	2024-07-28 09:49:13.470162	2024-07-28 09:49:13.470162
-459	211	Seed a random generator to initialize the algorithm corporated within it?	2024-07-28 09:49:14.037081	2024-07-28 09:49:14.037081
-460	211	Call for a new number from random engines?	2024-07-28 09:49:14.600038	2024-07-28 09:49:14.600038
-461	211	Discard the generated number of a random engine?	2024-07-28 09:49:15.023492	2024-07-28 09:49:15.023492
-462	211	Initialize all bits of the internal state of a psudo-random number generator?	2024-07-28 09:49:15.663358	2024-07-28 09:49:15.663358
-463	212	Take the difference of two time points?	2024-07-28 09:49:16.274759	2024-07-28 09:49:16.274759
-464	212	Explicitly specify duration type?	2024-07-28 09:49:16.854359	2024-07-28 09:49:16.854359
-465	212	Explicitly convert a duration into a different duration unit?	2024-07-28 09:49:17.430103	2024-07-28 09:49:17.430103
-466	214	Check whether a clock is steady?	2024-07-28 09:49:17.829435	2024-07-28 09:49:17.829435
-467	214	Query a clock's time resolution?	2024-07-28 09:49:18.115719	2024-07-28 09:49:18.115719
-468	215	Express all different chrono literals?	2024-07-28 09:49:18.574295	2024-07-28 09:49:18.574295
-469	217	What are the calendar string literals?	2024-07-28 09:49:18.898323	2024-07-28 09:49:18.898323
-470	217	Specify the date information about a specific day in a year?	2024-07-28 09:49:19.248001	2024-07-28 09:49:19.248001
-471	217	Iterate over the days of a month within a year?	2024-07-28 09:49:19.627097	2024-07-28 09:49:19.627097
-472	218	Get file time using pre-C++17 standard?	2024-07-28 09:49:20.34354	2024-07-28 09:49:20.34354
-473	218	What type is used to represent file time type?	2024-07-28 09:49:20.906703	2024-07-28 09:49:20.906703
-474	218	Get file time using C++20 standard?	2024-07-28 09:49:21.577952	2024-07-28 09:49:21.577952
-475	219	Retrieve the size information of a passed-in range or an array as a signed integer?	2024-07-28 09:49:22.318587	2024-07-28 09:49:22.318587
-476	220	What is a sentinel in ranges library?	2024-07-28 09:49:23.481707	2024-07-28 09:49:23.481707
-477	221	How to move iterators back and forth regardless of their bidirectional support?	2024-07-28 09:49:24.314606	2024-07-28 09:49:24.314606
-478	222	When do input and output iterators overlap?	2024-07-28 09:49:25.055683	2024-07-28 09:49:25.055683
-479	226	What are general category of algorithms?	2024-07-28 09:49:25.526255	2024-07-28 09:49:25.526255
-480	227	What algorithms are parallel?	2024-07-28 09:49:26.007884	2024-07-28 09:49:26.007884
-481	227	What is the downside of having two separate parallel operations on a common container?	2024-07-28 09:49:26.639412	2024-07-28 09:49:26.639412
-482	228	Find the biggest and smallest element within a range or parameters?	2024-07-28 09:49:27.084142	2024-07-28 09:49:27.084142
-483	229	Check if a range starts with an expected subrange?	2024-07-28 09:49:27.490973	2024-07-28 09:49:27.490973
-484	229	Check if a range ends with an expected subrange?	2024-07-28 09:49:27.894532	2024-07-28 09:49:27.894532
-485	229	Convert a resulting range to another type?	2024-07-28 09:49:28.439689	2024-07-28 09:49:28.439689
-486	230	Check if the contents of two containers of different types are equal?	2024-07-28 09:49:29.326447	2024-07-28 09:49:29.326447
-487	231	Invoke a functor for each range element in or out of order?	2024-07-28 09:49:31.496846	2024-07-28 09:49:31.496846
-488	231	Iterate over a range with <i>unsequenced parallel execution</i> model?	2024-07-28 09:49:32.806345	2024-07-28 09:49:32.806345
-489	231	Invoke an external method utilizing a projection over the entire elements of a range?	2024-07-28 09:49:33.535128	2024-07-28 09:49:33.535128
-490	231	Iterate over a limited number of elements within a range?	2024-07-28 09:49:34.317999	2024-07-28 09:49:34.317999
-491	232	Swap two values using standard algorithms?	2024-07-28 09:49:35.110015	2024-07-28 09:49:35.110015
-492	232	Swap values behind two forward iterators?	2024-07-28 09:49:35.902658	2024-07-28 09:49:35.902658
-493	232	Exchange elements of two non-overlapping ranges?	2024-07-28 09:49:36.543916	2024-07-28 09:49:36.543916
-494	232	Specialize swap for user-defined types?	2024-07-28 09:49:37.663073	2024-07-28 09:49:37.663073
-495	233	What is the minimum requirement for a type to be comparable for sorting algorithms?	2024-07-28 09:49:38.892416	2024-07-28 09:49:38.892416
-496	233	Compare if one range is lexicographically less than another?	2024-07-28 09:49:40.069377	2024-07-28 09:49:40.069377
-497	233	Compare if one range is lexicographically less than another using spaceship operator?	2024-07-28 09:49:41.079683	2024-07-28 09:49:41.079683
-498	233	What iterator type does the sort function operate on?	2024-07-28 09:49:41.51917	2024-07-28 09:49:41.51917
-499	233	Sort ranges having different iterator types?	2024-07-28 09:49:42.355078	2024-07-28 09:49:42.355078
-500	233	Sort a range providing an additional guarantee of preserving the relative order of equal elements?	2024-07-28 09:49:43.382541	2024-07-28 09:49:43.382541
-501	233	Check if a range is already sorted in ascending or descending order?	2024-07-28 09:49:44.214469	2024-07-28 09:49:44.214469
-502	233	Find the end iterator of the maximal sorted sub-range within a range using standard algorithms?	2024-07-28 09:49:44.86878	2024-07-28 09:49:44.86878
-503	233	Sort a sub-range within a range?	2024-07-28 09:49:45.670482	2024-07-28 09:49:45.670482
-504	233	Sort a sub-range within a range and write the results to another range?	2024-07-28 09:49:46.509268	2024-07-28 09:49:46.509268
-505	233	Extract a sub-range from a range?	2024-07-28 09:49:47.161296	2024-07-28 09:49:47.161296
-506	234	Partition a range into two based on a criterion?	2024-07-28 09:49:48.100549	2024-07-28 09:49:48.100549
-507	234	Guarantee the ordering of equal elements when partitioning a range?	2024-07-28 09:49:48.775533	2024-07-28 09:49:48.775533
-508	234	Check if a range is partitioned?	2024-07-28 09:49:49.411293	2024-07-28 09:49:49.411293
-509	234	Copy the partitioning results of a range into another?	2024-07-28 09:49:50.207509	2024-07-28 09:49:50.207509
-510	234	Find the nth element within a range?	2024-07-28 09:49:51.262649	2024-07-28 09:49:51.262649
-511	235	Find the lower and upper bounds of a value within a sorted range?	2024-07-28 09:49:52.874303	2024-07-28 09:49:52.874303
-512	235	Return both lower and upper bounds of a value within a sorted range?	2024-07-28 09:49:53.688913	2024-07-28 09:49:53.688913
-513	235	Return the upper bound of a value within a sorted range using a predicate?	2024-07-28 09:49:54.723993	2024-07-28 09:49:54.723993
-514	235	Check the presence of a value within a sorted range?	2024-07-28 09:49:55.637578	2024-07-28 09:49:55.637578
-515	236	Determine whether a sorted range is contained within another sorted range?	2024-07-28 09:49:56.283406	2024-07-28 09:49:56.283406
-516	236	Merge two sorted ranges into one?	2024-07-28 09:49:57.159469	2024-07-28 09:49:57.159469
-517	236	Merge two consecutive sub-ranges within a sorted range?	2024-07-28 09:49:57.758729	2024-07-28 09:49:57.758729
-518	236	Remove consecutive duplicate values within a sorted range?	2024-07-28 09:49:58.401192	2024-07-28 09:49:58.401192
-519	236	Remove consecutive duplicate values within a sorted range and copy the results into an output range?	2024-07-28 09:49:59.054556	2024-07-28 09:49:59.054556
-520	237	Produce a range containing elements present in the first range but not in the second range?	2024-07-28 09:49:59.683409	2024-07-28 09:49:59.683409
-521	237	Produce a range containing elements present only in one of two ranges, but not both?	2024-07-28 09:50:00.322144	2024-07-28 09:50:00.322144
-522	237	Produce a range containing elements present in either of the ranges?	2024-07-28 09:50:00.952995	2024-07-28 09:50:00.952995
-523	237	Produce a range containing elements present in both of the ranges?	2024-07-28 09:50:01.556971	2024-07-28 09:50:01.556971
-524	238	Apply a transformation function to each element within a range?	2024-07-28 09:50:02.369425	2024-07-28 09:50:02.369425
-525	238	Remove elements that match the given value within a range?	2024-07-28 09:50:02.964609	2024-07-28 09:50:02.964609
-526	238	Remove elements for which the given predicate evaluates true within a range?	2024-07-28 09:50:03.531587	2024-07-28 09:50:03.531587
-527	238	Replace elements that match the given value within a range?	2024-07-28 09:50:04.106852	2024-07-28 09:50:04.106852
-528	238	Replace elements for which the given predicate evaluates to true within a range?	2024-07-28 09:50:04.717783	2024-07-28 09:50:04.717783
-529	238	Reverse the order of elements in a range?	2024-07-28 09:50:05.300038	2024-07-28 09:50:05.300038
-530	238	Rearrange elements in the range from <code>[first, middle), [middle, last)</code> to <code>[middle, last), [first, middle)</code>?	2024-07-28 09:50:05.970702	2024-07-28 09:50:05.970702
-531	238	Move elements in the provided range by the specified amount of positions into left or right?	2024-07-28 09:50:06.788737	2024-07-28 09:50:06.788737
-532	238	Rearrange elements in the given array in a randomly order?	2024-07-28 09:50:07.492997	2024-07-28 09:50:07.492997
-533	239	Find the next and previous permutations of a container?	2024-07-28 09:50:08.360903	2024-07-28 09:50:08.360903
-534	239	Rearrange elements of given array so that they are in their next or previous permutation?	2024-07-28 09:50:09.061465	2024-07-28 09:50:09.061465
-535	239	Check whether two ranges have the same content but not necessarily the same order of elements?	2024-07-28 09:50:09.666972	2024-07-28 09:50:09.666972
-536	240	Indicate if all of the elements within a range evaluate to true for a predicate?	2024-07-28 09:50:10.301395	2024-07-28 09:50:10.301395
-537	240	Indicate if at least one element within a range evaluates to true for a predicate?	2024-07-28 09:50:10.915445	2024-07-28 09:50:10.915445
-538	240	Indicate if no elements within a range evaluates to true for a predicate?	2024-07-28 09:50:11.51158	2024-07-28 09:50:11.51158
-539	241	Convert a string to lowercase or uppercase?	2024-07-28 09:50:12.512373	2024-07-28 09:50:12.512373
-540	241	Reverse a string?	2024-07-28 09:50:13.296424	2024-07-28 09:50:13.296424
-541	241	Trim a string?	2024-07-28 09:50:13.882645	2024-07-28 09:50:13.882645
-542	241	Remove all occurances of a character from a string?	2024-07-28 09:50:14.497692	2024-07-28 09:50:14.497692
-543	241	Split a string based on user specified delimiter?	2024-07-28 09:50:15.320078	2024-07-28 09:50:15.320078
-544	241	What ranges operations are supported by strings?	2024-07-28 09:50:15.756338	2024-07-28 09:50:15.756338
-545	241	Insert a range within an string?	2024-07-28 09:50:16.433863	2024-07-28 09:50:16.433863
-546	242	Produce the view of the first elements and a range of second elements from a range of paired elements?	2024-07-28 09:50:17.127303	2024-07-28 09:50:17.127303
-547	242	Produce the view of Nth elements from a range of tuple-like elements?	2024-07-28 09:50:17.821007	2024-07-28 09:50:17.821007
-548	242	Apply a transformation functor to every element of the view of a range?	2024-07-28 09:50:18.418278	2024-07-28 09:50:18.418278
-549	242	Take first N elements of the view of a range?	2024-07-28 09:50:18.929318	2024-07-28 09:50:18.929318
-550	242	Take the sequence of elements from the view of a range for which the predicate evaluates to true?	2024-07-28 09:50:19.421621	2024-07-28 09:50:19.421621
-551	242	Drop the first N elements of the view of a range?	2024-07-28 09:50:19.937389	2024-07-28 09:50:19.937389
-552	242	Drop the sequence of elements from the view of a range for which the predicate evaluates to true?	2024-07-28 09:50:20.43966	2024-07-28 09:50:20.43966
-553	242	Filter the view of a range to consist all elements that satisfy the provided predicate?	2024-07-28 09:50:20.961088	2024-07-28 09:50:20.961088
-554	242	Reverse the view of a range for bidirectional ranges?	2024-07-28 09:50:21.456513	2024-07-28 09:50:21.456513
-555	242	Adapt an iterator and the number of elements following it into the view of a range?	2024-07-28 09:50:21.930918	2024-07-28 09:50:21.930918
-556	242	Adapt a view into a range with a begin and end iterator of matching types for non-range versions of algorithms?	2024-07-28 09:50:22.462606	2024-07-28 09:50:22.462606
-557	242	Represent the view of all the elements of a range?	2024-07-28 09:50:22.983777	2024-07-28 09:50:22.983777
-558	242	Split a single range into a view over sub-ranges? (incomplete)	2024-07-28 09:50:23.706604	2024-07-28 09:50:23.706604
-559	242	Flatten a splited view of a range?	2024-07-28 09:50:23.964562	2024-07-28 09:50:23.964562
-560	242	Represent an empty view?	2024-07-28 09:50:24.396498	2024-07-28 09:50:24.396498
-561	242	Represent a single element view?	2024-07-28 09:50:24.872213	2024-07-28 09:50:24.872213
-562	242	Represent a view of the generated sequence formed by repeatedly incrementing an initial value?	2024-07-28 09:50:25.385992	2024-07-28 09:50:25.385992
-563	242	Represent a view obtained by successively applying the istream input iterator?	2024-07-28 09:50:25.862003	2024-07-28 09:50:25.862003
-564	243	Specify a contract for a function?	2024-07-28 09:50:26.255704	2024-07-28 09:50:26.255704
-565	243	Enable contracts on a compiler to support a program with compilers?	2024-07-28 09:50:26.510363	2024-07-28 09:50:26.510363
-566	243	What cannot be specified directly by a contract?	2024-07-28 09:50:26.726162	2024-07-28 09:50:26.726162
-567	244	How many contract types do we have?	2024-07-28 09:50:26.959539	2024-07-28 09:50:26.959539
-568	244	What are the narrow and wide contracts?	2024-07-28 09:50:27.680913	2024-07-28 09:50:27.680913
-569	244	What is the definition of a bug in respect to contracts?	2024-07-28 09:50:28.033077	2024-07-28 09:50:28.033077
-570	245	What happens if we violate a contract?	2024-07-28 09:50:28.323081	2024-07-28 09:50:28.323081
-571	246	What function will be called to handle a contract violation?	2024-07-28 09:50:28.714851	2024-07-28 09:50:28.714851
-572	247	What controlling modes can be used against contracts?	2024-07-28 09:50:29.088093	2024-07-28 09:50:29.088093
-573	247	What happens when contracts are specified but ignore controlling mode is selected?	2024-07-28 09:50:29.406073	2024-07-28 09:50:29.406073
-574	248	What are the limitations of using contracts with virtual functions?	2024-07-28 09:50:30.082172	2024-07-28 09:50:30.082172
-575	249	Construct a thread and wait to the end of its normal execution?	2024-07-28 09:50:30.705757	2024-07-28 09:50:30.705757
-576	249	What kind of callable objects does a thread take?	2024-07-28 09:50:31.785305	2024-07-28 09:50:31.785305
-577	249	What are the requirements of passing different value categories as thread arguments?	2024-07-28 09:50:33.289083	2024-07-28 09:50:33.289083
-578	249	Create a thread that joins automatically followed by RAII principle?	2024-07-28 09:50:34.064566	2024-07-28 09:50:34.064566
-579	250	How does the destructor of a thread is called?	2024-07-28 09:50:34.664584	2024-07-28 09:50:34.664584
-580	251	Wait for a thread in case an exception is thrown?	2024-07-28 09:50:35.454885	2024-07-28 09:50:35.454885
-581	251	Write a thread guard to join on destruction?	2024-07-28 09:50:36.219976	2024-07-28 09:50:36.219976
-582	252	Run a thread in background?	2024-07-28 09:50:36.796204	2024-07-28 09:50:36.796204
-583	253	Transfer the ownership of a thread into another?	2024-07-28 09:50:37.450738	2024-07-28 09:50:37.450738
-584	254	Why do we need to have a stopping mechanism on our thread?	2024-07-28 09:50:37.778591	2024-07-28 09:50:37.778591
-585	254	What is the process of requesting a thread to stop?	2024-07-28 09:50:38.93318	2024-07-28 09:50:38.93318
-586	254	What member function can be used to obtain stop source from a thread?	2024-07-28 09:50:39.32795	2024-07-28 09:50:39.32795
-587	255	Send a stop request to a thread?	2024-07-28 09:50:39.920831	2024-07-28 09:50:39.920831
-588	255	What is the signature of callee function when constructing a jthread?	2024-07-28 09:50:40.505826	2024-07-28 09:50:40.505826
-589	255	What member function can be used to obtain stop token from a thread?	2024-07-28 09:50:40.822668	2024-07-28 09:50:40.822668
-590	255	What method can be used to stop a thread directly by using its handle?	2024-07-28 09:50:41.146121	2024-07-28 09:50:41.146121
-591	256	What is the use case of stop callbacks in threads?	2024-07-28 09:50:42.12601	2024-07-28 09:50:42.12601
-592	257	Retrieve the maximum number of threads efficiently running at runtime?	2024-07-28 09:50:42.910256	2024-07-28 09:50:42.910256
-593	257	Retrieve the ID of a thread?	2024-07-28 09:50:43.41582	2024-07-28 09:50:43.41582
-594	258	What are the basic synchronization points in a concurrent program?	2024-07-28 09:50:43.754849	2024-07-28 09:50:43.754849
-595	258	What synchronization facilities are available in C++?	2024-07-28 09:50:44.105296	2024-07-28 09:50:44.105296
-596	259	What is the use case of a mutex?	2024-07-28 09:50:44.722258	2024-07-28 09:50:44.722258
-597	259	What methods does a mutex have?	2024-07-28 09:50:45.078636	2024-07-28 09:50:45.078636
-598	260	What is the downside of manually locking mutexes?	2024-07-28 09:50:45.799329	2024-07-28 09:50:45.799329
-599	261	What is the use case of scoped lock?	2024-07-28 09:50:46.873369	2024-07-28 09:50:46.873369
-600	261	What is the advantage of scoped lock over lock guard?	2024-07-28 09:50:47.277515	2024-07-28 09:50:47.277515
-601	263	What is the use case of a shared mutex?	2024-07-28 09:50:48.184565	2024-07-28 09:50:48.184565
-602	264	What is the use case of a shared lock?	2024-07-28 09:50:48.550935	2024-07-28 09:50:48.550935
-603	266	What methods are available for a shared timed mutex?	2024-07-28 09:50:48.943828	2024-07-28 09:50:48.943828
-604	267	What is the use case of a recursive mutex?	2024-07-28 09:50:49.529173	2024-07-28 09:50:49.529173
-605	268	What are the use cases of conditional variable?	2024-07-28 09:50:50.000785	2024-07-28 09:50:50.000785
-606	268	Synchronize two threads signaling each other using condition variables?	2024-07-28 09:50:51.145884	2024-07-28 09:50:51.145884
-607	269	What data types can be used within atomic types?	2024-07-28 09:50:51.534754	2024-07-28 09:50:51.534754
-608	269	What is the use case of an atomic type?	2024-07-28 09:50:52.229318	2024-07-28 09:50:52.229318
-609	269	What storage duration guarantees access without data races?	2024-07-28 09:50:52.6057	2024-07-28 09:50:52.6057
-610	270	When is it safe to initialize a variable without using synchronization primitives?	2024-07-28 09:50:53.909223	2024-07-28 09:50:53.909223
-611	271	Initialize a member variable with thread safety?	2024-07-28 09:50:55.015815	2024-07-28 09:50:55.015815
-612	272	What is the use case of a future?	2024-07-28 09:50:55.608417	2024-07-28 09:50:55.608417
-613	272	Send a signal from 1 to N threads?	2024-07-28 09:50:56.813782	2024-07-28 09:50:56.813782
-614	273	What is the API of async free function?	2024-07-28 09:50:57.375681	2024-07-28 09:50:57.375681
-615	274	What is the API for promise?	2024-07-28 09:50:57.875431	2024-07-28 09:50:57.875431
-616	274	How a promise can be used to transfer data between threads?	2024-07-28 09:50:58.467542	2024-07-28 09:50:58.467542
-617	274	What happens when an exception is thrown in the future?	2024-07-28 09:50:59.029999	2024-07-28 09:50:59.029999
-618	276	What is the difference between a mutex and a semaphore?	2024-07-28 09:50:59.331774	2024-07-28 09:50:59.331774
-619	277	Retrieve the maximum value of internal counter a semaphore can have?	2024-07-28 09:50:59.587944	2024-07-28 09:50:59.587944
-620	278	What is the use case of a counting semaphore?	2024-07-28 09:50:59.930768	2024-07-28 09:50:59.930768
-621	278	What operations are available on counting semaphores?	2024-07-28 09:51:00.314781	2024-07-28 09:51:00.314781
-622	278	Synchronize threads writing on a shared container using semaphores?	2024-07-28 09:51:01.704738	2024-07-28 09:51:01.704738
-623	279	Write two blocking threads only to unlock when signaled by each other?	2024-07-28 09:51:02.594816	2024-07-28 09:51:02.594816
-624	280	What are the use cases of a latch?	2024-07-28 09:51:03.002259	2024-07-28 09:51:03.002259
-625	280	How does a latch operate?	2024-07-28 09:51:03.430685	2024-07-28 09:51:03.430685
-626	280	What operations are available to a latch?	2024-07-28 09:51:03.810115	2024-07-28 09:51:03.810115
-627	280	Synchronize multiple threads using a latch?	2024-07-28 09:51:04.753241	2024-07-28 09:51:04.753241
-628	281	What are the use cases of a barrier?	2024-07-28 09:51:05.257825	2024-07-28 09:51:05.257825
-629	281	What operations are available to a barrier?	2024-07-28 09:51:05.942521	2024-07-28 09:51:05.942521
-630	281	Synchronize threads with a barrier?	2024-07-28 09:51:07.211866	2024-07-28 09:51:07.211866
-631	282	What functions are coroutines?	2024-07-28 09:51:07.64241	2024-07-28 09:51:07.64241
-632	283	Write an object ensuring only one instance of its internal state exists?	2024-07-28 09:51:10.054	2024-07-28 09:51:10.054
-633	284	What are the constituents of a path?	2024-07-28 09:51:10.823945	2024-07-28 09:51:10.823945
-634	284	What path formats are available?	2024-07-28 09:51:11.381051	2024-07-28 09:51:11.381051
-635	284	What are the properties of a normalized path?	2024-07-28 09:51:11.833939	2024-07-28 09:51:11.833939
-636	284	What are the differences of member and free-standing functions of path?	2024-07-28 09:51:12.567378	2024-07-28 09:51:12.567378
-637	284	How many error handling approaches are available on filesystem library?	2024-07-28 09:51:13.008004	2024-07-28 09:51:13.008004
-638	285	Handle a filesystem operation error with exceptions?	2024-07-28 09:51:13.639468	2024-07-28 09:51:13.639468
-639	285	Handle a filesystem operation error with error code?	2024-07-28 09:51:14.311806	2024-07-28 09:51:14.311806
-640	286	What are the supporting different file types?	2024-07-28 09:51:14.901713	2024-07-28 09:51:14.901713
-641	287	Create a path with different string types?	2024-07-28 09:51:15.435607	2024-07-28 09:51:15.435607
-642	287	Create a path with a range?	2024-07-28 09:51:15.815464	2024-07-28 09:51:15.815464
-643	287	Get current path of the executing process?	2024-07-28 09:51:16.27291	2024-07-28 09:51:16.27291
-644	287	Get the path of temporary directory?	2024-07-28 09:51:16.645907	2024-07-28 09:51:16.645907
-645	288	Yield whether a path is empty?	2024-07-28 09:51:17.064339	2024-07-28 09:51:17.064339
-646	288	Yield whether a path is absolute or relative?	2024-07-28 09:51:17.408789	2024-07-28 09:51:17.408789
-647	288	Yield all the constituents of a path?	2024-07-28 09:51:18.356541	2024-07-28 09:51:18.356541
-648	288	Yield if a path is normalized?	2024-07-28 09:51:18.848724	2024-07-28 09:51:18.848724
-649	289	Yield a path as string objects of any byte size?	2024-07-28 09:51:19.31225	2024-07-28 09:51:19.31225
-650	290	Yield a relative path from two paths?	2024-07-28 09:51:19.877472	2024-07-28 09:51:19.877472
-651	291	Yield a path as a generic string?	2024-07-28 09:51:20.75342	2024-07-28 09:51:20.75342
-652	292	Concatenate a string to a path?	2024-07-28 09:51:21.373017	2024-07-28 09:51:21.373017
-653	292	Append a subpath to a path?	2024-07-28 09:51:21.973953	2024-07-28 09:51:21.973953
-654	292	Add extension to a file path that does not already have an extension?	2024-07-28 09:51:22.32238	2024-07-28 09:51:22.32238
-655	293	Assign a string to a path as a new path?	2024-07-28 09:51:22.754841	2024-07-28 09:51:22.754841
-656	293	Swap two path objects?	2024-07-28 09:51:23.152047	2024-07-28 09:51:23.152047
-657	293	Replace filename in a path?	2024-07-28 09:51:23.45018	2024-07-28 09:51:23.45018
-658	293	Replace extension in a path?	2024-07-28 09:51:23.739129	2024-07-28 09:51:23.739129
-659	293	Convert directory separators inside a path to the native format?	2024-07-28 09:51:24.001921	2024-07-28 09:51:24.001921
-660	294	Remove filename from a path?	2024-07-28 09:51:24.296093	2024-07-28 09:51:24.296093
-661	294	Remove extension from a path?	2024-07-28 09:51:24.621346	2024-07-28 09:51:24.621346
-662	295	What comparison operators are supported by path objects?	2024-07-28 09:51:24.866855	2024-07-28 09:51:24.866855
-663	295	Compare two paths <code>tmp/f</code> and <code>tmp/./f</code>?	2024-07-28 09:51:25.574637	2024-07-28 09:51:25.574637
-664	295	Compare two paths holding symbolic links?	2024-07-28 09:51:26.131648	2024-07-28 09:51:26.131648
-665	296	Check for existance of a file?	2024-07-28 09:51:26.461741	2024-07-28 09:51:26.461741
-666	297	Check if a file is a regular file or a directory or a symbolic link?	2024-07-28 09:51:26.880949	2024-07-28 09:51:26.880949
-667	297	Check if a file is neither a regular nor a directory nor a symbolic link?	2024-07-28 09:51:27.162582	2024-07-28 09:51:27.162582
-668	297	Check if a file is a special block, character, a fifo or a socket file?	2024-07-28 09:51:27.51029	2024-07-28 09:51:27.51029
-669	298	Check if a file is empty?	2024-07-28 09:51:27.791267	2024-07-28 09:51:27.791267
-670	298	Get the size of a file in bytes?	2024-07-28 09:51:28.197317	2024-07-28 09:51:28.197317
-671	298	Get the number of hard links to a file?	2024-07-28 09:51:28.495184	2024-07-28 09:51:28.495184
-672	298	Get the last time a file was written into?	2024-07-28 09:51:29.037941	2024-07-28 09:51:29.037941
-673	298	Yield information about the disk space available at a given path?	2024-07-28 09:51:29.6434	2024-07-28 09:51:29.6434
-674	299	Rename a file?	2024-07-28 09:51:30.086178	2024-07-28 09:51:30.086178
-675	299	Change the timepoint of the last write access of a file?	2024-07-28 09:51:30.431468	2024-07-28 09:51:30.431468
-676	299	Replace the permissions of a file?	2024-07-28 09:51:31.003067	2024-07-28 09:51:31.003067
-677	299	Resize a regular file?	2024-07-28 09:51:31.359023	2024-07-28 09:51:31.359023
-678	299	Change the current directory of the process?	2024-07-28 09:51:31.691906	2024-07-28 09:51:31.691906
-679	300	Check if a file exists?	2024-07-28 09:51:32.377096	2024-07-28 09:51:32.377096
-680	301	Use filesystem operations without following symbolic links?	2024-07-28 09:51:32.870998	2024-07-28 09:51:32.870998
-681	301	Yield the status of a file following any symbolic links?	2024-07-28 09:51:33.151675	2024-07-28 09:51:33.151675
-682	301	Yield the status of a file without following symbolic links?	2024-07-28 09:51:33.440618	2024-07-28 09:51:33.440618
-683	301	Improve performance of file operation calls using file status?	2024-07-28 09:51:33.910857	2024-07-28 09:51:33.910857
-684	301	Yield the type of a file using file status?	2024-07-28 09:51:34.567775	2024-07-28 09:51:34.567775
-685	301	Yield the permissions of a file using its file status?	2024-07-28 09:51:34.874547	2024-07-28 09:51:34.874547
-686	301	Yield the type of a file?	2024-07-28 09:51:35.30851	2024-07-28 09:51:35.30851
-687	302	Yield which permissions does a file have?	2024-07-28 09:51:36.369913	2024-07-28 09:51:36.369913
-688	303	Create a regular file?	2024-07-28 09:51:36.829324	2024-07-28 09:51:36.829324
-689	304	Create a directory inside an existing directory?	2024-07-28 09:51:37.382669	2024-07-28 09:51:37.382669
-690	304	Create a tree of nested directories?	2024-07-28 09:51:37.680944	2024-07-28 09:51:37.680944
-691	305	Create a symbolic link to a regular file?	2024-07-28 09:51:38.057419	2024-07-28 09:51:38.057419
-692	305	Create a symbolic link to a directory?	2024-07-28 09:51:38.320461	2024-07-28 09:51:38.320461
-693	306	Create a hard link from a file?	2024-07-28 09:51:38.577767	2024-07-28 09:51:38.577767
-694	307	Copy from a file of any type?	2024-07-28 09:51:38.913997	2024-07-28 09:51:38.913997
-695	307	Copy from a regular file?	2024-07-28 09:51:39.179714	2024-07-28 09:51:39.179714
-696	307	Why there is copy options?	2024-07-28 09:51:39.890742	2024-07-28 09:51:39.890742
-697	307	Copy a symbolic link?	2024-07-28 09:51:40.226879	2024-07-28 09:51:40.226879
-698	308	Remove a file?	2024-07-28 09:51:40.532309	2024-07-28 09:51:40.532309
-699	308	Recursively remove a directory and all of its contents?	2024-07-28 09:51:40.845051	2024-07-28 09:51:40.845051
-700	309	Yield the file an existing symbolic link refers to?	2024-07-28 09:51:41.197121	2024-07-28 09:51:41.197121
-701	309	Yield the absolute path of an existing path?	2024-07-28 09:51:41.690332	2024-07-28 09:51:41.690332
-702	309	Yield the relative path from current directory to a path?	2024-07-28 09:51:42.035694	2024-07-28 09:51:42.035694
-703	309	Yield the relative path from a base path to another path?	2024-07-28 09:51:42.332111	2024-07-28 09:51:42.332111
-704	310	Iterate over the entries of a directory?	2024-07-28 09:51:42.748433	2024-07-28 09:51:42.748433
-705	310	Recursively iterate over directories with following symbolic links?	2024-07-28 09:51:43.025117	2024-07-28 09:51:43.025117
-706	310	What are the directory iterator options?	2024-07-28 09:51:43.653572	2024-07-28 09:51:43.653572
-707	311	What operations are supported by directory entries?	2024-07-28 09:51:44.591793	2024-07-28 09:51:44.591793
-708	312	Make a log function revealing source location of the error?	2024-07-28 09:51:45.278686	2024-07-28 09:51:45.278686
-709	313	What are the common design pattern categories?	2024-07-28 09:51:45.633312	2024-07-28 09:51:45.633312
-710	314	What are the common creational patterns?	2024-07-28 09:51:45.912323	2024-07-28 09:51:45.912323
-711	315	What are the benefits of the factory method design pattern?	2024-07-28 09:51:46.162819	2024-07-28 09:51:46.162819
-712	315	What are the use cases of abstract factory pattern?	2024-07-28 09:51:46.851884	2024-07-28 09:51:46.851884
-713	315	Provide an interface to create variations of an object without exposing implementation details?	2024-07-28 09:51:49.711691	2024-07-28 09:51:49.711691
-714	317	What is the main advantage of using builder design pattern?	2024-07-28 09:51:50.545129	2024-07-28 09:51:50.545129
-715	317	Provide an export to different file format mechanism?	2024-07-28 09:51:52.403242	2024-07-28 09:51:52.403242
-716	321	What is a RAID used for?	2024-07-28 09:51:52.992622	2024-07-28 09:51:52.992622
-717	321	What are the RAID levels?	2024-07-28 09:51:53.35733	2024-07-28 09:51:53.35733
-718	322	Create an array of drives with RAID level 5?	2024-07-28 09:51:53.657195	2024-07-28 09:51:53.657195
-719	323	Get the current status of RAID array?	2024-07-28 09:51:53.956663	2024-07-28 09:51:53.956663
-720	323	Retrieve RAID details?	2024-07-28 09:51:54.239458	2024-07-28 09:51:54.239458
-721	324	Make a RAID array permanent?	2024-07-28 09:51:54.536237	2024-07-28 09:51:54.536237
-722	325	Start monitoring RAID and get notified about failures?	2024-07-28 09:51:54.842269	2024-07-28 09:51:54.842269
-723	325	Stop monitoring a RAID?	2024-07-28 09:51:55.09289	2024-07-28 09:51:55.09289
-724	326	Stop a RAID array temporarily?	2024-07-28 09:51:55.348513	2024-07-28 09:51:55.348513
-725	326	Run an array of raided devices from the stopped state?	2024-07-28 09:51:55.617154	2024-07-28 09:51:55.617154
-726	327	Remove an array component from a RAID?	2024-07-28 09:51:56.005646	2024-07-28 09:51:56.005646
-727	328	Add an storage drive into the array?	2024-07-28 09:51:56.317557	2024-07-28 09:51:56.317557
-728	329	What is the meaning of ACID terminology?	2024-07-28 09:51:56.749233	2024-07-28 09:51:56.749233
-729	330	How does PostgreSQL store data on storage?	2024-07-28 09:51:57.018187	2024-07-28 09:51:57.018187
-730	330	How long is the life time of a PostgreSQL release?	2024-07-28 09:51:57.290248	2024-07-28 09:51:57.290248
-731	330	What is a PostgreSQL cluster?	2024-07-28 09:51:57.525301	2024-07-28 09:51:57.525301
-732	330	What is a schema?	2024-07-28 09:51:57.76716	2024-07-28 09:51:57.76716
-733	330	What are the building blocks of an instance?	2024-07-28 09:51:58.020089	2024-07-28 09:51:58.020089
-734	330	What schema an object in postgres belongs to?	2024-07-28 09:51:58.260837	2024-07-28 09:51:58.260837
-735	330	What schema do users belong to?	2024-07-28 09:51:58.477999	2024-07-28 09:51:58.477999
-736	330	How many user categories exist in postgres?	2024-07-28 09:51:58.717258	2024-07-28 09:51:58.717258
-737	330	How many superusers are allowed in a postgres instance?	2024-07-28 09:51:58.937118	2024-07-28 09:51:58.937118
-738	330	Where are the internal postgres instance data stored?	2024-07-28 09:51:59.211496	2024-07-28 09:51:59.211496
-739	330	Where does postgres store its data?	2024-07-28 09:51:59.438974	2024-07-28 09:51:59.438974
-740	330	What is <code>PGDATA</code> contained of?	2024-07-28 09:51:59.665174	2024-07-28 09:51:59.665174
-741	330	How is it possible to have multiple postgres installations?	2024-07-28 09:51:59.883465	2024-07-28 09:51:59.883465
-742	330	When does postgres need the <code>PGDATA</code> directory?	2024-07-28 09:52:00.115741	2024-07-28 09:52:00.115741
-743	330	What is the purpose of postgres's first process?	2024-07-28 09:52:00.35742	2024-07-28 09:52:00.35742
-744	330	How does postgres handles connections?	2024-07-28 09:52:00.572578	2024-07-28 09:52:00.572578
-745	331	Build postgres from source?	2024-07-28 09:52:01.134692	2024-07-28 09:52:01.134692
-746	331	How to add systemd support to postgres installation?	2024-07-28 09:52:01.46728	2024-07-28 09:52:01.46728
-747	331	Build postgres using pgenv?	2024-07-28 09:52:01.794587	2024-07-28 09:52:01.794587
-748	331	Connect to a postgres instance?	2024-07-28 09:52:02.049878	2024-07-28 09:52:02.049878
-749	332	What libraries are required for C++ projects to link to postgres?	2024-07-28 09:52:02.328654	2024-07-28 09:52:02.328654
-750	333	Where should we check regularly for deprecation of features and removal on recent updates?	2024-07-28 09:52:02.63719	2024-07-28 09:52:02.63719
-751	333	Enable docker daemon to start on boot up?	2024-07-28 09:52:02.906281	2024-07-28 09:52:02.906281
-752	333	Manually run docker daemon?	2024-07-28 09:52:03.204169	2024-07-28 09:52:03.204169
-753	334	Check if Docker client is connected to the server?	2024-07-28 09:52:03.797489	2024-07-28 09:52:03.797489
-754	334	Connect docker client to a remote server?	2024-07-28 09:52:04.18942	2024-07-28 09:52:04.18942
-755	334	Retrieve detailed information of the installed docker client?	2024-07-28 09:52:04.470537	2024-07-28 09:52:04.470537
-756	335	List all the contexts available to client?	2024-07-28 09:52:04.763374	2024-07-28 09:52:04.763374
-757	336	Configure client to permanently connect to a remote server?	2024-07-28 09:52:05.17838	2024-07-28 09:52:05.17838
-758	337	Switch client context to make it connect to another remote server?	2024-07-28 09:52:05.495087	2024-07-28 09:52:05.495087
-759	338	List available Docker images?	2024-07-28 09:52:05.83078	2024-07-28 09:52:05.83078
-760	338	List dangling images?	2024-07-28 09:52:06.224091	2024-07-28 09:52:06.224091
-761	338	List images built before another available image was built?	2024-07-28 09:52:06.657108	2024-07-28 09:52:06.657108
-762	338	List images built since another available image was built?	2024-07-28 09:52:07.01488	2024-07-28 09:52:07.01488
-763	338	List images containing a string in their label?	2024-07-28 09:52:07.368549	2024-07-28 09:52:07.368549
-764	338	Customize the output format of the image list?	2024-07-28 09:52:07.848305	2024-07-28 09:52:07.848305
-765	339	Search an image on registeries?	2024-07-28 09:52:08.263447	2024-07-28 09:52:08.263447
-766	339	Limit the image search results to 10 entries?	2024-07-28 09:52:08.567069	2024-07-28 09:52:08.567069
-767	339	Filter the result of image search results to official images only?	2024-07-28 09:52:08.901508	2024-07-28 09:52:08.901508
-768	339	Filter the result of image search results to automated build images only?	2024-07-28 09:52:09.21418	2024-07-28 09:52:09.21418
-769	340	Pull an image from official repositories?	2024-07-28 09:52:09.523532	2024-07-28 09:52:09.523532
-770	340	Pull an image from unofficial repositories?	2024-07-28 09:52:09.941609	2024-07-28 09:52:09.941609
-771	340	Pull an image from other registeries?	2024-07-28 09:52:10.37813	2024-07-28 09:52:10.37813
-772	341	Inspect the layers of an image?	2024-07-28 09:52:10.730737	2024-07-28 09:52:10.730737
-773	341	See the build history of an image?	2024-07-28 09:52:11.114471	2024-07-28 09:52:11.114471
-774	341	See the digests of an image?	2024-07-28 09:52:11.443642	2024-07-28 09:52:11.443642
-775	341	What is an image manifest?	2024-07-28 09:52:11.823607	2024-07-28 09:52:11.823607
-776	342	Create an image for different platforms and architectures?	2024-07-28 09:52:12.625628	2024-07-28 09:52:12.625628
-777	343	How to remove an image in docker?	2024-07-28 09:52:13.287272	2024-07-28 09:52:13.287272
-778	343	Remove all dangling images?	2024-07-28 09:52:13.828378	2024-07-28 09:52:13.828378
-779	344	Verify the integrity of images?	2024-07-28 09:52:14.165517	2024-07-28 09:52:14.165517
-780	344	Configure <b>Docker Content Trust</b> to sign images?	2024-07-28 09:52:14.97329	2024-07-28 09:52:14.97329
-781	344	Inspect signing data of an image?	2024-07-28 09:52:15.388895	2024-07-28 09:52:15.388895
-782	344	Permanently configure docker to verify image push and pull operations?	2024-07-28 09:52:15.777876	2024-07-28 09:52:15.777876
-783	345	Run a container from an existing image?	2024-07-28 09:52:16.22194	2024-07-28 09:52:16.22194
-784	345	Exit a container shell without killing its process?	2024-07-28 09:52:16.592123	2024-07-28 09:52:16.592123
-785	345	Attach host's shell to the shell of a running container?	2024-07-28 09:52:17.003203	2024-07-28 09:52:17.003203
-786	345	Stop a container?	2024-07-28 09:52:17.420027	2024-07-28 09:52:17.420027
-787	345	Start a stopped container?	2024-07-28 09:52:17.79239	2024-07-28 09:52:17.79239
-788	345	Stop and remove a container?	2024-07-28 09:52:18.164536	2024-07-28 09:52:18.164536
-789	346	How many docker restart policies exist?	2024-07-28 09:52:18.656128	2024-07-28 09:52:18.656128
-790	346	Run a container with persistent restart policy on failure or system restart?	2024-07-28 09:52:19.171933	2024-07-28 09:52:19.171933
-791	346	Run a container always restarting except when manually stopped?	2024-07-28 09:52:19.529849	2024-07-28 09:52:19.529849
-792	346	Run a container restarting on failure only?	2024-07-28 09:52:19.928025	2024-07-28 09:52:19.928025
-793	347	List running and stopped Docker containers?	2024-07-28 09:52:20.359539	2024-07-28 09:52:20.359539
-794	348	Specify the maintainer of an image in Dockerfile?	2024-07-28 09:52:20.772558	2024-07-28 09:52:20.772558
-795	348	Specify required packages to be installed on an image in Dockerfile?	2024-07-28 09:52:21.320746	2024-07-28 09:52:21.320746
-796	348	Import source files of a project to an image in Dockerfile?	2024-07-28 09:52:21.825247	2024-07-28 09:52:21.825247
-797	348	Change the working directory of image in Dockerfile?	2024-07-28 09:52:22.223299	2024-07-28 09:52:22.223299
-798	348	Publish a port in an image in Dockerfile?	2024-07-28 09:52:22.572847	2024-07-28 09:52:22.572847
-799	348	Express the entry point of an image in Dockerfile?	2024-07-28 09:52:22.914538	2024-07-28 09:52:22.914538
-800	348	Express the command for default arguments given to the executable within an image?	2024-07-28 09:52:23.47019	2024-07-28 09:52:23.47019
-801	349	How to manage multiple Docker nodes?	2024-07-28 09:52:23.796173	2024-07-28 09:52:23.796173
-802	349	How many types of swarm nodes exist?	2024-07-28 09:52:24.04478	2024-07-28 09:52:24.04478
-803	349	How does a swarm synchronizes all of its nodes?	2024-07-28 09:52:24.288279	2024-07-28 09:52:24.288279
-804	349	How many modes does each node of a swarm have?	2024-07-28 09:52:24.593912	2024-07-28 09:52:24.593912
-805	350	Initialize a swarm on an existing node?	2024-07-28 09:52:24.874324	2024-07-28 09:52:24.874324
-806	350	What is the default port on swarms?	2024-07-28 09:52:25.110283	2024-07-28 09:52:25.110283
-807	351	List available swarm nodes?	2024-07-28 09:52:25.503689	2024-07-28 09:52:25.503689
-808	351	Extract joining tokens of a swarm?	2024-07-28 09:52:25.853673	2024-07-28 09:52:25.853673
-809	351	Join Docker nodes to a swarm?	2024-07-28 09:52:26.260771	2024-07-28 09:52:26.260771
-810	351	How does the <b>High Availability</b> mechanism in swarms work?	2024-07-28 09:52:26.65201	2024-07-28 09:52:26.65201
-811	351	How to apply <b>High Availability</b> mechanisms to a swarm?	2024-07-28 09:52:27.129014	2024-07-28 09:52:27.129014
-812	351	What is advantage of locking a swarm?	2024-07-28 09:52:27.515055	2024-07-28 09:52:27.515055
-813	351	Apply a lock on a swarm?	2024-07-28 09:52:27.969945	2024-07-28 09:52:27.969945
-814	351	Check the current swarm unlock key?	2024-07-28 09:52:28.304084	2024-07-28 09:52:28.304084
-815	351	Re-join Docker nodes to a locked swarm?	2024-07-28 09:52:28.893569	2024-07-28 09:52:28.893569
-816	351	How many ways are there to create a docker service?	2024-07-28 09:52:29.263999	2024-07-28 09:52:29.263999
-817	351	Create a docker service?	2024-07-28 09:52:29.502738	2024-07-28 09:52:29.502738
-818	351	List services running by docker?	2024-07-28 09:52:29.771123	2024-07-28 09:52:29.771123
-819	351	List the service replicas in docker?	2024-07-28 09:52:30.062581	2024-07-28 09:52:30.062581
-820	351	Inspect a docker service?	2024-07-28 09:52:30.319684	2024-07-28 09:52:30.319684
-821	351	What are the differences between replicated and global docker services?	2024-07-28 09:52:30.625496	2024-07-28 09:52:30.625496
-822	351	Scale up and scale down a docker serivce in a swarm?	2024-07-28 09:52:30.988867	2024-07-28 09:52:30.988867
-823	351	Remove a docker service from a swarm?	2024-07-28 09:52:31.26044	2024-07-28 09:52:31.26044
-824	351	Create an overlay network for a docker service?	2024-07-28 09:52:31.619532	2024-07-28 09:52:31.619532
-825	351	List available docker networks?	2024-07-28 09:52:31.903592	2024-07-28 09:52:31.903592
-826	351	Create a docker service and attach it to a network?	2024-07-28 09:52:32.152858	2024-07-28 09:52:32.152858
-827	351	How many publishing modes are available in docker service creation?	2024-07-28 09:52:32.469529	2024-07-28 09:52:32.469529
-828	351	Create docker service replicas on <b>host mode</b>?	2024-07-28 09:52:32.824675	2024-07-28 09:52:32.824675
-829	351	Push an updated image to the swarm in a staged manner?	2024-07-28 09:52:33.105739	2024-07-28 09:52:33.105739
-830	351	Print logs of a docker service?	2024-07-28 09:52:33.409908	2024-07-28 09:52:33.409908
-831	351	Configure docker daemon to log on different logging drivers?	2024-07-28 09:52:33.88268	2024-07-28 09:52:33.88268
-832	351	Why swarm backups are important?	2024-07-28 09:52:34.287918	2024-07-28 09:52:34.287918
-833	351	Where a swarm backup file will be written?	2024-07-28 09:52:34.548755	2024-07-28 09:52:34.548755
-834	351	Backup docker swarm and restore it?	2024-07-28 09:52:35.503643	2024-07-28 09:52:35.503643
-835	352	Join new managers in a swarm?	2024-07-28 09:52:36.389606	2024-07-28 09:52:36.389606
-836	352	Revoke compromised token and issue new swarm join-token?	2024-07-28 09:52:36.73878	2024-07-28 09:52:36.73878
-837	353	What analyzing tool scans images for vulnerability?	2024-07-28 09:52:37.071503	2024-07-28 09:52:37.071503
-838	353	What kernel feature provides container isolation?	2024-07-28 09:52:37.379597	2024-07-28 09:52:37.379597
-839	353	What kernel feature provides container resource management?	2024-07-28 09:52:37.712111	2024-07-28 09:52:37.712111
-840	353	Secure the network connections of a swarm?	2024-07-28 09:52:38.401567	2024-07-28 09:52:38.401567
-841	353	Inspect a node’s client certificate?	2024-07-28 09:52:38.783635	2024-07-28 09:52:38.783635
-842	354	Configure the swarm certificate rotation period?	2024-07-28 09:52:39.109929	2024-07-28 09:52:39.109929
-843	354	Manage CA related configuration?	2024-07-28 09:52:39.424609	2024-07-28 09:52:39.424609
-844	355	Create a secret on swarm to store credentials?	2024-07-28 09:52:39.907684	2024-07-28 09:52:39.907684
-845	356	What facilities are available to extend the Docker functionality?	2024-07-28 09:52:40.316057	2024-07-28 09:52:40.316057
-846	356	Install a plugin on docker?	2024-07-28 09:52:40.607941	2024-07-28 09:52:40.607941
-847	357	List available plugins?	2024-07-28 09:52:40.902286	2024-07-28 09:52:40.902286
-848	358	Create a volume?	2024-07-28 09:52:41.299877	2024-07-28 09:52:41.299877
-849	358	Create a volume in Dockerfile?	2024-07-28 09:52:41.762428	2024-07-28 09:52:41.762428
-850	358	Create a volume with an installed plugin?	2024-07-28 09:52:42.063271	2024-07-28 09:52:42.063271
-851	359	List available volumes?	2024-07-28 09:52:42.37343	2024-07-28 09:52:42.37343
-852	360	Inspect into a volume?	2024-07-28 09:52:42.798155	2024-07-28 09:52:42.798155
-853	361	Delete a volume?	2024-07-28 09:52:43.201308	2024-07-28 09:52:43.201308
-854	361	Delete all unmounted volumes?	2024-07-28 09:52:43.518265	2024-07-28 09:52:43.518265
-855	362	Attach a volume to a container?	2024-07-28 09:52:44.08306	2024-07-28 09:52:44.08306
-856	362	Attach a volume to a cluster?	2024-07-28 09:52:44.576901	2024-07-28 09:52:44.576901
-857	363	What is the potential data corruption on a shared volume between nodes?	2024-07-28 09:52:45.133233	2024-07-28 09:52:45.133233
-858	364	What communication channel is used by containers to talk to each other?	2024-07-28 09:52:45.487265	2024-07-28 09:52:45.487265
-859	366	What are the main phases of compiling a C code?	2024-07-28 09:52:45.877921	2024-07-28 09:52:45.877921
-860	366	Stop compiler processing source after preprocessing phase?	2024-07-28 09:52:46.435059	2024-07-28 09:52:46.435059
-861	366	Specify the assembly flavor for gcc?	2024-07-28 09:52:46.774977	2024-07-28 09:52:46.774977
-862	366	Stop compiler processing source after compilation phase?	2024-07-28 09:52:47.030707	2024-07-28 09:52:47.030707
-863	366	Stop compiler processing source after assembly phase?	2024-07-28 09:52:47.291671	2024-07-28 09:52:47.291671
-864	366	How many relocatable files exist?	2024-07-28 09:52:47.563763	2024-07-28 09:52:47.563763
-865	366	View the symbolic information of an executable?	2024-07-28 09:52:47.815457	2024-07-28 09:52:47.815457
-866	366	What formats are used to represent debugging symbols for executables?	2024-07-28 09:52:48.118047	2024-07-28 09:52:48.118047
-867	366	What library can be used to programmatically parse debugging symbols?	2024-07-28 09:52:48.320175	2024-07-28 09:52:48.320175
-868	366	Strip all the debugging symbols of an executable?	2024-07-28 09:52:48.587425	2024-07-28 09:52:48.587425
-869	366	Specify the assembly flavor for objdump utility?	2024-07-28 09:52:48.87988	2024-07-28 09:52:48.87988
-870	366	Inspect the rodata section of an object file?	2024-07-28 09:52:49.176407	2024-07-28 09:52:49.176407
-871	366	Disassembly an object file?	2024-07-28 09:52:49.442925	2024-07-28 09:52:49.442925
-872	366	List all the relocation symbols present in an object file?	2024-07-28 09:52:49.702538	2024-07-28 09:52:49.702538
-873	366	What address do relocation offsets are pointing to in relocation table of an object file?	2024-07-28 09:52:50.097451	2024-07-28 09:52:50.097451
-874	366	List all the available sections in an object file?	2024-07-28 09:52:50.363312	2024-07-28 09:52:50.363312
-875	367	Detect common memory faults in a program?	2024-07-28 09:52:50.876267	2024-07-28 09:52:50.876267
-876	367	Trace the origin of variables causing memory leaks?	2024-07-28 09:52:51.176505	2024-07-28 09:52:51.176505
-877	367	Fully check for memory leak of a program?	2024-07-28 09:52:51.411612	2024-07-28 09:52:51.411612
-878	369	Count the number of instructions used in a program?	2024-07-28 09:52:51.717188	2024-07-28 09:52:51.717188
-879	369	Use interactive control to use callgrind dump file?	2024-07-28 09:52:51.967659	2024-07-28 09:52:51.967659
-880	369	Use a user interface to interactively control the use of callgrind dump file?	2024-07-28 09:52:52.201331	2024-07-28 09:52:52.201331
-881	371	Attach gdb remote session to valgrind?	2024-07-28 09:52:52.644044	2024-07-28 09:52:52.644044
-882	372	What is the objective of <code>io_service</code> in boost?	2024-07-28 09:52:52.939142	2024-07-28 09:52:52.939142
-883	372	What is the objective of <code>io_object</code> in boost?	2024-07-28 09:52:53.222313	2024-07-28 09:52:53.222313
-884	373	Start an event processing loop on a worker thread?	2024-07-28 09:52:53.916758	2024-07-28 09:52:53.916758
-885	373	Start an event processing loop without blocking thread execution?	2024-07-28 09:52:54.55244	2024-07-28 09:52:54.55244
-886	374	Start an event processing loop to run queued tasks?	2024-07-28 09:52:55.485932	2024-07-28 09:52:55.485932
-887	374	Start an event processing loop to run tasks out of queue?	2024-07-28 09:52:56.536019	2024-07-28 09:52:56.536019
-888	375	Serialize concurrent execution of an event processing loop?	2024-07-28 09:52:57.574663	2024-07-28 09:52:57.574663
-889	376	Handle exceptional asynchronous control flow in an event processing loop?	2024-07-28 09:52:58.644728	2024-07-28 09:52:58.644728
-890	377	Expire a task when reached to a deadline?	2024-07-28 09:52:59.622814	2024-07-28 09:52:59.622814
-891	382	Write a client establishing a synchronous tcp connection to a server?	2024-07-28 09:53:00.847412	2024-07-28 09:53:00.847412
-892	382	Write a server accepting synchronous tcp requests?	2024-07-28 09:53:02.25769	2024-07-28 09:53:02.25769
-893	382	Write a client establishing a synchronous tcp connection to a server?	2024-07-28 09:53:02.709121	2024-07-28 09:53:02.709121
-894	382	Write a server accepting asynchronous tcp requests?	2024-07-28 09:53:02.923524	2024-07-28 09:53:02.923524
-895	383	Write a client establishing a synchronous tcp connection to a server?	2024-07-28 09:53:03.794323	2024-07-28 09:53:03.794323
-896	384	Write a client establishing an asynchronous tcp connection to a server?	2024-07-28 09:53:04.898799	2024-07-28 09:53:04.898799
-897	384	Write a server accepting asynchronous tcp requests?	2024-07-28 09:53:06.444014	2024-07-28 09:53:06.444014
-898	385	Write and read from server socket?	2024-07-28 09:53:09.501722	2024-07-28 09:53:09.501722
-899	386	Keep track of kernel release changes?	2024-07-28 09:53:10.27111	2024-07-28 09:53:10.27111
-900	386	Aquire the kernel source repository?	2024-07-28 09:53:10.912099	2024-07-28 09:53:10.912099
-901	386	Aquire the kernel source for long-term service?	2024-07-28 09:53:11.481749	2024-07-28 09:53:11.481749
-902	386	What is the basic layout of the kernel source tree?	2024-07-28 09:53:12.317712	2024-07-28 09:53:12.317712
-903	387	What is the name of the kernel configuration mechanism?	2024-07-28 09:53:12.571247	2024-07-28 09:53:12.571247
-904	387	What environment variables are used to configure the kernel for cross compiling?	2024-07-28 09:53:13.111404	2024-07-28 09:53:13.111404
-905	387	What values does <code>ARCH</code> take in the kernel configuration stage?	2024-07-28 09:53:13.584161	2024-07-28 09:53:13.584161
-906	387	Start configuring the kernel with graphical environments?	2024-07-28 09:53:13.945887	2024-07-28 09:53:13.945887
-907	387	Where is the kernel configuration file?	2024-07-28 09:53:14.176867	2024-07-28 09:53:14.176867
-908	387	Where are the default configuration files stored?	2024-07-28 09:53:14.525514	2024-07-28 09:53:14.525514
-909	387	Configure the kernel for a specific platform using default configuration files?	2024-07-28 09:53:15.270524	2024-07-28 09:53:15.270524
-910	387	Select default configuration for <code>x86_64</code> platform?	2024-07-28 09:53:15.799436	2024-07-28 09:53:15.799436
-911	387	Select default configuration for <code>Raspberry Pi Zero</code> evaluation board?	2024-07-28 09:53:16.119798	2024-07-28 09:53:16.119798
-912	387	Select default configuration for <code>BeagleBone Black</code> evaluation board?	2024-07-28 09:53:16.421342	2024-07-28 09:53:16.421342
-913	387	Restore previous configuration changes?	2024-07-28 09:53:16.678336	2024-07-28 09:53:16.678336
-914	387	Create a new default configuration target in kernel source tree?	2024-07-28 09:53:17.285526	2024-07-28 09:53:17.285526
-915	387	Update an already existing kernel configuration file with new released options?	2024-07-28 09:53:17.921661	2024-07-28 09:53:17.921661
-916	387	Extract the kernel configuration file from the running machine?	2024-07-28 09:53:18.536274	2024-07-28 09:53:18.536274
-917	387	Configure kernel to make its configuration options available in <code>/proc</code>?	2024-07-28 09:53:18.859455	2024-07-28 09:53:18.859455
-918	387	Configure kernel to allow extending command line options from within the configuration?	2024-07-28 09:53:19.219805	2024-07-28 09:53:19.219805
-919	387	Configure kernel to make kernel symbol table available through procfs?	2024-07-28 09:53:19.546607	2024-07-28 09:53:19.546607
-920	387	What kernel configuration option enables timing information while printing messages from the kernel?	2024-07-28 09:53:19.758562	2024-07-28 09:53:19.758562
-921	387	What kernel configuration option allows debugging input devices?	2024-07-28 09:53:19.958769	2024-07-28 09:53:19.958769
-922	387	What kernel configuration option enables system request key combinations to recover system after crash?	2024-07-28 09:53:20.200256	2024-07-28 09:53:20.200256
-923	387	What kernel configuration option enables the <code>ftrace</code> tracer support?	2024-07-28 09:53:20.402113	2024-07-28 09:53:20.402113
-924	387	What kernel configuration option allows tracing any non-inline function in the kernel?	2024-07-28 09:53:20.640455	2024-07-28 09:53:20.640455
-925	387	What kernel configuration option allows tracking off periods of IRQs in the kernel?	2024-07-28 09:53:20.841608	2024-07-28 09:53:20.841608
-926	387	What kernel configuration option allows measuring preemption off latency and schedule latency tracing?	2024-07-28 09:53:21.096067	2024-07-28 09:53:21.096067
-927	387	Print the version or release of configured kernel?	2024-07-28 09:53:21.453075	2024-07-28 09:53:21.453075
-928	387	Append local version to the kernel release string?	2024-07-28 09:53:21.728978	2024-07-28 09:53:21.728978
-929	387	What header file contains kernel configuration options?	2024-07-28 09:53:21.968611	2024-07-28 09:53:21.968611
-930	387	Add make object in Makefile for a configuration option?	2024-07-28 09:53:22.298906	2024-07-28 09:53:22.298906
-931	387	Make debug symbols available in the kernel image?	2024-07-28 09:53:22.556206	2024-07-28 09:53:22.556206
-932	387	Solve different relocation addresses of the kernel with multi-platform ARM <code>uImage</code>?	2024-07-28 09:53:22.875364	2024-07-28 09:53:22.875364
-933	387	What kernel configuration option enables module loading on runtime?	2024-07-28 09:53:23.110305	2024-07-28 09:53:23.110305
-934	387	What kernel configuration option enables unloading modules on runtime?	2024-07-28 09:53:23.307873	2024-07-28 09:53:23.307873
-935	387	What kernel configuration option ignores safely unloading modules having dependencies?	2024-07-28 09:53:23.518801	2024-07-28 09:53:23.518801
-936	388	What are the constructs of each menu in a <code>Kconfig</code> file?	2024-07-28 09:53:24.046229	2024-07-28 09:53:24.046229
-937	388	What types are available for kernel configuration options in a Kconfig menu?	2024-07-28 09:53:24.414259	2024-07-28 09:53:24.414259
-938	388	Make a kernel configuration option dependent on another?	2024-07-28 09:53:24.806446	2024-07-28 09:53:24.806446
-939	388	Enforce selection of an option in its parent option when it has reverse dependency?	2024-07-28 09:53:25.298772	2024-07-28 09:53:25.298772
-940	389	What <code>make</code> target should be used to build the kernel in the source tree?	2024-07-28 09:53:25.938557	2024-07-28 09:53:25.938557
-941	389	Specify the numbers of jobs allowed to build the kernel with?	2024-07-28 09:53:26.365195	2024-07-28 09:53:26.365195
-942	389	See the actual commands being executed in kernel build process in case build fails?	2024-07-28 09:53:26.657728	2024-07-28 09:53:26.657728
-943	389	What kernel build artifacts will be stored in the source tree?	2024-07-28 09:53:27.113782	2024-07-28 09:53:27.113782
-944	389	Use <code>mkimage</code> to create a compressed kernel image from an uncompressed kernel image?	2024-07-28 09:53:27.429951	2024-07-28 09:53:27.429951
-945	389	What are the steps required to build a kernel for the Raspberry Pi 4?	2024-07-28 09:53:28.840585	2024-07-28 09:53:28.840585
-946	389	What are the steps required to build a kernel for the Raspberry Pi Zero?	2024-07-28 09:53:29.772476	2024-07-28 09:53:29.772476
-947	389	What are the steps required to build a kernel for the BeagleBone Black?	2024-07-28 09:53:30.180132	2024-07-28 09:53:30.180132
-948	389	What are the steps required to build a kernel for the QEMU?	2024-07-28 09:53:30.554638	2024-07-28 09:53:30.554638
-949	390	Install the kernel binary file on native and non-native targets?	2024-07-28 09:53:30.942905	2024-07-28 09:53:30.942905
-950	390	Install kernel modules?	2024-07-28 09:53:31.342082	2024-07-28 09:53:31.342082
-951	390	What are the required steps after building a kernel image?	2024-07-28 09:53:31.904507	2024-07-28 09:53:31.904507
-952	390	Override the installation path of compiled module binaries?	2024-07-28 09:53:32.461286	2024-07-28 09:53:32.461286
-953	390	What artifacts does <code>make modules_install</code> command generate on the host machine?	2024-07-28 09:53:33.045007	2024-07-28 09:53:33.045007
-954	391	Clean kernel source tree from build artifacts?	2024-07-28 09:53:33.366412	2024-07-28 09:53:33.366412
-955	392	List all loaded modules on system?	2024-07-28 09:53:33.625379	2024-07-28 09:53:33.625379
-956	393	Get information of a module?	2024-07-28 09:53:33.898988	2024-07-28 09:53:33.898988
-957	393	Inspect the given parameters of a loaded module?	2024-07-28 09:53:34.152509	2024-07-28 09:53:34.152509
-958	393	Where do module parameters linger on the system?	2024-07-28 09:53:34.420117	2024-07-28 09:53:34.420117
-959	394	Load a module into the kernel?	2024-07-28 09:53:34.727933	2024-07-28 09:53:34.727933
-960	394	Load a module into the kernel with parameters?	2024-07-28 09:53:34.982896	2024-07-28 09:53:34.982896
-961	394	Load a module and all of its dependencies?	2024-07-28 09:53:35.230572	2024-07-28 09:53:35.230572
-962	394	Secure kernel from loading malicious modules?	2024-07-28 09:53:35.76868	2024-07-28 09:53:35.76868
-963	395	How does <code>modprobe</code> retrieve module dependencies?	2024-07-28 09:53:36.14106	2024-07-28 09:53:36.14106
-964	395	Manually retrieve module dependencies?	2024-07-28 09:53:36.464701	2024-07-28 09:53:36.464701
-965	396	Remove loadable modules from the kernel?	2024-07-28 09:53:36.818357	2024-07-28 09:53:36.818357
-966	396	Remove a loadable module and its dependencies?	2024-07-28 09:53:37.089419	2024-07-28 09:53:37.089419
-967	397	Where is the modules configuration file located?	2024-07-28 09:53:37.392953	2024-07-28 09:53:37.392953
-968	397	Supply automatic module parameters?	2024-07-28 09:53:37.621891	2024-07-28 09:53:37.621891
-969	397	Put multiple modules into blacklist?	2024-07-28 09:53:37.850516	2024-07-28 09:53:37.850516
-970	398	What is the signature of module initial function?	2024-07-28 09:53:38.195262	2024-07-28 09:53:38.195262
-971	398	What is the signature of module cleanup function?	2024-07-28 09:53:38.512436	2024-07-28 09:53:38.512436
-972	398	What is the minimal skeleton for a module?	2024-07-28 09:53:39.093285	2024-07-28 09:53:39.093285
-973	399	Manually create a device node?	2024-07-28 09:53:39.520736	2024-07-28 09:53:39.520736
-974	399	What is the least requirement for a <code>Makefile</code> to build a loadable module?	2024-07-28 09:53:39.895841	2024-07-28 09:53:39.895841
-975	399	What is the minimal skeleton of Makefile for a module?	2024-07-28 09:53:40.304955	2024-07-28 09:53:40.304955
-976	399	Specify a kernel object with multiple source files in <code>Makefile</code>?	2024-07-28 09:53:40.784313	2024-07-28 09:53:40.784313
-977	400	Write a module accepting parameters?	2024-07-28 09:53:41.563711	2024-07-28 09:53:41.563711
-978	401	What is a Device Tree and where is its specification?	2024-07-28 09:53:41.893291	2024-07-28 09:53:41.893291
-979	401	What are the common properties of device tree specification?	2024-07-28 09:53:42.622764	2024-07-28 09:53:42.622764
-980	401	Specify an interrupt controller in a device tree source?	2024-07-28 09:53:43.335142	2024-07-28 09:53:43.335142
-981	401	Include a device tree source from another?	2024-07-28 09:53:43.607284	2024-07-28 09:53:43.607284
-982	401	Overlay nodes on top of another to create a composite tree in which the outer layers extend or modify the inner ones?	2024-07-28 09:53:44.589993	2024-07-28 09:53:44.589993
-983	401	Assuming a new device is designed similar to BeagleBone Black and a new device tree needs to be ported for it, what are the necessary steps to make one?	2024-07-28 09:53:46.476327	2024-07-28 09:53:46.476327
-984	402	Compile a device tree source?	2024-07-28 09:53:46.975836	2024-07-28 09:53:46.975836
-985	403	Build and install <b>U-Boot</b> from source?	2024-07-28 09:53:47.69882	2024-07-28 09:53:47.69882
-986	404	Describe the boot sequence in an embedded device?	2024-07-28 09:53:48.13816	2024-07-28 09:53:48.13816
-987	404	Describe what parameters should be passed to the kernel on moving from the bootloader to a kernel?	2024-07-28 09:53:48.497487	2024-07-28 09:53:48.497487
-988	404	Use U-Boot to read flash memory over serial console?	2024-07-28 09:53:48.782466	2024-07-28 09:53:48.782466
-989	404	Set environment variables in U-Boot environment?	2024-07-28 09:53:49.141489	2024-07-28 09:53:49.141489
-990	404	Use <code>mkimage</code> to create a compressed kernel image from an uncompressed kernel image?	2024-07-28 09:53:49.441965	2024-07-28 09:53:49.441965
-991	404	Load a kernel image in a U-Boot shell environment?	2024-07-28 09:53:49.778741	2024-07-28 09:53:49.778741
-992	404	Boot a kernel image across network in a U-Boot shell environment?	2024-07-28 09:53:50.16988	2024-07-28 09:53:50.16988
-993	404	Boot Linux kernel after loading it within U-Boot shell environment?	2024-07-28 09:53:50.486458	2024-07-28 09:53:50.486458
-994	404	Automate the boot process in U-Boot shell environment?	2024-07-28 09:53:50.730496	2024-07-28 09:53:50.730496
-995	404	What are the required boot instructions on BeagleBone Black?	2024-07-28 09:53:51.040275	2024-07-28 09:53:51.040275
-996	404	What are the required boot instructions on QEMU?	2024-07-28 09:53:51.29538	2024-07-28 09:53:51.29538
-997	405	What are the essential kernel command lines?	2024-07-28 09:53:51.756258	2024-07-28 09:53:51.756258
-998	405	Reduce the time of calculating the constant <code>loops_per_jiffy</code> variable on boot time?	2024-07-28 09:53:52.007718	2024-07-28 09:53:52.007718
-999	406	What is the early user space after kernel is booted?	2024-07-28 09:53:52.518544	2024-07-28 09:53:52.518544
-1000	407	Configure udev in order to give devices another name?	2024-07-28 09:53:53.099757	2024-07-28 09:53:53.099757
-1001	408	How many synchronization mechanisms for accessibility of shared resources are available in the kernel?	2024-07-28 09:53:53.94139	2024-07-28 09:53:53.94139
-1002	409	What is a spinlock?	2024-07-28 09:53:54.596751	2024-07-28 09:53:54.596751
-1003	409	What is the mechanism of a spinlock on processors?	2024-07-28 09:53:55.055329	2024-07-28 09:53:55.055329
-1004	409	Define a spinlock?	2024-07-28 09:53:55.912287	2024-07-28 09:53:55.912287
-1005	409	Lock a previously defined spinlock in module source?	2024-07-28 09:53:56.379655	2024-07-28 09:53:56.379655
-1006	409	What are the limitations of locking/unlocking spinlocks in a kernel module?	2024-07-28 09:53:56.813899	2024-07-28 09:53:56.813899
-1007	409	Prevent deadlock caused by IRQs when using spinlocks?	2024-07-28 09:53:57.269141	2024-07-28 09:53:57.269141
-1008	409	How does spinlocks affect preemtion after locking and unlocking?	2024-07-28 09:53:57.620942	2024-07-28 09:53:57.620942
-1009	409	Store and restore previous IRQs status when using spinlocks?	2024-07-28 09:53:58.278637	2024-07-28 09:53:58.278637
-1010	409	How a critical section can be protected from being preemted by kernel?	2024-07-28 09:53:58.805427	2024-07-28 09:53:58.805427
-1011	409	Acquire a lock only if it is not already held by another contender?	2024-07-28 09:53:59.756185	2024-07-28 09:53:59.756185
-1012	410	What is a mutex and how does it operate?	2024-07-28 09:54:00.567605	2024-07-28 09:54:00.567605
-1013	410	Initialize a mutex in the kernel?	2024-07-28 09:54:01.364171	2024-07-28 09:54:01.364171
-1014	410	Acquire a mutex in the kernel?	2024-07-28 09:54:02.099091	2024-07-28 09:54:02.099091
-1015	410	Release an acquired mutex in the kernel?	2024-07-28 09:54:02.593407	2024-07-28 09:54:02.593407
-1016	410	Check mutex locking availability before acquiring it?	2024-07-28 09:54:02.972284	2024-07-28 09:54:02.972284
-1017	410	What are specific rules while using mutexes in the kernel?	2024-07-28 09:54:03.607058	2024-07-28 09:54:03.607058
-1018	410	What is more efficient between spinlocks and mutexes compared in terms of CPU cycles?	2024-07-28 09:54:04.004036	2024-07-28 09:54:04.004036
-1019	411	Convert standard time units to jiffies?	2024-07-28 09:54:04.323727	2024-07-28 09:54:04.323727
-1020	412	What does the term sleeping mean in the kernel?	2024-07-28 09:54:04.556978	2024-07-28 09:54:04.556978
-1021	412	What passive waiting mechanisms are implemented in the kernel?	2024-07-28 09:54:05.070483	2024-07-28 09:54:05.070483
-1022	412	What queues are implemented in the kernel to hold tasks?	2024-07-28 09:54:05.412109	2024-07-28 09:54:05.412109
-1023	413	What is a wait queue?	2024-07-28 09:54:05.964808	2024-07-28 09:54:05.964808
-1024	413	Initialize a wait queue?	2024-07-28 09:54:06.408745	2024-07-28 09:54:06.408745
-1025	414	Put a process to sleep waiting for an event to occur?	2024-07-28 09:54:06.994577	2024-07-28 09:54:06.994577
-1026	414	Put a process to sleep waiting either for an event to occur or a timeout to be reached?	2024-07-28 09:54:07.39751	2024-07-28 09:54:07.39751
-1097	417	Wake up a process waiting on a wait queue?	2024-07-28 09:54:39.870563	2024-07-28 09:54:39.870563
-1027	414	What values does the <code>wait_event_timeout()</code> function return?	2024-07-28 09:54:07.747215	2024-07-28 09:54:07.747215
-1028	415	Wake up a process waiting on a wait queue?	2024-07-28 09:54:08.251657	2024-07-28 09:54:08.251657
-1029	415	What values do <code>wait_up</code> family functions return?	2024-07-28 09:54:08.556417	2024-07-28 09:54:08.556417
-1030	416	How many module types are available?	2024-07-28 09:54:08.963506	2024-07-28 09:54:08.963506
-1031	416	What is the basic skeleton of a kernel module?	2024-07-28 09:54:09.587087	2024-07-28 09:54:09.587087
-1032	416	What functions are the entry points of all kernel modules?	2024-07-28 09:54:09.911386	2024-07-28 09:54:09.911386
-1033	416	What are the <code>\\_\\_init</code> and <code>\\_\\_exit</code> function prefixes in kernel modules?	2024-07-28 09:54:10.598571	2024-07-28 09:54:10.598571
-1034	416	What section is used in kernel objects to store module information?	2024-07-28 09:54:10.923528	2024-07-28 09:54:10.923528
-1035	416	What macros are commonly used in kernel modules to store module information?	2024-07-28 09:54:11.147623	2024-07-28 09:54:11.147623
-1036	416	What is the real underlying macro provided by the kernel to add an entry to the <code>.modinfo</code> section?	2024-07-28 09:54:11.414024	2024-07-28 09:54:11.414024
-1037	416	What utility dumps the <code>.modinfo</code> section of kernel modules?	2024-07-28 09:54:11.746942	2024-07-28 09:54:11.746942
-1038	416	What are the differences of <code>EXPORT_SYMBOL</code> and <code>EXPORT_SYMBOL_GPL</code> macros exporting symbols based on license?	2024-07-28 09:54:12.152241	2024-07-28 09:54:12.152241
-1039	416	What is the <b>out-of-tree</b> kernel module building?	2024-07-28 09:54:12.495207	2024-07-28 09:54:12.495207
-1040	416	What is the <b>built-in</b> kernel module building?	2024-07-28 09:54:12.735654	2024-07-28 09:54:12.735654
-1041	416	Write a custom <code>Makefile</code> for <b>out-of-tree</b> kernel modules?	2024-07-28 09:54:13.483667	2024-07-28 09:54:13.483667
-1042	416	What <code>make</code> targets should be available when writing a custom <code>Makefile</code> for kernel modules?	2024-07-28 09:54:13.903627	2024-07-28 09:54:13.903627
-1043	416	Write configuration dependent target in <code>Makefile</code> for a <b>built-in</b> kernel module?	2024-07-28 09:54:14.438143	2024-07-28 09:54:14.438143
-1044	416	Specify multiple source files in a custom <code>Makefile</code> for a specific target?	2024-07-28 09:54:15.232448	2024-07-28 09:54:15.232448
-1045	416	Specify compiler and linker flags in <code>Makefile</code> for kernel module building?	2024-07-28 09:54:15.684375	2024-07-28 09:54:15.684375
-1046	416	Include other kernel source directories within a <code>Makefile</code>?	2024-07-28 09:54:15.99097	2024-07-28 09:54:15.99097
-1047	416	Obtain a prebuilt kernel for building <b>out-of-tree</b> module?	2024-07-28 09:54:16.516875	2024-07-28 09:54:16.516875
-1048	416	Load and unload an <b>out-of-tree</b> built kernel module?	2024-07-28 09:54:16.917605	2024-07-28 09:54:16.917605
-1049	416	Write <code>Makefile</code> for a <b>built-in</b> kernel module?	2024-07-28 09:54:17.676435	2024-07-28 09:54:17.676435
-1050	416	Define parameters in kernel modules?	2024-07-28 09:54:18.73709	2024-07-28 09:54:18.73709
-1051	416	What psuedo-files represent module parameters?	2024-07-28 09:54:19.14719	2024-07-28 09:54:19.14719
-1052	416	Pass parameters to built-in modules?	2024-07-28 09:54:19.446431	2024-07-28 09:54:19.446431
-1053	416	How kernel functions can be called from a kernel module?	2024-07-28 09:54:19.837475	2024-07-28 09:54:19.837475
-1054	416	How does <code>depmod</code> utility determine module dependencies?	2024-07-28 09:54:20.175128	2024-07-28 09:54:20.175128
-1055	416	How does <code>modprobe</code> utility loads modules?	2024-07-28 09:54:20.54473	2024-07-28 09:54:20.54473
-1056	416	How does <code>depmod</code> utility map devices to their drivers?	2024-07-28 09:54:21.091995	2024-07-28 09:54:21.091995
-1057	416	Load a module at boot time?	2024-07-28 09:54:21.526286	2024-07-28 09:54:21.526286
-1058	416	Unload an automatically loaded module?	2024-07-28 09:54:22.021175	2024-07-28 09:54:22.021175
-1059	416	List loaded modules?	2024-07-28 09:54:22.562228	2024-07-28 09:54:22.562228
-1060	416	Where the error macros defined are defined?	2024-07-28 09:54:22.84682	2024-07-28 09:54:22.84682
-1061	416	What is the standard way to return an error in kernel modules?	2024-07-28 09:54:23.229573	2024-07-28 09:54:23.229573
-1062	416	Why <code>goto</code> statement is preferable over than nested <code>if</code>s in kernel modules?	2024-07-28 09:54:24.072699	2024-07-28 09:54:24.072699
-1063	416	What is the standard way of handling null pointer errors in kernel modules?	2024-07-28 09:54:25.400001	2024-07-28 09:54:25.400001
-1064	416	Where are the <code>printk()</code> function log levels are defined?	2024-07-28 09:54:25.788723	2024-07-28 09:54:25.788723
-1065	416	What are the recommended helper functions alternative to <code>printk()</code>?	2024-07-28 09:54:26.056974	2024-07-28 09:54:26.056974
-1066	416	What are the log levels of kernel printing helper functions?	2024-07-28 09:54:26.434611	2024-07-28 09:54:26.434611
-1067	416	What is the default kernel log level?	2024-07-28 09:54:26.850155	2024-07-28 09:54:26.850155
-1068	416	Change current kernel log level?	2024-07-28 09:54:27.131313	2024-07-28 09:54:27.131313
-1069	416	Prefix the module output messages with a custom string?	2024-07-28 09:54:27.537006	2024-07-28 09:54:27.537006
-1070	417	How many synchronization mechanisms for accessibility of shared resources are available in the kernel?	2024-07-28 09:54:28.150281	2024-07-28 09:54:28.150281
-1071	417	What is a spinlock?	2024-07-28 09:54:28.623174	2024-07-28 09:54:28.623174
-1072	417	How does spinlocks operate on a CPU?	2024-07-28 09:54:28.973608	2024-07-28 09:54:28.973608
-1073	417	Define a spinlock in module source?	2024-07-28 09:54:29.700807	2024-07-28 09:54:29.700807
-1074	417	Lock a previously defined spinlock in module source?	2024-07-28 09:54:30.170852	2024-07-28 09:54:30.170852
-1075	417	What are the limitations of locking/unlocking spinlocks in a kernel module?	2024-07-28 09:54:30.483647	2024-07-28 09:54:30.483647
-1076	417	Prevent deadlock caused by IRQs when using spinlocks?	2024-07-28 09:54:30.825212	2024-07-28 09:54:30.825212
-1077	417	How does spinlocks affect preemtion after locking and unlocking?	2024-07-28 09:54:31.061402	2024-07-28 09:54:31.061402
-1078	417	Store and restore previous IRQs status when using spinlocks?	2024-07-28 09:54:31.514084	2024-07-28 09:54:31.514084
-1079	417	How a critical section can be protected from being preemted by kernel?	2024-07-28 09:54:31.950912	2024-07-28 09:54:31.950912
-1080	417	What is a mutex and how does it operate?	2024-07-28 09:54:32.538472	2024-07-28 09:54:32.538472
-1081	417	Initialize a mutex in the kernel?	2024-07-28 09:54:33.251015	2024-07-28 09:54:33.251015
-1082	417	Acquire a mutex in the kernel?	2024-07-28 09:54:33.828249	2024-07-28 09:54:33.828249
-1083	417	Release an acquired mutex in the kernel?	2024-07-28 09:54:34.217623	2024-07-28 09:54:34.217623
-1084	417	Check mutex locking availability before acquiring it?	2024-07-28 09:54:34.535256	2024-07-28 09:54:34.535256
-1085	417	What are specific rules while using mutexes in the kernel?	2024-07-28 09:54:35.03114	2024-07-28 09:54:35.03114
-1086	417	What is more efficient between spinlocks and mutexes compared in terms of CPU cycles?	2024-07-28 09:54:35.303902	2024-07-28 09:54:35.303902
-1087	417	Acquire a lock only if it is not already held by another contender?	2024-07-28 09:54:36.120312	2024-07-28 09:54:36.120312
-1088	417	What does the term sleeping mean in the kernel?	2024-07-28 09:54:36.458804	2024-07-28 09:54:36.458804
-1089	417	What passive waiting mechanisms are implemented in the kernel?	2024-07-28 09:54:36.861002	2024-07-28 09:54:36.861002
-1090	417	What queues are implemented in the kernel to hold tasks?	2024-07-28 09:54:37.160095	2024-07-28 09:54:37.160095
-1091	417	What is a wait queue?	2024-07-28 09:54:37.605546	2024-07-28 09:54:37.605546
-1092	417	Initialize a wait queue?	2024-07-28 09:54:37.998306	2024-07-28 09:54:37.998306
-1093	417	Put a process to sleep waiting for an event to occur?	2024-07-28 09:54:38.463382	2024-07-28 09:54:38.463382
-1094	417	Put a process to sleep waiting either for an event to occur or a timeout to be reached?	2024-07-28 09:54:38.87271	2024-07-28 09:54:38.87271
-1095	417	What values does the <code>wait_event_timeout()</code> function return?	2024-07-28 09:54:39.180904	2024-07-28 09:54:39.180904
-1096	417	Convert standard time units to jiffies?	2024-07-28 09:54:39.504666	2024-07-28 09:54:39.504666
-1098	417	What values do <code>wait_up</code> family functions return?	2024-07-28 09:54:40.182469	2024-07-28 09:54:40.182469
-1099	418	Where does the kernel log?	2024-07-28 09:54:40.51604	2024-07-28 09:54:40.51604
-1100	418	Where is the tracing directory usually mounted?	2024-07-28 09:54:40.749378	2024-07-28 09:54:40.749378
-1101	419	Create tmux configuration file so that it reads on every execution?	2024-07-28 09:54:41.068625	2024-07-28 09:54:41.068625
-1102	419	Replace prefix key with other key-bindings?	2024-07-28 09:54:41.38076	2024-07-28 09:54:41.38076
-1103	420	What is the role of tmux server and clients?	2024-07-28 09:54:41.840648	2024-07-28 09:54:41.840648
-1104	421	Create a new session?	2024-07-28 09:54:42.201448	2024-07-28 09:54:42.201448
-1105	421	Create a new window?	2024-07-28 09:54:42.568054	2024-07-28 09:54:42.568054
-1106	421	Create a new pane by spliting window vertically or horizontally?	2024-07-28 09:54:42.854246	2024-07-28 09:54:42.854246
-1107	422	Generate a CA Certificate private key?	2024-07-28 09:54:43.23985	2024-07-28 09:54:43.23985
-1108	423	Generate an X509 Certificate?	2024-07-28 09:54:43.499775	2024-07-28 09:54:43.499775
-1109	423	Dump the x509 Certificate text?	2024-07-28 09:54:43.801007	2024-07-28 09:54:43.801007
-1110	423	Generate a CA Certificate Sign request file?	2024-07-28 09:54:44.075376	2024-07-28 09:54:44.075376
-1111	423	Generate a self-signed CA Certificate?	2024-07-28 09:54:44.481089	2024-07-28 09:54:44.481089
-1112	424	Compile an x64 assembly program?	2024-07-28 09:54:45.524412	2024-07-28 09:54:45.524412
-1113	425	Debug a compiled program with gdb?	2024-07-28 09:54:46.012211	2024-07-28 09:54:46.012211
-1114	425	List source lines in debugging?	2024-07-28 09:54:46.318901	2024-07-28 09:54:46.318901
-1115	425	Change the line number of source listing?	2024-07-28 09:54:46.631856	2024-07-28 09:54:46.631856
-1116	425	Set disassembly flavor in gdb?	2024-07-28 09:54:46.966486	2024-07-28 09:54:46.966486
-1117	425	Store gdb configurations in file for future use?	2024-07-28 09:54:47.221227	2024-07-28 09:54:47.221227
-1118	425	Disassemble a function or line of source in gdb?	2024-07-28 09:54:47.503935	2024-07-28 09:54:47.503935
-1119	425	Examine an address in memory in gdb?	2024-07-28 09:54:47.848048	2024-07-28 09:54:47.848048
-1120	425	Set breakpoints in gdb?	2024-07-28 09:54:48.141313	2024-07-28 09:54:48.141313
-1121	425	Start execution of the debugging program in gdb?	2024-07-28 09:54:48.448844	2024-07-28 09:54:48.448844
-1122	425	Inspect registers in gdb?	2024-07-28 09:54:48.761757	2024-07-28 09:54:48.761757
-1123	425	Inspect the breakpoint, stack, threads and other resources of the debugging program in gdb?	2024-07-28 09:54:49.155	2024-07-28 09:54:49.155
-1124	425	Manipulate breakpoints in gdb?	2024-07-28 09:54:49.530316	2024-07-28 09:54:49.530316
-1125	425	Change executation of the debugging program in gdb?	2024-07-28 09:54:49.889783	2024-07-28 09:54:49.889783
-1126	425	Print variables through debugging session?	2024-07-28 09:54:50.215565	2024-07-28 09:54:50.215565
-1127	425	Enable TUI in gdb:	2024-07-28 09:54:50.515584	2024-07-28 09:54:50.515584
-1128	426	Read the ELF header of an executable object?	2024-07-28 09:54:50.802989	2024-07-28 09:54:50.802989
-1129	426	Read symbols of an executable object?	2024-07-28 09:54:51.067278	2024-07-28 09:54:51.067278
-1130	426	Sort executable object symbols based on its memory locations?	2024-07-28 09:54:51.333507	2024-07-28 09:54:51.333507
-1131	427	Convert decimal, binary, and hexadecimal representations of integral and floating point numbers?	2024-07-28 09:54:51.590017	2024-07-28 09:54:51.590017
-1132	427	Indicate that a literal number is in octal base in x64 assembly?	2024-07-28 09:54:51.888004	2024-07-28 09:54:51.888004
-1133	427	Indicate that a literal number is in hexadecimal base in x64 assembly?	2024-07-28 09:54:52.202278	2024-07-28 09:54:52.202278
-1134	428	Name x64 registers?	2024-07-28 09:54:52.721711	2024-07-28 09:54:52.721711
-1135	428	What is the name of <b>Instruction Pointer</b> register?	2024-07-28 09:54:52.913634	2024-07-28 09:54:52.913634
-1136	428	Name the flag registers?	2024-07-28 09:54:53.302151	2024-07-28 09:54:53.302151
-1137	428	Name SIMD registers?	2024-07-28 09:54:53.576434	2024-07-28 09:54:53.576434
-1138	429	What header contains Linux system calls?	2024-07-28 09:54:53.799191	2024-07-28 09:54:53.799191
-1139	429	Write exit procedure in x64 Assembly?	2024-07-28 09:54:54.266378	2024-07-28 09:54:54.266378
-1140	429	Exit program without directly writing the exit syscall?	2024-07-28 09:54:54.695075	2024-07-28 09:54:54.695075
-1141	430	Create values in data section of memory?	2024-07-28 09:54:55.51753	2024-07-28 09:54:55.51753
-1142	430	Consecutively store a sequence of data into read-only memory section?	2024-07-28 09:54:55.896579	2024-07-28 09:54:55.896579
-1143	430	Preserve uninitialized variables in a writable memory section?	2024-07-28 09:54:56.284199	2024-07-28 09:54:56.284199
-1144	431	Use external functions from C in x64 assembly code?	2024-07-28 09:54:57.486845	2024-07-28 09:54:57.486845
-1145	432	Add and subtract two integral integers?	2024-07-28 09:54:58.619148	2024-07-28 09:54:58.619148
-1146	432	Increment and decrement a value stored on a writable variable?	2024-07-28 09:54:59.73189	2024-07-28 09:54:59.73189
-1147	432	Shift arithmetic values stored in writable variables?	2024-07-28 09:55:00.784303	2024-07-28 09:55:00.784303
-1148	432	Multiply and divide two integral integers?	2024-07-28 09:55:02.077904	2024-07-28 09:55:02.077904
-1149	433	Specify how many bits each floating point number occupies for exponent and fraction?	2024-07-28 09:55:02.750212	2024-07-28 09:55:02.750212
-1150	433	Add and subtract two floating point numbers?	2024-07-28 09:55:03.510825	2024-07-28 09:55:03.510825
-1151	433	Multiply and divide two floating point numbers?	2024-07-28 09:55:04.338256	2024-07-28 09:55:04.338256
-1152	433	Calculate the square root of a floating point number?	2024-07-28 09:55:05.032068	2024-07-28 09:55:05.032068
-1153	434	Evaluate bit-wise operations?	2024-07-28 09:55:06.334508	2024-07-28 09:55:06.334508
-1154	434	Set and reset specific bits of numeric variable?	2024-07-28 09:55:07.344724	2024-07-28 09:55:07.344724
-1155	434	Check if its 8th bit of a quadword variable is set?	2024-07-28 09:55:08.14794	2024-07-28 09:55:08.14794
-1156	435	Conditionally change the execution flow?	2024-07-28 09:55:09.669542	2024-07-28 09:55:09.669542
-1157	436	Repeat execution of a code section by manually counting down?	2024-07-28 09:55:10.980428	2024-07-28 09:55:10.980428
-1158	436	Repeat execution of a code section by automatically counting down?	2024-07-28 09:55:12.318032	2024-07-28 09:55:12.318032
-1159	437	Load the address of an array into a register to run operations on?	2024-07-28 09:55:13.280874	2024-07-28 09:55:13.280874
-1160	438	Temporarily store values on memory within the scope of a function?	2024-07-28 09:55:14.88775	2024-07-28 09:55:14.88775
-1161	439	Write a stack frame for a function?	2024-07-28 09:55:15.632027	2024-07-28 09:55:15.632027
-1162	439	Align the stack with stack frame after function call?	2024-07-28 09:55:16.561309	2024-07-28 09:55:16.561309
-1163	440	Abbreviate function epilogue?	2024-07-28 09:55:17.123065	2024-07-28 09:55:17.123065
-1164	440	Use calling convention to return error code from a function?	2024-07-28 09:55:18.244171	2024-07-28 09:55:18.244171
-1165	440	Use calling conventions to transfer variables from callee to caller functions?	2024-07-28 09:55:20.43408	2024-07-28 09:55:20.43408
-1166	441	Declare function local variables?	2024-07-28 09:55:21.943444	2024-07-28 09:55:21.943444
-1167	442	Expose a function to external linkage?	2024-07-28 09:55:24.297874	2024-07-28 09:55:24.297874
-1168	442	Expose a variable to external linkage?	2024-07-28 09:55:25.29658	2024-07-28 09:55:25.29658
-1169	443	Use an assembly function in a C source?	2024-07-28 09:55:26.277564	2024-07-28 09:55:26.277564
-1170	443	How many of inline assembly types are available?	2024-07-28 09:55:26.716756	2024-07-28 09:55:26.716756
-1171	443	Write a basic inline assembly in C programs?	2024-07-28 09:55:27.279682	2024-07-28 09:55:27.279682
-1172	443	Write extended inline assembly in C programs? (needs work)	2024-07-28 09:55:28.377419	2024-07-28 09:55:28.377419
-1173	444	Use inline procedures to avoid runtime overhead of function calls?	2024-07-28 09:55:29.49917	2024-07-28 09:55:29.49917
-1174	444	Conditionally compile a part of x64 assembly program?	2024-07-28 09:55:30.237498	2024-07-28 09:55:30.237498
-1175	445	Write into the standard output stream?	2024-07-28 09:55:30.92766	2024-07-28 09:55:30.92766
-1176	445	Read from the standard input stream?	2024-07-28 09:55:31.536376	2024-07-28 09:55:31.536376
-1177	446	Prevent stack overflow by counting input string before printing it?	2024-07-28 09:55:32.579177	2024-07-28 09:55:32.579177
-1178	446	Prevent stack overflows by limiting the maximum allowed input length from standard input?	2024-07-28 09:55:34.425503	2024-07-28 09:55:34.425503
-1179	447	What registers are used to read command line arguments from an x64 assembly program?	2024-07-28 09:55:35.014317	2024-07-28 09:55:35.014317
-1180	447	Read command line arguments from an x64 assembly program?	2024-07-28 09:55:35.798851	2024-07-28 09:55:35.798851
-1181	447	Inspect the command line arguments stored in registers in a GNU debugger?	2024-07-28 09:55:36.260512	2024-07-28 09:55:36.260512
-1182	448	What header contains file operation constants?	2024-07-28 09:55:36.473143	2024-07-28 09:55:36.473143
-1183	448	Open and close a file in x64 assembly?	2024-07-28 09:55:38.07657	2024-07-28 09:55:38.07657
-1184	448	Write content to a file in x64 assembly?	2024-07-28 09:55:39.544064	2024-07-28 09:55:39.544064
-1185	448	Truncate a file in x64 assembly?	2024-07-28 09:55:40.922228	2024-07-28 09:55:40.922228
-1186	449	Obtain the CPU information of the processor in x64 assembly?	2024-07-28 09:55:41.855298	2024-07-28 09:55:41.855298
-1187	449	Check the processors which version of SSE extensions do they support?	2024-07-28 09:55:44.709321	2024-07-28 09:55:44.709321
-1188	449	How many registers of SSE are available on any processor supporting it?	2024-07-28 09:55:45.635908	2024-07-28 09:55:45.635908
-1189	449	What are the two types of data that can be stored on SSE registers?	2024-07-28 09:55:45.914257	2024-07-28 09:55:45.914257
-1190	449	What are AVX registers and how much data can they hold?	2024-07-28 09:55:46.197935	2024-07-28 09:55:46.197935
-1191	449	How does alignment of data in <code>.data</code> and <code>.bss</code> sections can improve performance of a program?	2024-07-28 09:55:46.43182	2024-07-28 09:55:46.43182
-1192	449	How can we align data in <code>.data</code> and <code>.bss</code> sections in specific byte sizes?	2024-07-28 09:55:46.735824	2024-07-28 09:55:46.735824
+COPY flashback.practices (id, topic_id, heading, creation, updated, "position") FROM stdin;
+1	1	What are the development stages of an embedded Linux system?	2024-07-28 09:45:11.194663	2024-07-28 09:45:11.194663	0
+2	1	What are the building blocks of an embedded Linux system?	2024-07-28 09:45:11.496136	2024-07-28 09:45:11.496136	0
+3	1	What are the minimum required hardware target to develop an Embedded Linux for?	2024-07-28 09:45:11.754399	2024-07-28 09:45:11.754399	0
+4	1	What toolchains are available to build cross-toolchains with?	2024-07-28 09:45:12.014434	2024-07-28 09:45:12.014434	0
+5	2	What C libraries are commonly used in toolchains?	2024-07-28 09:45:12.282889	2024-07-28 09:45:12.282889	0
+6	2	What components are used in the toolchain tuple?	2024-07-28 09:45:12.598923	2024-07-28 09:45:12.598923	0
+7	2	Print the tuple embedded in GNU GCC compiler?	2024-07-28 09:45:12.865624	2024-07-28 09:45:12.865624	0
+8	2	Get the version and configurations of a native or cross-compiled GCC compiler?	2024-07-28 09:45:13.117269	2024-07-28 09:45:13.117269	0
+9	2	Override the default processor for GCC compiler?	2024-07-28 09:45:13.352713	2024-07-28 09:45:13.352713	0
+10	2	List available architecture specific options in GCC compiler?	2024-07-28 09:45:13.595982	2024-07-28 09:45:13.595982	0
+11	2	Print the <code>sysroot</code> path of GCC compiler?	2024-07-28 09:45:13.833421	2024-07-28 09:45:13.833421	0
+12	2	What are prerequisites for communicating with an embedded device?	2024-07-28 09:45:14.237917	2024-07-28 09:45:14.237917	0
+13	2	How to connect to an embedded device using <code>picocom</code> through <code>/dev/ttyUSB0</code> device driver?	2024-07-28 09:45:14.638922	2024-07-28 09:45:14.638922	0
+14	2	How to list the GNU GCC compiler default configurations?	2024-07-28 09:45:14.922687	2024-07-28 09:45:14.922687	0
+15	2	How to inspect the detailed steps the GNU GCC takes to compile a source file?	2024-07-28 09:45:15.153662	2024-07-28 09:45:15.153662	0
+16	2	How to inspect the meta data of an executable file?	2024-07-28 09:45:15.39656	2024-07-28 09:45:15.39656	0
+17	2	How to remove symbol table from an executable file using binary utilities?	2024-07-28 09:45:15.633528	2024-07-28 09:45:15.633528	0
+18	2	How to use GNU GCC compiler to compile C source files separately?	2024-07-28 09:45:15.905137	2024-07-28 09:45:15.905137	0
+19	2	How to list the symbol paths within an executable file?	2024-07-28 09:45:16.139389	2024-07-28 09:45:16.139389	0
+20	2	Why do C libraries require kernel headers and how kernel headers can be installed?	2024-07-28 09:45:16.57231	2024-07-28 09:45:16.57231	0
+21	2	What is the GNU GCC compiler flag to specify processor architecture and processor specific optimization?	2024-07-28 09:45:16.935028	2024-07-28 09:45:16.935028	0
+22	3	What toolchains are available to use in kernel image build process?	2024-07-28 09:45:17.275438	2024-07-28 09:45:17.275438	0
+23	3	How to build <code>Crosstool-ng</code>?	2024-07-28 09:45:17.669406	2024-07-28 09:45:17.669406	0
+24	3	How to list <code>Crosstool-ng</code> sample configurations?	2024-07-28 09:45:17.922638	2024-07-28 09:45:17.922638	0
+25	3	How to use <code>Crosstool-ng</code> to show a brief info of current or specified configuration?	2024-07-28 09:45:18.348128	2024-07-28 09:45:18.348128	0
+26	3	How to use <code>Crosstool-ng</code> to load a target specific configuration sample?	2024-07-28 09:45:18.674765	2024-07-28 09:45:18.674765	0
+27	3	How to use <code>Crosstool-ng</code> to configure selected architecture specific cross-toolchain?	2024-07-28 09:45:19.024616	2024-07-28 09:45:19.024616	0
+28	3	How to use <code>Crosstool-ng</code> to print the tuple of the currently configured toolchain?	2024-07-28 09:45:19.286999	2024-07-28 09:45:19.286999	0
+29	3	How to use <code>Crosstool-ng</code> to separate downloading source files from building stage?	2024-07-28 09:45:19.520854	2024-07-28 09:45:19.520854	0
+30	3	How to use <code>Crosstool-ng</code> to build the desired architecture specific cross-toolchain?	2024-07-28 09:45:19.789951	2024-07-28 09:45:19.789951	0
+31	3	How to set library and headers path for a cross-compiled GNU GCC compiler?	2024-07-28 09:45:20.05671	2024-07-28 09:45:20.05671	0
+32	4	Build and install <i>crosstool-ng</i>?	2024-07-28 09:45:20.463785	2024-07-28 09:45:20.463785	0
+33	5	Print the list of crosstool-ng sample configurations?	2024-07-28 09:45:20.751587	2024-07-28 09:45:20.751587	0
+34	5	Inspect the configuration details of crosstool-ng targets?	2024-07-28 09:45:21.089651	2024-07-28 09:45:21.089651	0
+35	6	Build a cross-toolchain for Raspberry Pi Zero?	2024-07-28 09:45:21.778467	2024-07-28 09:45:21.778467	0
+36	6	Build a cross-toolchain for BeagleBone Black?	2024-07-28 09:45:22.429304	2024-07-28 09:45:22.429304	0
+37	6	Build a cross-toolchain for QEMU?	2024-07-28 09:45:22.971203	2024-07-28 09:45:22.971203	0
+38	7	What are the main C library components?	2024-07-28 09:45:23.32341	2024-07-28 09:45:23.32341	0
+39	7	Print the linked libraries of an executable using GNU toolchains?	2024-07-28 09:45:23.59281	2024-07-28 09:45:23.59281	0
+40	7	Print the runtime linker used for an executable using GNU toolchains?	2024-07-28 09:45:23.861669	2024-07-28 09:45:23.861669	0
+41	7	Compile by linking libraries statically using GNU GCC compiler?	2024-07-28 09:45:24.144163	2024-07-28 09:45:24.144163	0
+42	7	Where are static libraries located in <code>sysroot</code> directory used by GNU toolchains?	2024-07-28 09:45:24.475672	2024-07-28 09:45:24.475672	0
+43	7	Use GNU toolchains to create a static library containing two executable objects compiled from C source files?	2024-07-28 09:45:24.832122	2024-07-28 09:45:24.832122	0
+44	7	Use GNU toolchains to create a shared library containing two executable objects compiled from C source files?	2024-07-28 09:45:25.224549	2024-07-28 09:45:25.224549	0
+45	7	Use GNU cross-toolchains to print the <code>SONAME</code> of a shared library?	2024-07-28 09:45:25.507401	2024-07-28 09:45:25.507401	0
+46	7	Use GNU toolchains to cross-compile for a specific target?	2024-07-28 09:45:26.006447	2024-07-28 09:45:26.006447	0
+47	7	Override the toolchain in an autotools compatible project?	2024-07-28 09:45:26.35677	2024-07-28 09:45:26.35677	0
+48	7	Use <code>crosstool-ng</code> to cross compile <i>SQlite</i> and add it to an existing toolchain?	2024-07-28 09:45:26.73175	2024-07-28 09:45:26.73175	0
+49	7	Prepare <code>pkg-config</code> to look up library dependencies in a sysroot?	2024-07-28 09:45:27.099312	2024-07-28 09:45:27.099312	0
+50	7	Use CMake to cross compile a project?	2024-07-28 09:45:27.417131	2024-07-28 09:45:27.417131	0
+51	8	How to obtain U-Boot and configure it?	2024-07-28 09:45:27.961755	2024-07-28 09:45:27.961755	0
+52	9	Where to download the Raspberry Pi bootloader?	2024-07-28 09:45:28.423314	2024-07-28 09:45:28.423314	0
+53	9	What files are required to boot using a Raspberry Pi device?	2024-07-28 09:45:29.212878	2024-07-28 09:45:29.212878	0
+54	10	How to load a file from a filesystem to RAM within U-Boot shell?	2024-07-28 09:45:29.971908	2024-07-28 09:45:29.971908	0
+55	11	What command can be used within U-Boot shell to load a kernel image into RAM from network?	2024-07-28 09:45:30.313915	2024-07-28 09:45:30.313915	0
+56	11	What command can be used within U-Boot shell to test network conectivity?	2024-07-28 09:45:30.566379	2024-07-28 09:45:30.566379	0
+57	11	What utilities can be used within U-Boot shell to load a kernel image from serial line to RAM?	2024-07-28 09:45:30.783223	2024-07-28 09:45:30.783223	0
+58	11	What command can be used within U-Boot shell to control the USB subsystem?	2024-07-28 09:45:31.041607	2024-07-28 09:45:31.041607	0
+59	11	What command can be used within U-Boot shell to control MMC subsystem?	2024-07-28 09:45:31.308343	2024-07-28 09:45:31.308343	0
+60	11	What command can be used within U-Boot shell to read, write and erase contents to NAND flash?	2024-07-28 09:45:31.579825	2024-07-28 09:45:31.579825	0
+61	11	What commands can be used within U-Boot shell to erase, modify protection or write contents to NOR flash?	2024-07-28 09:45:31.911514	2024-07-28 09:45:31.911514	0
+62	11	What command can be used within U-Boot shell to display memory info?	2024-07-28 09:45:32.189234	2024-07-28 09:45:32.189234	0
+63	11	What command can be used within U-Boot shell to modify memory info?	2024-07-28 09:45:32.472715	2024-07-28 09:45:32.472715	0
+64	11	What command can be used within U-Boot shell to display board information?	2024-07-28 09:45:32.756022	2024-07-28 09:45:32.756022	0
+140	45	How many types of components are available?	2024-07-28 09:45:59.824579	2024-07-28 09:45:59.824579	0
+65	11	What command can be used within U-Boot shell to display environment variables?	2024-07-28 09:45:33.060719	2024-07-28 09:45:33.060719	0
+66	11	What command can be used within U-Boot shell to set environment variables?	2024-07-28 09:45:33.33417	2024-07-28 09:45:33.33417	0
+67	11	What command can be used within U-Boot shell to edit an environment variable?	2024-07-28 09:45:33.603088	2024-07-28 09:45:33.603088	0
+68	11	What command can be used within U-Boot shell to save environment variables permanently?	2024-07-28 09:45:33.895722	2024-07-28 09:45:33.895722	0
+69	11	What environment variable can be set within U-Boot shell to specify the boot command sequence that U-Boot should automatically execute at boot time?	2024-07-28 09:45:34.215169	2024-07-28 09:45:34.215169	0
+70	11	What environment variable can be set within U-Boot shell to be passed to the kernel as arguments?	2024-07-28 09:45:34.512493	2024-07-28 09:45:34.512493	0
+71	11	What environment variables should be set within U-Boot shell to load an image into RAM from network?	2024-07-28 09:45:34.789175	2024-07-28 09:45:34.789175	0
+72	11	What command can be used within U-Boot shell to see the size of the latest copy into memory?	2024-07-28 09:45:35.159107	2024-07-28 09:45:35.159107	0
+73	11	How to write conditional expressions within U-Boot shell?	2024-07-28 09:45:35.535356	2024-07-28 09:45:35.535356	0
+74	11	How to run a script within U-Boot shell?	2024-07-28 09:45:35.87535	2024-07-28 09:45:35.87535	0
+75	11	How to reference other variable within U-Boot shell?	2024-07-28 09:45:36.194345	2024-07-28 09:45:36.194345	0
+76	11	What does the <code>source</code> command do in U-Boot shell environment?	2024-07-28 09:45:36.604969	2024-07-28 09:45:36.604969	0
+77	12	How to list all available processors available to QEMU?	2024-07-28 09:45:36.884209	2024-07-28 09:45:36.884209	0
+78	12	How to use <code>qemu-system-arm</code> command to boot into <code>u-boot</code>?	2024-07-28 09:45:37.107054	2024-07-28 09:45:37.107054	0
+79	13	When are the release cycles of the Yocto Project?	2024-07-28 09:45:37.391224	2024-07-28 09:45:37.391224	0
+80	13	What are the input requirements for the Yocto Project?	2024-07-28 09:45:37.581846	2024-07-28 09:45:37.581846	0
+81	13	What are the expected outputs from the Yocto Project?	2024-07-28 09:45:37.770496	2024-07-28 09:45:37.770496	0
+82	13	What is the default referencing build system for the Yocto Project?	2024-07-28 09:45:37.942766	2024-07-28 09:45:37.942766	0
+83	13	What are the constituents of the Poky build tool?	2024-07-28 09:45:38.157809	2024-07-28 09:45:38.157809	0
+84	13	What are the constituents of the Poky build system?	2024-07-28 09:45:38.354097	2024-07-28 09:45:38.354097	0
+85	13	What is the role of BitBake in the Yocto Project?	2024-07-28 09:45:38.67952	2024-07-28 09:45:38.67952	0
+86	13	What is the role of OpenEmbedded Core in the Yocto Project?	2024-07-28 09:45:38.93503	2024-07-28 09:45:38.93503	0
+87	13	What is the role of Metadata in the Yocto Project?	2024-07-28 09:45:39.181268	2024-07-28 09:45:39.181268	0
+88	13	What are the building blocks of the Metadata component in the Poky build system?	2024-07-28 09:45:39.491623	2024-07-28 09:45:39.491623	0
+89	13	What are the different roles and their tasks in Linux-based software development teams?	2024-07-28 09:45:39.858636	2024-07-28 09:45:39.858636	0
+90	14	How to create a patch?	2024-07-28 09:45:40.034246	2024-07-28 09:45:40.034246	0
+91	21	What is the common method to write a document as a beginner?	2024-07-28 09:45:40.391582	2024-07-28 09:45:40.391582	0
+92	21	What is the best practice in naming tex files?	2024-07-28 09:45:40.60542	2024-07-28 09:45:40.60542	0
+93	21	How many document classes are available?	2024-07-28 09:45:40.841593	2024-07-28 09:45:40.841593	0
+94	21	Create an empty article document?	2024-07-28 09:45:41.251108	2024-07-28 09:45:41.251108	0
+95	21	Set default font for document?	2024-07-28 09:45:41.663726	2024-07-28 09:45:41.663726	0
+96	21	Make a title in document?	2024-07-28 09:45:42.189077	2024-07-28 09:45:42.189077	0
+97	23	What features does the blindtext package present?	2024-07-28 09:45:42.74319	2024-07-28 09:45:42.74319	0
+98	24	What package should be used when UTF8 characters are written in text?	2024-07-28 09:45:43.148693	2024-07-28 09:45:43.148693	0
+99	25	What is best method to separate consequent lines in tex document?	2024-07-28 09:45:43.505262	2024-07-28 09:45:43.505262	0
+100	26	Bold a text?	2024-07-28 09:45:43.817827	2024-07-28 09:45:43.817827	0
+101	26	Italic a text?	2024-07-28 09:45:44.059571	2024-07-28 09:45:44.059571	0
+102	26	Underline a text?	2024-07-28 09:45:44.319987	2024-07-28 09:45:44.319987	0
+103	26	Underline a text with double line?	2024-07-28 09:45:44.625682	2024-07-28 09:45:44.625682	0
+104	26	Underline a text with wavy line?	2024-07-28 09:45:44.9391	2024-07-28 09:45:44.9391	0
+105	26	Strikethrough a text?	2024-07-28 09:45:45.250086	2024-07-28 09:45:45.250086	0
+106	26	Slash through a text?	2024-07-28 09:45:45.561981	2024-07-28 09:45:45.561981	0
+107	26	Underline text with dashed line?	2024-07-28 09:45:45.861514	2024-07-28 09:45:45.861514	0
+108	26	Underline text with dotted line?	2024-07-28 09:45:46.162355	2024-07-28 09:45:46.162355	0
+109	27	Color text?	2024-07-28 09:45:46.559274	2024-07-28 09:45:46.559274	0
+110	28	What symbol is used to create an inline math block?	2024-07-28 09:45:46.8767	2024-07-28 09:45:46.8767	0
+111	28	Protect a piece of inline math block from breaking into two lines?	2024-07-28 09:45:47.204181	2024-07-28 09:45:47.204181	0
+112	29	Write a math equation to be shown in a new separate line?	2024-07-28 09:45:47.49675	2024-07-28 09:45:47.49675	0
+113	30	What are the basic data types in OpenCV?	2024-07-28 09:45:47.831866	2024-07-28 09:45:47.831866	0
+114	30	What operations are supported by <code>cv::Point<></code> template class?	2024-07-28 09:45:48.241589	2024-07-28 09:45:48.241589	0
+115	30	What operations are supported by <code>cv::Scalar</code> class?	2024-07-28 09:45:48.672664	2024-07-28 09:45:48.672664	0
+116	30	What operations are supported by <code>cv::Size</code> class?	2024-07-28 09:45:49.038913	2024-07-28 09:45:49.038913	0
+117	30	What operations are supported by <code>cv::Rect</code> class?	2024-07-28 09:45:49.655218	2024-07-28 09:45:49.655218	0
+118	30	What operations are supported by <code>cv::RotatedRect</code> class?	2024-07-28 09:45:50.119711	2024-07-28 09:45:50.119711	0
+119	30	What operations are supported by <code>cv::Matx</code> template class?	2024-07-28 09:45:50.946821	2024-07-28 09:45:50.946821	0
+120	30	What operations are supported by <code>cv::Vec</code> template class?	2024-07-28 09:45:51.350931	2024-07-28 09:45:51.350931	0
+121	30	What operations are supported by <code>cv::Complex<></code> class template?	2024-07-28 09:45:51.821708	2024-07-28 09:45:51.821708	0
+122	33	Where the Qt installer can be found?	2024-07-28 09:45:52.250237	2024-07-28 09:45:52.250237	0
+123	33	How to update Qt components after manual installation?	2024-07-28 09:45:52.588782	2024-07-28 09:45:52.588782	0
+124	35	What is the interpreter of QML?	2024-07-28 09:45:52.911818	2024-07-28 09:45:52.911818	0
+125	35	What is the base code for a QML app?	2024-07-28 09:45:53.313537	2024-07-28 09:45:53.313537	0
+126	36	What elements are grouped as core in QML?	2024-07-28 09:45:53.658893	2024-07-28 09:45:53.658893	0
+127	37	What element is an item?	2024-07-28 09:45:53.976591	2024-07-28 09:45:53.976591	0
+128	37	What properties does an item element define inherited by all other elements?	2024-07-28 09:45:54.282913	2024-07-28 09:45:54.282913	0
+129	38	What properties does a window element support?	2024-07-28 09:45:54.523488	2024-07-28 09:45:54.523488	0
+130	38	Changed the default size of the window?	2024-07-28 09:45:54.969712	2024-07-28 09:45:54.969712	0
+131	39	What properties does a rectangle support?	2024-07-28 09:45:55.300049	2024-07-28 09:45:55.300049	0
+132	39	Colorize the background of a window?	2024-07-28 09:45:55.723888	2024-07-28 09:45:55.723888	0
+133	40	Draw a text on the app?	2024-07-28 09:45:56.493747	2024-07-28 09:45:56.493747	0
+134	41	How does a property alias work?	2024-07-28 09:45:56.854793	2024-07-28 09:45:56.854793	0
+135	42	How do signals work in QML?	2024-07-28 09:45:57.11721	2024-07-28 09:45:57.11721	0
+136	42	Capture key signals in an element?	2024-07-28 09:45:57.740033	2024-07-28 09:45:57.740033	0
+137	43	Load an image into the app?	2024-07-28 09:45:58.587171	2024-07-28 09:45:58.587171	0
+138	43	What are the properties of an image component?	2024-07-28 09:45:58.952591	2024-07-28 09:45:58.952591	0
+139	44	Make an area of window clickable?	2024-07-28 09:45:59.497731	2024-07-28 09:45:59.497731	0
+141	45	Make a reusable element?	2024-07-28 09:46:00.050719	2024-07-28 09:46:00.050719	0
+142	45	Propegate clicked signal to root level component?	2024-07-28 09:46:00.749552	2024-07-28 09:46:00.749552	0
+143	46	What are the porcelain commands?	2024-07-28 09:46:01.199778	2024-07-28 09:46:01.199778	0
+144	47	What are the plumbing commands?	2024-07-28 09:46:01.560067	2024-07-28 09:46:01.560067	0
+145	48	Conditionally use different git config file based on your project directory?	2024-07-28 09:46:01.989266	2024-07-28 09:46:01.989266	0
+146	48	Configure git to sign commits by ssh?	2024-07-28 09:46:02.441546	2024-07-28 09:46:02.441546	0
+147	49	Use shell command as a git alias?	2024-07-28 09:46:02.756246	2024-07-28 09:46:02.756246	0
+148	50	List available branches?	2024-07-28 09:46:03.174788	2024-07-28 09:46:03.174788	0
+149	50	Enable column view of branches by default?	2024-07-28 09:46:03.538153	2024-07-28 09:46:03.538153	0
+150	51	What options can be used to stash all ignored and untracked files along unstaged files?	2024-07-28 09:46:03.930094	2024-07-28 09:46:03.930094	0
+151	52	Log only a part of a file?	2024-07-28 09:46:04.264083	2024-07-28 09:46:04.264083	0
+152	52	Search through the git history for a string that was removed?	2024-07-28 09:46:04.520459	2024-07-28 09:46:04.520459	0
+153	53	What is a safer mechanism to force push commits?	2024-07-28 09:46:04.883524	2024-07-28 09:46:04.883524	0
+154	53	Push your sign along with pushing changes?	2024-07-28 09:46:05.194487	2024-07-28 09:46:05.194487	0
+155	55	How cloning can become faster?	2024-07-28 09:46:05.567781	2024-07-28 09:46:05.567781	0
+156	55	What is the downside of partial cloning?	2024-07-28 09:46:05.922423	2024-07-28 09:46:05.922423	0
+157	56	List remote refs?	2024-07-28 09:46:06.229165	2024-07-28 09:46:06.229165	0
+158	57	Set fetch remotes to a project?	2024-07-28 09:46:06.523845	2024-07-28 09:46:06.523845	0
+159	58	Blame only a part of a file?	2024-07-28 09:46:06.792311	2024-07-28 09:46:06.792311	0
+160	58	Ignore white spaces in blame?	2024-07-28 09:46:07.044229	2024-07-28 09:46:07.044229	0
+161	58	Detect who moved or copied in the same commit in blame?	2024-07-28 09:46:07.29786	2024-07-28 09:46:07.29786	0
+162	58	Detect who created or changed the file in blame?	2024-07-28 09:46:07.551109	2024-07-28 09:46:07.551109	0
+163	58	Detect any commit that affects a line of code in blame?	2024-07-28 09:46:07.810364	2024-07-28 09:46:07.810364	0
+164	59	What is a reflog?	2024-07-28 09:46:08.154645	2024-07-28 09:46:08.154645	0
+165	60	Differentiate two commits by line?	2024-07-28 09:46:08.47528	2024-07-28 09:46:08.47528	0
+166	60	Differentiate two commits by word?	2024-07-28 09:46:08.734618	2024-07-28 09:46:08.734618	0
+167	61	What is the advantage of using Reused Recorded Resolution?	2024-07-28 09:46:08.996206	2024-07-28 09:46:08.996206	0
+168	61	Enable Reused Recorded Resolution feature?	2024-07-28 09:46:09.268388	2024-07-28 09:46:09.268388	0
+169	62	What does <code>maitainance start</code> command do?	2024-07-28 09:46:09.627146	2024-07-28 09:46:09.627146	0
+170	62	What is the use case of maintainance command?	2024-07-28 09:46:10.017831	2024-07-28 09:46:10.017831	0
+171	63	What is the use case of commit graph command?	2024-07-28 09:46:10.390928	2024-07-28 09:46:10.390928	0
+172	63	How often should we run commit graph command?	2024-07-28 09:46:10.724286	2024-07-28 09:46:10.724286	0
+173	64	What mechanism can be used to increase the status command performance on big repositories?	2024-07-28 09:46:11.166001	2024-07-28 09:46:11.166001	0
+174	65	What is the impact of using multipack index mechanism?	2024-07-28 09:46:11.4781	2024-07-28 09:46:11.4781	0
+175	68	Clone with no checkout?	2024-07-28 09:46:11.799272	2024-07-28 09:46:11.799272	0
+176	69	Initiate project configuration with cmake?	2024-07-28 09:46:12.104512	2024-07-28 09:46:12.104512	0
+177	69	Specify the generator used for building the project?	2024-07-28 09:46:12.428502	2024-07-28 09:46:12.428502	0
+178	69	Externally specify the toolset and platform in configuration stage?	2024-07-28 09:46:12.80758	2024-07-28 09:46:12.80758	0
+179	69	Initialize project configuration by providing a pre-cached configuration file?	2024-07-28 09:46:13.135882	2024-07-28 09:46:13.135882	0
+180	70	Modify project cache variables in configuration stage?	2024-07-28 09:46:13.580012	2024-07-28 09:46:13.580012	0
+181	70	Specify the path to build directory in configuration stage?	2024-07-28 09:46:14.108715	2024-07-28 09:46:14.108715	0
+182	70	Remove one or more of configuration cache variables?	2024-07-28 09:46:14.510926	2024-07-28 09:46:14.510926	0
+183	71	List configuration cache variables?	2024-07-28 09:46:14.924949	2024-07-28 09:46:14.924949	0
+184	72	Get general information about variables, commands, macros, and other settings?	2024-07-28 09:46:15.3347	2024-07-28 09:46:15.3347	0
+185	73	Filter the CMake log output by log level in the command line?	2024-07-28 09:46:15.86564	2024-07-28 09:46:15.86564	0
+186	73	Permanently specify the log level in project configuration?	2024-07-28 09:46:16.139136	2024-07-28 09:46:16.139136	0
+187	73	Display log context with each <code>message()</code> call?	2024-07-28 09:46:16.63339	2024-07-28 09:46:16.63339	0
+188	74	Enable trace mode?	2024-07-28 09:46:17.034442	2024-07-28 09:46:17.034442	0
+189	74	Where does cmake write project presets?	2024-07-28 09:46:17.293178	2024-07-28 09:46:17.293178	0
+190	75	List all of the available presets?	2024-07-28 09:46:17.524821	2024-07-28 09:46:17.524821	0
+191	75	Use one of the available presets in the project?	2024-07-28 09:46:17.83098	2024-07-28 09:46:17.83098	0
+192	75	What preset paths are available in scripts?	2024-07-28 09:46:18.083749	2024-07-28 09:46:18.083749	0
+193	76	Execute the build stage of the project?	2024-07-28 09:46:18.329405	2024-07-28 09:46:18.329405	0
+194	76	Provide special arguments to the native builder?	2024-07-28 09:46:18.641082	2024-07-28 09:46:18.641082	0
+195	76	Specify the number of jobs that should build the project simultaneously?	2024-07-28 09:46:19.052158	2024-07-28 09:46:19.052158	0
+196	76	Explicitly specify targets to build?	2024-07-28 09:46:19.428431	2024-07-28 09:46:19.428431	0
+197	77	Remove all artifacts from the build directory?	2024-07-28 09:46:19.73093	2024-07-28 09:46:19.73093	0
+198	77	Execute build stage by first cleaning the build directory?	2024-07-28 09:46:19.998345	2024-07-28 09:46:19.998345	0
+199	77	Instruct CMake to be verbose in build stage?	2024-07-28 09:46:20.339192	2024-07-28 09:46:20.339192	0
+200	78	Execute CMake to install targets?	2024-07-28 09:46:20.641362	2024-07-28 09:46:20.641362	0
+201	78	Execute CMake to install targets with a specific build type?	2024-07-28 09:46:21.053336	2024-07-28 09:46:21.053336	0
+202	78	Execute CMake to install specific components within a project?	2024-07-28 09:46:21.406375	2024-07-28 09:46:21.406375	0
+203	78	Set default permissions of installed files?	2024-07-28 09:46:21.77042	2024-07-28 09:46:21.77042	0
+204	78	Modify the installation path?	2024-07-28 09:46:22.08852	2024-07-28 09:46:22.08852	0
+205	78	Instruct CMake to log a detailed output of the installation stage?	2024-07-28 09:46:22.483882	2024-07-28 09:46:22.483882	0
+206	79	Run CMake scripts?	2024-07-28 09:46:22.795068	2024-07-28 09:46:22.795068	0
+207	79	Pass values to CMake scripts?	2024-07-28 09:46:23.206786	2024-07-28 09:46:23.206786	0
+208	80	Execute external commands with CMake?	2024-07-28 09:46:23.584526	2024-07-28 09:46:23.584526	0
+209	80	List all the available external commands in CMake?	2024-07-28 09:46:23.854197	2024-07-28 09:46:23.854197	0
+210	81	Get help from CMake documentation?	2024-07-28 09:46:24.149317	2024-07-28 09:46:24.149317	0
+211	82	Run test on a built project?	2024-07-28 09:46:24.504178	2024-07-28 09:46:24.504178	0
+212	83	Include another listfile in <code>CMakeLists.txt</code>?	2024-07-28 09:46:25.018262	2024-07-28 09:46:25.018262	0
+213	83	What are the actual requirements for the script file provided?	2024-07-28 09:46:25.43419	2024-07-28 09:46:25.43419	0
+214	83	Use a utility in script?	2024-07-28 09:46:25.652108	2024-07-28 09:46:25.652108	0
+215	84	Generate DWARF debugging information in an executable?	2024-07-28 09:46:26.176159	2024-07-28 09:46:26.176159	0
+216	85	Start the text user interface in gdb?	2024-07-28 09:46:26.750491	2024-07-28 09:46:26.750491	0
+217	85	Enter SingleKey mode?	2024-07-28 09:46:27.080983	2024-07-28 09:46:27.080983	0
+218	85	Cycle through assembly and source code windows in GDB TUI?	2024-07-28 09:46:27.265149	2024-07-28 09:46:27.265149	0
+219	85	Switch focus between GDB TUI windows?	2024-07-28 09:46:27.547839	2024-07-28 09:46:27.547839	0
+220	86	Navigate through command history?	2024-07-28 09:46:27.796269	2024-07-28 09:46:27.796269	0
+221	87	Begin debugging session of an executable?	2024-07-28 09:46:28.018575	2024-07-28 09:46:28.018575	0
+222	88	Start debugging an already running process?	2024-07-28 09:46:28.380741	2024-07-28 09:46:28.380741	0
+223	89	Detach debugger from a debugging process?	2024-07-28 09:46:28.757274	2024-07-28 09:46:28.757274	0
+224	90	Show source code in debugging session?	2024-07-28 09:46:29.012779	2024-07-28 09:46:29.012779	0
+225	91	How many breakpoints does GDB offer?	2024-07-28 09:46:29.28102	2024-07-28 09:46:29.28102	0
+226	91	Get information about breakpoints, watchpoints and catchpoints?	2024-07-28 09:46:29.530495	2024-07-28 09:46:29.530495	0
+227	92	Set breakpoints on a program?	2024-07-28 09:46:29.893506	2024-07-28 09:46:29.893506	0
+228	92	Run program with an immediate stop on main function?	2024-07-28 09:46:30.098814	2024-07-28 09:46:30.098814	0
+229	92	Use regex to select multiple breakpoints for an operation?	2024-07-28 09:46:30.312123	2024-07-28 09:46:30.312123	0
+230	93	Delete a breakpoint from a program?	2024-07-28 09:46:30.585771	2024-07-28 09:46:30.585771	0
+231	94	Set condition for a breakpoint?	2024-07-28 09:46:30.846409	2024-07-28 09:46:30.846409	0
+232	94	Conditionally break execution only when iteration index has increased to 3?	2024-07-28 09:46:31.100774	2024-07-28 09:46:31.100774	0
+233	95	Skip over a number of breakpoint hits?	2024-07-28 09:46:31.557411	2024-07-28 09:46:31.557411	0
+234	96	Disable an already existing breakpoint?	2024-07-28 09:46:31.895398	2024-07-28 09:46:31.895398	0
+235	96	Enable an already disabled breakpoint?	2024-07-28 09:46:32.142065	2024-07-28 09:46:32.142065	0
+236	97	Save breakpoints of a debugging session?	2024-07-28 09:46:32.417619	2024-07-28 09:46:32.417619	0
+237	97	Restore saved breakpoints on a debugging session?	2024-07-28 09:46:32.729816	2024-07-28 09:46:32.729816	0
+238	97	Manually write the content of a file in which breakpoints were saved?	2024-07-28 09:46:33.042194	2024-07-28 09:46:33.042194	0
+239	98	Watch changes of a variable only when a criteria is met?	2024-07-28 09:46:33.290319	2024-07-28 09:46:33.290319	0
+240	98	Track a particular location in memory rather than the value of an expression?	2024-07-28 09:46:33.679731	2024-07-28 09:46:33.679731	0
+241	99	Step through program execution in debugging session?	2024-07-28 09:46:34.049657	2024-07-28 09:46:34.049657	0
+242	100	Examine a memory address or register?	2024-07-28 09:46:34.397026	2024-07-28 09:46:34.397026	0
+243	101	Get information of threads?	2024-07-28 09:46:34.980041	2024-07-28 09:46:34.980041	0
+244	102	List the innermost or outermost frames of backtrace?	2024-07-28 09:46:35.454945	2024-07-28 09:46:35.454945	0
+245	103	Where the coredumps are stored?	2024-07-28 09:46:35.742274	2024-07-28 09:46:35.742274	0
+246	103	Store the core dump of your program into a file?	2024-07-28 09:46:35.998895	2024-07-28 09:46:35.998895	0
+247	103	Load the stored coredump into debugging session?	2024-07-28 09:46:36.279435	2024-07-28 09:46:36.279435	0
+248	103	Select a core section to inspect the cause of termination?	2024-07-28 09:46:36.580728	2024-07-28 09:46:36.580728	0
+249	104	Create a core dump from the state of an executable in debugging session?	2024-07-28 09:46:36.862272	2024-07-28 09:46:36.862272	0
+250	105	Print the value of an object?	2024-07-28 09:46:37.107335	2024-07-28 09:46:37.107335	0
+251	105	Inspect the type of a variable?	2024-07-28 09:46:37.345198	2024-07-28 09:46:37.345198	0
+252	106	Modify the value of a variable?	2024-07-28 09:46:37.585299	2024-07-28 09:46:37.585299	0
+253	107	Run shell commands in debugging session?	2024-07-28 09:46:37.854731	2024-07-28 09:46:37.854731	0
+254	108	Automatically run commands on GDB startup?	2024-07-28 09:46:38.361481	2024-07-28 09:46:38.361481	0
+255	109	Measure the processor events using perf?	2024-07-28 09:46:38.715851	2024-07-28 09:46:38.715851	0
+256	110	Visually analyze the output of perf?	2024-07-28 09:46:38.979613	2024-07-28 09:46:38.979613	0
+257	111	Build an executable from C++ source?	2024-07-28 09:46:39.339065	2024-07-28 09:46:39.339065	0
+258	112	What is the behavior of a fundamental data type when it's default initialized?	2024-07-28 09:46:40.160291	2024-07-28 09:46:40.160291	0
+259	113	Initialize scoped and global variables?	2024-07-28 09:46:40.847548	2024-07-28 09:46:40.847548	0
+260	114	How many constants are available in C++?	2024-07-28 09:46:41.284079	2024-07-28 09:46:41.284079	0
+261	114	Initialize a constant?	2024-07-28 09:46:41.525236	2024-07-28 09:46:41.525236	0
+262	115	Uniformly initialize objects of any type?	2024-07-28 09:46:42.665301	2024-07-28 09:46:42.665301	0
+263	115	What is the defect in auto rule for direct list initialization?	2024-07-28 09:46:43.264734	2024-07-28 09:46:43.264734	0
+264	116	What are the possible ways of initializing aggregate objects?	2024-07-28 09:46:44.244292	2024-07-28 09:46:44.244292	0
+265	117	What object types are able to initialize specific members explicitly?	2024-07-28 09:46:45.285257	2024-07-28 09:46:45.285257	0
+266	118	Declare and define a function separately?	2024-07-28 09:46:45.882124	2024-07-28 09:46:45.882124	0
+267	119	Declare a function evaluated at compile time?	2024-07-28 09:46:46.266782	2024-07-28 09:46:46.266782	0
+268	120	Ensure compile time evaluation of a function?	2024-07-28 09:46:46.741065	2024-07-28 09:46:46.741065	0
+269	121	What conditional statement can be used to separate a function into compiletime and runtime evaluation?	2024-07-28 09:46:47.502058	2024-07-28 09:46:47.502058	0
+270	121	What is the equivalent form of <code>if consteval</code> prior standard 23?	2024-07-28 09:46:47.980317	2024-07-28 09:46:47.980317	0
+271	121	What are the advantages of using <code>if consteval</code> compared to <code>std::is_constant_evaluated()</code>?	2024-07-28 09:46:48.34759	2024-07-28 09:46:48.34759	0
+272	125	Transfer ownership of a pointer without making a copy of it?	2024-07-28 09:46:49.356446	2024-07-28 09:46:49.356446	0
+273	128	Abbreviate namespaces to avoid repetition?	2024-07-28 09:46:49.961222	2024-07-28 09:46:49.961222	0
+274	129	Declare an object with internal linkage without being static?	2024-07-28 09:46:50.657686	2024-07-28 09:46:50.657686	0
+275	129	Initialize a non-type template argument with an object of internal linkage?	2024-07-28 09:46:51.358382	2024-07-28 09:46:51.358382	0
+276	130	Define symbol versioning of a library without breaking client code when implementing template specializations?	2024-07-28 09:46:53.841039	2024-07-28 09:46:53.841039	0
+277	131	What is the abbreviated way of declaring nested namespaces?	2024-07-28 09:46:54.836737	2024-07-28 09:46:54.836737	0
+278	132	What are the main module properties?	2024-07-28 09:46:55.115109	2024-07-28 09:46:55.115109	0
+279	132	Import a standard module in a translation unit?	2024-07-28 09:46:55.61067	2024-07-28 09:46:55.61067	0
+280	132	What are the constituents of a module?	2024-07-28 09:46:56.068395	2024-07-28 09:46:56.068395	0
+281	132	What C++ entities can be exported as module interface?	2024-07-28 09:46:56.401183	2024-07-28 09:46:56.401183	0
+282	132	What C++ entities cannot be exported as module interface?	2024-07-28 09:46:56.718678	2024-07-28 09:46:56.718678	0
+283	133	Express a module to be used within another translation unit?	2024-07-28 09:46:57.880571	2024-07-28 09:46:57.880571	0
+284	134	What is a module partition?	2024-07-28 09:46:58.607927	2024-07-28 09:46:58.607927	0
+285	134	What is a module interface partition?	2024-07-28 09:47:00.336753	2024-07-28 09:47:00.336753	0
+286	135	What is a module implementation partition?	2024-07-28 09:47:01.66626	2024-07-28 09:47:01.66626	0
+287	135	What is the difference between module partitions and submodules?	2024-07-28 09:47:03.792271	2024-07-28 09:47:03.792271	0
+288	136	Initialize objects using automatic compiler type deduction?	2024-07-28 09:47:05.570834	2024-07-28 09:47:05.570834	0
+289	136	When does auto type decays?	2024-07-28 09:47:06.178935	2024-07-28 09:47:06.178935	0
+290	137	Bind multiple returned values into existing objects?	2024-07-28 09:47:06.785821	2024-07-28 09:47:06.785821	0
+291	138	Define a new type based on predefined types?	2024-07-28 09:47:07.129858	2024-07-28 09:47:07.129858	0
+292	139	Create type aliases for objects and functions?	2024-07-28 09:47:07.652088	2024-07-28 09:47:07.652088	0
+293	140	Specify the underlying type for an enumeration type?	2024-07-28 09:47:08.344316	2024-07-28 09:47:08.344316	0
+294	140	Export enumerators of an enumeration in a local scope?	2024-07-28 09:47:09.131869	2024-07-28 09:47:09.131869	0
+295	141	Construct a variant to hold three different types?	2024-07-28 09:47:09.727335	2024-07-28 09:47:09.727335	0
+296	141	Change the active type of a variant?	2024-07-28 09:47:10.180659	2024-07-28 09:47:10.180659	0
+297	141	Retreive value of the active type within a variant?	2024-07-28 09:47:10.940786	2024-07-28 09:47:10.940786	0
+298	141	Access the content of a variant with visitor approach?	2024-07-28 09:47:11.650181	2024-07-28 09:47:11.650181	0
+299	141	Create a helper to be compatible with any of the variant types?	2024-07-28 09:47:12.541954	2024-07-28 09:47:12.541954	0
+300	143	Use <code>std::expected</code> to link possible outcomes of an operation?	2024-07-28 09:47:13.45524	2024-07-28 09:47:13.45524	0
+301	144	Enable all comparison operators for an object type?	2024-07-28 09:47:15.435984	2024-07-28 09:47:15.435984	0
+302	144	Implement an object comparable with all six comparison operators?	2024-07-28 09:47:17.006497	2024-07-28 09:47:17.006497	0
+303	144	What are the possible comparison categories?	2024-07-28 09:47:18.127749	2024-07-28 09:47:18.127749	0
+304	144	Compare two objects that might result any of the comparison categories?	2024-07-28 09:47:19.361323	2024-07-28 09:47:19.361323	0
+305	144	Compare two derived objects having a base class?	2024-07-28 09:47:21.034555	2024-07-28 09:47:21.034555	0
+306	144	What is the compatibility defect of comparison operators in C++20?	2024-07-28 09:47:22.682333	2024-07-28 09:47:22.682333	0
+307	145	Avoid implicit conversion of classes?	2024-07-28 09:47:23.77159	2024-07-28 09:47:23.77159	0
+308	146	Initialize non-static member variables of a class?	2024-07-28 09:47:24.504026	2024-07-28 09:47:24.504026	0
+309	147	Indicate error when a return value from a function is ignored?	2024-07-28 09:47:24.884322	2024-07-28 09:47:24.884322	0
+310	147	Add a message to discard attribute?	2024-07-28 09:47:25.143992	2024-07-28 09:47:25.143992	0
+311	147	Indicate error when a return value from lambda is ignored?	2024-07-28 09:47:25.440973	2024-07-28 09:47:25.440973	0
+312	147	Indicate error when a type is ignored when returned?	2024-07-28 09:47:25.833575	2024-07-28 09:47:25.833575	0
+313	147	Indicate error when a constructor is used without object name?	2024-07-28 09:47:26.361731	2024-07-28 09:47:26.361731	0
+314	148	Replace ref-quialified overloads of a method with one generic overload?	2024-07-28 09:47:27.250384	2024-07-28 09:47:27.250384	0
+315	148	What is the equivalent form of ref-quialified function?	2024-07-28 09:47:27.841506	2024-07-28 09:47:27.841506	0
+316	148	Access the object containing the lambda within a recursive lambda?	2024-07-28 09:47:28.336632	2024-07-28 09:47:28.336632	0
+317	149	What are the alternatives to templates which should be avoided by using templates?	2024-07-28 09:47:28.680401	2024-07-28 09:47:28.680401	0
+318	150	What are the alternatives to typename keyword?	2024-07-28 09:47:28.957044	2024-07-28 09:47:28.957044	0
+319	151	What are the translation phases of a template?	2024-07-28 09:47:29.49531	2024-07-28 09:47:29.49531	0
+320	151	What happens when a function template triggers its instantiation?	2024-07-28 09:47:29.878655	2024-07-28 09:47:29.878655	0
+321	152	What is the signature of a function template?	2024-07-28 09:47:30.320647	2024-07-28 09:47:30.320647	0
+322	152	What requirements should the type of a function template parameter meet?	2024-07-28 09:47:30.669129	2024-07-28 09:47:30.669129	0
+323	153	What is the alternative to writing function templates without having typenames?	2024-07-28 09:47:31.143015	2024-07-28 09:47:31.143015	0
+324	154	Use a function template with different types?	2024-07-28 09:47:31.599991	2024-07-28 09:47:31.599991	0
+325	155	How does the compile deduce the type of function template arguments?	2024-07-28 09:47:32.175944	2024-07-28 09:47:32.175944	0
+326	155	What are the limits of type conversion during type deduction of function template arguments?	2024-07-28 09:47:33.022209	2024-07-28 09:47:33.022209	0
+327	155	What are the common ways to handle type conversions during type deduction of function template arguments?	2024-07-28 09:47:33.854165	2024-07-28 09:47:33.854165	0
+328	155	How does the compiler deduce the default function template parameters?	2024-07-28 09:47:34.580258	2024-07-28 09:47:34.580258	0
+329	156	Declare a function template with multiple template parameters?	2024-07-28 09:47:35.089698	2024-07-28 09:47:35.089698	0
+330	156	What are the common ways of handling return type deduction for function templates having multiple function template parameters?	2024-07-28 09:47:35.381319	2024-07-28 09:47:35.381319	0
+331	156	What are the disadvantages of using additional template parameter for return types when having multiple function template parameters?	2024-07-28 09:47:36.123585	2024-07-28 09:47:36.123585	0
+332	157	What types are supported as non-type template arguments?	2024-07-28 09:47:36.7777	2024-07-28 09:47:36.7777	0
+333	158	Since when <code>template</code> keyword can be used instead of class in a template template parameter?	2024-07-28 09:47:37.457037	2024-07-28 09:47:37.457037	0
+334	159	What is a variadic template parameter?	2024-07-28 09:47:37.961061	2024-07-28 09:47:37.961061	0
+335	159	What operator can be used to retrieve the number of arguments in a variadic template parameter?	2024-07-28 09:47:38.397005	2024-07-28 09:47:38.397005	0
+336	160	What is the compact form of variadic templates?	2024-07-28 09:47:38.845289	2024-07-28 09:47:38.845289	0
+337	161	What are the disadvantages of using automatic deduction of return types when multiple function template parameters are used?	2024-07-28 09:47:39.260196	2024-07-28 09:47:39.260196	0
+338	161	Use trailing return type to deduce the return type of a function template?	2024-07-28 09:47:39.750061	2024-07-28 09:47:39.750061	0
+339	161	What is the drawback of using trailing return type?	2024-07-28 09:47:40.44985	2024-07-28 09:47:40.44985	0
+340	161	Use common type as the return type of a function template?	2024-07-28 09:47:41.190379	2024-07-28 09:47:41.190379	0
+341	162	What are the use cases of default template arguments?	2024-07-28 09:47:41.87969	2024-07-28 09:47:41.87969	0
+342	162	What ordering default template parameter can have?	2024-07-28 09:47:42.471393	2024-07-28 09:47:42.471393	0
+343	163	What are the rules of overload resolution for matching a function template overload by a compiler?	2024-07-28 09:47:43.482501	2024-07-28 09:47:43.482501	0
+344	163	What happens when there are two matching template overloads for a function call?	2024-07-28 09:47:44.118335	2024-07-28 09:47:44.118335	0
+345	163	What are the common use cases of overloading function templates?	2024-07-28 09:47:45.003836	2024-07-28 09:47:45.003836	0
+346	163	What is the drawback of overloading function templates?	2024-07-28 09:47:46.375882	2024-07-28 09:47:46.375882	0
+347	163	When a template function overload would be missed by a call?	2024-07-28 09:47:47.347476	2024-07-28 09:47:47.347476	0
+348	164	What is the use case of concepts?	2024-07-28 09:47:47.94318	2024-07-28 09:47:47.94318	0
+349	165	Write a custom concept?	2024-07-28 09:47:48.280669	2024-07-28 09:47:48.280669	0
+350	165	How can we have two different bodies of a function with the same signature and let compiler know which is best match?	2024-07-28 09:47:48.973659	2024-07-28 09:47:48.973659	0
+351	165	In how many ways can we apply a concept as a type constraint on a function template?	2024-07-28 09:47:49.867406	2024-07-28 09:47:49.867406	0
+352	167	Declare a class template?	2024-07-28 09:47:50.618117	2024-07-28 09:47:50.618117	0
+353	167	Declare copy constructor and copy assignment operator of a class template?	2024-07-28 09:47:51.508938	2024-07-28 09:47:51.508938	0
+354	167	Define the member functions of a class template outside of the scope of the class?	2024-07-28 09:47:52.210433	2024-07-28 09:47:52.210433	0
+355	168	What is the requirements of the type used as class template arguments?	2024-07-28 09:47:53.05042	2024-07-28 09:47:53.05042	0
+356	169	Declare a friend function template in a class template?	2024-07-28 09:47:54.329374	2024-07-28 09:47:54.329374	0
+357	170	Specialize a class template for a specific type?	2024-07-28 09:47:55.224206	2024-07-28 09:47:55.224206	0
+358	170	Partially specialize a class template for pointers?	2024-07-28 09:47:56.028315	2024-07-28 09:47:56.028315	0
+359	170	What are the possible template specializations of a class template with multiple template parameters?	2024-07-28 09:47:57.163708	2024-07-28 09:47:57.163708	0
+360	171	Define default values for class template parameters?	2024-07-28 09:47:58.382879	2024-07-28 09:47:58.382879	0
+361	172	Define an alias template?	2024-07-28 09:47:58.845129	2024-07-28 09:47:58.845129	0
+362	172	Use alias templates for member types of class templates?	2024-07-28 09:47:59.525661	2024-07-28 09:47:59.525661	0
+363	173	Under what condition class templates do not require specifying template parameters?	2024-07-28 09:48:00.071904	2024-07-28 09:48:00.071904	0
+427	202	Express all different string literals?	2024-07-28 09:48:55.599918	2024-07-28 09:48:55.599918	0
+364	173	How does compiler realize which constructor should be used as the result of arguments deduction?	2024-07-28 09:48:02.238464	2024-07-28 09:48:02.238464	0
+365	173	What is the common way of supporting type deduction for a class template?	2024-07-28 09:48:03.345357	2024-07-28 09:48:03.345357	0
+366	173	What is the drawback of supporting class template argument deduction by providing constructors passing initial argument?	2024-07-28 09:48:04.422647	2024-07-28 09:48:04.422647	0
+367	173	What is the drawback of passing arguments of a template type by reference when supporting class template argument deduction?	2024-07-28 09:48:05.517425	2024-07-28 09:48:05.517425	0
+368	174	Disable automatic deduction of raw character pointers using deduction guides instead of constructors passing arguments?	2024-07-28 09:48:06.286427	2024-07-28 09:48:06.286427	0
+369	174	Use deduction guides for the constructor of a class that takes two iterators to deduce the value type of iterators?	2024-07-28 09:48:07.362821	2024-07-28 09:48:07.362821	0
+370	174	Where are the edge cases where deduction guides do not work?	2024-07-28 09:48:08.074712	2024-07-28 09:48:08.074712	0
+371	174	Define deduction guides for aggregate class templates?	2024-07-28 09:48:08.982219	2024-07-28 09:48:08.982219	0
+372	175	Iterate over a range without invoking iterator functions?	2024-07-28 09:48:10.22186	2024-07-28 09:48:10.22186	0
+373	175	Enable iteration mechanism for custom types?	2024-07-28 09:48:13.033535	2024-07-28 09:48:13.033535	0
+374	176	Evaluate alignment of structures considering the size of their members?	2024-07-28 09:48:14.770063	2024-07-28 09:48:14.770063	0
+375	176	Query alignment of object types?	2024-07-28 09:48:15.547091	2024-07-28 09:48:15.547091	0
+376	176	Set alignment of object types?	2024-07-28 09:48:17.088137	2024-07-28 09:48:17.088137	0
+377	177	Determine the size of an expression?	2024-07-28 09:48:17.708407	2024-07-28 09:48:17.708407	0
+378	179	What types can be used to create a cooked user-defined literal?	2024-07-28 09:48:18.277066	2024-07-28 09:48:18.277066	0
+379	179	How to create a compile-time generated user-defined literal?	2024-07-28 09:48:19.014783	2024-07-28 09:48:19.014783	0
+380	180	What signatues can a literal operator or a literal operator template have to overload a user-defined literal?	2024-07-28 09:48:19.474256	2024-07-28 09:48:19.474256	0
+381	180	How literal operators or literal operator templates can be used to construct a numberic value by its binary representation?	2024-07-28 09:48:20.689941	2024-07-28 09:48:20.689941	0
+382	181	Where does move semantics apply optimizations compared to prior C++11 standard?	2024-07-28 09:48:21.578192	2024-07-28 09:48:21.578192	0
+383	181	How move semantics can be implemented for a class?	2024-07-28 09:48:22.772283	2024-07-28 09:48:22.772283	0
+384	181	When do compilers automatically switch to move semantics?	2024-07-28 09:48:23.193484	2024-07-28 09:48:23.193484	0
+385	181	What header file should be included when using move semantics?	2024-07-28 09:48:23.521703	2024-07-28 09:48:23.521703	0
+386	181	What is the equivallent form of <code>std::move()</code>?	2024-07-28 09:48:23.867019	2024-07-28 09:48:23.867019	0
+387	182	What happens to an object when move semantics is not available?	2024-07-28 09:48:24.233593	2024-07-28 09:48:24.233593	0
+388	182	What happens to an object declared with <code>const</code> when moved?	2024-07-28 09:48:24.691596	2024-07-28 09:48:24.691596	0
+389	182	Why return values should not be marked as <code>const</code>?	2024-07-28 09:48:25.280944	2024-07-28 09:48:25.280944	0
+390	183	What should be the state of an object after it has been moved?	2024-07-28 09:48:25.616559	2024-07-28 09:48:25.616559	0
+391	183	What is the moved-from object state?	2024-07-28 09:48:26.270278	2024-07-28 09:48:26.270278	0
+392	184	What is the behavior of a parameter that is declared as an rvalue reference?	2024-07-28 09:48:26.959325	2024-07-28 09:48:26.959325	0
+393	184	What are the major ways of call-by-reference and what kind of arguments does each take?	2024-07-28 09:48:28.425067	2024-07-28 09:48:28.425067	0
+394	185	Why does automatic move operations disable when user declares special member functions?	2024-07-28 09:48:29.19972	2024-07-28 09:48:29.19972	0
+395	185	Based on the exact rules for <i>generated special member functions</i> when would copy constructor and copy assignment operator automatically be generated?	2024-07-28 09:48:29.573103	2024-07-28 09:48:29.573103	0
+396	185	Based on the exact rules for <i>generated special member functions</i> when would move constructor and move assignment operator be automatically generated?	2024-07-28 09:48:29.964618	2024-07-28 09:48:29.964618	0
+397	185	Based on the exact rules for <i>generated special member functions</i> when would destructor disable automatic move operations?	2024-07-28 09:48:30.279157	2024-07-28 09:48:30.279157	0
+398	185	What special member functions are generated by default for a class?	2024-07-28 09:48:30.876613	2024-07-28 09:48:30.876613	0
+399	185	When do move operations become broken?	2024-07-28 09:48:31.312321	2024-07-28 09:48:31.312321	0
+400	185	What declarations does the <b>Rule of Five</b> formulate to simplify special member functions generation?	2024-07-28 09:48:31.647704	2024-07-28 09:48:31.647704	0
+401	186	What does it mean to say move semantics is not passed through?	2024-07-28 09:48:32.291874	2024-07-28 09:48:32.291874	0
+402	186	How to deal with moving an object to itself?	2024-07-28 09:48:33.02778	2024-07-28 09:48:33.02778	0
+403	186	Why deleting moving operations does not make semantic sence?	2024-07-28 09:48:34.411291	2024-07-28 09:48:34.411291	0
+404	186	Why should we avoid using move operations when returning a local object?	2024-07-28 09:48:35.051045	2024-07-28 09:48:35.051045	0
+405	187	How to properly disable move semantics in an object without disabling fallback mechanism?	2024-07-28 09:48:35.680862	2024-07-28 09:48:35.680862	0
+406	187	How does move operation work for a class containing a member with disabled move operations?	2024-07-28 09:48:36.578071	2024-07-28 09:48:36.578071	0
+407	187	Does <code>virtual</code> destructor in a base class disable automatic move operations in its derived classes?	2024-07-28 09:48:37.357857	2024-07-28 09:48:37.357857	0
+408	188	When does the call-by-value become cheap with move semantics?	2024-07-28 09:48:38.218555	2024-07-28 09:48:38.218555	0
+409	188	When would passing by value becomes cheaper than passing by const lvalue references?	2024-07-28 09:48:42.017278	2024-07-28 09:48:42.017278	0
+410	188	When to take arguments by value and when to take by references?	2024-07-28 09:48:43.126731	2024-07-28 09:48:43.126731	0
+411	189	Ensure correct virtual declaration of methods base and derived classes?	2024-07-28 09:48:43.88757	2024-07-28 09:48:43.88757	0
+412	189	Prevent derived classes from overriding virtual methods?	2024-07-28 09:48:44.831111	2024-07-28 09:48:44.831111	0
+413	190	Prevent inheritance of a class?	2024-07-28 09:48:45.589681	2024-07-28 09:48:45.589681	0
+414	195	Synchronize an stream to be flushed when went out of scope regarding RAII idiom?	2024-07-28 09:48:46.230359	2024-07-28 09:48:46.230359	0
+415	196	Take the string stream contents as an string?	2024-07-28 09:48:47.031415	2024-07-28 09:48:47.031415	0
+416	196	Use move semantics to avoid copies on string stream construction?	2024-07-28 09:48:47.763748	2024-07-28 09:48:47.763748	0
+417	197	Use a preallocated buffer as the internal memory for a stream object?	2024-07-28 09:48:48.662442	2024-07-28 09:48:48.662442	0
+418	198	Insert elements into containers by constructing them on insertion?	2024-07-28 09:48:49.503154	2024-07-28 09:48:49.503154	0
+419	200	Find a substring within another string?	2024-07-28 09:48:50.481073	2024-07-28 09:48:50.481073	0
+420	200	Check if a string has expected prefix?	2024-07-28 09:48:51.055454	2024-07-28 09:48:51.055454	0
+421	200	Check if a string has expected postfix?	2024-07-28 09:48:51.573406	2024-07-28 09:48:51.573406	0
+422	201	Convert integeral and floating-point types into strings?	2024-07-28 09:48:51.975756	2024-07-28 09:48:51.975756	0
+423	201	Convert string to numeric types?	2024-07-28 09:48:52.841429	2024-07-28 09:48:52.841429	0
+424	201	What are the valid input characters for integral type to string conversion functions?	2024-07-28 09:48:53.403639	2024-07-28 09:48:53.403639	0
+425	201	What exceptions are thrown by numeric to string conversion functions on failure?	2024-07-28 09:48:54.177429	2024-07-28 09:48:54.177429	0
+426	201	What are the valid input characters for floating-point type to string conversion functions?	2024-07-28 09:48:54.947429	2024-07-28 09:48:54.947429	0
+428	203	Create string literals containing special characters without escaping them?	2024-07-28 09:48:56.110026	2024-07-28 09:48:56.110026	0
+429	203	Express different types of strings that raw string literals can generate?	2024-07-28 09:48:56.723017	2024-07-28 09:48:56.723017	0
+430	204	Avoid string copies over function call?	2024-07-28 09:48:57.464768	2024-07-28 09:48:57.464768	0
+431	204	Find the first and last occurance of a character in a <code>string_view</code>?	2024-07-28 09:48:57.887842	2024-07-28 09:48:57.887842	0
+432	204	Remove tailing and trailing characters from a <code>string_view</code>?	2024-07-28 09:48:58.347103	2024-07-28 09:48:58.347103	0
+433	204	Construct a <code>std::string</code> from a <code>std::string_view</code>?	2024-07-28 09:48:58.794015	2024-07-28 09:48:58.794015	0
+434	205	Check existance of a substring at the beginning or the end of a string?	2024-07-28 09:48:59.446347	2024-07-28 09:48:59.446347	0
+435	206	What are the advantages of using format compared to printf?	2024-07-28 09:48:59.755642	2024-07-28 09:48:59.755642	0
+436	206	Format a text by positioning multiple values in a text in a specific order?	2024-07-28 09:49:00.132205	2024-07-28 09:49:00.132205	0
+437	206	Format a 2-digit integer in hexadecimal with zero padding?	2024-07-28 09:49:00.471265	2024-07-28 09:49:00.471265	0
+438	206	Enable formating of a custom type?	2024-07-28 09:49:01.110549	2024-07-28 09:49:01.110549	0
+439	206	Format the current date?	2024-07-28 09:49:01.50234	2024-07-28 09:49:01.50234	0
+440	207	Print a text to standard output?	2024-07-28 09:49:01.824701	2024-07-28 09:49:01.824701	0
+441	208	Construct a regex?	2024-07-28 09:49:02.281262	2024-07-28 09:49:02.281262	0
+442	208	Make regular expressions case insensitive?	2024-07-28 09:49:02.627235	2024-07-28 09:49:02.627235	0
+443	208	Verify existance of a pattern in a string?	2024-07-28 09:49:03.440991	2024-07-28 09:49:03.440991	0
+444	208	Retrieve submatches of a pattern matched within a string?	2024-07-28 09:49:04.712764	2024-07-28 09:49:04.712764	0
+445	208	How many regular expression engines are available in C++?	2024-07-28 09:49:05.439347	2024-07-28 09:49:05.439347	0
+446	208	Search for the first occurance of a pattern in a string?	2024-07-28 09:49:06.285399	2024-07-28 09:49:06.285399	0
+447	208	Find all occurences of a pattern in a given text?	2024-07-28 09:49:07.893762	2024-07-28 09:49:07.893762	0
+448	208	Replace the content of a string with a pattern?	2024-07-28 09:49:08.536939	2024-07-28 09:49:08.536939	0
+449	208	Reposition submatches of a string?	2024-07-28 09:49:09.077129	2024-07-28 09:49:09.077129	0
+450	209	Get the smallest and largest finite numbers of a type?	2024-07-28 09:49:10.022137	2024-07-28 09:49:10.022137	0
+451	209	Retrieve the maximum number of digits for integral and floating-point types?	2024-07-28 09:49:10.672179	2024-07-28 09:49:10.672179	0
+452	209	Retrieve the longest possible digits of a decimal type that can be represented without a change?	2024-07-28 09:49:11.101842	2024-07-28 09:49:11.101842	0
+453	209	Verify if a numeric type is signed?	2024-07-28 09:49:11.482015	2024-07-28 09:49:11.482015	0
+454	209	Verify if a numeric type is an integer?	2024-07-28 09:49:11.856668	2024-07-28 09:49:11.856668	0
+455	209	Verify if a floating-point value is exact?	2024-07-28 09:49:12.239018	2024-07-28 09:49:12.239018	0
+456	209	Verify if a floating-point value holds infinity value?	2024-07-28 09:49:12.588427	2024-07-28 09:49:12.588427	0
+457	210	Express all different <code>std::complex</code> literals?	2024-07-28 09:49:13.014154	2024-07-28 09:49:13.014154	0
+458	211	Get the minimum and maximum value that a random engine can generate?	2024-07-28 09:49:13.470162	2024-07-28 09:49:13.470162	0
+459	211	Seed a random generator to initialize the algorithm corporated within it?	2024-07-28 09:49:14.037081	2024-07-28 09:49:14.037081	0
+460	211	Call for a new number from random engines?	2024-07-28 09:49:14.600038	2024-07-28 09:49:14.600038	0
+461	211	Discard the generated number of a random engine?	2024-07-28 09:49:15.023492	2024-07-28 09:49:15.023492	0
+462	211	Initialize all bits of the internal state of a psudo-random number generator?	2024-07-28 09:49:15.663358	2024-07-28 09:49:15.663358	0
+463	212	Take the difference of two time points?	2024-07-28 09:49:16.274759	2024-07-28 09:49:16.274759	0
+464	212	Explicitly specify duration type?	2024-07-28 09:49:16.854359	2024-07-28 09:49:16.854359	0
+465	212	Explicitly convert a duration into a different duration unit?	2024-07-28 09:49:17.430103	2024-07-28 09:49:17.430103	0
+466	214	Check whether a clock is steady?	2024-07-28 09:49:17.829435	2024-07-28 09:49:17.829435	0
+467	214	Query a clock's time resolution?	2024-07-28 09:49:18.115719	2024-07-28 09:49:18.115719	0
+468	215	Express all different chrono literals?	2024-07-28 09:49:18.574295	2024-07-28 09:49:18.574295	0
+469	217	What are the calendar string literals?	2024-07-28 09:49:18.898323	2024-07-28 09:49:18.898323	0
+470	217	Specify the date information about a specific day in a year?	2024-07-28 09:49:19.248001	2024-07-28 09:49:19.248001	0
+471	217	Iterate over the days of a month within a year?	2024-07-28 09:49:19.627097	2024-07-28 09:49:19.627097	0
+472	218	Get file time using pre-C++17 standard?	2024-07-28 09:49:20.34354	2024-07-28 09:49:20.34354	0
+473	218	What type is used to represent file time type?	2024-07-28 09:49:20.906703	2024-07-28 09:49:20.906703	0
+474	218	Get file time using C++20 standard?	2024-07-28 09:49:21.577952	2024-07-28 09:49:21.577952	0
+475	219	Retrieve the size information of a passed-in range or an array as a signed integer?	2024-07-28 09:49:22.318587	2024-07-28 09:49:22.318587	0
+476	220	What is a sentinel in ranges library?	2024-07-28 09:49:23.481707	2024-07-28 09:49:23.481707	0
+477	221	How to move iterators back and forth regardless of their bidirectional support?	2024-07-28 09:49:24.314606	2024-07-28 09:49:24.314606	0
+478	222	When do input and output iterators overlap?	2024-07-28 09:49:25.055683	2024-07-28 09:49:25.055683	0
+479	226	What are general category of algorithms?	2024-07-28 09:49:25.526255	2024-07-28 09:49:25.526255	0
+480	227	What algorithms are parallel?	2024-07-28 09:49:26.007884	2024-07-28 09:49:26.007884	0
+481	227	What is the downside of having two separate parallel operations on a common container?	2024-07-28 09:49:26.639412	2024-07-28 09:49:26.639412	0
+482	228	Find the biggest and smallest element within a range or parameters?	2024-07-28 09:49:27.084142	2024-07-28 09:49:27.084142	0
+483	229	Check if a range starts with an expected subrange?	2024-07-28 09:49:27.490973	2024-07-28 09:49:27.490973	0
+484	229	Check if a range ends with an expected subrange?	2024-07-28 09:49:27.894532	2024-07-28 09:49:27.894532	0
+485	229	Convert a resulting range to another type?	2024-07-28 09:49:28.439689	2024-07-28 09:49:28.439689	0
+486	230	Check if the contents of two containers of different types are equal?	2024-07-28 09:49:29.326447	2024-07-28 09:49:29.326447	0
+487	231	Invoke a functor for each range element in or out of order?	2024-07-28 09:49:31.496846	2024-07-28 09:49:31.496846	0
+488	231	Iterate over a range with <i>unsequenced parallel execution</i> model?	2024-07-28 09:49:32.806345	2024-07-28 09:49:32.806345	0
+489	231	Invoke an external method utilizing a projection over the entire elements of a range?	2024-07-28 09:49:33.535128	2024-07-28 09:49:33.535128	0
+490	231	Iterate over a limited number of elements within a range?	2024-07-28 09:49:34.317999	2024-07-28 09:49:34.317999	0
+491	232	Swap two values using standard algorithms?	2024-07-28 09:49:35.110015	2024-07-28 09:49:35.110015	0
+492	232	Swap values behind two forward iterators?	2024-07-28 09:49:35.902658	2024-07-28 09:49:35.902658	0
+493	232	Exchange elements of two non-overlapping ranges?	2024-07-28 09:49:36.543916	2024-07-28 09:49:36.543916	0
+494	232	Specialize swap for user-defined types?	2024-07-28 09:49:37.663073	2024-07-28 09:49:37.663073	0
+495	233	What is the minimum requirement for a type to be comparable for sorting algorithms?	2024-07-28 09:49:38.892416	2024-07-28 09:49:38.892416	0
+496	233	Compare if one range is lexicographically less than another?	2024-07-28 09:49:40.069377	2024-07-28 09:49:40.069377	0
+497	233	Compare if one range is lexicographically less than another using spaceship operator?	2024-07-28 09:49:41.079683	2024-07-28 09:49:41.079683	0
+498	233	What iterator type does the sort function operate on?	2024-07-28 09:49:41.51917	2024-07-28 09:49:41.51917	0
+499	233	Sort ranges having different iterator types?	2024-07-28 09:49:42.355078	2024-07-28 09:49:42.355078	0
+500	233	Sort a range providing an additional guarantee of preserving the relative order of equal elements?	2024-07-28 09:49:43.382541	2024-07-28 09:49:43.382541	0
+501	233	Check if a range is already sorted in ascending or descending order?	2024-07-28 09:49:44.214469	2024-07-28 09:49:44.214469	0
+502	233	Find the end iterator of the maximal sorted sub-range within a range using standard algorithms?	2024-07-28 09:49:44.86878	2024-07-28 09:49:44.86878	0
+503	233	Sort a sub-range within a range?	2024-07-28 09:49:45.670482	2024-07-28 09:49:45.670482	0
+504	233	Sort a sub-range within a range and write the results to another range?	2024-07-28 09:49:46.509268	2024-07-28 09:49:46.509268	0
+505	233	Extract a sub-range from a range?	2024-07-28 09:49:47.161296	2024-07-28 09:49:47.161296	0
+506	234	Partition a range into two based on a criterion?	2024-07-28 09:49:48.100549	2024-07-28 09:49:48.100549	0
+507	234	Guarantee the ordering of equal elements when partitioning a range?	2024-07-28 09:49:48.775533	2024-07-28 09:49:48.775533	0
+508	234	Check if a range is partitioned?	2024-07-28 09:49:49.411293	2024-07-28 09:49:49.411293	0
+509	234	Copy the partitioning results of a range into another?	2024-07-28 09:49:50.207509	2024-07-28 09:49:50.207509	0
+510	234	Find the nth element within a range?	2024-07-28 09:49:51.262649	2024-07-28 09:49:51.262649	0
+511	235	Find the lower and upper bounds of a value within a sorted range?	2024-07-28 09:49:52.874303	2024-07-28 09:49:52.874303	0
+512	235	Return both lower and upper bounds of a value within a sorted range?	2024-07-28 09:49:53.688913	2024-07-28 09:49:53.688913	0
+513	235	Return the upper bound of a value within a sorted range using a predicate?	2024-07-28 09:49:54.723993	2024-07-28 09:49:54.723993	0
+514	235	Check the presence of a value within a sorted range?	2024-07-28 09:49:55.637578	2024-07-28 09:49:55.637578	0
+515	236	Determine whether a sorted range is contained within another sorted range?	2024-07-28 09:49:56.283406	2024-07-28 09:49:56.283406	0
+516	236	Merge two sorted ranges into one?	2024-07-28 09:49:57.159469	2024-07-28 09:49:57.159469	0
+517	236	Merge two consecutive sub-ranges within a sorted range?	2024-07-28 09:49:57.758729	2024-07-28 09:49:57.758729	0
+518	236	Remove consecutive duplicate values within a sorted range?	2024-07-28 09:49:58.401192	2024-07-28 09:49:58.401192	0
+519	236	Remove consecutive duplicate values within a sorted range and copy the results into an output range?	2024-07-28 09:49:59.054556	2024-07-28 09:49:59.054556	0
+520	237	Produce a range containing elements present in the first range but not in the second range?	2024-07-28 09:49:59.683409	2024-07-28 09:49:59.683409	0
+521	237	Produce a range containing elements present only in one of two ranges, but not both?	2024-07-28 09:50:00.322144	2024-07-28 09:50:00.322144	0
+522	237	Produce a range containing elements present in either of the ranges?	2024-07-28 09:50:00.952995	2024-07-28 09:50:00.952995	0
+523	237	Produce a range containing elements present in both of the ranges?	2024-07-28 09:50:01.556971	2024-07-28 09:50:01.556971	0
+524	238	Apply a transformation function to each element within a range?	2024-07-28 09:50:02.369425	2024-07-28 09:50:02.369425	0
+525	238	Remove elements that match the given value within a range?	2024-07-28 09:50:02.964609	2024-07-28 09:50:02.964609	0
+526	238	Remove elements for which the given predicate evaluates true within a range?	2024-07-28 09:50:03.531587	2024-07-28 09:50:03.531587	0
+527	238	Replace elements that match the given value within a range?	2024-07-28 09:50:04.106852	2024-07-28 09:50:04.106852	0
+528	238	Replace elements for which the given predicate evaluates to true within a range?	2024-07-28 09:50:04.717783	2024-07-28 09:50:04.717783	0
+529	238	Reverse the order of elements in a range?	2024-07-28 09:50:05.300038	2024-07-28 09:50:05.300038	0
+530	238	Rearrange elements in the range from <code>[first, middle), [middle, last)</code> to <code>[middle, last), [first, middle)</code>?	2024-07-28 09:50:05.970702	2024-07-28 09:50:05.970702	0
+531	238	Move elements in the provided range by the specified amount of positions into left or right?	2024-07-28 09:50:06.788737	2024-07-28 09:50:06.788737	0
+532	238	Rearrange elements in the given array in a randomly order?	2024-07-28 09:50:07.492997	2024-07-28 09:50:07.492997	0
+533	239	Find the next and previous permutations of a container?	2024-07-28 09:50:08.360903	2024-07-28 09:50:08.360903	0
+534	239	Rearrange elements of given array so that they are in their next or previous permutation?	2024-07-28 09:50:09.061465	2024-07-28 09:50:09.061465	0
+535	239	Check whether two ranges have the same content but not necessarily the same order of elements?	2024-07-28 09:50:09.666972	2024-07-28 09:50:09.666972	0
+536	240	Indicate if all of the elements within a range evaluate to true for a predicate?	2024-07-28 09:50:10.301395	2024-07-28 09:50:10.301395	0
+537	240	Indicate if at least one element within a range evaluates to true for a predicate?	2024-07-28 09:50:10.915445	2024-07-28 09:50:10.915445	0
+538	240	Indicate if no elements within a range evaluates to true for a predicate?	2024-07-28 09:50:11.51158	2024-07-28 09:50:11.51158	0
+539	241	Convert a string to lowercase or uppercase?	2024-07-28 09:50:12.512373	2024-07-28 09:50:12.512373	0
+540	241	Reverse a string?	2024-07-28 09:50:13.296424	2024-07-28 09:50:13.296424	0
+541	241	Trim a string?	2024-07-28 09:50:13.882645	2024-07-28 09:50:13.882645	0
+542	241	Remove all occurances of a character from a string?	2024-07-28 09:50:14.497692	2024-07-28 09:50:14.497692	0
+543	241	Split a string based on user specified delimiter?	2024-07-28 09:50:15.320078	2024-07-28 09:50:15.320078	0
+544	241	What ranges operations are supported by strings?	2024-07-28 09:50:15.756338	2024-07-28 09:50:15.756338	0
+545	241	Insert a range within an string?	2024-07-28 09:50:16.433863	2024-07-28 09:50:16.433863	0
+546	242	Produce the view of the first elements and a range of second elements from a range of paired elements?	2024-07-28 09:50:17.127303	2024-07-28 09:50:17.127303	0
+547	242	Produce the view of Nth elements from a range of tuple-like elements?	2024-07-28 09:50:17.821007	2024-07-28 09:50:17.821007	0
+548	242	Apply a transformation functor to every element of the view of a range?	2024-07-28 09:50:18.418278	2024-07-28 09:50:18.418278	0
+549	242	Take first N elements of the view of a range?	2024-07-28 09:50:18.929318	2024-07-28 09:50:18.929318	0
+550	242	Take the sequence of elements from the view of a range for which the predicate evaluates to true?	2024-07-28 09:50:19.421621	2024-07-28 09:50:19.421621	0
+551	242	Drop the first N elements of the view of a range?	2024-07-28 09:50:19.937389	2024-07-28 09:50:19.937389	0
+552	242	Drop the sequence of elements from the view of a range for which the predicate evaluates to true?	2024-07-28 09:50:20.43966	2024-07-28 09:50:20.43966	0
+553	242	Filter the view of a range to consist all elements that satisfy the provided predicate?	2024-07-28 09:50:20.961088	2024-07-28 09:50:20.961088	0
+554	242	Reverse the view of a range for bidirectional ranges?	2024-07-28 09:50:21.456513	2024-07-28 09:50:21.456513	0
+555	242	Adapt an iterator and the number of elements following it into the view of a range?	2024-07-28 09:50:21.930918	2024-07-28 09:50:21.930918	0
+556	242	Adapt a view into a range with a begin and end iterator of matching types for non-range versions of algorithms?	2024-07-28 09:50:22.462606	2024-07-28 09:50:22.462606	0
+557	242	Represent the view of all the elements of a range?	2024-07-28 09:50:22.983777	2024-07-28 09:50:22.983777	0
+558	242	Split a single range into a view over sub-ranges? (incomplete)	2024-07-28 09:50:23.706604	2024-07-28 09:50:23.706604	0
+559	242	Flatten a splited view of a range?	2024-07-28 09:50:23.964562	2024-07-28 09:50:23.964562	0
+560	242	Represent an empty view?	2024-07-28 09:50:24.396498	2024-07-28 09:50:24.396498	0
+561	242	Represent a single element view?	2024-07-28 09:50:24.872213	2024-07-28 09:50:24.872213	0
+562	242	Represent a view of the generated sequence formed by repeatedly incrementing an initial value?	2024-07-28 09:50:25.385992	2024-07-28 09:50:25.385992	0
+563	242	Represent a view obtained by successively applying the istream input iterator?	2024-07-28 09:50:25.862003	2024-07-28 09:50:25.862003	0
+564	243	Specify a contract for a function?	2024-07-28 09:50:26.255704	2024-07-28 09:50:26.255704	0
+565	243	Enable contracts on a compiler to support a program with compilers?	2024-07-28 09:50:26.510363	2024-07-28 09:50:26.510363	0
+566	243	What cannot be specified directly by a contract?	2024-07-28 09:50:26.726162	2024-07-28 09:50:26.726162	0
+567	244	How many contract types do we have?	2024-07-28 09:50:26.959539	2024-07-28 09:50:26.959539	0
+568	244	What are the narrow and wide contracts?	2024-07-28 09:50:27.680913	2024-07-28 09:50:27.680913	0
+569	244	What is the definition of a bug in respect to contracts?	2024-07-28 09:50:28.033077	2024-07-28 09:50:28.033077	0
+570	245	What happens if we violate a contract?	2024-07-28 09:50:28.323081	2024-07-28 09:50:28.323081	0
+571	246	What function will be called to handle a contract violation?	2024-07-28 09:50:28.714851	2024-07-28 09:50:28.714851	0
+572	247	What controlling modes can be used against contracts?	2024-07-28 09:50:29.088093	2024-07-28 09:50:29.088093	0
+573	247	What happens when contracts are specified but ignore controlling mode is selected?	2024-07-28 09:50:29.406073	2024-07-28 09:50:29.406073	0
+574	248	What are the limitations of using contracts with virtual functions?	2024-07-28 09:50:30.082172	2024-07-28 09:50:30.082172	0
+575	249	Construct a thread and wait to the end of its normal execution?	2024-07-28 09:50:30.705757	2024-07-28 09:50:30.705757	0
+576	249	What kind of callable objects does a thread take?	2024-07-28 09:50:31.785305	2024-07-28 09:50:31.785305	0
+577	249	What are the requirements of passing different value categories as thread arguments?	2024-07-28 09:50:33.289083	2024-07-28 09:50:33.289083	0
+578	249	Create a thread that joins automatically followed by RAII principle?	2024-07-28 09:50:34.064566	2024-07-28 09:50:34.064566	0
+579	250	How does the destructor of a thread is called?	2024-07-28 09:50:34.664584	2024-07-28 09:50:34.664584	0
+580	251	Wait for a thread in case an exception is thrown?	2024-07-28 09:50:35.454885	2024-07-28 09:50:35.454885	0
+581	251	Write a thread guard to join on destruction?	2024-07-28 09:50:36.219976	2024-07-28 09:50:36.219976	0
+582	252	Run a thread in background?	2024-07-28 09:50:36.796204	2024-07-28 09:50:36.796204	0
+583	253	Transfer the ownership of a thread into another?	2024-07-28 09:50:37.450738	2024-07-28 09:50:37.450738	0
+584	254	Why do we need to have a stopping mechanism on our thread?	2024-07-28 09:50:37.778591	2024-07-28 09:50:37.778591	0
+585	254	What is the process of requesting a thread to stop?	2024-07-28 09:50:38.93318	2024-07-28 09:50:38.93318	0
+586	254	What member function can be used to obtain stop source from a thread?	2024-07-28 09:50:39.32795	2024-07-28 09:50:39.32795	0
+587	255	Send a stop request to a thread?	2024-07-28 09:50:39.920831	2024-07-28 09:50:39.920831	0
+588	255	What is the signature of callee function when constructing a jthread?	2024-07-28 09:50:40.505826	2024-07-28 09:50:40.505826	0
+589	255	What member function can be used to obtain stop token from a thread?	2024-07-28 09:50:40.822668	2024-07-28 09:50:40.822668	0
+590	255	What method can be used to stop a thread directly by using its handle?	2024-07-28 09:50:41.146121	2024-07-28 09:50:41.146121	0
+591	256	What is the use case of stop callbacks in threads?	2024-07-28 09:50:42.12601	2024-07-28 09:50:42.12601	0
+592	257	Retrieve the maximum number of threads efficiently running at runtime?	2024-07-28 09:50:42.910256	2024-07-28 09:50:42.910256	0
+593	257	Retrieve the ID of a thread?	2024-07-28 09:50:43.41582	2024-07-28 09:50:43.41582	0
+594	258	What are the basic synchronization points in a concurrent program?	2024-07-28 09:50:43.754849	2024-07-28 09:50:43.754849	0
+595	258	What synchronization facilities are available in C++?	2024-07-28 09:50:44.105296	2024-07-28 09:50:44.105296	0
+596	259	What is the use case of a mutex?	2024-07-28 09:50:44.722258	2024-07-28 09:50:44.722258	0
+597	259	What methods does a mutex have?	2024-07-28 09:50:45.078636	2024-07-28 09:50:45.078636	0
+598	260	What is the downside of manually locking mutexes?	2024-07-28 09:50:45.799329	2024-07-28 09:50:45.799329	0
+599	261	What is the use case of scoped lock?	2024-07-28 09:50:46.873369	2024-07-28 09:50:46.873369	0
+600	261	What is the advantage of scoped lock over lock guard?	2024-07-28 09:50:47.277515	2024-07-28 09:50:47.277515	0
+601	263	What is the use case of a shared mutex?	2024-07-28 09:50:48.184565	2024-07-28 09:50:48.184565	0
+602	264	What is the use case of a shared lock?	2024-07-28 09:50:48.550935	2024-07-28 09:50:48.550935	0
+603	266	What methods are available for a shared timed mutex?	2024-07-28 09:50:48.943828	2024-07-28 09:50:48.943828	0
+604	267	What is the use case of a recursive mutex?	2024-07-28 09:50:49.529173	2024-07-28 09:50:49.529173	0
+605	268	What are the use cases of conditional variable?	2024-07-28 09:50:50.000785	2024-07-28 09:50:50.000785	0
+606	268	Synchronize two threads signaling each other using condition variables?	2024-07-28 09:50:51.145884	2024-07-28 09:50:51.145884	0
+607	269	What data types can be used within atomic types?	2024-07-28 09:50:51.534754	2024-07-28 09:50:51.534754	0
+608	269	What is the use case of an atomic type?	2024-07-28 09:50:52.229318	2024-07-28 09:50:52.229318	0
+609	269	What storage duration guarantees access without data races?	2024-07-28 09:50:52.6057	2024-07-28 09:50:52.6057	0
+610	270	When is it safe to initialize a variable without using synchronization primitives?	2024-07-28 09:50:53.909223	2024-07-28 09:50:53.909223	0
+611	271	Initialize a member variable with thread safety?	2024-07-28 09:50:55.015815	2024-07-28 09:50:55.015815	0
+612	272	What is the use case of a future?	2024-07-28 09:50:55.608417	2024-07-28 09:50:55.608417	0
+613	272	Send a signal from 1 to N threads?	2024-07-28 09:50:56.813782	2024-07-28 09:50:56.813782	0
+614	273	What is the API of async free function?	2024-07-28 09:50:57.375681	2024-07-28 09:50:57.375681	0
+615	274	What is the API for promise?	2024-07-28 09:50:57.875431	2024-07-28 09:50:57.875431	0
+616	274	How a promise can be used to transfer data between threads?	2024-07-28 09:50:58.467542	2024-07-28 09:50:58.467542	0
+617	274	What happens when an exception is thrown in the future?	2024-07-28 09:50:59.029999	2024-07-28 09:50:59.029999	0
+618	276	What is the difference between a mutex and a semaphore?	2024-07-28 09:50:59.331774	2024-07-28 09:50:59.331774	0
+619	277	Retrieve the maximum value of internal counter a semaphore can have?	2024-07-28 09:50:59.587944	2024-07-28 09:50:59.587944	0
+620	278	What is the use case of a counting semaphore?	2024-07-28 09:50:59.930768	2024-07-28 09:50:59.930768	0
+621	278	What operations are available on counting semaphores?	2024-07-28 09:51:00.314781	2024-07-28 09:51:00.314781	0
+622	278	Synchronize threads writing on a shared container using semaphores?	2024-07-28 09:51:01.704738	2024-07-28 09:51:01.704738	0
+623	279	Write two blocking threads only to unlock when signaled by each other?	2024-07-28 09:51:02.594816	2024-07-28 09:51:02.594816	0
+624	280	What are the use cases of a latch?	2024-07-28 09:51:03.002259	2024-07-28 09:51:03.002259	0
+625	280	How does a latch operate?	2024-07-28 09:51:03.430685	2024-07-28 09:51:03.430685	0
+626	280	What operations are available to a latch?	2024-07-28 09:51:03.810115	2024-07-28 09:51:03.810115	0
+627	280	Synchronize multiple threads using a latch?	2024-07-28 09:51:04.753241	2024-07-28 09:51:04.753241	0
+628	281	What are the use cases of a barrier?	2024-07-28 09:51:05.257825	2024-07-28 09:51:05.257825	0
+629	281	What operations are available to a barrier?	2024-07-28 09:51:05.942521	2024-07-28 09:51:05.942521	0
+630	281	Synchronize threads with a barrier?	2024-07-28 09:51:07.211866	2024-07-28 09:51:07.211866	0
+631	282	What functions are coroutines?	2024-07-28 09:51:07.64241	2024-07-28 09:51:07.64241	0
+632	283	Write an object ensuring only one instance of its internal state exists?	2024-07-28 09:51:10.054	2024-07-28 09:51:10.054	0
+633	284	What are the constituents of a path?	2024-07-28 09:51:10.823945	2024-07-28 09:51:10.823945	0
+634	284	What path formats are available?	2024-07-28 09:51:11.381051	2024-07-28 09:51:11.381051	0
+635	284	What are the properties of a normalized path?	2024-07-28 09:51:11.833939	2024-07-28 09:51:11.833939	0
+636	284	What are the differences of member and free-standing functions of path?	2024-07-28 09:51:12.567378	2024-07-28 09:51:12.567378	0
+637	284	How many error handling approaches are available on filesystem library?	2024-07-28 09:51:13.008004	2024-07-28 09:51:13.008004	0
+638	285	Handle a filesystem operation error with exceptions?	2024-07-28 09:51:13.639468	2024-07-28 09:51:13.639468	0
+639	285	Handle a filesystem operation error with error code?	2024-07-28 09:51:14.311806	2024-07-28 09:51:14.311806	0
+640	286	What are the supporting different file types?	2024-07-28 09:51:14.901713	2024-07-28 09:51:14.901713	0
+641	287	Create a path with different string types?	2024-07-28 09:51:15.435607	2024-07-28 09:51:15.435607	0
+642	287	Create a path with a range?	2024-07-28 09:51:15.815464	2024-07-28 09:51:15.815464	0
+643	287	Get current path of the executing process?	2024-07-28 09:51:16.27291	2024-07-28 09:51:16.27291	0
+644	287	Get the path of temporary directory?	2024-07-28 09:51:16.645907	2024-07-28 09:51:16.645907	0
+645	288	Yield whether a path is empty?	2024-07-28 09:51:17.064339	2024-07-28 09:51:17.064339	0
+646	288	Yield whether a path is absolute or relative?	2024-07-28 09:51:17.408789	2024-07-28 09:51:17.408789	0
+647	288	Yield all the constituents of a path?	2024-07-28 09:51:18.356541	2024-07-28 09:51:18.356541	0
+648	288	Yield if a path is normalized?	2024-07-28 09:51:18.848724	2024-07-28 09:51:18.848724	0
+649	289	Yield a path as string objects of any byte size?	2024-07-28 09:51:19.31225	2024-07-28 09:51:19.31225	0
+650	290	Yield a relative path from two paths?	2024-07-28 09:51:19.877472	2024-07-28 09:51:19.877472	0
+651	291	Yield a path as a generic string?	2024-07-28 09:51:20.75342	2024-07-28 09:51:20.75342	0
+652	292	Concatenate a string to a path?	2024-07-28 09:51:21.373017	2024-07-28 09:51:21.373017	0
+653	292	Append a subpath to a path?	2024-07-28 09:51:21.973953	2024-07-28 09:51:21.973953	0
+654	292	Add extension to a file path that does not already have an extension?	2024-07-28 09:51:22.32238	2024-07-28 09:51:22.32238	0
+655	293	Assign a string to a path as a new path?	2024-07-28 09:51:22.754841	2024-07-28 09:51:22.754841	0
+656	293	Swap two path objects?	2024-07-28 09:51:23.152047	2024-07-28 09:51:23.152047	0
+657	293	Replace filename in a path?	2024-07-28 09:51:23.45018	2024-07-28 09:51:23.45018	0
+658	293	Replace extension in a path?	2024-07-28 09:51:23.739129	2024-07-28 09:51:23.739129	0
+659	293	Convert directory separators inside a path to the native format?	2024-07-28 09:51:24.001921	2024-07-28 09:51:24.001921	0
+660	294	Remove filename from a path?	2024-07-28 09:51:24.296093	2024-07-28 09:51:24.296093	0
+661	294	Remove extension from a path?	2024-07-28 09:51:24.621346	2024-07-28 09:51:24.621346	0
+662	295	What comparison operators are supported by path objects?	2024-07-28 09:51:24.866855	2024-07-28 09:51:24.866855	0
+663	295	Compare two paths <code>tmp/f</code> and <code>tmp/./f</code>?	2024-07-28 09:51:25.574637	2024-07-28 09:51:25.574637	0
+664	295	Compare two paths holding symbolic links?	2024-07-28 09:51:26.131648	2024-07-28 09:51:26.131648	0
+665	296	Check for existance of a file?	2024-07-28 09:51:26.461741	2024-07-28 09:51:26.461741	0
+666	297	Check if a file is a regular file or a directory or a symbolic link?	2024-07-28 09:51:26.880949	2024-07-28 09:51:26.880949	0
+667	297	Check if a file is neither a regular nor a directory nor a symbolic link?	2024-07-28 09:51:27.162582	2024-07-28 09:51:27.162582	0
+668	297	Check if a file is a special block, character, a fifo or a socket file?	2024-07-28 09:51:27.51029	2024-07-28 09:51:27.51029	0
+669	298	Check if a file is empty?	2024-07-28 09:51:27.791267	2024-07-28 09:51:27.791267	0
+670	298	Get the size of a file in bytes?	2024-07-28 09:51:28.197317	2024-07-28 09:51:28.197317	0
+671	298	Get the number of hard links to a file?	2024-07-28 09:51:28.495184	2024-07-28 09:51:28.495184	0
+672	298	Get the last time a file was written into?	2024-07-28 09:51:29.037941	2024-07-28 09:51:29.037941	0
+673	298	Yield information about the disk space available at a given path?	2024-07-28 09:51:29.6434	2024-07-28 09:51:29.6434	0
+674	299	Rename a file?	2024-07-28 09:51:30.086178	2024-07-28 09:51:30.086178	0
+675	299	Change the timepoint of the last write access of a file?	2024-07-28 09:51:30.431468	2024-07-28 09:51:30.431468	0
+676	299	Replace the permissions of a file?	2024-07-28 09:51:31.003067	2024-07-28 09:51:31.003067	0
+677	299	Resize a regular file?	2024-07-28 09:51:31.359023	2024-07-28 09:51:31.359023	0
+678	299	Change the current directory of the process?	2024-07-28 09:51:31.691906	2024-07-28 09:51:31.691906	0
+679	300	Check if a file exists?	2024-07-28 09:51:32.377096	2024-07-28 09:51:32.377096	0
+680	301	Use filesystem operations without following symbolic links?	2024-07-28 09:51:32.870998	2024-07-28 09:51:32.870998	0
+681	301	Yield the status of a file following any symbolic links?	2024-07-28 09:51:33.151675	2024-07-28 09:51:33.151675	0
+682	301	Yield the status of a file without following symbolic links?	2024-07-28 09:51:33.440618	2024-07-28 09:51:33.440618	0
+683	301	Improve performance of file operation calls using file status?	2024-07-28 09:51:33.910857	2024-07-28 09:51:33.910857	0
+684	301	Yield the type of a file using file status?	2024-07-28 09:51:34.567775	2024-07-28 09:51:34.567775	0
+685	301	Yield the permissions of a file using its file status?	2024-07-28 09:51:34.874547	2024-07-28 09:51:34.874547	0
+686	301	Yield the type of a file?	2024-07-28 09:51:35.30851	2024-07-28 09:51:35.30851	0
+687	302	Yield which permissions does a file have?	2024-07-28 09:51:36.369913	2024-07-28 09:51:36.369913	0
+688	303	Create a regular file?	2024-07-28 09:51:36.829324	2024-07-28 09:51:36.829324	0
+689	304	Create a directory inside an existing directory?	2024-07-28 09:51:37.382669	2024-07-28 09:51:37.382669	0
+690	304	Create a tree of nested directories?	2024-07-28 09:51:37.680944	2024-07-28 09:51:37.680944	0
+691	305	Create a symbolic link to a regular file?	2024-07-28 09:51:38.057419	2024-07-28 09:51:38.057419	0
+692	305	Create a symbolic link to a directory?	2024-07-28 09:51:38.320461	2024-07-28 09:51:38.320461	0
+693	306	Create a hard link from a file?	2024-07-28 09:51:38.577767	2024-07-28 09:51:38.577767	0
+694	307	Copy from a file of any type?	2024-07-28 09:51:38.913997	2024-07-28 09:51:38.913997	0
+695	307	Copy from a regular file?	2024-07-28 09:51:39.179714	2024-07-28 09:51:39.179714	0
+696	307	Why there is copy options?	2024-07-28 09:51:39.890742	2024-07-28 09:51:39.890742	0
+697	307	Copy a symbolic link?	2024-07-28 09:51:40.226879	2024-07-28 09:51:40.226879	0
+698	308	Remove a file?	2024-07-28 09:51:40.532309	2024-07-28 09:51:40.532309	0
+699	308	Recursively remove a directory and all of its contents?	2024-07-28 09:51:40.845051	2024-07-28 09:51:40.845051	0
+700	309	Yield the file an existing symbolic link refers to?	2024-07-28 09:51:41.197121	2024-07-28 09:51:41.197121	0
+701	309	Yield the absolute path of an existing path?	2024-07-28 09:51:41.690332	2024-07-28 09:51:41.690332	0
+702	309	Yield the relative path from current directory to a path?	2024-07-28 09:51:42.035694	2024-07-28 09:51:42.035694	0
+703	309	Yield the relative path from a base path to another path?	2024-07-28 09:51:42.332111	2024-07-28 09:51:42.332111	0
+704	310	Iterate over the entries of a directory?	2024-07-28 09:51:42.748433	2024-07-28 09:51:42.748433	0
+705	310	Recursively iterate over directories with following symbolic links?	2024-07-28 09:51:43.025117	2024-07-28 09:51:43.025117	0
+706	310	What are the directory iterator options?	2024-07-28 09:51:43.653572	2024-07-28 09:51:43.653572	0
+707	311	What operations are supported by directory entries?	2024-07-28 09:51:44.591793	2024-07-28 09:51:44.591793	0
+708	312	Make a log function revealing source location of the error?	2024-07-28 09:51:45.278686	2024-07-28 09:51:45.278686	0
+709	313	What are the common design pattern categories?	2024-07-28 09:51:45.633312	2024-07-28 09:51:45.633312	0
+710	314	What are the common creational patterns?	2024-07-28 09:51:45.912323	2024-07-28 09:51:45.912323	0
+711	315	What are the benefits of the factory method design pattern?	2024-07-28 09:51:46.162819	2024-07-28 09:51:46.162819	0
+712	315	What are the use cases of abstract factory pattern?	2024-07-28 09:51:46.851884	2024-07-28 09:51:46.851884	0
+713	315	Provide an interface to create variations of an object without exposing implementation details?	2024-07-28 09:51:49.711691	2024-07-28 09:51:49.711691	0
+714	317	What is the main advantage of using builder design pattern?	2024-07-28 09:51:50.545129	2024-07-28 09:51:50.545129	0
+715	317	Provide an export to different file format mechanism?	2024-07-28 09:51:52.403242	2024-07-28 09:51:52.403242	0
+716	321	What is a RAID used for?	2024-07-28 09:51:52.992622	2024-07-28 09:51:52.992622	0
+717	321	What are the RAID levels?	2024-07-28 09:51:53.35733	2024-07-28 09:51:53.35733	0
+718	322	Create an array of drives with RAID level 5?	2024-07-28 09:51:53.657195	2024-07-28 09:51:53.657195	0
+719	323	Get the current status of RAID array?	2024-07-28 09:51:53.956663	2024-07-28 09:51:53.956663	0
+720	323	Retrieve RAID details?	2024-07-28 09:51:54.239458	2024-07-28 09:51:54.239458	0
+721	324	Make a RAID array permanent?	2024-07-28 09:51:54.536237	2024-07-28 09:51:54.536237	0
+722	325	Start monitoring RAID and get notified about failures?	2024-07-28 09:51:54.842269	2024-07-28 09:51:54.842269	0
+723	325	Stop monitoring a RAID?	2024-07-28 09:51:55.09289	2024-07-28 09:51:55.09289	0
+724	326	Stop a RAID array temporarily?	2024-07-28 09:51:55.348513	2024-07-28 09:51:55.348513	0
+725	326	Run an array of raided devices from the stopped state?	2024-07-28 09:51:55.617154	2024-07-28 09:51:55.617154	0
+726	327	Remove an array component from a RAID?	2024-07-28 09:51:56.005646	2024-07-28 09:51:56.005646	0
+727	328	Add an storage drive into the array?	2024-07-28 09:51:56.317557	2024-07-28 09:51:56.317557	0
+728	329	What is the meaning of ACID terminology?	2024-07-28 09:51:56.749233	2024-07-28 09:51:56.749233	0
+729	330	How does PostgreSQL store data on storage?	2024-07-28 09:51:57.018187	2024-07-28 09:51:57.018187	0
+730	330	How long is the life time of a PostgreSQL release?	2024-07-28 09:51:57.290248	2024-07-28 09:51:57.290248	0
+731	330	What is a PostgreSQL cluster?	2024-07-28 09:51:57.525301	2024-07-28 09:51:57.525301	0
+732	330	What is a schema?	2024-07-28 09:51:57.76716	2024-07-28 09:51:57.76716	0
+733	330	What are the building blocks of an instance?	2024-07-28 09:51:58.020089	2024-07-28 09:51:58.020089	0
+734	330	What schema an object in postgres belongs to?	2024-07-28 09:51:58.260837	2024-07-28 09:51:58.260837	0
+735	330	What schema do users belong to?	2024-07-28 09:51:58.477999	2024-07-28 09:51:58.477999	0
+736	330	How many user categories exist in postgres?	2024-07-28 09:51:58.717258	2024-07-28 09:51:58.717258	0
+737	330	How many superusers are allowed in a postgres instance?	2024-07-28 09:51:58.937118	2024-07-28 09:51:58.937118	0
+738	330	Where are the internal postgres instance data stored?	2024-07-28 09:51:59.211496	2024-07-28 09:51:59.211496	0
+739	330	Where does postgres store its data?	2024-07-28 09:51:59.438974	2024-07-28 09:51:59.438974	0
+740	330	What is <code>PGDATA</code> contained of?	2024-07-28 09:51:59.665174	2024-07-28 09:51:59.665174	0
+741	330	How is it possible to have multiple postgres installations?	2024-07-28 09:51:59.883465	2024-07-28 09:51:59.883465	0
+742	330	When does postgres need the <code>PGDATA</code> directory?	2024-07-28 09:52:00.115741	2024-07-28 09:52:00.115741	0
+743	330	What is the purpose of postgres's first process?	2024-07-28 09:52:00.35742	2024-07-28 09:52:00.35742	0
+744	330	How does postgres handles connections?	2024-07-28 09:52:00.572578	2024-07-28 09:52:00.572578	0
+745	331	Build postgres from source?	2024-07-28 09:52:01.134692	2024-07-28 09:52:01.134692	0
+746	331	How to add systemd support to postgres installation?	2024-07-28 09:52:01.46728	2024-07-28 09:52:01.46728	0
+747	331	Build postgres using pgenv?	2024-07-28 09:52:01.794587	2024-07-28 09:52:01.794587	0
+748	331	Connect to a postgres instance?	2024-07-28 09:52:02.049878	2024-07-28 09:52:02.049878	0
+749	332	What libraries are required for C++ projects to link to postgres?	2024-07-28 09:52:02.328654	2024-07-28 09:52:02.328654	0
+750	333	Where should we check regularly for deprecation of features and removal on recent updates?	2024-07-28 09:52:02.63719	2024-07-28 09:52:02.63719	0
+751	333	Enable docker daemon to start on boot up?	2024-07-28 09:52:02.906281	2024-07-28 09:52:02.906281	0
+752	333	Manually run docker daemon?	2024-07-28 09:52:03.204169	2024-07-28 09:52:03.204169	0
+753	334	Check if Docker client is connected to the server?	2024-07-28 09:52:03.797489	2024-07-28 09:52:03.797489	0
+754	334	Connect docker client to a remote server?	2024-07-28 09:52:04.18942	2024-07-28 09:52:04.18942	0
+755	334	Retrieve detailed information of the installed docker client?	2024-07-28 09:52:04.470537	2024-07-28 09:52:04.470537	0
+756	335	List all the contexts available to client?	2024-07-28 09:52:04.763374	2024-07-28 09:52:04.763374	0
+757	336	Configure client to permanently connect to a remote server?	2024-07-28 09:52:05.17838	2024-07-28 09:52:05.17838	0
+758	337	Switch client context to make it connect to another remote server?	2024-07-28 09:52:05.495087	2024-07-28 09:52:05.495087	0
+759	338	List available Docker images?	2024-07-28 09:52:05.83078	2024-07-28 09:52:05.83078	0
+760	338	List dangling images?	2024-07-28 09:52:06.224091	2024-07-28 09:52:06.224091	0
+761	338	List images built before another available image was built?	2024-07-28 09:52:06.657108	2024-07-28 09:52:06.657108	0
+762	338	List images built since another available image was built?	2024-07-28 09:52:07.01488	2024-07-28 09:52:07.01488	0
+763	338	List images containing a string in their label?	2024-07-28 09:52:07.368549	2024-07-28 09:52:07.368549	0
+764	338	Customize the output format of the image list?	2024-07-28 09:52:07.848305	2024-07-28 09:52:07.848305	0
+765	339	Search an image on registeries?	2024-07-28 09:52:08.263447	2024-07-28 09:52:08.263447	0
+766	339	Limit the image search results to 10 entries?	2024-07-28 09:52:08.567069	2024-07-28 09:52:08.567069	0
+767	339	Filter the result of image search results to official images only?	2024-07-28 09:52:08.901508	2024-07-28 09:52:08.901508	0
+768	339	Filter the result of image search results to automated build images only?	2024-07-28 09:52:09.21418	2024-07-28 09:52:09.21418	0
+769	340	Pull an image from official repositories?	2024-07-28 09:52:09.523532	2024-07-28 09:52:09.523532	0
+770	340	Pull an image from unofficial repositories?	2024-07-28 09:52:09.941609	2024-07-28 09:52:09.941609	0
+771	340	Pull an image from other registeries?	2024-07-28 09:52:10.37813	2024-07-28 09:52:10.37813	0
+772	341	Inspect the layers of an image?	2024-07-28 09:52:10.730737	2024-07-28 09:52:10.730737	0
+773	341	See the build history of an image?	2024-07-28 09:52:11.114471	2024-07-28 09:52:11.114471	0
+774	341	See the digests of an image?	2024-07-28 09:52:11.443642	2024-07-28 09:52:11.443642	0
+775	341	What is an image manifest?	2024-07-28 09:52:11.823607	2024-07-28 09:52:11.823607	0
+776	342	Create an image for different platforms and architectures?	2024-07-28 09:52:12.625628	2024-07-28 09:52:12.625628	0
+777	343	How to remove an image in docker?	2024-07-28 09:52:13.287272	2024-07-28 09:52:13.287272	0
+778	343	Remove all dangling images?	2024-07-28 09:52:13.828378	2024-07-28 09:52:13.828378	0
+779	344	Verify the integrity of images?	2024-07-28 09:52:14.165517	2024-07-28 09:52:14.165517	0
+780	344	Configure <b>Docker Content Trust</b> to sign images?	2024-07-28 09:52:14.97329	2024-07-28 09:52:14.97329	0
+781	344	Inspect signing data of an image?	2024-07-28 09:52:15.388895	2024-07-28 09:52:15.388895	0
+782	344	Permanently configure docker to verify image push and pull operations?	2024-07-28 09:52:15.777876	2024-07-28 09:52:15.777876	0
+783	345	Run a container from an existing image?	2024-07-28 09:52:16.22194	2024-07-28 09:52:16.22194	0
+784	345	Exit a container shell without killing its process?	2024-07-28 09:52:16.592123	2024-07-28 09:52:16.592123	0
+785	345	Attach host's shell to the shell of a running container?	2024-07-28 09:52:17.003203	2024-07-28 09:52:17.003203	0
+786	345	Stop a container?	2024-07-28 09:52:17.420027	2024-07-28 09:52:17.420027	0
+787	345	Start a stopped container?	2024-07-28 09:52:17.79239	2024-07-28 09:52:17.79239	0
+788	345	Stop and remove a container?	2024-07-28 09:52:18.164536	2024-07-28 09:52:18.164536	0
+789	346	How many docker restart policies exist?	2024-07-28 09:52:18.656128	2024-07-28 09:52:18.656128	0
+790	346	Run a container with persistent restart policy on failure or system restart?	2024-07-28 09:52:19.171933	2024-07-28 09:52:19.171933	0
+791	346	Run a container always restarting except when manually stopped?	2024-07-28 09:52:19.529849	2024-07-28 09:52:19.529849	0
+792	346	Run a container restarting on failure only?	2024-07-28 09:52:19.928025	2024-07-28 09:52:19.928025	0
+793	347	List running and stopped Docker containers?	2024-07-28 09:52:20.359539	2024-07-28 09:52:20.359539	0
+794	348	Specify the maintainer of an image in Dockerfile?	2024-07-28 09:52:20.772558	2024-07-28 09:52:20.772558	0
+795	348	Specify required packages to be installed on an image in Dockerfile?	2024-07-28 09:52:21.320746	2024-07-28 09:52:21.320746	0
+796	348	Import source files of a project to an image in Dockerfile?	2024-07-28 09:52:21.825247	2024-07-28 09:52:21.825247	0
+797	348	Change the working directory of image in Dockerfile?	2024-07-28 09:52:22.223299	2024-07-28 09:52:22.223299	0
+798	348	Publish a port in an image in Dockerfile?	2024-07-28 09:52:22.572847	2024-07-28 09:52:22.572847	0
+799	348	Express the entry point of an image in Dockerfile?	2024-07-28 09:52:22.914538	2024-07-28 09:52:22.914538	0
+800	348	Express the command for default arguments given to the executable within an image?	2024-07-28 09:52:23.47019	2024-07-28 09:52:23.47019	0
+801	349	How to manage multiple Docker nodes?	2024-07-28 09:52:23.796173	2024-07-28 09:52:23.796173	0
+802	349	How many types of swarm nodes exist?	2024-07-28 09:52:24.04478	2024-07-28 09:52:24.04478	0
+803	349	How does a swarm synchronizes all of its nodes?	2024-07-28 09:52:24.288279	2024-07-28 09:52:24.288279	0
+804	349	How many modes does each node of a swarm have?	2024-07-28 09:52:24.593912	2024-07-28 09:52:24.593912	0
+805	350	Initialize a swarm on an existing node?	2024-07-28 09:52:24.874324	2024-07-28 09:52:24.874324	0
+806	350	What is the default port on swarms?	2024-07-28 09:52:25.110283	2024-07-28 09:52:25.110283	0
+807	351	List available swarm nodes?	2024-07-28 09:52:25.503689	2024-07-28 09:52:25.503689	0
+808	351	Extract joining tokens of a swarm?	2024-07-28 09:52:25.853673	2024-07-28 09:52:25.853673	0
+809	351	Join Docker nodes to a swarm?	2024-07-28 09:52:26.260771	2024-07-28 09:52:26.260771	0
+810	351	How does the <b>High Availability</b> mechanism in swarms work?	2024-07-28 09:52:26.65201	2024-07-28 09:52:26.65201	0
+811	351	How to apply <b>High Availability</b> mechanisms to a swarm?	2024-07-28 09:52:27.129014	2024-07-28 09:52:27.129014	0
+812	351	What is advantage of locking a swarm?	2024-07-28 09:52:27.515055	2024-07-28 09:52:27.515055	0
+813	351	Apply a lock on a swarm?	2024-07-28 09:52:27.969945	2024-07-28 09:52:27.969945	0
+814	351	Check the current swarm unlock key?	2024-07-28 09:52:28.304084	2024-07-28 09:52:28.304084	0
+815	351	Re-join Docker nodes to a locked swarm?	2024-07-28 09:52:28.893569	2024-07-28 09:52:28.893569	0
+816	351	How many ways are there to create a docker service?	2024-07-28 09:52:29.263999	2024-07-28 09:52:29.263999	0
+817	351	Create a docker service?	2024-07-28 09:52:29.502738	2024-07-28 09:52:29.502738	0
+818	351	List services running by docker?	2024-07-28 09:52:29.771123	2024-07-28 09:52:29.771123	0
+819	351	List the service replicas in docker?	2024-07-28 09:52:30.062581	2024-07-28 09:52:30.062581	0
+820	351	Inspect a docker service?	2024-07-28 09:52:30.319684	2024-07-28 09:52:30.319684	0
+821	351	What are the differences between replicated and global docker services?	2024-07-28 09:52:30.625496	2024-07-28 09:52:30.625496	0
+822	351	Scale up and scale down a docker serivce in a swarm?	2024-07-28 09:52:30.988867	2024-07-28 09:52:30.988867	0
+823	351	Remove a docker service from a swarm?	2024-07-28 09:52:31.26044	2024-07-28 09:52:31.26044	0
+824	351	Create an overlay network for a docker service?	2024-07-28 09:52:31.619532	2024-07-28 09:52:31.619532	0
+825	351	List available docker networks?	2024-07-28 09:52:31.903592	2024-07-28 09:52:31.903592	0
+826	351	Create a docker service and attach it to a network?	2024-07-28 09:52:32.152858	2024-07-28 09:52:32.152858	0
+827	351	How many publishing modes are available in docker service creation?	2024-07-28 09:52:32.469529	2024-07-28 09:52:32.469529	0
+828	351	Create docker service replicas on <b>host mode</b>?	2024-07-28 09:52:32.824675	2024-07-28 09:52:32.824675	0
+829	351	Push an updated image to the swarm in a staged manner?	2024-07-28 09:52:33.105739	2024-07-28 09:52:33.105739	0
+830	351	Print logs of a docker service?	2024-07-28 09:52:33.409908	2024-07-28 09:52:33.409908	0
+831	351	Configure docker daemon to log on different logging drivers?	2024-07-28 09:52:33.88268	2024-07-28 09:52:33.88268	0
+832	351	Why swarm backups are important?	2024-07-28 09:52:34.287918	2024-07-28 09:52:34.287918	0
+833	351	Where a swarm backup file will be written?	2024-07-28 09:52:34.548755	2024-07-28 09:52:34.548755	0
+834	351	Backup docker swarm and restore it?	2024-07-28 09:52:35.503643	2024-07-28 09:52:35.503643	0
+835	352	Join new managers in a swarm?	2024-07-28 09:52:36.389606	2024-07-28 09:52:36.389606	0
+836	352	Revoke compromised token and issue new swarm join-token?	2024-07-28 09:52:36.73878	2024-07-28 09:52:36.73878	0
+837	353	What analyzing tool scans images for vulnerability?	2024-07-28 09:52:37.071503	2024-07-28 09:52:37.071503	0
+838	353	What kernel feature provides container isolation?	2024-07-28 09:52:37.379597	2024-07-28 09:52:37.379597	0
+839	353	What kernel feature provides container resource management?	2024-07-28 09:52:37.712111	2024-07-28 09:52:37.712111	0
+840	353	Secure the network connections of a swarm?	2024-07-28 09:52:38.401567	2024-07-28 09:52:38.401567	0
+841	353	Inspect a node’s client certificate?	2024-07-28 09:52:38.783635	2024-07-28 09:52:38.783635	0
+842	354	Configure the swarm certificate rotation period?	2024-07-28 09:52:39.109929	2024-07-28 09:52:39.109929	0
+843	354	Manage CA related configuration?	2024-07-28 09:52:39.424609	2024-07-28 09:52:39.424609	0
+844	355	Create a secret on swarm to store credentials?	2024-07-28 09:52:39.907684	2024-07-28 09:52:39.907684	0
+845	356	What facilities are available to extend the Docker functionality?	2024-07-28 09:52:40.316057	2024-07-28 09:52:40.316057	0
+846	356	Install a plugin on docker?	2024-07-28 09:52:40.607941	2024-07-28 09:52:40.607941	0
+847	357	List available plugins?	2024-07-28 09:52:40.902286	2024-07-28 09:52:40.902286	0
+848	358	Create a volume?	2024-07-28 09:52:41.299877	2024-07-28 09:52:41.299877	0
+849	358	Create a volume in Dockerfile?	2024-07-28 09:52:41.762428	2024-07-28 09:52:41.762428	0
+850	358	Create a volume with an installed plugin?	2024-07-28 09:52:42.063271	2024-07-28 09:52:42.063271	0
+851	359	List available volumes?	2024-07-28 09:52:42.37343	2024-07-28 09:52:42.37343	0
+852	360	Inspect into a volume?	2024-07-28 09:52:42.798155	2024-07-28 09:52:42.798155	0
+853	361	Delete a volume?	2024-07-28 09:52:43.201308	2024-07-28 09:52:43.201308	0
+854	361	Delete all unmounted volumes?	2024-07-28 09:52:43.518265	2024-07-28 09:52:43.518265	0
+855	362	Attach a volume to a container?	2024-07-28 09:52:44.08306	2024-07-28 09:52:44.08306	0
+856	362	Attach a volume to a cluster?	2024-07-28 09:52:44.576901	2024-07-28 09:52:44.576901	0
+857	363	What is the potential data corruption on a shared volume between nodes?	2024-07-28 09:52:45.133233	2024-07-28 09:52:45.133233	0
+858	364	What communication channel is used by containers to talk to each other?	2024-07-28 09:52:45.487265	2024-07-28 09:52:45.487265	0
+859	366	What are the main phases of compiling a C code?	2024-07-28 09:52:45.877921	2024-07-28 09:52:45.877921	0
+860	366	Stop compiler processing source after preprocessing phase?	2024-07-28 09:52:46.435059	2024-07-28 09:52:46.435059	0
+861	366	Specify the assembly flavor for gcc?	2024-07-28 09:52:46.774977	2024-07-28 09:52:46.774977	0
+862	366	Stop compiler processing source after compilation phase?	2024-07-28 09:52:47.030707	2024-07-28 09:52:47.030707	0
+863	366	Stop compiler processing source after assembly phase?	2024-07-28 09:52:47.291671	2024-07-28 09:52:47.291671	0
+864	366	How many relocatable files exist?	2024-07-28 09:52:47.563763	2024-07-28 09:52:47.563763	0
+865	366	View the symbolic information of an executable?	2024-07-28 09:52:47.815457	2024-07-28 09:52:47.815457	0
+866	366	What formats are used to represent debugging symbols for executables?	2024-07-28 09:52:48.118047	2024-07-28 09:52:48.118047	0
+867	366	What library can be used to programmatically parse debugging symbols?	2024-07-28 09:52:48.320175	2024-07-28 09:52:48.320175	0
+868	366	Strip all the debugging symbols of an executable?	2024-07-28 09:52:48.587425	2024-07-28 09:52:48.587425	0
+869	366	Specify the assembly flavor for objdump utility?	2024-07-28 09:52:48.87988	2024-07-28 09:52:48.87988	0
+870	366	Inspect the rodata section of an object file?	2024-07-28 09:52:49.176407	2024-07-28 09:52:49.176407	0
+871	366	Disassembly an object file?	2024-07-28 09:52:49.442925	2024-07-28 09:52:49.442925	0
+872	366	List all the relocation symbols present in an object file?	2024-07-28 09:52:49.702538	2024-07-28 09:52:49.702538	0
+873	366	What address do relocation offsets are pointing to in relocation table of an object file?	2024-07-28 09:52:50.097451	2024-07-28 09:52:50.097451	0
+874	366	List all the available sections in an object file?	2024-07-28 09:52:50.363312	2024-07-28 09:52:50.363312	0
+875	367	Detect common memory faults in a program?	2024-07-28 09:52:50.876267	2024-07-28 09:52:50.876267	0
+876	367	Trace the origin of variables causing memory leaks?	2024-07-28 09:52:51.176505	2024-07-28 09:52:51.176505	0
+877	367	Fully check for memory leak of a program?	2024-07-28 09:52:51.411612	2024-07-28 09:52:51.411612	0
+878	369	Count the number of instructions used in a program?	2024-07-28 09:52:51.717188	2024-07-28 09:52:51.717188	0
+879	369	Use interactive control to use callgrind dump file?	2024-07-28 09:52:51.967659	2024-07-28 09:52:51.967659	0
+880	369	Use a user interface to interactively control the use of callgrind dump file?	2024-07-28 09:52:52.201331	2024-07-28 09:52:52.201331	0
+881	371	Attach gdb remote session to valgrind?	2024-07-28 09:52:52.644044	2024-07-28 09:52:52.644044	0
+882	372	What is the objective of <code>io_service</code> in boost?	2024-07-28 09:52:52.939142	2024-07-28 09:52:52.939142	0
+883	372	What is the objective of <code>io_object</code> in boost?	2024-07-28 09:52:53.222313	2024-07-28 09:52:53.222313	0
+884	373	Start an event processing loop on a worker thread?	2024-07-28 09:52:53.916758	2024-07-28 09:52:53.916758	0
+885	373	Start an event processing loop without blocking thread execution?	2024-07-28 09:52:54.55244	2024-07-28 09:52:54.55244	0
+886	374	Start an event processing loop to run queued tasks?	2024-07-28 09:52:55.485932	2024-07-28 09:52:55.485932	0
+887	374	Start an event processing loop to run tasks out of queue?	2024-07-28 09:52:56.536019	2024-07-28 09:52:56.536019	0
+888	375	Serialize concurrent execution of an event processing loop?	2024-07-28 09:52:57.574663	2024-07-28 09:52:57.574663	0
+889	376	Handle exceptional asynchronous control flow in an event processing loop?	2024-07-28 09:52:58.644728	2024-07-28 09:52:58.644728	0
+890	377	Expire a task when reached to a deadline?	2024-07-28 09:52:59.622814	2024-07-28 09:52:59.622814	0
+891	382	Write a client establishing a synchronous tcp connection to a server?	2024-07-28 09:53:00.847412	2024-07-28 09:53:00.847412	0
+892	382	Write a server accepting synchronous tcp requests?	2024-07-28 09:53:02.25769	2024-07-28 09:53:02.25769	0
+893	382	Write a client establishing a synchronous tcp connection to a server?	2024-07-28 09:53:02.709121	2024-07-28 09:53:02.709121	0
+894	382	Write a server accepting asynchronous tcp requests?	2024-07-28 09:53:02.923524	2024-07-28 09:53:02.923524	0
+895	383	Write a client establishing a synchronous tcp connection to a server?	2024-07-28 09:53:03.794323	2024-07-28 09:53:03.794323	0
+896	384	Write a client establishing an asynchronous tcp connection to a server?	2024-07-28 09:53:04.898799	2024-07-28 09:53:04.898799	0
+897	384	Write a server accepting asynchronous tcp requests?	2024-07-28 09:53:06.444014	2024-07-28 09:53:06.444014	0
+898	385	Write and read from server socket?	2024-07-28 09:53:09.501722	2024-07-28 09:53:09.501722	0
+899	386	Keep track of kernel release changes?	2024-07-28 09:53:10.27111	2024-07-28 09:53:10.27111	0
+900	386	Aquire the kernel source repository?	2024-07-28 09:53:10.912099	2024-07-28 09:53:10.912099	0
+901	386	Aquire the kernel source for long-term service?	2024-07-28 09:53:11.481749	2024-07-28 09:53:11.481749	0
+902	386	What is the basic layout of the kernel source tree?	2024-07-28 09:53:12.317712	2024-07-28 09:53:12.317712	0
+903	387	What is the name of the kernel configuration mechanism?	2024-07-28 09:53:12.571247	2024-07-28 09:53:12.571247	0
+904	387	What environment variables are used to configure the kernel for cross compiling?	2024-07-28 09:53:13.111404	2024-07-28 09:53:13.111404	0
+905	387	What values does <code>ARCH</code> take in the kernel configuration stage?	2024-07-28 09:53:13.584161	2024-07-28 09:53:13.584161	0
+906	387	Start configuring the kernel with graphical environments?	2024-07-28 09:53:13.945887	2024-07-28 09:53:13.945887	0
+907	387	Where is the kernel configuration file?	2024-07-28 09:53:14.176867	2024-07-28 09:53:14.176867	0
+908	387	Where are the default configuration files stored?	2024-07-28 09:53:14.525514	2024-07-28 09:53:14.525514	0
+909	387	Configure the kernel for a specific platform using default configuration files?	2024-07-28 09:53:15.270524	2024-07-28 09:53:15.270524	0
+910	387	Select default configuration for <code>x86_64</code> platform?	2024-07-28 09:53:15.799436	2024-07-28 09:53:15.799436	0
+911	387	Select default configuration for <code>Raspberry Pi Zero</code> evaluation board?	2024-07-28 09:53:16.119798	2024-07-28 09:53:16.119798	0
+912	387	Select default configuration for <code>BeagleBone Black</code> evaluation board?	2024-07-28 09:53:16.421342	2024-07-28 09:53:16.421342	0
+913	387	Restore previous configuration changes?	2024-07-28 09:53:16.678336	2024-07-28 09:53:16.678336	0
+914	387	Create a new default configuration target in kernel source tree?	2024-07-28 09:53:17.285526	2024-07-28 09:53:17.285526	0
+915	387	Update an already existing kernel configuration file with new released options?	2024-07-28 09:53:17.921661	2024-07-28 09:53:17.921661	0
+916	387	Extract the kernel configuration file from the running machine?	2024-07-28 09:53:18.536274	2024-07-28 09:53:18.536274	0
+917	387	Configure kernel to make its configuration options available in <code>/proc</code>?	2024-07-28 09:53:18.859455	2024-07-28 09:53:18.859455	0
+918	387	Configure kernel to allow extending command line options from within the configuration?	2024-07-28 09:53:19.219805	2024-07-28 09:53:19.219805	0
+919	387	Configure kernel to make kernel symbol table available through procfs?	2024-07-28 09:53:19.546607	2024-07-28 09:53:19.546607	0
+920	387	What kernel configuration option enables timing information while printing messages from the kernel?	2024-07-28 09:53:19.758562	2024-07-28 09:53:19.758562	0
+921	387	What kernel configuration option allows debugging input devices?	2024-07-28 09:53:19.958769	2024-07-28 09:53:19.958769	0
+922	387	What kernel configuration option enables system request key combinations to recover system after crash?	2024-07-28 09:53:20.200256	2024-07-28 09:53:20.200256	0
+923	387	What kernel configuration option enables the <code>ftrace</code> tracer support?	2024-07-28 09:53:20.402113	2024-07-28 09:53:20.402113	0
+924	387	What kernel configuration option allows tracing any non-inline function in the kernel?	2024-07-28 09:53:20.640455	2024-07-28 09:53:20.640455	0
+925	387	What kernel configuration option allows tracking off periods of IRQs in the kernel?	2024-07-28 09:53:20.841608	2024-07-28 09:53:20.841608	0
+926	387	What kernel configuration option allows measuring preemption off latency and schedule latency tracing?	2024-07-28 09:53:21.096067	2024-07-28 09:53:21.096067	0
+927	387	Print the version or release of configured kernel?	2024-07-28 09:53:21.453075	2024-07-28 09:53:21.453075	0
+928	387	Append local version to the kernel release string?	2024-07-28 09:53:21.728978	2024-07-28 09:53:21.728978	0
+929	387	What header file contains kernel configuration options?	2024-07-28 09:53:21.968611	2024-07-28 09:53:21.968611	0
+930	387	Add make object in Makefile for a configuration option?	2024-07-28 09:53:22.298906	2024-07-28 09:53:22.298906	0
+931	387	Make debug symbols available in the kernel image?	2024-07-28 09:53:22.556206	2024-07-28 09:53:22.556206	0
+932	387	Solve different relocation addresses of the kernel with multi-platform ARM <code>uImage</code>?	2024-07-28 09:53:22.875364	2024-07-28 09:53:22.875364	0
+933	387	What kernel configuration option enables module loading on runtime?	2024-07-28 09:53:23.110305	2024-07-28 09:53:23.110305	0
+934	387	What kernel configuration option enables unloading modules on runtime?	2024-07-28 09:53:23.307873	2024-07-28 09:53:23.307873	0
+935	387	What kernel configuration option ignores safely unloading modules having dependencies?	2024-07-28 09:53:23.518801	2024-07-28 09:53:23.518801	0
+936	388	What are the constructs of each menu in a <code>Kconfig</code> file?	2024-07-28 09:53:24.046229	2024-07-28 09:53:24.046229	0
+937	388	What types are available for kernel configuration options in a Kconfig menu?	2024-07-28 09:53:24.414259	2024-07-28 09:53:24.414259	0
+938	388	Make a kernel configuration option dependent on another?	2024-07-28 09:53:24.806446	2024-07-28 09:53:24.806446	0
+939	388	Enforce selection of an option in its parent option when it has reverse dependency?	2024-07-28 09:53:25.298772	2024-07-28 09:53:25.298772	0
+940	389	What <code>make</code> target should be used to build the kernel in the source tree?	2024-07-28 09:53:25.938557	2024-07-28 09:53:25.938557	0
+941	389	Specify the numbers of jobs allowed to build the kernel with?	2024-07-28 09:53:26.365195	2024-07-28 09:53:26.365195	0
+942	389	See the actual commands being executed in kernel build process in case build fails?	2024-07-28 09:53:26.657728	2024-07-28 09:53:26.657728	0
+943	389	What kernel build artifacts will be stored in the source tree?	2024-07-28 09:53:27.113782	2024-07-28 09:53:27.113782	0
+944	389	Use <code>mkimage</code> to create a compressed kernel image from an uncompressed kernel image?	2024-07-28 09:53:27.429951	2024-07-28 09:53:27.429951	0
+945	389	What are the steps required to build a kernel for the Raspberry Pi 4?	2024-07-28 09:53:28.840585	2024-07-28 09:53:28.840585	0
+946	389	What are the steps required to build a kernel for the Raspberry Pi Zero?	2024-07-28 09:53:29.772476	2024-07-28 09:53:29.772476	0
+947	389	What are the steps required to build a kernel for the BeagleBone Black?	2024-07-28 09:53:30.180132	2024-07-28 09:53:30.180132	0
+948	389	What are the steps required to build a kernel for the QEMU?	2024-07-28 09:53:30.554638	2024-07-28 09:53:30.554638	0
+949	390	Install the kernel binary file on native and non-native targets?	2024-07-28 09:53:30.942905	2024-07-28 09:53:30.942905	0
+950	390	Install kernel modules?	2024-07-28 09:53:31.342082	2024-07-28 09:53:31.342082	0
+951	390	What are the required steps after building a kernel image?	2024-07-28 09:53:31.904507	2024-07-28 09:53:31.904507	0
+952	390	Override the installation path of compiled module binaries?	2024-07-28 09:53:32.461286	2024-07-28 09:53:32.461286	0
+953	390	What artifacts does <code>make modules_install</code> command generate on the host machine?	2024-07-28 09:53:33.045007	2024-07-28 09:53:33.045007	0
+954	391	Clean kernel source tree from build artifacts?	2024-07-28 09:53:33.366412	2024-07-28 09:53:33.366412	0
+955	392	List all loaded modules on system?	2024-07-28 09:53:33.625379	2024-07-28 09:53:33.625379	0
+956	393	Get information of a module?	2024-07-28 09:53:33.898988	2024-07-28 09:53:33.898988	0
+957	393	Inspect the given parameters of a loaded module?	2024-07-28 09:53:34.152509	2024-07-28 09:53:34.152509	0
+958	393	Where do module parameters linger on the system?	2024-07-28 09:53:34.420117	2024-07-28 09:53:34.420117	0
+959	394	Load a module into the kernel?	2024-07-28 09:53:34.727933	2024-07-28 09:53:34.727933	0
+960	394	Load a module into the kernel with parameters?	2024-07-28 09:53:34.982896	2024-07-28 09:53:34.982896	0
+961	394	Load a module and all of its dependencies?	2024-07-28 09:53:35.230572	2024-07-28 09:53:35.230572	0
+962	394	Secure kernel from loading malicious modules?	2024-07-28 09:53:35.76868	2024-07-28 09:53:35.76868	0
+963	395	How does <code>modprobe</code> retrieve module dependencies?	2024-07-28 09:53:36.14106	2024-07-28 09:53:36.14106	0
+964	395	Manually retrieve module dependencies?	2024-07-28 09:53:36.464701	2024-07-28 09:53:36.464701	0
+965	396	Remove loadable modules from the kernel?	2024-07-28 09:53:36.818357	2024-07-28 09:53:36.818357	0
+966	396	Remove a loadable module and its dependencies?	2024-07-28 09:53:37.089419	2024-07-28 09:53:37.089419	0
+967	397	Where is the modules configuration file located?	2024-07-28 09:53:37.392953	2024-07-28 09:53:37.392953	0
+968	397	Supply automatic module parameters?	2024-07-28 09:53:37.621891	2024-07-28 09:53:37.621891	0
+969	397	Put multiple modules into blacklist?	2024-07-28 09:53:37.850516	2024-07-28 09:53:37.850516	0
+970	398	What is the signature of module initial function?	2024-07-28 09:53:38.195262	2024-07-28 09:53:38.195262	0
+971	398	What is the signature of module cleanup function?	2024-07-28 09:53:38.512436	2024-07-28 09:53:38.512436	0
+972	398	What is the minimal skeleton for a module?	2024-07-28 09:53:39.093285	2024-07-28 09:53:39.093285	0
+973	399	Manually create a device node?	2024-07-28 09:53:39.520736	2024-07-28 09:53:39.520736	0
+974	399	What is the least requirement for a <code>Makefile</code> to build a loadable module?	2024-07-28 09:53:39.895841	2024-07-28 09:53:39.895841	0
+975	399	What is the minimal skeleton of Makefile for a module?	2024-07-28 09:53:40.304955	2024-07-28 09:53:40.304955	0
+976	399	Specify a kernel object with multiple source files in <code>Makefile</code>?	2024-07-28 09:53:40.784313	2024-07-28 09:53:40.784313	0
+977	400	Write a module accepting parameters?	2024-07-28 09:53:41.563711	2024-07-28 09:53:41.563711	0
+978	401	What is a Device Tree and where is its specification?	2024-07-28 09:53:41.893291	2024-07-28 09:53:41.893291	0
+979	401	What are the common properties of device tree specification?	2024-07-28 09:53:42.622764	2024-07-28 09:53:42.622764	0
+980	401	Specify an interrupt controller in a device tree source?	2024-07-28 09:53:43.335142	2024-07-28 09:53:43.335142	0
+981	401	Include a device tree source from another?	2024-07-28 09:53:43.607284	2024-07-28 09:53:43.607284	0
+982	401	Overlay nodes on top of another to create a composite tree in which the outer layers extend or modify the inner ones?	2024-07-28 09:53:44.589993	2024-07-28 09:53:44.589993	0
+983	401	Assuming a new device is designed similar to BeagleBone Black and a new device tree needs to be ported for it, what are the necessary steps to make one?	2024-07-28 09:53:46.476327	2024-07-28 09:53:46.476327	0
+984	402	Compile a device tree source?	2024-07-28 09:53:46.975836	2024-07-28 09:53:46.975836	0
+985	403	Build and install <b>U-Boot</b> from source?	2024-07-28 09:53:47.69882	2024-07-28 09:53:47.69882	0
+986	404	Describe the boot sequence in an embedded device?	2024-07-28 09:53:48.13816	2024-07-28 09:53:48.13816	0
+987	404	Describe what parameters should be passed to the kernel on moving from the bootloader to a kernel?	2024-07-28 09:53:48.497487	2024-07-28 09:53:48.497487	0
+988	404	Use U-Boot to read flash memory over serial console?	2024-07-28 09:53:48.782466	2024-07-28 09:53:48.782466	0
+989	404	Set environment variables in U-Boot environment?	2024-07-28 09:53:49.141489	2024-07-28 09:53:49.141489	0
+990	404	Use <code>mkimage</code> to create a compressed kernel image from an uncompressed kernel image?	2024-07-28 09:53:49.441965	2024-07-28 09:53:49.441965	0
+991	404	Load a kernel image in a U-Boot shell environment?	2024-07-28 09:53:49.778741	2024-07-28 09:53:49.778741	0
+992	404	Boot a kernel image across network in a U-Boot shell environment?	2024-07-28 09:53:50.16988	2024-07-28 09:53:50.16988	0
+993	404	Boot Linux kernel after loading it within U-Boot shell environment?	2024-07-28 09:53:50.486458	2024-07-28 09:53:50.486458	0
+994	404	Automate the boot process in U-Boot shell environment?	2024-07-28 09:53:50.730496	2024-07-28 09:53:50.730496	0
+995	404	What are the required boot instructions on BeagleBone Black?	2024-07-28 09:53:51.040275	2024-07-28 09:53:51.040275	0
+996	404	What are the required boot instructions on QEMU?	2024-07-28 09:53:51.29538	2024-07-28 09:53:51.29538	0
+997	405	What are the essential kernel command lines?	2024-07-28 09:53:51.756258	2024-07-28 09:53:51.756258	0
+998	405	Reduce the time of calculating the constant <code>loops_per_jiffy</code> variable on boot time?	2024-07-28 09:53:52.007718	2024-07-28 09:53:52.007718	0
+999	406	What is the early user space after kernel is booted?	2024-07-28 09:53:52.518544	2024-07-28 09:53:52.518544	0
+1000	407	Configure udev in order to give devices another name?	2024-07-28 09:53:53.099757	2024-07-28 09:53:53.099757	0
+1001	408	How many synchronization mechanisms for accessibility of shared resources are available in the kernel?	2024-07-28 09:53:53.94139	2024-07-28 09:53:53.94139	0
+1002	409	What is a spinlock?	2024-07-28 09:53:54.596751	2024-07-28 09:53:54.596751	0
+1003	409	What is the mechanism of a spinlock on processors?	2024-07-28 09:53:55.055329	2024-07-28 09:53:55.055329	0
+1004	409	Define a spinlock?	2024-07-28 09:53:55.912287	2024-07-28 09:53:55.912287	0
+1005	409	Lock a previously defined spinlock in module source?	2024-07-28 09:53:56.379655	2024-07-28 09:53:56.379655	0
+1006	409	What are the limitations of locking/unlocking spinlocks in a kernel module?	2024-07-28 09:53:56.813899	2024-07-28 09:53:56.813899	0
+1007	409	Prevent deadlock caused by IRQs when using spinlocks?	2024-07-28 09:53:57.269141	2024-07-28 09:53:57.269141	0
+1008	409	How does spinlocks affect preemtion after locking and unlocking?	2024-07-28 09:53:57.620942	2024-07-28 09:53:57.620942	0
+1009	409	Store and restore previous IRQs status when using spinlocks?	2024-07-28 09:53:58.278637	2024-07-28 09:53:58.278637	0
+1010	409	How a critical section can be protected from being preemted by kernel?	2024-07-28 09:53:58.805427	2024-07-28 09:53:58.805427	0
+1011	409	Acquire a lock only if it is not already held by another contender?	2024-07-28 09:53:59.756185	2024-07-28 09:53:59.756185	0
+1012	410	What is a mutex and how does it operate?	2024-07-28 09:54:00.567605	2024-07-28 09:54:00.567605	0
+1013	410	Initialize a mutex in the kernel?	2024-07-28 09:54:01.364171	2024-07-28 09:54:01.364171	0
+1014	410	Acquire a mutex in the kernel?	2024-07-28 09:54:02.099091	2024-07-28 09:54:02.099091	0
+1015	410	Release an acquired mutex in the kernel?	2024-07-28 09:54:02.593407	2024-07-28 09:54:02.593407	0
+1016	410	Check mutex locking availability before acquiring it?	2024-07-28 09:54:02.972284	2024-07-28 09:54:02.972284	0
+1017	410	What are specific rules while using mutexes in the kernel?	2024-07-28 09:54:03.607058	2024-07-28 09:54:03.607058	0
+1018	410	What is more efficient between spinlocks and mutexes compared in terms of CPU cycles?	2024-07-28 09:54:04.004036	2024-07-28 09:54:04.004036	0
+1019	411	Convert standard time units to jiffies?	2024-07-28 09:54:04.323727	2024-07-28 09:54:04.323727	0
+1020	412	What does the term sleeping mean in the kernel?	2024-07-28 09:54:04.556978	2024-07-28 09:54:04.556978	0
+1021	412	What passive waiting mechanisms are implemented in the kernel?	2024-07-28 09:54:05.070483	2024-07-28 09:54:05.070483	0
+1022	412	What queues are implemented in the kernel to hold tasks?	2024-07-28 09:54:05.412109	2024-07-28 09:54:05.412109	0
+1023	413	What is a wait queue?	2024-07-28 09:54:05.964808	2024-07-28 09:54:05.964808	0
+1024	413	Initialize a wait queue?	2024-07-28 09:54:06.408745	2024-07-28 09:54:06.408745	0
+1025	414	Put a process to sleep waiting for an event to occur?	2024-07-28 09:54:06.994577	2024-07-28 09:54:06.994577	0
+1026	414	Put a process to sleep waiting either for an event to occur or a timeout to be reached?	2024-07-28 09:54:07.39751	2024-07-28 09:54:07.39751	0
+1097	417	Wake up a process waiting on a wait queue?	2024-07-28 09:54:39.870563	2024-07-28 09:54:39.870563	0
+1027	414	What values does the <code>wait_event_timeout()</code> function return?	2024-07-28 09:54:07.747215	2024-07-28 09:54:07.747215	0
+1028	415	Wake up a process waiting on a wait queue?	2024-07-28 09:54:08.251657	2024-07-28 09:54:08.251657	0
+1029	415	What values do <code>wait_up</code> family functions return?	2024-07-28 09:54:08.556417	2024-07-28 09:54:08.556417	0
+1030	416	How many module types are available?	2024-07-28 09:54:08.963506	2024-07-28 09:54:08.963506	0
+1031	416	What is the basic skeleton of a kernel module?	2024-07-28 09:54:09.587087	2024-07-28 09:54:09.587087	0
+1032	416	What functions are the entry points of all kernel modules?	2024-07-28 09:54:09.911386	2024-07-28 09:54:09.911386	0
+1033	416	What are the <code>\\_\\_init</code> and <code>\\_\\_exit</code> function prefixes in kernel modules?	2024-07-28 09:54:10.598571	2024-07-28 09:54:10.598571	0
+1034	416	What section is used in kernel objects to store module information?	2024-07-28 09:54:10.923528	2024-07-28 09:54:10.923528	0
+1035	416	What macros are commonly used in kernel modules to store module information?	2024-07-28 09:54:11.147623	2024-07-28 09:54:11.147623	0
+1036	416	What is the real underlying macro provided by the kernel to add an entry to the <code>.modinfo</code> section?	2024-07-28 09:54:11.414024	2024-07-28 09:54:11.414024	0
+1037	416	What utility dumps the <code>.modinfo</code> section of kernel modules?	2024-07-28 09:54:11.746942	2024-07-28 09:54:11.746942	0
+1038	416	What are the differences of <code>EXPORT_SYMBOL</code> and <code>EXPORT_SYMBOL_GPL</code> macros exporting symbols based on license?	2024-07-28 09:54:12.152241	2024-07-28 09:54:12.152241	0
+1039	416	What is the <b>out-of-tree</b> kernel module building?	2024-07-28 09:54:12.495207	2024-07-28 09:54:12.495207	0
+1040	416	What is the <b>built-in</b> kernel module building?	2024-07-28 09:54:12.735654	2024-07-28 09:54:12.735654	0
+1041	416	Write a custom <code>Makefile</code> for <b>out-of-tree</b> kernel modules?	2024-07-28 09:54:13.483667	2024-07-28 09:54:13.483667	0
+1042	416	What <code>make</code> targets should be available when writing a custom <code>Makefile</code> for kernel modules?	2024-07-28 09:54:13.903627	2024-07-28 09:54:13.903627	0
+1043	416	Write configuration dependent target in <code>Makefile</code> for a <b>built-in</b> kernel module?	2024-07-28 09:54:14.438143	2024-07-28 09:54:14.438143	0
+1044	416	Specify multiple source files in a custom <code>Makefile</code> for a specific target?	2024-07-28 09:54:15.232448	2024-07-28 09:54:15.232448	0
+1045	416	Specify compiler and linker flags in <code>Makefile</code> for kernel module building?	2024-07-28 09:54:15.684375	2024-07-28 09:54:15.684375	0
+1046	416	Include other kernel source directories within a <code>Makefile</code>?	2024-07-28 09:54:15.99097	2024-07-28 09:54:15.99097	0
+1047	416	Obtain a prebuilt kernel for building <b>out-of-tree</b> module?	2024-07-28 09:54:16.516875	2024-07-28 09:54:16.516875	0
+1048	416	Load and unload an <b>out-of-tree</b> built kernel module?	2024-07-28 09:54:16.917605	2024-07-28 09:54:16.917605	0
+1049	416	Write <code>Makefile</code> for a <b>built-in</b> kernel module?	2024-07-28 09:54:17.676435	2024-07-28 09:54:17.676435	0
+1050	416	Define parameters in kernel modules?	2024-07-28 09:54:18.73709	2024-07-28 09:54:18.73709	0
+1051	416	What psuedo-files represent module parameters?	2024-07-28 09:54:19.14719	2024-07-28 09:54:19.14719	0
+1052	416	Pass parameters to built-in modules?	2024-07-28 09:54:19.446431	2024-07-28 09:54:19.446431	0
+1053	416	How kernel functions can be called from a kernel module?	2024-07-28 09:54:19.837475	2024-07-28 09:54:19.837475	0
+1054	416	How does <code>depmod</code> utility determine module dependencies?	2024-07-28 09:54:20.175128	2024-07-28 09:54:20.175128	0
+1055	416	How does <code>modprobe</code> utility loads modules?	2024-07-28 09:54:20.54473	2024-07-28 09:54:20.54473	0
+1056	416	How does <code>depmod</code> utility map devices to their drivers?	2024-07-28 09:54:21.091995	2024-07-28 09:54:21.091995	0
+1057	416	Load a module at boot time?	2024-07-28 09:54:21.526286	2024-07-28 09:54:21.526286	0
+1058	416	Unload an automatically loaded module?	2024-07-28 09:54:22.021175	2024-07-28 09:54:22.021175	0
+1059	416	List loaded modules?	2024-07-28 09:54:22.562228	2024-07-28 09:54:22.562228	0
+1060	416	Where the error macros defined are defined?	2024-07-28 09:54:22.84682	2024-07-28 09:54:22.84682	0
+1061	416	What is the standard way to return an error in kernel modules?	2024-07-28 09:54:23.229573	2024-07-28 09:54:23.229573	0
+1062	416	Why <code>goto</code> statement is preferable over than nested <code>if</code>s in kernel modules?	2024-07-28 09:54:24.072699	2024-07-28 09:54:24.072699	0
+1063	416	What is the standard way of handling null pointer errors in kernel modules?	2024-07-28 09:54:25.400001	2024-07-28 09:54:25.400001	0
+1064	416	Where are the <code>printk()</code> function log levels are defined?	2024-07-28 09:54:25.788723	2024-07-28 09:54:25.788723	0
+1065	416	What are the recommended helper functions alternative to <code>printk()</code>?	2024-07-28 09:54:26.056974	2024-07-28 09:54:26.056974	0
+1066	416	What are the log levels of kernel printing helper functions?	2024-07-28 09:54:26.434611	2024-07-28 09:54:26.434611	0
+1067	416	What is the default kernel log level?	2024-07-28 09:54:26.850155	2024-07-28 09:54:26.850155	0
+1068	416	Change current kernel log level?	2024-07-28 09:54:27.131313	2024-07-28 09:54:27.131313	0
+1069	416	Prefix the module output messages with a custom string?	2024-07-28 09:54:27.537006	2024-07-28 09:54:27.537006	0
+1070	417	How many synchronization mechanisms for accessibility of shared resources are available in the kernel?	2024-07-28 09:54:28.150281	2024-07-28 09:54:28.150281	0
+1071	417	What is a spinlock?	2024-07-28 09:54:28.623174	2024-07-28 09:54:28.623174	0
+1072	417	How does spinlocks operate on a CPU?	2024-07-28 09:54:28.973608	2024-07-28 09:54:28.973608	0
+1073	417	Define a spinlock in module source?	2024-07-28 09:54:29.700807	2024-07-28 09:54:29.700807	0
+1074	417	Lock a previously defined spinlock in module source?	2024-07-28 09:54:30.170852	2024-07-28 09:54:30.170852	0
+1075	417	What are the limitations of locking/unlocking spinlocks in a kernel module?	2024-07-28 09:54:30.483647	2024-07-28 09:54:30.483647	0
+1076	417	Prevent deadlock caused by IRQs when using spinlocks?	2024-07-28 09:54:30.825212	2024-07-28 09:54:30.825212	0
+1077	417	How does spinlocks affect preemtion after locking and unlocking?	2024-07-28 09:54:31.061402	2024-07-28 09:54:31.061402	0
+1078	417	Store and restore previous IRQs status when using spinlocks?	2024-07-28 09:54:31.514084	2024-07-28 09:54:31.514084	0
+1079	417	How a critical section can be protected from being preemted by kernel?	2024-07-28 09:54:31.950912	2024-07-28 09:54:31.950912	0
+1080	417	What is a mutex and how does it operate?	2024-07-28 09:54:32.538472	2024-07-28 09:54:32.538472	0
+1081	417	Initialize a mutex in the kernel?	2024-07-28 09:54:33.251015	2024-07-28 09:54:33.251015	0
+1082	417	Acquire a mutex in the kernel?	2024-07-28 09:54:33.828249	2024-07-28 09:54:33.828249	0
+1083	417	Release an acquired mutex in the kernel?	2024-07-28 09:54:34.217623	2024-07-28 09:54:34.217623	0
+1084	417	Check mutex locking availability before acquiring it?	2024-07-28 09:54:34.535256	2024-07-28 09:54:34.535256	0
+1085	417	What are specific rules while using mutexes in the kernel?	2024-07-28 09:54:35.03114	2024-07-28 09:54:35.03114	0
+1086	417	What is more efficient between spinlocks and mutexes compared in terms of CPU cycles?	2024-07-28 09:54:35.303902	2024-07-28 09:54:35.303902	0
+1087	417	Acquire a lock only if it is not already held by another contender?	2024-07-28 09:54:36.120312	2024-07-28 09:54:36.120312	0
+1088	417	What does the term sleeping mean in the kernel?	2024-07-28 09:54:36.458804	2024-07-28 09:54:36.458804	0
+1089	417	What passive waiting mechanisms are implemented in the kernel?	2024-07-28 09:54:36.861002	2024-07-28 09:54:36.861002	0
+1090	417	What queues are implemented in the kernel to hold tasks?	2024-07-28 09:54:37.160095	2024-07-28 09:54:37.160095	0
+1091	417	What is a wait queue?	2024-07-28 09:54:37.605546	2024-07-28 09:54:37.605546	0
+1092	417	Initialize a wait queue?	2024-07-28 09:54:37.998306	2024-07-28 09:54:37.998306	0
+1093	417	Put a process to sleep waiting for an event to occur?	2024-07-28 09:54:38.463382	2024-07-28 09:54:38.463382	0
+1094	417	Put a process to sleep waiting either for an event to occur or a timeout to be reached?	2024-07-28 09:54:38.87271	2024-07-28 09:54:38.87271	0
+1095	417	What values does the <code>wait_event_timeout()</code> function return?	2024-07-28 09:54:39.180904	2024-07-28 09:54:39.180904	0
+1096	417	Convert standard time units to jiffies?	2024-07-28 09:54:39.504666	2024-07-28 09:54:39.504666	0
+1098	417	What values do <code>wait_up</code> family functions return?	2024-07-28 09:54:40.182469	2024-07-28 09:54:40.182469	0
+1099	418	Where does the kernel log?	2024-07-28 09:54:40.51604	2024-07-28 09:54:40.51604	0
+1100	418	Where is the tracing directory usually mounted?	2024-07-28 09:54:40.749378	2024-07-28 09:54:40.749378	0
+1101	419	Create tmux configuration file so that it reads on every execution?	2024-07-28 09:54:41.068625	2024-07-28 09:54:41.068625	0
+1102	419	Replace prefix key with other key-bindings?	2024-07-28 09:54:41.38076	2024-07-28 09:54:41.38076	0
+1103	420	What is the role of tmux server and clients?	2024-07-28 09:54:41.840648	2024-07-28 09:54:41.840648	0
+1104	421	Create a new session?	2024-07-28 09:54:42.201448	2024-07-28 09:54:42.201448	0
+1105	421	Create a new window?	2024-07-28 09:54:42.568054	2024-07-28 09:54:42.568054	0
+1106	421	Create a new pane by spliting window vertically or horizontally?	2024-07-28 09:54:42.854246	2024-07-28 09:54:42.854246	0
+1107	422	Generate a CA Certificate private key?	2024-07-28 09:54:43.23985	2024-07-28 09:54:43.23985	0
+1108	423	Generate an X509 Certificate?	2024-07-28 09:54:43.499775	2024-07-28 09:54:43.499775	0
+1109	423	Dump the x509 Certificate text?	2024-07-28 09:54:43.801007	2024-07-28 09:54:43.801007	0
+1110	423	Generate a CA Certificate Sign request file?	2024-07-28 09:54:44.075376	2024-07-28 09:54:44.075376	0
+1111	423	Generate a self-signed CA Certificate?	2024-07-28 09:54:44.481089	2024-07-28 09:54:44.481089	0
+1112	424	Compile an x64 assembly program?	2024-07-28 09:54:45.524412	2024-07-28 09:54:45.524412	0
+1113	425	Debug a compiled program with gdb?	2024-07-28 09:54:46.012211	2024-07-28 09:54:46.012211	0
+1114	425	List source lines in debugging?	2024-07-28 09:54:46.318901	2024-07-28 09:54:46.318901	0
+1115	425	Change the line number of source listing?	2024-07-28 09:54:46.631856	2024-07-28 09:54:46.631856	0
+1116	425	Set disassembly flavor in gdb?	2024-07-28 09:54:46.966486	2024-07-28 09:54:46.966486	0
+1117	425	Store gdb configurations in file for future use?	2024-07-28 09:54:47.221227	2024-07-28 09:54:47.221227	0
+1118	425	Disassemble a function or line of source in gdb?	2024-07-28 09:54:47.503935	2024-07-28 09:54:47.503935	0
+1119	425	Examine an address in memory in gdb?	2024-07-28 09:54:47.848048	2024-07-28 09:54:47.848048	0
+1120	425	Set breakpoints in gdb?	2024-07-28 09:54:48.141313	2024-07-28 09:54:48.141313	0
+1121	425	Start execution of the debugging program in gdb?	2024-07-28 09:54:48.448844	2024-07-28 09:54:48.448844	0
+1122	425	Inspect registers in gdb?	2024-07-28 09:54:48.761757	2024-07-28 09:54:48.761757	0
+1123	425	Inspect the breakpoint, stack, threads and other resources of the debugging program in gdb?	2024-07-28 09:54:49.155	2024-07-28 09:54:49.155	0
+1124	425	Manipulate breakpoints in gdb?	2024-07-28 09:54:49.530316	2024-07-28 09:54:49.530316	0
+1125	425	Change executation of the debugging program in gdb?	2024-07-28 09:54:49.889783	2024-07-28 09:54:49.889783	0
+1126	425	Print variables through debugging session?	2024-07-28 09:54:50.215565	2024-07-28 09:54:50.215565	0
+1127	425	Enable TUI in gdb:	2024-07-28 09:54:50.515584	2024-07-28 09:54:50.515584	0
+1128	426	Read the ELF header of an executable object?	2024-07-28 09:54:50.802989	2024-07-28 09:54:50.802989	0
+1129	426	Read symbols of an executable object?	2024-07-28 09:54:51.067278	2024-07-28 09:54:51.067278	0
+1130	426	Sort executable object symbols based on its memory locations?	2024-07-28 09:54:51.333507	2024-07-28 09:54:51.333507	0
+1131	427	Convert decimal, binary, and hexadecimal representations of integral and floating point numbers?	2024-07-28 09:54:51.590017	2024-07-28 09:54:51.590017	0
+1132	427	Indicate that a literal number is in octal base in x64 assembly?	2024-07-28 09:54:51.888004	2024-07-28 09:54:51.888004	0
+1133	427	Indicate that a literal number is in hexadecimal base in x64 assembly?	2024-07-28 09:54:52.202278	2024-07-28 09:54:52.202278	0
+1134	428	Name x64 registers?	2024-07-28 09:54:52.721711	2024-07-28 09:54:52.721711	0
+1135	428	What is the name of <b>Instruction Pointer</b> register?	2024-07-28 09:54:52.913634	2024-07-28 09:54:52.913634	0
+1136	428	Name the flag registers?	2024-07-28 09:54:53.302151	2024-07-28 09:54:53.302151	0
+1137	428	Name SIMD registers?	2024-07-28 09:54:53.576434	2024-07-28 09:54:53.576434	0
+1138	429	What header contains Linux system calls?	2024-07-28 09:54:53.799191	2024-07-28 09:54:53.799191	0
+1139	429	Write exit procedure in x64 Assembly?	2024-07-28 09:54:54.266378	2024-07-28 09:54:54.266378	0
+1140	429	Exit program without directly writing the exit syscall?	2024-07-28 09:54:54.695075	2024-07-28 09:54:54.695075	0
+1141	430	Create values in data section of memory?	2024-07-28 09:54:55.51753	2024-07-28 09:54:55.51753	0
+1142	430	Consecutively store a sequence of data into read-only memory section?	2024-07-28 09:54:55.896579	2024-07-28 09:54:55.896579	0
+1143	430	Preserve uninitialized variables in a writable memory section?	2024-07-28 09:54:56.284199	2024-07-28 09:54:56.284199	0
+1144	431	Use external functions from C in x64 assembly code?	2024-07-28 09:54:57.486845	2024-07-28 09:54:57.486845	0
+1145	432	Add and subtract two integral integers?	2024-07-28 09:54:58.619148	2024-07-28 09:54:58.619148	0
+1146	432	Increment and decrement a value stored on a writable variable?	2024-07-28 09:54:59.73189	2024-07-28 09:54:59.73189	0
+1147	432	Shift arithmetic values stored in writable variables?	2024-07-28 09:55:00.784303	2024-07-28 09:55:00.784303	0
+1148	432	Multiply and divide two integral integers?	2024-07-28 09:55:02.077904	2024-07-28 09:55:02.077904	0
+1149	433	Specify how many bits each floating point number occupies for exponent and fraction?	2024-07-28 09:55:02.750212	2024-07-28 09:55:02.750212	0
+1150	433	Add and subtract two floating point numbers?	2024-07-28 09:55:03.510825	2024-07-28 09:55:03.510825	0
+1151	433	Multiply and divide two floating point numbers?	2024-07-28 09:55:04.338256	2024-07-28 09:55:04.338256	0
+1152	433	Calculate the square root of a floating point number?	2024-07-28 09:55:05.032068	2024-07-28 09:55:05.032068	0
+1153	434	Evaluate bit-wise operations?	2024-07-28 09:55:06.334508	2024-07-28 09:55:06.334508	0
+1154	434	Set and reset specific bits of numeric variable?	2024-07-28 09:55:07.344724	2024-07-28 09:55:07.344724	0
+1155	434	Check if its 8th bit of a quadword variable is set?	2024-07-28 09:55:08.14794	2024-07-28 09:55:08.14794	0
+1156	435	Conditionally change the execution flow?	2024-07-28 09:55:09.669542	2024-07-28 09:55:09.669542	0
+1157	436	Repeat execution of a code section by manually counting down?	2024-07-28 09:55:10.980428	2024-07-28 09:55:10.980428	0
+1158	436	Repeat execution of a code section by automatically counting down?	2024-07-28 09:55:12.318032	2024-07-28 09:55:12.318032	0
+1159	437	Load the address of an array into a register to run operations on?	2024-07-28 09:55:13.280874	2024-07-28 09:55:13.280874	0
+1160	438	Temporarily store values on memory within the scope of a function?	2024-07-28 09:55:14.88775	2024-07-28 09:55:14.88775	0
+1161	439	Write a stack frame for a function?	2024-07-28 09:55:15.632027	2024-07-28 09:55:15.632027	0
+1162	439	Align the stack with stack frame after function call?	2024-07-28 09:55:16.561309	2024-07-28 09:55:16.561309	0
+1163	440	Abbreviate function epilogue?	2024-07-28 09:55:17.123065	2024-07-28 09:55:17.123065	0
+1164	440	Use calling convention to return error code from a function?	2024-07-28 09:55:18.244171	2024-07-28 09:55:18.244171	0
+1165	440	Use calling conventions to transfer variables from callee to caller functions?	2024-07-28 09:55:20.43408	2024-07-28 09:55:20.43408	0
+1166	441	Declare function local variables?	2024-07-28 09:55:21.943444	2024-07-28 09:55:21.943444	0
+1167	442	Expose a function to external linkage?	2024-07-28 09:55:24.297874	2024-07-28 09:55:24.297874	0
+1168	442	Expose a variable to external linkage?	2024-07-28 09:55:25.29658	2024-07-28 09:55:25.29658	0
+1169	443	Use an assembly function in a C source?	2024-07-28 09:55:26.277564	2024-07-28 09:55:26.277564	0
+1170	443	How many of inline assembly types are available?	2024-07-28 09:55:26.716756	2024-07-28 09:55:26.716756	0
+1171	443	Write a basic inline assembly in C programs?	2024-07-28 09:55:27.279682	2024-07-28 09:55:27.279682	0
+1172	443	Write extended inline assembly in C programs? (needs work)	2024-07-28 09:55:28.377419	2024-07-28 09:55:28.377419	0
+1173	444	Use inline procedures to avoid runtime overhead of function calls?	2024-07-28 09:55:29.49917	2024-07-28 09:55:29.49917	0
+1174	444	Conditionally compile a part of x64 assembly program?	2024-07-28 09:55:30.237498	2024-07-28 09:55:30.237498	0
+1175	445	Write into the standard output stream?	2024-07-28 09:55:30.92766	2024-07-28 09:55:30.92766	0
+1176	445	Read from the standard input stream?	2024-07-28 09:55:31.536376	2024-07-28 09:55:31.536376	0
+1177	446	Prevent stack overflow by counting input string before printing it?	2024-07-28 09:55:32.579177	2024-07-28 09:55:32.579177	0
+1178	446	Prevent stack overflows by limiting the maximum allowed input length from standard input?	2024-07-28 09:55:34.425503	2024-07-28 09:55:34.425503	0
+1179	447	What registers are used to read command line arguments from an x64 assembly program?	2024-07-28 09:55:35.014317	2024-07-28 09:55:35.014317	0
+1180	447	Read command line arguments from an x64 assembly program?	2024-07-28 09:55:35.798851	2024-07-28 09:55:35.798851	0
+1181	447	Inspect the command line arguments stored in registers in a GNU debugger?	2024-07-28 09:55:36.260512	2024-07-28 09:55:36.260512	0
+1182	448	What header contains file operation constants?	2024-07-28 09:55:36.473143	2024-07-28 09:55:36.473143	0
+1183	448	Open and close a file in x64 assembly?	2024-07-28 09:55:38.07657	2024-07-28 09:55:38.07657	0
+1184	448	Write content to a file in x64 assembly?	2024-07-28 09:55:39.544064	2024-07-28 09:55:39.544064	0
+1185	448	Truncate a file in x64 assembly?	2024-07-28 09:55:40.922228	2024-07-28 09:55:40.922228	0
+1186	449	Obtain the CPU information of the processor in x64 assembly?	2024-07-28 09:55:41.855298	2024-07-28 09:55:41.855298	0
+1187	449	Check the processors which version of SSE extensions do they support?	2024-07-28 09:55:44.709321	2024-07-28 09:55:44.709321	0
+1188	449	How many registers of SSE are available on any processor supporting it?	2024-07-28 09:55:45.635908	2024-07-28 09:55:45.635908	0
+1189	449	What are the two types of data that can be stored on SSE registers?	2024-07-28 09:55:45.914257	2024-07-28 09:55:45.914257	0
+1190	449	What are AVX registers and how much data can they hold?	2024-07-28 09:55:46.197935	2024-07-28 09:55:46.197935	0
+1191	449	How does alignment of data in <code>.data</code> and <code>.bss</code> sections can improve performance of a program?	2024-07-28 09:55:46.43182	2024-07-28 09:55:46.43182	0
+1192	449	How can we align data in <code>.data</code> and <code>.bss</code> sections in specific byte sizes?	2024-07-28 09:55:46.735824	2024-07-28 09:55:46.735824	0
 \.
 
 
@@ -16722,6 +16723,7 @@ COPY flashback.section_name_patterns (id, pattern) FROM stdin;
 1	Chapter
 2	Page
 3	Course
+4	Video
 \.
 
 
@@ -16729,1457 +16731,1457 @@ COPY flashback.section_name_patterns (id, pattern) FROM stdin;
 -- Data for Name: sections; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
-COPY flashback.sections (id, resource_id, headline, state, reference, created, updated, "position") FROM stdin;
-1	15	Chapter 1	ignored	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-2	15	Chapter 2	ignored	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-4	15	Chapter 4	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-5	15	Chapter 5	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-6	15	Chapter 6	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-7	15	Chapter 7	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-8	15	Chapter 8	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-9	15	Chapter 9	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-10	15	Chapter 10	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-11	15	Chapter 11	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-12	15	Chapter 12	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-13	15	Chapter 13	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-14	15	Chapter 14	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-15	15	Chapter 15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-16	15	Chapter 16	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-17	15	Chapter 17	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-18	15	Chapter 18	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-19	15	Chapter 19	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-20	15	Chapter 20	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-21	15	Chapter 21	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-22	15	Chapter 22	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-23	15	Chapter 23	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-24	16	Chapter 1	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0
-25	16	Chapter 2	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0
-26	16	Chapter 3	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0
-27	16	Chapter 4	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0
-28	16	Chapter 5	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0
-29	16	Chapter 6	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0
-30	16	Chapter 7	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0
-31	16	Chapter 8	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0
-32	16	Chapter 9	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0
-33	16	Chapter 10	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0
-34	16	Chapter 11	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0
-35	16	Chapter 12	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0
-36	16	Chapter 13	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0
-37	17	Qt Logs	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0
-38	17	Palettes	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0
-39	17	Badges	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0
-40	17	HTTP	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0
-41	17	Protobuf	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0
-42	17	Multimedia	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0
-43	17	CMake	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0
-44	17	String Literals	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0
-45	17	Signals	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0
-50	18	Chapter 5	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-51	18	Chapter 6	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-52	18	Chapter 7	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-53	18	Chapter 8	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-54	18	Chapter 9	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-55	18	Chapter 10	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-56	18	Chapter 11	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-57	18	Chapter 12	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-58	18	Chapter 13	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-59	18	Chapter 14	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-60	18	Chapter 15	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-61	18	Chapter 16	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-62	18	Chapter 17	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-63	18	Chapter 18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-64	18	Chapter 19	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-68	19	Chapter 4	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-69	19	Chapter 5	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-70	19	Chapter 6	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-71	19	Chapter 7	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-72	19	Chapter 8	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-73	19	Chapter 9	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-74	19	Chapter 10	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-75	19	Chapter 11	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-76	19	Chapter 12	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-77	19	Chapter 13	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-78	19	Chapter 14	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-79	19	Chapter 15	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-80	19	Chapter 16	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-81	19	Chapter 17	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-82	19	Chapter 18	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-83	19	Chapter 19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-84	19	Chapter 20	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-85	19	Chapter 21	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-86	19	Chapter 22	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-87	19	Chapter 23	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-88	19	Chapter 24	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-89	19	Chapter 25	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-90	19	Chapter 26	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-91	19	Chapter 27	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-92	19	Chapter 28	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-93	19	Chapter 29	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-94	19	Chapter 30	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-95	19	Chapter 31	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-96	20	Chapter 1	writing	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0
-97	20	Chapter 2	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0
-98	20	Chapter 3	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0
-99	20	Chapter 4	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0
-100	20	Chapter 5	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0
-101	20	Chapter 6	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0
-102	20	Chapter 7	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0
-103	20	Chapter 8	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0
-104	20	Chapter 9	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0
-105	20	Chapter 10	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0
-106	20	Chapter 11	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0
-107	21	Chapter 1	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0
-108	21	Chapter 2	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0
-109	21	Chapter 3	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0
-110	21	Chapter 4	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0
-111	21	Chapter 5	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0
-112	21	Chapter 6	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0
-119	22	Chapter 7	ignored	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-123	22	Chapter 11	ignored	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-129	22	Chapter 17	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-130	22	Chapter 18	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-131	22	Chapter 19	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-132	22	Chapter 20	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-133	23	Chapter 1	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-134	23	Chapter 2	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-135	23	Chapter 3	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-136	23	Chapter 4	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-137	23	Chapter 5	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-138	23	Chapter 6	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-139	23	Chapter 7	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-140	23	Chapter 8	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-141	23	Chapter 9	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-142	23	Chapter 10	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-143	23	Chapter 11	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-144	23	Chapter 12	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-145	23	Chapter 13	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-146	23	Chapter 14	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-147	23	Chapter 15	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-148	23	Chapter 16	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-149	23	Chapter 17	writing	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-150	23	Chapter 18	writing	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-151	23	Chapter 19	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-152	23	Chapter 20	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-153	23	Chapter 21	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-154	23	Chapter 22	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-155	23	Chapter 23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-156	23	Chapter 24	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-157	23	Chapter 25	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-158	23	Chapter 26	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-159	23	Chapter 27	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-160	23	Chapter 28	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-161	23	Chapter 29	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-162	23	Chapter 30	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-163	23	Chapter 31	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-164	23	Chapter 32	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-165	23	Chapter 33	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-166	23	Chapter 34	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0
-167	24	Chapter 1	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-168	24	Chapter 2	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-169	24	Chapter 3	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-170	24	Chapter 4	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-171	24	Chapter 5	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-172	24	Chapter 6	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-173	24	Chapter 7	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-174	24	Chapter 8	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-175	24	Chapter 9	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-176	24	Chapter 10	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-177	24	Chapter 11	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-178	24	Chapter 12	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-179	24	Chapter 13	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-180	24	Chapter 14	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-181	24	Chapter 15	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-182	24	Chapter 16	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-183	24	Chapter 17	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-184	24	Chapter 18	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-185	24	Chapter 19	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-186	24	Chapter 20	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0
-189	25	Chapter 3	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-190	25	Chapter 4	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-191	25	Chapter 5	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-192	25	Chapter 6	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-193	25	Chapter 7	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-194	25	Chapter 8	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-195	25	Chapter 9	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-196	25	Chapter 10	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-197	25	Chapter 11	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-198	25	Chapter 12	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-199	25	Chapter 13	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-200	25	Chapter 14	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-201	25	Chapter 15	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-202	25	Chapter 16	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-203	25	Chapter 17	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-204	25	Chapter 18	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-206	26	Chapter 2	writing	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-207	26	Chapter 3	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-208	26	Chapter 4	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-209	26	Chapter 5	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-210	26	Chapter 6	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-211	26	Chapter 7	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-212	26	Chapter 8	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-213	26	Chapter 9	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-214	26	Chapter 10	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-215	26	Chapter 11	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-216	26	Chapter 12	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-217	26	Chapter 13	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-218	26	Chapter 14	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-219	26	Chapter 15	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-220	26	Chapter 16	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-221	26	Chapter 17	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-222	26	Chapter 18	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-223	26	Chapter 19	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-224	26	Chapter 20	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-187	25	Chapter 1	writing	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-188	25	Chapter 2	writing	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0
-225	27	Chapter 1	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-226	27	Chapter 2	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-227	27	Chapter 3	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-228	27	Chapter 4	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-229	27	Chapter 5	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-230	27	Chapter 6	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-231	27	Chapter 7	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-232	27	Chapter 8	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-233	27	Chapter 9	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-234	27	Chapter 10	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-235	27	Chapter 11	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-236	27	Chapter 12	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-237	27	Chapter 13	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-238	27	Chapter 14	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-239	27	Chapter 15	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-240	27	Chapter 16	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0
-241	28	Chapter 1	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0
-242	28	Chapter 2	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0
-243	28	Chapter 3	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0
-244	28	Chapter 4	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0
-245	28	Chapter 5	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0
-246	28	Chapter 6	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0
-247	28	Chapter 7	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0
-248	28	Chapter 8	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0
-249	28	Chapter 9	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0
-250	28	Chapter 10	writing	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0
-251	29	Chapter 1	open	\N	2024-07-28 09:44:57.91634	2024-07-28 09:44:57.91634	0
-259	30	Chapter 8	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-260	30	Chapter 9	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-261	30	Chapter 10	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-262	30	Chapter 11	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-263	30	Chapter 12	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-264	30	Chapter 13	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-265	30	Chapter 14	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-266	30	Chapter 15	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-269	30	Chapter 18	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-270	30	Chapter 19	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-271	30	Chapter 20	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-272	30	Chapter 21	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-274	31	Chapter 2	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-275	31	Chapter 3	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-276	31	Chapter 4	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-277	31	Chapter 5	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-278	31	Chapter 6	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-279	31	Chapter 7	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-280	31	Chapter 8	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-281	31	Chapter 9	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-282	31	Chapter 10	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-283	31	Chapter 11	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-284	31	Chapter 12	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-285	31	Chapter 13	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-286	31	Chapter 14	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-287	31	Chapter 15	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-288	32	Chapter 1	ignored	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0
-292	32	Chapter 5	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0
-294	32	Chapter 7	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0
-297	32	Chapter 10	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0
-298	32	Chapter 11	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0
-312	34	Chapter 1	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0
-313	34	Chapter 2	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0
-314	34	Chapter 3	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0
-315	34	Chapter 4	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0
-316	34	Chapter 5	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0
-317	34	Chapter 6	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0
-318	34	Chapter 7	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0
-319	34	Chapter 8	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0
-320	34	Chapter 9	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0
-321	34	Chapter 10	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0
-322	34	Chapter 11	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0
-323	34	Chapter 12	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0
-324	35	Chapter 1	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
-325	35	Chapter 2	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
-326	35	Chapter 3	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
-327	35	Chapter 4	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
-328	35	Chapter 5	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
-329	35	Chapter 6	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
-330	35	Chapter 7	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
-331	35	Chapter 8	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
-332	35	Chapter 9	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
-333	35	Chapter 10	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
-334	35	Chapter 11	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
-335	35	Chapter 12	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0
-338	36	Chapter 3	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-339	36	Chapter 4	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-341	36	Chapter 6	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-342	36	Chapter 7	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-343	36	Chapter 8	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-344	36	Chapter 9	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-345	36	Chapter 10	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-346	36	Chapter 11	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-347	36	Chapter 12	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-348	36	Chapter 13	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-349	36	Chapter 14	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-350	36	Chapter 15	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-351	36	Chapter 16	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-352	36	Chapter 17	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-353	36	Chapter 18	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-354	36	Chapter 19	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-360	37	Chapter 6	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-363	37	Chapter 9	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-364	37	Chapter 10	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-365	37	Chapter 11	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-366	37	Chapter 12	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-367	37	Chapter 13	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-371	37	Chapter 17	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-372	37	Chapter 18	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-373	37	Chapter 19	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-374	37	Chapter 20	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-375	37	Chapter 21	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-380	37	Chapter 26	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-381	37	Chapter 27	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-382	37	Chapter 28	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-383	37	Chapter 29	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-384	37	Chapter 30	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-385	37	Chapter 31	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-386	37	Chapter 32	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-387	37	Chapter 33	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-388	37	Chapter 34	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-389	37	Chapter 35	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-390	37	Chapter 36	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-391	37	Chapter 37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-392	38	Chapter 1	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-394	38	Chapter 3	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-395	38	Chapter 4	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-396	38	Chapter 5	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-397	38	Chapter 6	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-398	38	Chapter 7	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-399	38	Chapter 8	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-400	38	Chapter 9	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-401	38	Chapter 10	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-402	38	Chapter 11	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-403	38	Chapter 12	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-404	38	Chapter 13	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-405	38	Chapter 14	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-406	38	Chapter 15	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-407	38	Chapter 16	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-408	38	Chapter 17	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-409	38	Chapter 18	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-410	39	Chapter 1	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0
-411	39	Chapter 2	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0
-412	39	Chapter 3	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0
-413	39	Chapter 4	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0
-414	39	Chapter 5	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0
-415	39	Chapter 6	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0
-416	39	Chapter 7	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0
-417	39	Chapter 8	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0
-418	39	Chapter 9	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0
-421	40	Chapter 3	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0
-422	40	Chapter 4	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0
-423	40	Chapter 5	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0
-424	40	Chapter 6	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0
-425	40	Chapter 7	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0
-426	40	Chapter 8	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0
-427	40	Chapter 9	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0
-428	40	Chapter 10	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0
-429	40	Chapter 11	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0
-430	41	Chapter 1	writing	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0
-431	41	Chapter 2	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0
-432	41	Chapter 3	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0
-433	41	Chapter 4	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0
-434	41	Chapter 5	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0
-435	41	Chapter 6	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0
-436	41	Chapter 7	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0
-437	42	Chapter 1	writing	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-438	42	Chapter 2	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-439	42	Chapter 3	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-440	42	Chapter 4	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-441	42	Chapter 5	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-442	42	Chapter 6	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-443	42	Chapter 7	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-444	42	Chapter 8	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-445	42	Chapter 9	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-446	42	Chapter 10	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-447	42	Chapter 11	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-448	42	Chapter 12	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-449	42	Chapter 13	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-450	42	Chapter 14	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-451	42	Chapter 15	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-452	42	Chapter 16	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-453	42	Chapter 17	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-454	42	Chapter 18	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-455	42	Chapter 19	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-456	42	Chapter 20	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-457	42	Chapter 21	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0
-460	43	Chapter 3	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
-461	43	Chapter 4	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
-462	43	Chapter 5	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
-463	43	Chapter 6	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
-464	43	Chapter 7	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
-465	43	Chapter 8	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
-466	43	Chapter 9	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
-467	43	Chapter 10	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
-468	43	Chapter 11	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
-469	43	Chapter 12	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
-393	38	Chapter 2	writing	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0
-475	44	Chapter 5	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-476	44	Chapter 6	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-498	44	Chapter 28	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-499	44	Chapter 29	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-500	44	Chapter 30	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-501	44	Chapter 31	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-502	44	Chapter 32	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-503	44	Chapter 33	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-504	44	Chapter 34	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-505	44	Chapter 35	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-506	44	Chapter 36	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-507	44	Chapter 37	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-508	44	Chapter 38	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-509	44	Chapter 39	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-510	44	Chapter 40	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-511	44	Chapter 41	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-512	44	Chapter 42	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-513	44	Chapter 43	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-514	45	Chapter 1	ignored	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-517	45	Chapter 4	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-518	45	Chapter 5	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-519	45	Chapter 6	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-520	45	Chapter 7	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-521	45	Chapter 8	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-522	45	Chapter 9	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-523	45	Chapter 10	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-524	45	Chapter 11	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-525	45	Chapter 12	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-526	45	Chapter 13	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-527	45	Chapter 14	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-528	46	Chapter 1	writing	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-529	46	Chapter 2	writing	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-530	46	Chapter 3	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-531	46	Chapter 4	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-532	46	Chapter 5	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-533	46	Chapter 6	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-534	46	Chapter 7	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-535	46	Chapter 8	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-536	46	Chapter 9	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-537	46	Chapter 10	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-538	46	Chapter 11	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-539	46	Chapter 12	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-540	46	Chapter 13	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-541	46	Chapter 14	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-542	46	Chapter 15	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-543	46	Chapter 16	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0
-544	47	Chapter 1	ignored	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-545	47	Chapter 2	ignored	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-546	47	Chapter 3	writing	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-547	47	Chapter 4	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-548	47	Chapter 5	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-549	47	Chapter 6	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-550	47	Chapter 7	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-551	47	Chapter 8	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-552	47	Chapter 9	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-553	47	Chapter 10	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-554	47	Chapter 11	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-555	47	Chapter 12	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-556	47	Chapter 13	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-557	47	Chapter 14	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-558	47	Chapter 15	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-559	47	Chapter 16	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-560	47	Chapter 17	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-561	47	Chapter 18	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-562	47	Chapter 19	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-563	47	Chapter 20	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-564	47	Chapter 21	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-565	47	Chapter 22	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-566	47	Chapter 23	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-567	47	Chapter 24	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-568	47	Chapter 25	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-569	47	Chapter 26	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-570	47	Chapter 27	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-571	47	Chapter 28	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-572	47	Chapter 29	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-573	47	Chapter 30	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-574	47	Chapter 31	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-575	47	Chapter 32	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-576	47	Chapter 33	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-577	47	Chapter 34	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-578	47	Chapter 35	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-579	47	Chapter 36	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-580	47	Chapter 37	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-581	47	Chapter 38	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-582	47	Chapter 39	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-583	47	Chapter 40	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-584	47	Chapter 41	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-585	47	Chapter 42	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-586	47	Chapter 43	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-587	47	Chapter 44	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-588	47	Chapter 45	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-589	47	Chapter 46	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-590	47	Chapter 47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-591	47	Chapter 48	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-592	47	Chapter 49	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-593	47	Chapter 50	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-594	47	Chapter 51	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-595	47	Chapter 52	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-596	47	Chapter 53	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-597	47	Chapter 54	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-598	47	Chapter 55	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-599	47	Chapter 56	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-600	47	Chapter 57	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-601	47	Chapter 58	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-602	47	Chapter 59	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-603	47	Chapter 60	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-604	47	Chapter 61	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-605	47	Chapter 62	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-606	47	Chapter 63	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-607	47	Chapter 64	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0
-608	48	Chapter 1	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-609	48	Chapter 2	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-610	48	Chapter 3	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-611	48	Chapter 4	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-612	48	Chapter 5	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-613	48	Chapter 6	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-614	48	Chapter 7	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-615	48	Chapter 8	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-616	48	Chapter 9	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-617	48	Chapter 10	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-618	48	Chapter 11	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-619	48	Chapter 12	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-620	48	Chapter 13	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-621	48	Chapter 14	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-622	48	Chapter 15	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-623	48	Chapter 16	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0
-625	50	Chapter 1	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0
-626	50	Chapter 2	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0
-628	50	Chapter 3	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0
-629	50	Chapter 4	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0
-630	50	Chapter 5	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0
-631	50	Chapter 6	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0
-632	50	Chapter 7	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0
-633	50	Chapter 8	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0
-634	50	Chapter 9	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0
-635	50	Chapter 10	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0
-636	50	Chapter 11	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0
-637	50	Chapter 12	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0
-638	51	Chapter 1	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-639	51	Chapter 2	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-640	51	Chapter 3	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-641	51	Chapter 4	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-642	51	Chapter 5	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-643	51	Chapter 6	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-644	51	Chapter 7	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-645	51	Chapter 8	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-646	51	Chapter 9	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-647	51	Chapter 10	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-648	51	Chapter 11	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-649	51	Chapter 12	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-650	51	Chapter 13	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-651	51	Chapter 14	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-653	51	Chapter 16	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-654	51	Chapter 17	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-655	51	Chapter 18	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-656	51	Chapter 19	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-657	51	Chapter 20	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-658	51	Chapter 21	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-659	51	Chapter 22	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-660	51	Chapter 23	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-661	52	Chapter 1	writing	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-662	52	Chapter 2	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-663	52	Chapter 3	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-664	52	Chapter 4	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-665	52	Chapter 5	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-666	52	Chapter 6	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-667	52	Chapter 7	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-668	52	Chapter 8	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-669	52	Chapter 9	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-670	52	Chapter 10	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-671	52	Chapter 11	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-672	52	Chapter 12	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-673	52	Chapter 13	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-674	52	Chapter 14	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0
-676	53	Chapter 2	writing	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-677	53	Chapter 3	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-678	53	Chapter 4	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-679	53	Chapter 5	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-680	53	Chapter 6	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-681	53	Chapter 7	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-682	53	Chapter 8	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-683	53	Chapter 9	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-684	53	Chapter 10	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-685	53	Chapter 11	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-686	53	Chapter 12	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-687	53	Chapter 13	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-688	53	Chapter 14	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-689	53	Chapter 15	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-690	53	Chapter 16	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-691	53	Chapter 17	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-692	53	Chapter 18	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-693	53	Chapter 19	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-694	53	Chapter 20	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-695	53	Chapter 21	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-696	53	Chapter 22	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-697	53	Chapter 23	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-698	53	Chapter 24	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-699	53	Chapter 25	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-700	53	Chapter 26	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-701	53	Chapter 27	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-702	54	Chapter 1	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-703	54	Chapter 2	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-704	54	Chapter 3	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-705	54	Chapter 4	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-706	54	Chapter 5	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-707	54	Chapter 6	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-708	54	Chapter 7	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-709	54	Chapter 8	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-710	54	Chapter 9	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-711	54	Chapter 10	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-712	54	Chapter 11	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-713	54	Chapter 12	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-714	54	Chapter 13	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-715	54	Chapter 14	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-716	54	Chapter 15	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-717	54	Chapter 16	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-718	54	Chapter 17	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-719	54	Chapter 18	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-720	54	Chapter 19	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-721	54	Chapter 20	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-722	54	Chapter 21	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-723	54	Chapter 22	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-724	54	Chapter 23	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-725	54	Chapter 24	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-726	54	Chapter 25	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0
-727	55	Chapter 1	ignored	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-728	55	Chapter 2	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-729	55	Chapter 3	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-730	55	Chapter 4	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-731	55	Chapter 5	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-732	55	Chapter 6	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-733	55	Chapter 7	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-734	55	Chapter 8	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-735	55	Chapter 9	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-736	55	Chapter 10	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-737	55	Chapter 11	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-738	55	Chapter 12	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-739	55	Chapter 13	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-740	55	Chapter 14	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-741	55	Chapter 15	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-742	55	Chapter 16	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-743	55	Chapter 17	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-744	55	Chapter 18	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-745	55	Chapter 19	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0
-746	56	Chapter 1	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-747	56	Chapter 2	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-748	56	Chapter 3	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-750	56	Chapter 5	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-754	56	Chapter 9	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-756	56	Chapter 11	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-757	56	Chapter 12	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-759	56	Chapter 14	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-761	56	Chapter 16	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-764	57	Chapter 3	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
-765	57	Chapter 4	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
-766	57	Chapter 5	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
-767	57	Chapter 6	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
-768	57	Chapter 7	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
-769	57	Chapter 8	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
-770	57	Chapter 9	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
-771	57	Chapter 10	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
-772	57	Chapter 11	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
-773	57	Chapter 12	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
-774	58	Chapter 1	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
-775	58	Chapter 2	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
-776	58	Chapter 3	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
-777	58	Chapter 4	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
-778	58	Chapter 5	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
-779	58	Chapter 6	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
-780	58	Chapter 7	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
-781	58	Chapter 8	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
-782	58	Chapter 9	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
-783	58	Chapter 10	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
-784	58	Chapter 11	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
-785	58	Chapter 12	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0
-788	59	Chapter 3	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-789	59	Chapter 4	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-790	59	Chapter 5	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-791	59	Chapter 6	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-792	59	Chapter 7	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-793	59	Chapter 8	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-794	59	Chapter 9	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-795	59	Chapter 10	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-796	59	Chapter 11	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-797	59	Chapter 12	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-798	59	Chapter 13	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-799	59	Chapter 14	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-800	59	Chapter 15	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-801	59	Chapter 16	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-802	59	Chapter 17	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-804	60	Chapter 2	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
-805	60	Chapter 3	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
-806	60	Chapter 4	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
-807	60	Chapter 5	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
-808	60	Chapter 6	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
-809	60	Chapter 7	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
-810	60	Chapter 8	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
-811	60	Chapter 9	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
-812	60	Chapter 10	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
-813	60	Chapter 11	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
-814	60	Chapter 12	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
-815	60	Chapter 13	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
-816	61	Chapter 1	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-817	61	Chapter 2	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-818	61	Chapter 3	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-819	61	Chapter 4	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-820	61	Chapter 5	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-821	61	Chapter 6	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-822	61	Chapter 7	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-823	61	Chapter 8	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-824	61	Chapter 9	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-825	61	Chapter 10	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-826	61	Chapter 11	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-827	61	Chapter 12	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-828	61	Chapter 13	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-829	61	Chapter 14	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-830	61	Chapter 15	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-831	61	Chapter 16	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-832	61	Chapter 17	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-833	61	Chapter 18	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-834	61	Chapter 19	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-835	61	Chapter 20	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-836	61	Chapter 21	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-837	61	Chapter 22	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0
-839	62	Chapter 2	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0
-840	62	Chapter 3	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0
-841	62	Chapter 4	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0
-842	62	Chapter 5	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0
-843	62	Chapter 6	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0
-844	63	Chapter 1	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-845	63	Chapter 2	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-846	63	Chapter 3	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-847	63	Chapter 4	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-848	63	Chapter 5	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-849	63	Chapter 6	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-850	63	Chapter 7	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-851	63	Chapter 8	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-852	63	Chapter 9	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-853	63	Chapter 10	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-854	63	Chapter 11	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-855	63	Chapter 12	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-856	63	Chapter 13	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-857	63	Chapter 14	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-858	63	Chapter 15	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-859	63	Chapter 16	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-860	63	Chapter 17	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-861	63	Chapter 18	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-862	63	Chapter 19	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-864	63	Chapter 21	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-865	63	Chapter 22	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-866	63	Chapter 23	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-867	63	Chapter 24	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-868	63	Chapter 25	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-869	63	Chapter 26	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-870	63	Chapter 27	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-871	63	Chapter 28	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-872	63	Chapter 29	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-887	66	Chapter 1	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-888	66	Chapter 2	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-889	66	Chapter 3	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-890	66	Chapter 4	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-891	66	Chapter 5	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-892	66	Chapter 6	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-893	66	Chapter 7	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-894	66	Chapter 8	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-895	66	Chapter 9	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-896	66	Chapter 10	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-897	66	Chapter 11	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-898	66	Chapter 12	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-899	66	Chapter 13	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-900	66	Chapter 14	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0
-904	67	Chapter 4	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-905	67	Chapter 5	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-906	67	Chapter 6	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-907	67	Chapter 7	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-908	67	Chapter 8	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-909	67	Chapter 9	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-910	67	Chapter 10	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-911	67	Chapter 11	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-912	67	Chapter 12	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-913	67	Chapter 13	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-914	67	Chapter 14	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-915	67	Chapter 15	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-916	67	Chapter 16	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-917	67	Chapter 17	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-918	68	Chapter 1	writing	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-919	68	Chapter 2	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-920	68	Chapter 3	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-921	68	Chapter 4	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-922	68	Chapter 5	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-923	68	Chapter 6	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-924	68	Chapter 7	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-925	68	Chapter 8	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-926	68	Chapter 9	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-927	68	Chapter 10	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-928	68	Chapter 11	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-929	68	Chapter 12	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-930	68	Chapter 13	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-931	68	Chapter 14	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-932	68	Chapter 15	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-933	68	Chapter 16	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-934	68	Chapter 17	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-935	68	Chapter 18	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-936	68	Chapter 19	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-937	68	Chapter 20	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-938	68	Chapter 21	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-939	68	Chapter 22	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-940	68	Chapter 23	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-941	68	Chapter 24	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-942	68	Chapter 25	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-943	68	Chapter 26	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-944	68	Chapter 27	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-945	68	Chapter 28	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-946	68	Chapter 29	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-947	68	Chapter 30	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-948	68	Chapter 31	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-949	68	Chapter 32	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-950	68	Chapter 33	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-951	68	Chapter 34	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-952	68	Chapter 35	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-953	68	Chapter 36	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-954	68	Chapter 37	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-955	68	Chapter 38	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-956	68	Chapter 39	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-957	68	Chapter 40	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-958	68	Chapter 41	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-959	68	Chapter 42	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-960	68	Chapter 43	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-961	68	Chapter 44	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0
-966	69	Chapter 5	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-967	69	Chapter 6	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-968	69	Chapter 7	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-969	69	Chapter 8	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-970	69	Chapter 9	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-971	69	Chapter 10	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-972	69	Chapter 11	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-973	69	Chapter 12	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-974	69	Chapter 13	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-975	69	Chapter 14	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-976	69	Chapter 15	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-977	69	Chapter 16	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-978	70	Chapter 1	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-979	70	Chapter 2	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-980	70	Chapter 3	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-981	70	Chapter 4	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-982	70	Chapter 5	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-983	70	Chapter 6	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-984	70	Chapter 7	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-985	70	Chapter 8	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-986	70	Chapter 9	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-987	70	Chapter 10	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-988	70	Chapter 11	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-989	70	Chapter 12	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-990	70	Chapter 13	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-991	70	Chapter 14	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-992	70	Chapter 15	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-993	70	Chapter 16	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-994	70	Chapter 17	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-995	70	Chapter 18	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-996	70	Chapter 19	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-997	70	Chapter 20	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-998	70	Chapter 21	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-999	70	Chapter 22	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1000	70	Chapter 23	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1001	70	Chapter 24	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1002	70	Chapter 25	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1003	70	Chapter 26	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1004	70	Chapter 27	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1005	70	Chapter 28	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1006	70	Chapter 29	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1007	70	Chapter 30	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1008	70	Chapter 31	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1009	70	Chapter 32	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1010	70	Chapter 33	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1011	70	Chapter 34	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1012	70	Chapter 35	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1013	70	Chapter 36	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1014	70	Chapter 37	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1015	70	Chapter 38	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1016	70	Chapter 39	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1017	70	Chapter 40	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1018	70	Chapter 41	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1019	70	Chapter 42	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1020	70	Chapter 43	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1021	70	Chapter 44	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1022	70	Chapter 45	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1023	70	Chapter 46	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1024	70	Chapter 47	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1025	70	Chapter 48	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1026	70	Chapter 49	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1027	70	Chapter 50	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1028	70	Chapter 51	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0
-1030	71	Chapter 2	ignored	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0
-1032	71	Chapter 4	ignored	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0
-1033	72	Chapter 1	writing	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0
-1034	72	Chapter 2	open	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0
-1035	72	Chapter 3	open	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0
-1038	73	Chapter 3	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
-1039	73	Chapter 4	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
-1040	73	Chapter 5	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
-1041	73	Chapter 6	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
-1042	73	Chapter 7	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
-1043	73	Chapter 8	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
-1044	73	Chapter 9	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
-1045	73	Chapter 10	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
-1046	73	Chapter 11	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
-1047	74	Chapter 1	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1048	74	Chapter 2	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1049	74	Chapter 3	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1050	74	Chapter 4	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1051	74	Chapter 5	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1052	74	Chapter 6	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1053	74	Chapter 7	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1054	74	Chapter 8	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1055	74	Chapter 9	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1056	74	Chapter 10	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1057	74	Chapter 11	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1058	74	Chapter 12	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1059	74	Chapter 13	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1060	74	Chapter 14	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1061	74	Chapter 15	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1062	74	Chapter 16	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1063	74	Chapter 17	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1064	74	Chapter 18	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1065	74	Chapter 19	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1066	74	Chapter 20	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1067	74	Chapter 21	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1068	74	Chapter 22	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1069	74	Chapter 23	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1070	74	Chapter 24	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1071	74	Chapter 25	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1072	74	Chapter 26	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1073	74	Chapter 27	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1074	74	Chapter 28	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1075	74	Chapter 29	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1076	74	Chapter 30	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1077	74	Chapter 31	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1078	74	Chapter 32	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1079	74	Chapter 33	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1080	74	Chapter 34	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1081	74	Chapter 35	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1082	74	Chapter 36	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0
-1083	75	Chapter 1	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1084	75	Chapter 2	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1085	75	Chapter 3	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1086	75	Chapter 4	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1087	75	Chapter 5	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1088	75	Chapter 6	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1089	75	Chapter 7	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1090	75	Chapter 8	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1091	75	Chapter 9	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1092	75	Chapter 10	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1093	75	Chapter 11	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1094	75	Chapter 12	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1095	75	Chapter 13	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1096	75	Chapter 14	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1097	75	Chapter 15	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1098	75	Chapter 16	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1099	75	Chapter 17	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1100	75	Chapter 18	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0
-1101	76	Chapter 1	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1102	76	Chapter 2	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1103	76	Chapter 3	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1104	76	Chapter 4	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1105	76	Chapter 5	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1106	76	Chapter 6	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1107	76	Chapter 7	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1108	76	Chapter 8	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1109	76	Chapter 9	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1110	76	Chapter 10	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1111	76	Chapter 11	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1112	76	Chapter 12	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1113	76	Chapter 13	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1114	76	Chapter 14	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1115	76	Chapter 15	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1116	76	Chapter 16	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1117	76	Chapter 17	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1118	76	Chapter 18	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1119	76	Chapter 19	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1120	76	Chapter 20	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1121	76	Chapter 21	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0
-1122	77	Chapter 1	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0
-1123	77	Chapter 2	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0
-1124	77	Chapter 3	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0
-1125	77	Chapter 4	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0
-1126	77	Chapter 5	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0
-1127	77	Chapter 6	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0
-1128	77	Chapter 7	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0
-1129	77	Chapter 8	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0
-1130	77	Chapter 9	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0
-1131	77	Chapter 10	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0
-1132	77	Chapter 11	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0
-1133	77	Chapter 12	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0
-1136	78	Chapter 3	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0
-1137	78	Chapter 4	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0
-1138	78	Chapter 5	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0
-1139	78	Chapter 6	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0
-1140	78	Chapter 7	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0
-1142	78	Chapter 9	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0
-1143	78	Chapter 10	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0
-1144	78	Chapter 11	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0
-1145	78	Chapter 12	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0
-1146	78	Chapter 13	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0
-1147	78	Chapter 14	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0
-1148	79	Chapter 1	writing	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1149	79	Chapter 2	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1150	79	Chapter 3	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1151	79	Chapter 4	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1152	79	Chapter 5	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1153	79	Chapter 6	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1154	79	Chapter 7	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1155	79	Chapter 8	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1156	79	Chapter 9	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1157	79	Chapter 10	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1158	79	Chapter 11	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1159	79	Chapter 12	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1160	79	Chapter 13	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1161	79	Chapter 14	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1162	79	Chapter 15	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1163	79	Chapter 16	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1164	79	Chapter 17	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1165	79	Chapter 18	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1166	79	Chapter 19	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1167	79	Chapter 20	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1168	79	Chapter 21	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0
-1169	80	Chapter 1	ignored	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1170	80	Chapter 2	ignored	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1171	80	Chapter 3	ignored	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1172	80	Chapter 4	writing	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1173	80	Chapter 5	writing	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1174	80	Chapter 6	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1175	80	Chapter 7	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1176	80	Chapter 8	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1177	80	Chapter 9	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1178	80	Chapter 10	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1179	80	Chapter 11	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1180	80	Chapter 12	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1181	80	Chapter 13	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1182	80	Chapter 14	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1183	80	Chapter 15	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1184	80	Chapter 16	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1185	80	Chapter 17	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1186	80	Chapter 18	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1187	80	Chapter 19	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1188	80	Chapter 20	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1189	80	Chapter 21	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1190	80	Chapter 22	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1191	80	Chapter 23	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1192	80	Chapter 24	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1193	80	Chapter 25	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1194	80	Chapter 26	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1195	80	Chapter 27	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1196	80	Chapter 28	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1197	80	Chapter 29	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1198	80	Chapter 30	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1199	80	Chapter 31	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1200	80	Chapter 32	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1201	80	Chapter 33	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1202	80	Chapter 34	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1203	80	Chapter 35	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1204	80	Chapter 36	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1205	80	Chapter 37	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1206	80	Chapter 38	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1207	80	Chapter 39	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1208	80	Chapter 40	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1209	80	Chapter 41	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1210	80	Chapter 42	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1211	80	Chapter 43	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1212	80	Chapter 44	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1213	80	Chapter 45	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1214	80	Chapter 46	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1215	80	Chapter 47	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0
-1216	81	Chapter 1	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0
-1217	81	Chapter 2	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0
-1218	81	Chapter 3	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0
-1219	81	Chapter 4	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0
-1220	81	Chapter 5	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0
-1221	81	Chapter 6	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0
-1222	81	Chapter 7	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0
-1223	81	Chapter 8	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0
-1224	81	Chapter 9	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0
-1225	81	Chapter 10	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0
-1226	81	Chapter 11	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0
-1227	81	Chapter 12	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0
-1228	82	Chapter 1	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1229	82	Chapter 2	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1230	82	Chapter 3	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1231	82	Chapter 4	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1232	82	Chapter 5	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1233	82	Chapter 6	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1234	82	Chapter 7	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1235	82	Chapter 8	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1236	82	Chapter 9	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1237	82	Chapter 10	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1238	82	Chapter 11	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1239	82	Chapter 12	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1240	82	Chapter 13	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1241	82	Chapter 14	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1242	82	Chapter 15	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1243	82	Chapter 16	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1244	82	Chapter 17	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1245	82	Chapter 18	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1246	82	Chapter 19	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1247	82	Chapter 20	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0
-1258	83	Chapter 11	open	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0
-1262	84	Chapter 2	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1263	84	Chapter 3	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1264	84	Chapter 4	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1265	84	Chapter 5	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1266	84	Chapter 6	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1267	84	Chapter 7	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1268	84	Chapter 8	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1269	84	Chapter 9	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1270	84	Chapter 10	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1271	84	Chapter 11	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1272	84	Chapter 12	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1273	84	Chapter 13	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1274	84	Chapter 14	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1275	84	Chapter 15	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1276	84	Chapter 16	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1277	84	Chapter 17	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1278	84	Chapter 18	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1279	84	Chapter 19	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1280	84	Chapter 20	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1282	85	Chapter 2	ignored	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
-1283	85	Chapter 3	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
-1285	85	Chapter 5	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
-1286	85	Chapter 6	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
-1287	85	Chapter 7	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
-1288	85	Chapter 8	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
-1289	85	Chapter 9	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
-1290	85	Chapter 10	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
-1291	85	Chapter 11	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
-1292	85	Chapter 12	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
-1293	86	Chapter 1	ignored	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1294	86	Chapter 2	writing	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1295	86	Chapter 3	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1296	86	Chapter 4	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1297	86	Chapter 5	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1298	86	Chapter 6	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1299	86	Chapter 7	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1300	86	Chapter 8	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1301	86	Chapter 9	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1302	86	Chapter 10	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1303	86	Chapter 11	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1304	86	Chapter 12	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1305	86	Chapter 13	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1306	86	Chapter 14	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1307	86	Chapter 15	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1308	86	Chapter 16	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1309	86	Chapter 17	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0
-1311	87	Chapter 2	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1312	87	Chapter 3	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1313	87	Chapter 4	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1314	87	Chapter 5	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1315	87	Chapter 6	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1316	87	Chapter 7	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1317	87	Chapter 8	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1318	87	Chapter 9	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1319	87	Chapter 10	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1320	87	Chapter 11	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1321	87	Chapter 12	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1322	87	Chapter 13	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1323	87	Chapter 14	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1324	87	Chapter 15	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1325	87	Chapter 16	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1326	87	Chapter 17	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1327	88	Chapter 1	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1328	88	Chapter 2	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1329	88	Chapter 3	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1332	88	Chapter 6	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1333	88	Chapter 7	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1334	88	Chapter 8	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1335	88	Chapter 9	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1336	88	Chapter 10	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1337	88	Chapter 11	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1338	88	Chapter 12	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1339	88	Chapter 13	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1340	88	Chapter 14	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1341	88	Chapter 15	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1342	88	Chapter 16	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1343	88	Chapter 17	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1344	88	Chapter 18	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1345	88	Chapter 19	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1346	88	Chapter 20	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1352	89	Chapter 6	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1354	89	Chapter 8	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1355	89	Chapter 9	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1356	89	Chapter 10	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1357	89	Chapter 11	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1358	89	Chapter 12	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1362	90	Chapter 1	writing	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1363	90	Chapter 2	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1364	90	Chapter 3	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1365	90	Chapter 4	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1366	90	Chapter 5	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1367	90	Chapter 6	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1368	90	Chapter 7	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1369	90	Chapter 8	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1370	90	Chapter 9	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1371	90	Chapter 10	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1372	90	Chapter 11	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1373	90	Chapter 12	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1374	90	Chapter 13	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1375	90	Chapter 14	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1376	90	Chapter 15	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0
-1377	91	Course 1	writing	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0
-1378	91	Course 2	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0
-1379	91	Course 3	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0
-1380	91	Course 4	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0
-1381	91	Course 5	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0
-1382	91	Course 6	writing	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0
-1383	92	Chapter 1	writing	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1384	92	Chapter 2	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1385	92	Chapter 3	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1386	92	Chapter 4	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1387	92	Chapter 5	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1388	92	Chapter 6	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1389	92	Chapter 7	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1390	92	Chapter 8	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1391	92	Chapter 9	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1392	92	Chapter 10	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1393	92	Chapter 11	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1394	92	Chapter 12	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1395	92	Chapter 13	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1396	92	Chapter 14	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1397	92	Chapter 15	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0
-1399	94	Chapter 1	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0
-1400	94	Chapter 2	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0
-1401	94	Chapter 3	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0
-1402	94	Chapter 4	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0
-1403	94	Chapter 5	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0
-1404	94	Chapter 6	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0
-1405	94	Chapter 7	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0
-1406	94	Chapter 8	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0
-1407	94	Chapter 9	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0
-1408	94	Chapter 10	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0
-1409	94	Chapter 11	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0
-1410	95	Chapter 1	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
-1411	95	Chapter 2	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
-1412	95	Chapter 3	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
-1420	97	Chapter 3	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1421	97	Chapter 4	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1422	97	Chapter 5	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1423	97	Chapter 6	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1424	97	Chapter 7	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1425	97	Chapter 8	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1426	97	Chapter 9	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1427	97	Chapter 10	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1428	97	Chapter 11	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1429	97	Chapter 12	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1430	97	Chapter 13	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1431	97	Chapter 14	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1432	97	Chapter 15	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1433	97	Chapter 16	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1434	97	Chapter 17	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1435	97	Chapter 18	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1436	97	Chapter 19	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1437	97	Chapter 20	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1438	97	Chapter 21	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1439	97	Chapter 22	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1440	97	Chapter 23	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1441	97	Chapter 24	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1442	97	Chapter 25	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1443	97	Chapter 26	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1444	97	Chapter 27	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1445	97	Chapter 28	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-113	22	Chapter 1	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-114	22	Chapter 2	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-115	22	Chapter 3	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-116	22	Chapter 4	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-117	22	Chapter 5	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-118	22	Chapter 6	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-120	22	Chapter 8	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-121	22	Chapter 9	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-122	22	Chapter 10	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-124	22	Chapter 12	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-252	30	Chapter 1	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-253	30	Chapter 2	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-254	30	Chapter 3	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-255	30	Chapter 4	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-256	30	Chapter 5	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-257	30	Chapter 6	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-258	30	Chapter 7	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-267	30	Chapter 16	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-268	30	Chapter 17	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0
-289	32	Chapter 2	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0
-290	32	Chapter 3	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0
-291	32	Chapter 4	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0
-293	32	Chapter 6	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0
-295	32	Chapter 8	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0
-296	32	Chapter 9	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0
-299	32	Chapter 12	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0
-300	33	Chapter 1	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0
-301	33	Chapter 2	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0
-302	33	Chapter 3	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0
-303	33	Chapter 4	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0
-304	33	Chapter 5	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0
-305	33	Chapter 6	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0
-306	33	Chapter 7	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0
-307	33	Chapter 8	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0
-308	33	Chapter 9	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0
-309	33	Chapter 10	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0
-310	33	Chapter 11	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0
-311	33	Chapter 12	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0
-340	36	Chapter 5	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-419	40	Chapter 1	writing	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0
-420	40	Chapter 2	writing	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0
-458	43	Chapter 1	writing	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
-459	43	Chapter 2	writing	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
-470	43	Chapter 13	writing	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0
-490	44	Chapter 20	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-494	44	Chapter 24	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-497	44	Chapter 27	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-624	49	Chapter 1	writing	\N	2024-07-28 09:45:01.922317	2024-07-28 09:45:01.922317	0
-627	50	Cauchy Schwarz Inequality	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0
-652	51	Chapter 15	writing	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0
-753	56	Chapter 8	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-787	59	Chapter 2	writing	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-838	62	Chapter 1	writing	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0
-886	65	Video 1	writing	\N	2024-07-28 09:45:04.811441	2024-07-28 09:45:04.811441	0
-962	69	Chapter 1	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-963	69	Chapter 2	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-964	69	Chapter 3	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-965	69	Chapter 4	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0
-1134	78	Chapter 1	writing	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0
-1135	78	Chapter 2	writing	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0
-1141	78	Chapter 8	writing	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0
-1248	83	Chapter 1	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0
-1249	83	Chapter 2	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0
-1250	83	Chapter 3	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0
-1251	83	Chapter 4	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0
-1252	83	Chapter 5	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0
-1253	83	Chapter 6	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0
-1254	83	Chapter 7	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0
-1255	83	Chapter 8	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0
-1256	83	Chapter 9	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0
-1257	83	Chapter 10	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0
-1259	83	Chapter 12	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0
-1260	83	Chapter 13	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0
-1261	84	Chapter 1	writing	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0
-1284	85	Chapter 4	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
-1398	93	Chapter 1	writing	\N	2024-07-28 09:45:10.333395	2024-07-28 09:45:10.333395	0
-1417	96	Chapter 1	writing	\N	2024-07-28 09:45:10.605868	2024-07-28 09:45:10.605868	0
-1447	98	Chapter 2	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1448	98	Chapter 3	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1449	98	Chapter 4	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1450	98	Chapter 5	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1451	98	Chapter 6	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1452	98	Chapter 7	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1453	98	Chapter 8	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1454	98	Chapter 9	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1455	98	Chapter 10	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1456	98	Chapter 11	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1457	98	Chapter 12	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1458	98	Chapter 13	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1459	98	Chapter 14	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1460	98	Chapter 15	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1462	98	Chapter 17	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-1463	98	Chapter 18	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0
-3	15	Chapter 3	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0
-46	18	Chapter 1	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-47	18	Chapter 2	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-48	18	Chapter 3	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-49	18	Chapter 4	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0
-65	19	Chapter 1	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-66	19	Chapter 2	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-67	19	Chapter 3	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0
-125	22	Chapter 13	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-126	22	Chapter 14	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-127	22	Chapter 15	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-128	22	Chapter 16	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0
-205	26	Chapter 1	writing	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0
-273	31	Chapter 1	writing	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0
-336	36	Chapter 1	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-337	36	Chapter 2	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0
-355	37	Chapter 1	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-356	37	Chapter 2	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-357	37	Chapter 3	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-358	37	Chapter 4	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-359	37	Chapter 5	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-361	37	Chapter 7	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-362	37	Chapter 8	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-368	37	Chapter 14	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-369	37	Chapter 15	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-370	37	Chapter 16	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-376	37	Chapter 22	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-377	37	Chapter 23	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-378	37	Chapter 24	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-379	37	Chapter 25	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0
-471	44	Chapter 1	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-472	44	Chapter 2	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-473	44	Chapter 3	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-474	44	Chapter 4	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-477	44	Chapter 7	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-1446	98	Chapter 1	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	1
-1461	98	Chapter 16	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	16
-478	44	Chapter 8	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-479	44	Chapter 9	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-480	44	Chapter 10	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-481	44	Chapter 11	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-482	44	Chapter 12	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-483	44	Chapter 13	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-484	44	Chapter 14	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-485	44	Chapter 15	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-486	44	Chapter 16	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-487	44	Chapter 17	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-488	44	Chapter 18	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-489	44	Chapter 19	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-491	44	Chapter 21	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-492	44	Chapter 22	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-493	44	Chapter 23	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-495	44	Chapter 25	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-496	44	Chapter 26	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0
-515	45	Chapter 2	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-516	45	Chapter 3	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0
-675	53	Chapter 1	writing	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0
-749	56	Chapter 4	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-751	56	Chapter 6	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-752	56	Chapter 7	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-755	56	Chapter 10	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-758	56	Chapter 13	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-760	56	Chapter 15	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0
-762	57	Chapter 1	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
-763	57	Chapter 2	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0
-786	59	Chapter 1	writing	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0
-803	60	Chapter 1	writing	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0
-863	63	Chapter 20	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0
-901	67	Chapter 1	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-902	67	Chapter 2	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-903	67	Chapter 3	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0
-1029	71	Chapter 1	writing	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0
-1031	71	Chapter 3	writing	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0
-1036	73	Chapter 1	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
-1037	73	Chapter 2	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0
-1281	85	Chapter 1	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0
-1310	87	Chapter 1	writing	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0
-1330	88	Chapter 4	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1331	88	Chapter 5	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0
-1347	89	Chapter 1	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1348	89	Chapter 2	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1349	89	Chapter 3	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1350	89	Chapter 4	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1351	89	Chapter 5	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1353	89	Chapter 7	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1359	89	Chapter 13	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1360	89	Chapter 14	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1361	89	Chapter 15	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0
-1413	95	Chapter 4	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
-1414	95	Chapter 5	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
-1415	95	Chapter 6	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
-1416	95	Chapter 7	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0
-1418	97	Chapter 1	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
-1419	97	Chapter 2	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0
+COPY flashback.sections (id, resource_id, state, reference, created, updated, "position", index, name_pattern_id) FROM stdin;
+37	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	1	1
+38	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	2	1
+39	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	3	1
+40	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	4	1
+41	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	5	1
+42	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	6	1
+43	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	7	1
+44	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	8	1
+45	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	9	1
+51	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	6	1
+70	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	6	1
+22	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	22	1
+57	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	12	1
+19	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	19	1
+91	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	27	1
+176	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	10	1
+173	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	7	1
+189	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	3	1
+161	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	29	1
+350	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	15	1
+278	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	6	1
+292	32	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	5	1
+271	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	20	1
+266	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	15	1
+315	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	4	1
+417	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	8	1
+390	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	36	1
+440	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	4	1
+366	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	12	1
+400	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	9	1
+391	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	37	1
+428	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	10	1
+453	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	17	1
+539	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	12	1
+576	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	33	1
+556	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	13	1
+529	46	writing	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	2	1
+578	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	35	1
+508	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	38	1
+534	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	7	1
+501	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	31	1
+545	47	ignored	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	2	1
+528	46	writing	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	1	1
+563	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	20	1
+555	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	12	1
+567	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	24	1
+507	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	37	1
+551	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	8	1
+532	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	5	1
+519	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	6	1
+663	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	3	1
+770	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	9	1
+764	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	3	1
+791	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	6	1
+775	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	2	1
+695	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	21	1
+794	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	9	1
+769	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	8	1
+839	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	2	1
+802	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	17	1
+815	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	13	1
+824	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	9	1
+841	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	4	1
+823	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	8	1
+822	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	7	1
+906	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	6	1
+909	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	9	1
+811	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	9	1
+814	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	12	1
+850	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	7	1
+853	63	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	10	1
+1091	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	9	1
+1075	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	29	1
+1108	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	8	1
+1269	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	9	1
+1307	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	15	1
+1268	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	8	1
+1263	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	3	1
+1289	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	9	1
+1313	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	4	1
+1262	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	2	1
+1287	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	7	1
+1312	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	3	1
+1373	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	12	1
+113	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	1	1
+1431	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	14	1
+1372	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	11	1
+120	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	8	1
+627	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	1	1
+886	65	writing	\N	2024-07-28 09:45:04.811441	2024-07-28 09:45:04.811441	0	1	4
+652	51	writing	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	15	1
+273	31	writing	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	1	1
+951	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	34	1
+758	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	13	1
+1128	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	7	1
+1284	85	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	4	1
+1136	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	3	1
+946	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	29	1
+1003	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	26	1
+1045	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	10	1
+1331	88	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	5	1
+929	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	12	1
+1175	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	7	1
+638	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	1	1
+940	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	23	1
+1018	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	41	1
+632	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	7	1
+658	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	21	1
+1422	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	5	1
+1415	95	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	6	1
+1004	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	27	1
+160	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	28	1
+644	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	7	1
+1368	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	7	1
+357	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	3	1
+1194	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	26	1
+1143	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	10	1
+1463	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	18	1
+307	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	8	1
+1162	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	15	1
+1030	71	ignored	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0	2	1
+1239	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	12	1
+803	60	writing	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	1	1
+305	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	6	1
+54	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	9	1
+181	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	15	1
+743	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	17	1
+10	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	10	1
+35	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	12	1
+963	69	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	2	1
+220	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	16	1
+1278	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	18	1
+1118	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	18	1
+1025	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	48	1
+241	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	1	1
+175	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	9	1
+1007	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	30	1
+596	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	53	1
+285	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	13	1
+50	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	5	1
+13	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	13	1
+1319	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	10	1
+1266	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	6	1
+1104	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	4	1
+487	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	17	1
+2	15	ignored	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	2	1
+699	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	25	1
+246	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	6	1
+75	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	11	1
+128	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	16	1
+1190	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	22	1
+714	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	13	1
+344	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	9	1
+1321	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	12	1
+745	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	19	1
+1078	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	32	1
+152	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	20	1
+1216	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	1	1
+1049	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	3	1
+355	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	1	1
+637	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	12	1
+1279	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	19	1
+1403	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	5	1
+747	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	2	1
+222	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	18	1
+1006	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	29	1
+1324	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	15	1
+1008	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	31	1
+777	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	4	1
+164	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	32	1
+1098	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	16	1
+1325	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	16	1
+922	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	5	1
+787	59	writing	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	2	1
+186	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	20	1
+750	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	5	1
+182	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	16	1
+977	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	16	1
+18	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	18	1
+27	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	4	1
+143	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	11	1
+496	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	26	1
+58	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	13	1
+228	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	4	1
+667	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	7	1
+668	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	8	1
+294	32	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	7	1
+481	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	11	1
+926	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	9	1
+645	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	8	1
+1009	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	32	1
+1460	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	15	1
+607	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	64	1
+438	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	2	1
+382	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	28	1
+258	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	7	1
+378	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	24	1
+483	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	13	1
+1349	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	3	1
+1050	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	4	1
+84	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	20	1
+799	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	14	1
+276	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	4	1
+646	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	9	1
+1259	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	12	1
+1044	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	9	1
+379	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	25	1
+320	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	9	1
+115	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	3	1
+1062	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	16	1
+942	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	25	1
+1458	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	13	1
+97	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	2	1
+108	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	2	1
+59	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	14	1
+589	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	46	1
+127	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	15	1
+1285	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	5	1
+1167	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	20	1
+682	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	8	1
+329	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	6	1
+1144	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	11	1
+816	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	1	1
+1447	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	2	1
+1398	93	writing	\N	2024-07-28 09:45:10.333395	2024-07-28 09:45:10.333395	0	1	1
+676	53	writing	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	2	1
+153	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	21	1
+1022	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	45	1
+778	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	5	1
+944	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	27	1
+214	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	10	1
+847	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	4	1
+419	40	writing	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	1	1
+1336	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	10	1
+664	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	4	1
+1170	80	ignored	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	2	1
+945	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	28	1
+1371	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	10	1
+948	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	31	1
+95	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	31	1
+1434	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	17	1
+259	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	8	1
+1203	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	35	1
+1250	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	3	1
+965	69	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	4	1
+172	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	6	1
+409	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	18	1
+840	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	3	1
+30	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	7	1
+521	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	8	1
+1378	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	2	3
+3	15	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	3	1
+1038	73	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	3	1
+936	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	19	1
+324	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	1	1
+981	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	4	1
+921	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	4	1
+1334	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	8	1
+1221	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	6	1
+1227	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	12	1
+249	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	9	1
+255	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	4	1
+1295	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	3	1
+1126	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	5	1
+1217	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	2	1
+296	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	9	1
+984	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	7	1
+639	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	2	1
+209	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	5	1
+74	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	10	1
+937	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	20	1
+1249	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	2	1
+868	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	25	1
+138	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	6	1
+34	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	11	1
+418	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	9	1
+947	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	30	1
+1411	95	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	2	1
+1229	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	2	1
+978	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	1	1
+972	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	11	1
+761	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	16	1
+407	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	16	1
+1084	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	2	1
+90	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	26	1
+904	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	4	1
+443	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	7	1
+387	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	33	1
+1337	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	11	1
+690	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	16	1
+526	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	13	1
+1209	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	41	1
+1428	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	11	1
+393	38	writing	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	2	1
+524	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	11	1
+312	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	1	1
+1151	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	4	1
+498	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	28	1
+862	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	19	1
+1185	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	17	1
+494	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	24	1
+469	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	12	1
+118	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	6	1
+683	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	9	1
+793	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	8	1
+608	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	1	1
+317	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	6	1
+1265	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	5	1
+702	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	1	1
+488	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	18	1
+126	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	14	1
+1101	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	1	1
+1048	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	2	1
+194	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	8	1
+360	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	6	1
+463	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	6	1
+476	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	6	1
+99	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	4	1
+629	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	4	1
+726	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	25	1
+374	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	20	1
+1146	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	13	1
+1215	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	47	1
+1210	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	42	1
+224	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	20	1
+719	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	18	1
+756	56	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	11	1
+318	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	7	1
+933	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	16	1
+647	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	10	1
+442	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	6	1
+354	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	19	1
+1296	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	4	1
+1238	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	11	1
+593	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	50	1
+12	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	12	1
+479	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	9	1
+293	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	6	1
+1354	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	8	1
+1120	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	20	1
+495	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	25	1
+1257	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	10	1
+154	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	22	1
+1283	85	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	3	1
+657	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	20	1
+234	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	10	1
+474	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	4	1
+1306	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	14	1
+899	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	13	1
+935	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	18	1
+675	53	writing	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	1	1
+748	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	3	1
+696	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	22	1
+969	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	8	1
+1179	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	11	1
+264	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	13	1
+1253	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	6	1
+270	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	19	1
+898	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	12	1
+435	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	6	1
+384	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	30	1
+1145	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	12	1
+351	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	16	1
+116	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	4	1
+970	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	9	1
+732	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	6	1
+837	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	22	1
+826	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	11	1
+431	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	2	1
+1226	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	11	1
+491	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	21	1
+911	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	11	1
+462	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	5	1
+734	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	8	1
+855	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	12	1
+1272	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	12	1
+1248	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	1	1
+436	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	7	1
+180	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	14	1
+1219	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	4	1
+967	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	6	1
+870	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	27	1
+1397	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	15	1
+626	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	2	1
+263	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	12	1
+836	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	21	1
+784	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	11	1
+470	43	writing	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	13	1
+711	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	10	1
+780	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	7	1
+768	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	7	1
+1036	73	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	1	1
+838	62	writing	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	1	1
+478	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	8	1
+149	23	writing	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	17	1
+1301	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	9	1
+577	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	34	1
+505	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	35	1
+280	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	8	1
+88	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	24	1
+188	25	writing	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	2	1
+461	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	4	1
+240	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	16	1
+1057	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	11	1
+328	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	5	1
+717	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	16	1
+525	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	12	1
+634	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	9	1
+1046	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	11	1
+1328	88	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	2	1
+650	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	13	1
+703	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	2	1
+226	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	2	1
+210	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	6	1
+48	18	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	3	1
+1161	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	14	1
+843	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	6	1
+710	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	9	1
+1016	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	39	1
+447	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	11	1
+298	32	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	11	1
+81	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	17	1
+1015	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	38	1
+954	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	37	1
+1218	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	3	1
+800	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	15	1
+204	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	18	1
+1021	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	44	1
+5	15	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	5	1
+1165	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	18	1
+1077	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	31	1
+456	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	20	1
+796	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	11	1
+1281	85	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	1	1
+1247	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	20	1
+531	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	4	1
+1429	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	12	1
+283	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	11	1
+1409	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	11	1
+807	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	5	1
+624	49	writing	\N	2024-07-28 09:45:01.922317	2024-07-28 09:45:01.922317	0	1	1
+546	47	writing	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	3	1
+1427	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	10	1
+686	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	12	1
+297	32	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	10	1
+361	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	7	1
+681	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	7	1
+1173	80	writing	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	5	1
+303	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	4	1
+1261	84	writing	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	1	1
+974	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	13	1
+829	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	14	1
+785	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	12	1
+472	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	2	1
+1406	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	8	1
+643	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	6	1
+444	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	8	1
+537	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	10	1
+233	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	9	1
+1149	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	2	1
+1370	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	9	1
+1115	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	15	1
+1401	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	3	1
+93	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	29	1
+89	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	25	1
+373	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	19	1
+252	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	1	1
+343	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	8	1
+31	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	8	1
+1383	92	writing	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	1	1
+1199	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	31	1
+1345	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	19	1
+1316	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	7	1
+723	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	22	1
+497	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	27	1
+1086	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	4	1
+155	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	23	1
+722	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	21	1
+953	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	36	1
+609	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	2	1
+416	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	7	1
+1286	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	6	1
+195	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	9	1
+1153	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	6	1
+1137	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	4	1
+1097	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	15	1
+199	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	13	1
+369	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	15	1
+1374	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	13	1
+441	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	5	1
+243	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	3	1
+1264	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	4	1
+902	67	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	2	1
+1309	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	17	1
+1142	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	9	1
+1047	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	1	1
+740	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	14	1
+1178	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	10	1
+892	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	6	1
+856	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	13	1
+1083	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	1	1
+230	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	6	1
+503	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	33	1
+1154	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	7	1
+78	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	14	1
+573	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	30	1
+1356	89	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	10	1
+1451	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	6	1
+994	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	17	1
+987	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	10	1
+1099	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	17	1
+852	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	9	1
+250	28	writing	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	10	1
+611	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	4	1
+621	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	14	1
+865	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	22	1
+1246	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	19	1
+1382	91	writing	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	6	3
+1206	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	38	1
+962	69	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	1	1
+106	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	11	1
+1200	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	32	1
+1010	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	33	1
+178	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	12	1
+795	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	10	1
+809	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	7	1
+585	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	42	1
+8	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	8	1
+934	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	17	1
+908	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	8	1
+1310	87	writing	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	1	1
+708	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	7	1
+455	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	19	1
+370	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	16	1
+684	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	10	1
+713	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	12	1
+1135	78	writing	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	2	1
+1205	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	37	1
+1156	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	9	1
+448	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	12	1
+930	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	13	1
+396	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	5	1
+1395	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	13	1
+701	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	27	1
+1092	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	10	1
+132	22	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	20	1
+514	45	ignored	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	1	1
+322	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	11	1
+1414	95	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	5	1
+1234	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	7	1
+854	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	11	1
+389	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	35	1
+1056	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	10	1
+916	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	16	1
+863	63	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	20	1
+114	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	2	1
+60	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	15	1
+1106	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	6	1
+1052	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	6	1
+1413	95	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	4	1
+289	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	2	1
+754	56	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	9	1
+518	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	5	1
+1299	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	7	1
+65	19	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	1	1
+583	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	40	1
+1202	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	34	1
+693	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	19	1
+1400	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	2	1
+98	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	3	1
+744	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	18	1
+715	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	14	1
+1462	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	17	1
+490	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	20	1
+527	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	14	1
+235	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	11	1
+1132	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	11	1
+763	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	2	1
+119	22	ignored	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	7	1
+306	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	7	1
+286	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	14	1
+376	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	22	1
+147	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	15	1
+480	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	10	1
+860	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	17	1
+338	36	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	3	1
+1066	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	20	1
+358	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	4	1
+412	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	3	1
+989	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	12	1
+26	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	3	1
+950	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	33	1
+564	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	21	1
+535	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	8	1
+72	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	8	1
+1168	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	21	1
+1159	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	12	1
+1260	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	13	1
+642	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	5	1
+232	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	8	1
+77	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	13	1
+725	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	24	1
+131	22	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	19	1
+310	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	11	1
+832	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	17	1
+907	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	7	1
+1001	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	24	1
+584	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	41	1
+746	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	1	1
+806	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	4	1
+353	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	18	1
+939	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	22	1
+834	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	19	1
+831	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	16	1
+813	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	11	1
+1164	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	17	1
+1298	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	6	1
+574	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	31	1
+1335	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	9	1
+1443	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	26	1
+225	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	1	1
+1305	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	13	1
+1344	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	18	1
+333	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	10	1
+1446	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	1	1	1
+174	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	8	1
+1375	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	14	1
+891	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	5	1
+134	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	2	1
+1430	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	13	1
+1297	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	5	1
+1419	97	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	2	1
+918	68	writing	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	1	1
+1241	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	14	1
+1293	86	ignored	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	1	1
+975	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	14	1
+36	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	13	1
+848	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	5	1
+1303	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	11	1
+430	41	writing	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	1	1
+102	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	7	1
+1292	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	12	1
+158	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	26	1
+533	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	6	1
+915	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	15	1
+459	43	writing	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	2	1
+207	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	3	1
+979	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	2	1
+123	22	ignored	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	11	1
+1418	97	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	1	1
+1180	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	12	1
+871	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	28	1
+385	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	31	1
+492	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	22	1
+1410	95	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	1	1
+544	47	ignored	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	1	1
+1442	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	25	1
+365	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	11	1
+704	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	3	1
+157	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	25	1
+606	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	63	1
+308	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	9	1
+618	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	11	1
+1072	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	26	1
+313	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	2	1
+1080	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	34	1
+140	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	8	1
+248	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	8	1
+137	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	5	1
+208	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	4	1
+614	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	7	1
+392	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	1	1
+24	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	1	1
+191	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	5	1
+966	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	5	1
+760	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	15	1
+94	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	30	1
+1055	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	9	1
+218	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	14	1
+49	18	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	4	1
+1188	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	20	1
+671	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	11	1
+580	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	37	1
+1131	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	10	1
+742	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	16	1
+912	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	12	1
+846	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	3	1
+938	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	21	1
+1037	73	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	2	1
+1158	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	11	1
+184	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	18	1
+87	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	23	1
+753	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	8	1
+477	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	7	1
+1300	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	8	1
+550	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	7	1
+394	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	3	1
+272	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	21	1
+781	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	8	1
+1437	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	20	1
+1362	90	writing	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	1	1
+867	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	24	1
+190	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	4	1
+858	63	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	15	1
+554	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	11	1
+424	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	6	1
+406	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	15	1
+670	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	10	1
+309	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	10	1
+849	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	6	1
+509	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	39	1
+1366	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	5	1
+1348	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	2	1
+919	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	2	1
+1067	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	21	1
+156	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	24	1
+1096	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	14	1
+932	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	15	1
+1273	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	13	1
+1408	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	10	1
+641	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	4	1
+475	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	5	1
+961	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	44	1
+1433	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	16	1
+888	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	2	1
+1235	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	8	1
+282	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	10	1
+733	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	7	1
+269	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	18	1
+261	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	10	1
+502	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	32	1
+117	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	5	1
+125	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	13	1
+257	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	6	1
+1122	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	1	1
+1426	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	9	1
+700	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	26	1
+1308	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	16	1
+1258	83	open	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	11	1
+1166	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	19	1
+587	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	44	1
+1444	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	27	1
+1090	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	8	1
+349	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	14	1
+187	25	writing	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	1	1
+914	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	14	1
+766	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	5	1
+728	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	2	1
+1150	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	3	1
+1119	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	19	1
+506	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	36	1
+1416	95	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	7	1
+242	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	2	1
+331	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	8	1
+1024	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	47	1
+913	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	13	1
+599	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	56	1
+677	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	3	1
+1461	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	16	16	1
+1232	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	5	1
+1028	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	51	1
+29	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	6	1
+4	15	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	4	1
+698	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	24	1
+96	20	writing	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	1	1
+466	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	9	1
+201	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	15	1
+844	63	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	1	1
+980	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	3	1
+1039	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	4	1
+1201	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	33	1
+631	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	6	1
+1314	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	5	1
+1196	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	28	1
+107	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	1	1
+6	15	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	6	1
+446	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	10	1
+749	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	4	1
+1163	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	16	1
+86	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	22	1
+1148	79	writing	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	1	1
+920	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	3	1
+1058	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	12	1
+219	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	15	1
+363	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	9	1
+1432	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	15	1
+66	19	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	2	1
+231	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	7	1
+340	36	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	5	1
+661	52	writing	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	1	1
+512	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	42	1
+1213	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	45	1
+356	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	2	1
+523	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	10	1
+458	43	writing	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	1	1
+1311	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	2	1
+414	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	5	1
+640	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	3	1
+368	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	14	1
+1053	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	7	1
+1452	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	7	1
+735	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	9	1
+538	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	11	1
+166	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	34	1
+595	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	52	1
+142	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	10	1
+924	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	7	1
+872	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	29	1
+410	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	1	1
+1140	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	7	1
+1054	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	8	1
+792	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	7	1
+1381	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	5	3
+896	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	10	1
+651	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	14	1
+381	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	27	1
+359	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	5	1
+1005	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	28	1
+597	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	54	1
+1291	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	11	1
+193	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	7	1
+1449	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	4	1
+1435	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	18	1
+1012	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	35	1
+730	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	4	1
+548	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	5	1
+1212	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	44	1
+217	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	13	1
+1087	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	5	1
+1457	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	12	1
+47	18	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	2	1
+709	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	8	1
+1105	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	5	1
+177	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	11	1
+1332	88	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	6	1
+727	55	ignored	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	1	1
+985	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	8	1
+1405	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	7	1
+810	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	8	1
+779	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	6	1
+1231	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	4	1
+1276	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	16	1
+1117	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	17	1
+110	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	4	1
+1251	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	4	1
+931	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	14	1
+145	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	13	1
+557	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	14	1
+1189	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	21	1
+718	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	17	1
+485	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	15	1
+623	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	16	1
+1364	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	3	1
+1439	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	22	1
+1388	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	6	1
+1081	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	35	1
+229	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	5	1
+1112	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	12	1
+559	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	16	1
+1315	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	6	1
+304	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	5	1
+1102	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	2	1
+788	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	3	1
+52	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	7	1
+1453	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	8	1
+1198	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	30	1
+633	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	8	1
+341	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	6	1
+450	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	14	1
+900	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	14	1
+405	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	14	1
+1195	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	27	1
+170	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	4	1
+762	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	1	1
+996	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	19	1
+712	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	11	1
+192	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	6	1
+1174	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	6	1
+513	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	43	1
+1197	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	29	1
+101	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	6	1
+473	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	3	1
+1063	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	17	1
+69	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	5	1
+1059	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	13	1
+679	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	5	1
+983	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	6	1
+375	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	21	1
+415	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	6	1
+976	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	15	1
+729	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	3	1
+1242	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	15	1
+680	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	6	1
+408	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	17	1
+1376	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	15	1
+1365	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	4	1
+782	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	9	1
+1160	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	13	1
+689	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	15	1
+1338	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	12	1
+1359	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	13	1
+982	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	5	1
+522	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	9	1
+1079	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	33	1
+674	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	14	1
+1445	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	28	1
+630	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	5	1
+11	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	11	1
+1152	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	5	1
+575	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	32	1
+1330	88	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	4	1
+1384	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	2	1
+821	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	6	1
+401	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	10	1
+1456	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	11	1
+1141	78	writing	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	8	1
+1329	88	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	3	1
+659	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	22	1
+739	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	13	1
+1094	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	12	1
+279	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	7	1
+9	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	9	1
+903	67	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	3	1
+1110	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	10	1
+741	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	15	1
+716	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	15	1
+897	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	11	1
+543	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	16	1
+736	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	10	1
+565	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	22	1
+566	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	23	1
+1130	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	9	1
+457	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	21	1
+85	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	21	1
+592	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	49	1
+1440	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	23	1
+281	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	9	1
+687	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	13	1
+1041	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	6	1
+553	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	10	1
+302	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	3	1
+288	32	ignored	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	1	1
+21	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	21	1
+622	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	15	1
+927	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	10	1
+1027	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	50	1
+774	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	1	1
+1385	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	3	1
+398	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	7	1
+635	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	10	1
+388	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	34	1
+1233	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	6	1
+165	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	33	1
+56	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	11	1
+151	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	19	1
+1346	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	20	1
+820	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	5	1
+1267	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	7	1
+992	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	15	1
+620	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	13	1
+894	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	8	1
+1357	89	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	11	1
+205	26	writing	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	1	1
+245	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	5	1
+67	19	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	3	1
+1326	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	17	1
+1020	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	43	1
+325	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	2	1
+895	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	9	1
+673	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	13	1
+1377	91	writing	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	1	3
+1127	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	6	1
+1060	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	14	1
+1017	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	40	1
+783	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	10	1
+484	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	14	1
+334	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	11	1
+558	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	15	1
+144	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	12	1
+1071	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	25	1
+540	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	13	1
+1224	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	9	1
+168	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	2	1
+471	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	1	1
+598	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	55	1
+1051	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	5	1
+1424	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	7	1
+287	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	15	1
+464	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	7	1
+1109	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	9	1
+167	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	1	1
+277	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	5	1
+290	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	3	1
+300	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	1	1
+1352	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	6	1
+662	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	2	1
+284	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	12	1
+1254	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	7	1
+342	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	7	1
+1133	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	12	1
+1441	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	24	1
+1271	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	11	1
+1035	72	open	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0	3	1
+367	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	13	1
+1073	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	27	1
+588	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	45	1
+1019	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	42	1
+46	18	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	1	1
+439	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	3	1
+206	26	writing	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	2	1
+1389	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	7	1
+586	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	43	1
+572	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	29	1
+53	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	8	1
+32	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	9	1
+336	36	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	1	1
+275	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	3	1
+247	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	7	1
+1412	95	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	3	1
+260	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	9	1
+423	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	5	1
+1240	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	13	1
+136	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	4	1
+139	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	7	1
+1459	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	14	1
+1182	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	14	1
+411	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	2	1
+869	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	26	1
+1033	72	writing	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0	1	1
+864	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	21	1
+425	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	7	1
+672	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	12	1
+825	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	10	1
+1454	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	9	1
+1040	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	5	1
+316	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	5	1
+731	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	5	1
+403	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	12	1
+1282	85	ignored	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	2	1
+256	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	5	1
+1350	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	4	1
+654	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	17	1
+332	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	9	1
+628	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	3	1
+33	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	10	1
+422	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	4	1
+549	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	6	1
+185	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	19	1
+653	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	16	1
+380	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	26	1
+215	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	11	1
+1275	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	15	1
+1107	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	7	1
+1339	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	13	1
+130	22	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	18	1
+1157	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	10	1
+23	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	23	1
+486	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	16	1
+612	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	5	1
+625	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	1	1
+1155	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	8	1
+617	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	10	1
+765	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	4	1
+1277	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	17	1
+552	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	9	1
+887	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	1	1
+959	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	42	1
+819	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	4	1
+314	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	3	1
+817	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	2	1
+386	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	32	1
+1274	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	14	1
+426	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	8	1
+433	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	4	1
+364	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	10	1
+1187	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	19	1
+299	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	12	1
+169	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	3	1
+1123	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	2	1
+1113	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	13	1
+605	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	62	1
+345	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	10	1
+92	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	28	1
+1317	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	8	1
+541	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	14	1
+971	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	10	1
+660	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	23	1
+910	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	10	1
+437	42	writing	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	1	1
+236	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	12	1
+941	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	24	1
+957	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	40	1
+1065	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	19	1
+998	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	21	1
+949	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	32	1
+197	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	11	1
+135	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	3	1
+493	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	23	1
+999	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	22	1
+1064	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	18	1
+707	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	6	1
+665	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	5	1
+454	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	18	1
+759	56	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	14	1
+482	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	12	1
+1193	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	25	1
+227	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	3	1
+500	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	30	1
+1204	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	36	1
+311	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	12	1
+73	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	9	1
+1169	80	ignored	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	1	1
+103	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	8	1
+1252	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	5	1
+1171	80	ignored	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	3	1
+1236	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	9	1
+1138	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	5	1
+1085	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	3	1
+121	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	9	1
+239	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	15	1
+1353	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	7	1
+1255	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	8	1
+420	40	writing	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	2	1
+1438	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	21	1
+1407	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	9	1
+561	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	18	1
+1322	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	13	1
+845	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	2	1
+755	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	10	1
+1031	71	writing	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0	3	1
+1184	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	16	1
+196	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	10	1
+291	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	4	1
+15	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	15	1
+1069	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	23	1
+1361	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	15	1
+1129	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	8	1
+859	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	16	1
+842	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	5	1
+767	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	6	1
+1367	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	6	1
+61	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	16	1
+1043	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	8	1
+244	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	4	1
+602	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	59	1
+1192	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	24	1
+1088	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	6	1
+1124	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	3	1
+691	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	17	1
+468	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	11	1
+697	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	23	1
+1243	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	16	1
+721	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	20	1
+251	29	open	\N	2024-07-28 09:44:57.91634	2024-07-28 09:44:57.91634	0	1	1
+1100	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	18	1
+705	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	4	1
+104	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	9	1
+1270	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	10	1
+1436	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	19	1
+1032	71	ignored	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0	4	1
+960	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	43	1
+171	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	5	1
+397	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	6	1
+604	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	61	1
+427	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	9	1
+786	59	writing	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	1	1
+347	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	12	1
+179	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	13	1
+562	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	19	1
+1455	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	10	1
+636	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	11	1
+1228	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	1	1
+321	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	10	1
+1387	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	5	1
+105	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	10	1
+402	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	11	1
+804	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	2	1
+445	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	9	1
+866	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	23	1
+889	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	3	1
+991	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	14	1
+1391	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	9	1
+776	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	3	1
+467	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	10	1
+327	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	4	1
+253	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	2	1
+1369	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	8	1
+692	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	18	1
+581	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	38	1
+14	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	14	1
+1177	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	9	1
+1121	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	21	1
+109	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	3	1
+133	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	1	1
+1343	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	17	1
+724	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	23	1
+1134	78	writing	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	1	1
+1323	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	14	1
+1237	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	10	1
+1222	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	7	1
+372	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	18	1
+1358	89	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	12	1
+339	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	4	1
+600	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	57	1
+772	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	11	1
+335	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	12	1
+603	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	60	1
+591	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	48	1
+808	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	6	1
+383	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	29	1
+301	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	2	1
+7	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	7	1
+1011	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	34	1
+757	56	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	12	1
+771	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	10	1
+827	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	12	1
+254	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	3	1
+1360	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	14	1
+377	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	23	1
+952	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	35	1
+159	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	27	1
+1402	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	4	1
+1399	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	1	1
+432	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	3	1
+986	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	9	1
+857	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	14	1
+619	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	12	1
+890	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	4	1
+1214	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	46	1
+20	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	20	1
+1394	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	12	1
+1347	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	1	1
+1341	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	15	1
+1061	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	15	1
+319	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	8	1
+1417	96	writing	\N	2024-07-28 09:45:10.605868	2024-07-28 09:45:10.605868	0	1	1
+1	15	ignored	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	1	1
+76	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	12	1
+1074	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	28	1
+517	45	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	4	1
+1111	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	11	1
+1082	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	36	1
+1392	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	10	1
+129	22	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	17	1
+203	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	17	1
+1181	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	13	1
+789	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	4	1
+346	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	11	1
+71	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	7	1
+267	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	16	1
+68	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	4	1
+1002	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	25	1
+773	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	12	1
+1023	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	46	1
+146	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	14	1
+80	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	16	1
+1172	80	writing	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	4	1
+861	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	18	1
+1208	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	40	1
+511	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	41	1
+162	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	30	1
+1351	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	5	1
+738	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	12	1
+1183	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	15	1
+797	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	12	1
+582	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	39	1
+1333	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	7	1
+1095	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	13	1
+1034	72	open	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0	2	1
+943	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	26	1
+1386	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	4	1
+330	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	7	1
+751	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	6	1
+237	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	13	1
+1220	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	5	1
+451	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	15	1
+262	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	11	1
+323	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	12	1
+337	36	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	2	1
+348	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	13	1
+1363	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	2	1
+504	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	34	1
+399	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	8	1
+238	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	14	1
+112	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	6	1
+560	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	17	1
+547	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	4	1
+818	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	3	1
+268	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	17	1
+1042	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	7	1
+613	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	6	1
+737	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	11	1
+1404	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	6	1
+569	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	26	1
+124	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	12	1
+615	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	8	1
+452	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	16	1
+798	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	13	1
+830	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	15	1
+200	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	14	1
+988	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	11	1
+1340	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	14	1
+964	69	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	3	1
+601	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	58	1
+590	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	47	1
+82	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	18	1
+990	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	13	1
+1396	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	14	1
+202	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	16	1
+685	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	11	1
+905	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	5	1
+1379	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	3	3
+973	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	12	1
+610	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	3	1
+79	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	15	1
+1425	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	8	1
+678	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	4	1
+812	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	10	1
+1390	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	8	1
+579	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	36	1
+510	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	40	1
+1448	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	3	1
+1176	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	8	1
+1186	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	18	1
+198	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	12	1
+17	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	17	1
+212	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	8	1
+28	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	5	1
+1116	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	16	1
+1290	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	10	1
+1089	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	7	1
+1380	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	4	3
+1070	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	24	1
+404	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	13	1
+1147	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	14	1
+720	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	19	1
+997	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	20	1
+917	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	17	1
+489	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	19	1
+1029	71	writing	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0	1	1
+1280	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	20	1
+515	45	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	2	1
+1068	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	22	1
+1256	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	9	1
+1000	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	23	1
+1245	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	18	1
+616	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	9	1
+1211	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	43	1
+1393	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	11	1
+706	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	5	1
+83	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	19	1
+63	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	18	1
+1230	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	3	1
+516	45	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	3	1
+571	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	28	1
+1423	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	6	1
+956	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	39	1
+666	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	6	1
+542	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	15	1
+395	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	4	1
+216	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	12	1
+1294	86	writing	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	2	1
+295	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	8	1
+958	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	41	1
+694	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	20	1
+213	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	9	1
+955	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	38	1
+1114	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	14	1
+274	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	2	1
+1304	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	12	1
+801	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	16	1
+163	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	31	1
+1302	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	10	1
+1103	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	3	1
+833	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	18	1
+669	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	9	1
+223	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	19	1
+352	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	17	1
+1244	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	17	1
+362	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	8	1
+221	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	17	1
+752	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	7	1
+1013	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	36	1
+688	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	14	1
+1288	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	8	1
+1207	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	39	1
+594	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	51	1
+460	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	3	1
+499	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	29	1
+265	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	14	1
+111	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	5	1
+1093	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	11	1
+1076	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	30	1
+851	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	8	1
+968	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	7	1
+16	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	16	1
+62	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	17	1
+893	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	7	1
+1318	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	9	1
+993	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	16	1
+326	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	3	1
+568	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	25	1
+371	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	17	1
+805	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	3	1
+655	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	18	1
+1327	88	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	1	1
+1139	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	6	1
+413	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	4	1
+1450	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	5	1
+649	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	12	1
+183	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	17	1
+100	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	5	1
+1225	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	10	1
+1223	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	8	1
+925	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	8	1
+150	23	writing	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	18	1
+1342	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	16	1
+656	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	19	1
+421	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	3	1
+429	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	11	1
+835	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	20	1
+25	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	2	1
+122	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	10	1
+141	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	9	1
+1355	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	9	1
+648	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	11	1
+570	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	27	1
+1026	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	49	1
+923	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	6	1
+995	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	18	1
+434	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	5	1
+211	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	7	1
+1420	97	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	3	1
+1320	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	11	1
+901	67	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	1	1
+1191	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	23	1
+1014	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	37	1
+1125	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	4	1
+530	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	3	1
+928	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	11	1
+536	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	9	1
+465	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	8	1
+449	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	13	1
+520	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	7	1
+64	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	19	1
+1421	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	4	1
+55	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	10	1
+148	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	16	1
+790	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	5	1
+828	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	13	1
 \.
 
 
@@ -19014,7 +19016,7 @@ SELECT pg_catalog.setval('flashback.resources_id_seq', 98, true);
 -- Name: section_types_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.section_types_id_seq', 3, true);
+SELECT pg_catalog.setval('flashback.section_types_id_seq', 4, true);
 
 
 --
@@ -19472,6 +19474,14 @@ ALTER TABLE ONLY flashback.resource_subjects
 
 ALTER TABLE ONLY flashback.resource_subjects
     ADD CONSTRAINT resource_subject_sid_pk FOREIGN KEY (subject_id) REFERENCES flashback.subjects(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: sections sections_name_pattern_id; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.sections
+    ADD CONSTRAINT sections_name_pattern_id FOREIGN KEY (name_pattern_id) REFERENCES flashback.section_name_patterns(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
