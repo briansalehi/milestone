@@ -122,10 +122,10 @@ end; $$;
 ALTER PROCEDURE flashback.create_note(IN resource_index integer, IN section_index integer, IN heading character varying) OWNER TO flashback;
 
 --
--- Name: create_note_with_name(character varying, character varying, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
+-- Name: create_note_with_name(character varying, integer, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
 --
 
-CREATE PROCEDURE flashback.create_note_with_name(IN resource_name character varying, IN section_name character varying, IN heading character varying)
+CREATE PROCEDURE flashback.create_note_with_name(IN resource_name character varying, IN index_value integer, IN heading character varying)
     LANGUAGE plpgsql
     AS $$
 declare resource_index integer;
@@ -136,7 +136,7 @@ declare block_index integer;
 declare record record;
 begin
     select r.id into resource_index from flashback.resources r where r.name = resource_name;
-    select s.id into section_index from flashback.sections s where s.headline = section_name and s.resource_id = resource_index;
+    select s.id into section_index from flashback.sections s where s.index = index_value and s.resource_id = resource_index;
     select s.state into section_state from flashback.sections s where s.id = section_index;
     insert into flashback.notes (section_id, heading) values (section_index, heading) returning id into note_index;
     insert into flashback.note_blocks (note_id, content, type, language, position) select note_index, t_content, t_type, t_language, row_number from temp_blocks;
@@ -146,7 +146,7 @@ begin
 end; $$;
 
 
-ALTER PROCEDURE flashback.create_note_with_name(IN resource_name character varying, IN section_name character varying, IN heading character varying) OWNER TO flashback;
+ALTER PROCEDURE flashback.create_note_with_name(IN resource_name character varying, IN index_value integer, IN heading character varying) OWNER TO flashback;
 
 --
 -- Name: create_practice(character varying, character varying, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
