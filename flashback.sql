@@ -171,22 +171,22 @@ end; $$;
 ALTER PROCEDURE flashback.create_practice(IN subject_name character varying, IN topic_name character varying, IN practice_heading character varying) OWNER TO flashback;
 
 --
--- Name: create_resource(integer, character varying, flashback.resource_type, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
+-- Name: create_resource(integer, character varying, flashback.resource_type, integer, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
 --
 
-CREATE PROCEDURE flashback.create_resource(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN resource_reference character varying DEFAULT NULL::character varying)
+CREATE PROCEDURE flashback.create_resource(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN pattern_index integer, IN resource_reference character varying DEFAULT NULL::character varying)
     LANGUAGE plpgsql
     AS $$
 declare resource_index integer;
 begin
-    insert into flashback.resources (name, reference, type) values (name_string, resource_reference, type_string) returning id into resource_index;
+    insert into flashback.resources (name, reference, type, section_pattern_id) values (name_string, resource_reference, type_string, pattern_index) returning id into resource_index;
     insert into flashback.resource_subjects (subject_id, resource_id) values (subject_index, resource_index);
-    insert into flashback.sections (resource_id, headline, reference) select resource_index, t_headline, t_reference from temp_sections;
+    insert into flashback.sections (resource_id, index, reference) select resource_index, t_index, t_reference from temp_sections;
     delete from temp_sections;
 end; $$;
 
 
-ALTER PROCEDURE flashback.create_resource(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN resource_reference character varying) OWNER TO flashback;
+ALTER PROCEDURE flashback.create_resource(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN pattern_index integer, IN resource_reference character varying) OWNER TO flashback;
 
 --
 -- Name: create_resource_with_sequenced_sections(integer, character varying, flashback.resource_type, integer, integer, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
@@ -196,12 +196,10 @@ CREATE PROCEDURE flashback.create_resource_with_sequenced_sections(IN subject_in
     LANGUAGE plpgsql
     AS $$
 declare resource_index integer;
-declare section_pattern varchar(50);
 begin
-    insert into flashback.resources (name, reference, type) values (name_string, resource_reference, type_string) returning id into resource_index;
+    insert into flashback.resources (name, reference, type, section_pattern_id) values (name_string, resource_reference, type_string, section_pattern_index) returning id into resource_index;
     insert into flashback.resource_subjects (subject_id, resource_id) values (subject_index, resource_index);
-    select pattern into section_pattern from flashback.section_name_patterns where id = section_pattern_index;
-    insert into flashback.sections (resource_id, headline) select resource_index, format('%s %s', section_pattern, generate_series(1, sections));
+    insert into flashback.sections (resource_id, index) select resource_index, generate_series(1, sections);
 end; $$;
 
 
@@ -899,7 +897,8 @@ CREATE TABLE flashback.resources (
     reference character varying(2000),
     type flashback.resource_type DEFAULT 'unknown'::flashback.resource_type NOT NULL,
     created timestamp without time zone DEFAULT now() NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
+    updated timestamp without time zone DEFAULT now() NOT NULL,
+    section_pattern_id integer
 );
 
 
@@ -957,8 +956,7 @@ CREATE TABLE flashback.sections (
     created timestamp without time zone DEFAULT now() NOT NULL,
     updated timestamp without time zone DEFAULT now() NOT NULL,
     "position" integer DEFAULT 0 NOT NULL,
-    index integer DEFAULT 0 NOT NULL,
-    name_pattern_id integer
+    index integer DEFAULT 0 NOT NULL
 );
 
 
@@ -2557,6 +2555,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1437	329	int main()\n{\n    std::vector<long> numbers{1,2,3,4,5};\n    std::vector<long>::iterator iter = numbers.begin();\n    std::ranges::for_each(iter, sentinel<long>{iter, 3}, [](auto e) { std::cout << e << " "; });\n}	code	txt	2024-07-28 09:59:40.220475	0
 1438	330	#include <algorithm>\n#include <vector>\n#include <list>	text	txt	2024-07-28 09:59:40.832086	0
 1439	330	int main()\n{\n    std::vector<long> random_access{1,2,3,4,5};\n    std::list<long> bidirectional{1,2,3,4,5};	text	txt	2024-07-28 09:59:40.854197	0
+1858	436	To use `std::atomic_flag` it must be initialized to `false` with the constant\n`ATOMIC_FLAG_INIT`.	text	txt	2024-07-28 10:00:52.292049	0
 1440	330	    auto random_access_iterator = random_access.begin();\n    random_access_iterator += 3; // OK\n    random_access_iterator++; // OK\n    ssize_t random_difference = random_access_iterator - random_access.begin(); // OK: 4	text	txt	2024-07-28 09:59:40.874647	0
 1441	330	    auto bidirectional_iterator = bidirectional.begin();\n    //bidirectional_iterator += 5; // ERROR\n    std::advance(bidirectional_iterator, 3); // OK\n    bidirectional_iterator++; // OK, all iterators provide advance operation\n    //ssize_t bidirectional_difference = bidirectional_iterator - bidirectional.begin(); // ERROR\n    ssize_t bidirectional_difference = std::distance(bidirectional.begin(), bidirectional_iterator); // OK: 4\n}	code	txt	2024-07-28 09:59:40.895484	0
 1442	331	The benefit of thinking about the returned value as the end iterator of a range is that it removes the potential for corner cases.	text	txt	2024-07-28 09:59:41.418384	0
@@ -2601,6 +2600,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1481	338	    std::ranges::swap(p1, p2);\n    // p1.get() == p1_pre, *p1 == 2\n    // p2.get() == p2_pre, *p2 == 1\n}	code	txt	2024-07-28 09:59:46.667347	0
 1482	339	| feature | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:59:47.191202	0
 1483	339	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:59:47.212849	0
+6463	2037	Window {\n    width: 200\n    height: 300\n    visible: true\n    title: qsTr("Note")	text	txt	2024-07-28 10:13:00.397911	0
 1484	339	int main()\n{\n    std::vector<long> numbers{1,2,3,4,5,6};\n    std::swap_ranges(numbers.begin(), numbers.begin()+2, numbers.rbegin());\n    // numbers: {6,5,3,4,2,1}\n}	code	txt	2024-07-28 09:59:47.234129	0
 1485	340	Implementing a `strict_weak_ordering` for a custom type, at minimum requires providing an overload of `operator<`.	text	txt	2024-07-28 09:59:48.163266	0
 1486	340	A good default for a `strict_weak_ordering` implementation is *lexicographical ordering*.	text	txt	2024-07-28 09:59:48.184156	0
@@ -2728,6 +2728,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1605	359	int main()\n{\n    std::ranges::includes({1,2,3,4,5}, {3,4});\n    // true\n}	code	txt	2024-07-28 10:00:03.896533	0
 1606	360	| `std::merge` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:04.694278	0
 1607	360	#include <algorithm>\n#include <execution>\n#include <iostream>\n#include <iterator>\n#include <ranges>\n#include <vector>\n#include <string>\n#include <map>	text	txt	2024-07-28 10:00:04.715084	0
+6413	2028	*RedSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'red'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:52.337901	0
 1608	360	int main()\n{\n    std::map<long, std::string> data1{{1, "first"}, {2, "first"}, {3, "first"}};\n    std::map<long, std::string> data2{{0, "second"}, {2, "second"}, {4, "second"}};\n    std::vector<std::pair<long, std::string>> result1, result2;\n    auto compare = [](auto const& left, auto const& right) { return left.first < right.first; };	text	txt	2024-07-28 10:00:04.735771	0
 1609	360	    std::ranges::merge(data1, data2, std::back_inserter(result1), compare);\n    std::ranges::for_each(result1, [](auto const& p) { std::cout << "{" << p.first << ", " << p.second << "} "; });\n    std::cout << "\\\\n";	text	txt	2024-07-28 10:00:04.756341	0
 1610	360	    std::merge(std::execution::par_unseq, data1.begin(), data1.end(), data2.begin(), data2.end(), std::back_inserter(result2), compare);\n    std::ranges::for_each(result2, [](auto const& p) { std::cout << "{" << p.first << ", " << p.second << "} "; });\n    std::cout << "\\\\n";\n}	code	txt	2024-07-28 10:00:04.777928	0
@@ -2982,7 +2983,6 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1855	435	1. Multithreading\n2. Sequencial Consistency\n3. Aquire-release Semantic\n4. Relaxed Semantic	text	txt	2024-07-28 10:00:51.091866	0
 1856	436	Spinlock mechanism can be implemented lock-free using atomic library.	text	txt	2024-07-28 10:00:52.248016	0
 1857	436	`std::atomic_flag` is an atomic boolean. It has a clear and a set state.\nThere are two methods in `std::atomic_flag`, the `clear()` which sets its\nvalue to `false`. Withe the `test_and_set()` method you can set the value\nback to `true` and return the previous value. There is no method to ask for\nthe current value.	text	txt	2024-07-28 10:00:52.269935	0
-1858	436	To use `std::atomic_flag` it must be initialized to `false` with the constant\n`ATOMIC_FLAG_INIT`.	text	txt	2024-07-28 10:00:52.292049	0
 1859	436	The `std::atomic_flag` has to be initialized with the statement\n`std::atomic_flag = ATOMIC_FLAG_INIT`. Other initialization contexts such as\n`std::atomic_flag{ATOMIC_FLAG_INIT}` are unspecified.	text	txt	2024-07-28 10:00:52.313109	0
 1860	436	#include <atomic>\n#include <thread>\n#include <chrono>	text	txt	2024-07-28 10:00:52.3345	0
 1861	436	class task_unit\n{\npublic:\n    void do_something()\n    {\n        lock();\n        std::this_thread::sleep_for(std::chrono::seconds{1});\n        unlock();\n    }	text	txt	2024-07-28 10:00:52.355119	0
@@ -3078,6 +3078,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1948	451	struct empty_stack : std::exception\n{\n    char const* what() const noexcept;\n};	text	txt	2024-07-28 10:01:06.213254	0
 1949	451	template<typename T>\nclass threadsafe_stack\n{\nprivate:\n    mutable std::mutex exclusive_lock;\n    std::stack<T> data;	text	txt	2024-07-28 10:01:06.234983	0
 1950	451	public:\n    threadsafe_stack() { }	text	txt	2024-07-28 10:01:06.255606	0
+6414	2028	*GreenSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'green'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:52.359123	0
 1951	451	    threadsafe_stack(threadsafe_stack const& other)\n    {\n        std::lock_guard<std::mutex> guard(other.exclusive_lock);\n        data = other;\n    }	text	txt	2024-07-28 10:01:06.276646	0
 1952	451	    threadsafe_stack& operator=(threadsafe_stack const&) = delete;	text	txt	2024-07-28 10:01:06.29775	0
 1953	451	    void push(T value)\n    {\n        std::lock_guard<std::mutex> guard(exclusive_lock);\n        data.push(value);\n    }	text	txt	2024-07-28 10:01:06.317783	0
@@ -3102,6 +3103,9 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1969	454	The `std::adopt_lock` parameter is supplied in addition to the mutex to\nindicate to the `std::lock_guard` objects that the mutexes are already\nlocked, and they should adopt the ownership of the existing lock on the mutex\nrather than attempt to lock the mutex in the constructor.	text	txt	2024-07-28 10:01:08.721253	0
 1970	455	It’s worth noting that locking any of the mutexes inside the call to\n`std::lock` can throw an exception; in this case, the exception is propagated\nout of `std::lock`. If `std::lock` has successfully acquired a lock on one\nmutex and an exception is thrown when it tries to acquire a lock on the other\nmutex, this first lock is released automatically. `std::lock` provides\nall-or-nothing semantics with regard to locking the supplied mutexes.	text	txt	2024-07-28 10:01:09.142334	0
 1971	455	C++17 provides additional support for this scenario, in the form of a new\nRAII template, `std::scoped_lock<>`. This is exactly equivalent to\n`std::lock_guard<>`, except that it is a variadic template, accepting a list\nof mutex types as template parameters, and a list of mutexes as constructor\narguments. The mutexes supplied to the constructor are locked using the same\nalgorithm as std::lock, so that when the constructor completes they are all\nlocked, and they are then all unlocked in the destructor.	text	txt	2024-07-28 10:01:09.164075	0
+3467	826	* `std::ios_base::app`\n* `std::ios_base::binary`\n* `std::ios_base::in`\n* `std::ios_base::out`\n* `std::ios_base::trunc`\n* `std::ios_base::ate`	text	txt	2024-07-28 10:04:55.212181	0
+3468	827	#include <fstream>	text	txt	2024-07-28 10:04:55.809739	0
+3469	827	int main()\n{\n    double buffer;\n    std::ifstream file("/tmp/sample.txt");	text	txt	2024-07-28 10:04:55.831116	0
 1972	456	`std::unique_lock` provides a bit more flexibility than `std::lock_guard` by\nrelaxing the invariants; an `std::unique_lock` instance doesn't always own\nthe mutex that it's associated with. First off, as you can pass\n`std::adopt_lock` as a second argument to the constructor to have the lock\nobject manage the lock on a mutex, you can also pass `std::defer_lock` as the\nsecond argument to indicate that the mutex should remain unlocked on\nconstruction. The lock can then be acquired later by `std::lock()` on the\n`std::unique_lock` object or by passing `std::unique_lock` object to\n`std::lock()`.	text	txt	2024-07-28 10:01:10.079399	0
 1973	456	class some_big_object;	text	txt	2024-07-28 10:01:10.100901	0
 1974	456	void swap(some_big_object& lhs, some_big_object& rhs);	text	txt	2024-07-28 10:01:10.122185	0
@@ -3344,6 +3348,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2209	511	    // coll1 (5 elems): ’love’ ’is’ ’all’ ’you’ ’need’\n    // coll2 (5 elems): ’’ ’’ ’’ ’’ ’’	text	txt	2024-07-28 10:01:46.866427	0
 2210	511	    // move assign the values from coll1 to coll2\n    // - not changing any size\n    std::move(coll1.begin(), coll1.end(),   // source range\n              coll2.begin());               // destination range	text	txt	2024-07-28 10:01:46.887362	0
 2211	511	    // coll1 (5 elems): ’?’ ’?’ ’?’ ’?’ ’?’\n    // coll2 (5 elems): ’love’ ’is’ ’all’ ’you’ ’need’	text	txt	2024-07-28 10:01:46.907874	0
+3470	827	    if (file.is_open())\n    {\n        file.read(reinterpret_cast<char*>(buffer), std::sizeof(buffer));	text	txt	2024-07-28 10:04:55.851641	0
 2212	511	    // move assign the first three values inside coll2 to the end\n    // - not changing any size\n    std::move_backward(coll2.begin(), coll2.begin()+3,  // source range\n                       coll2.end());                    // destination range	text	txt	2024-07-28 10:01:46.929923	0
 2213	511	    // coll1 (5 elems): ’?’ ’?’ ’?’ ’?’ ’?’\n    // coll2 (5 elems): ’?’ ’?’ ’love’ ’is’ ’all’\n}	code	txt	2024-07-28 10:01:46.949994	0
 2214	512	While iterating over elements of a container or range, each access to an\nelement uses `std::move()`. This might be significantly faster but it leaves\nthe element in a valid but unspecified state. You should not use an element\ntwice.	text	txt	2024-07-28 10:01:47.927288	0
@@ -3880,6 +3885,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2742	670	class Value\n{\n    long id;	text	txt	2024-07-28 10:03:10.752148	0
 2743	670	public:\n    [[nodiscard]] friend constexpr bool operator==(Value const& lhs, Value const& rhs) noexcept { return lhs.id == rhs.id; }\n    [[nodiscard]] friend constexpr bool operator!=(Value const& lhs, Value const& rhs) noexcept { return !(lhs == rhs); }\n    [[nodiscard]] friend constexpr bool operator< (Value const& lhs, Value const& rhs) noexcept { return lhs.id < rhs.id; }\n    [[nodiscard]] friend constexpr bool operator<=(Value const& lhs, Value const& rhs) noexcept { return !(lhs < rhs); }\n    [[nodiscard]] friend constexpr bool operator> (Value const& lhs, Value const& rhs) noexcept { return rhs < lhs; }\n    [[nodiscard]] friend constexpr bool operator>=(Value const& lhs, Value const& rhs) noexcept { return !(rhs < lhs); }\n};	code	txt	2024-07-28 10:03:10.774199	0
 2744	670	Since C++20 `operator ==` also implies `operator !=`, therefore, for `a` of\ntype `TypeA` and `b` of `TypeB`, the compiler will be able to compile `a !=\nb` if there is:	text	txt	2024-07-28 10:03:10.795724	0
+3471	827	        if (file.gcount == std::sizeof(buffer))\n            std::clog << "successfully read\\\\n";\n        else\n            std::clog << "failed to read completely\\\\n";	text	txt	2024-07-28 10:04:55.873657	0
 2745	670	- a freestanding `operator !=(TypeA, TypeB)`\n- a freestanding `operator ==(TypeA, TypeB)`\n- a freestanding `operator ==(TypeB, TypeA)`\n- a member function `TypeA::operator!=(TypeB)`\n- a member function `TypeA::operator==(TypeB)`\n- a member function `TypeB::operator==(TypeA)`	text	txt	2024-07-28 10:03:10.817156	0
 2746	670	Having both a freestanding and a member function is an ambiguity error.	text	txt	2024-07-28 10:03:10.838248	0
 2747	670	Since C++20 it is enough to declare `operator <=>` with `=default` so that\nthe defaulted member `operator <=>` generates a corresponding member\n`operator ==`:	text	txt	2024-07-28 10:03:10.85967	0
@@ -4012,6 +4018,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2869	687	By using concepts, we can even prefer some constraints over others. However,\nthis requires the use of concepts that **subsume** other concepts.	text	txt	2024-07-28 10:03:26.438343	0
 2870	688	Specifying concepts as a type constraint in template parameters:	text	txt	2024-07-28 10:03:27.327559	0
 2871	688	template<typename T>\nconcept is_pointer = std::is_pointer_v<T>;	text	txt	2024-07-28 10:03:27.349007	0
+3472	827	        file.close();\n    }\n}	code	txt	2024-07-28 10:04:55.894886	0
 2872	688	template <is_pointer T>\nauto print(T value)\n{\n    std::cout << value << '\\\\n';\n}	code	txt	2024-07-28 10:03:27.370309	0
 2873	688	Specifying concepts as a type constraint behind parameters with `auto`:	text	txt	2024-07-28 10:03:27.391413	0
 2874	688	template<typename T>\nconcept is_pointer = std::is_pointer_v<T>;	text	txt	2024-07-28 10:03:27.412601	0
@@ -4226,6 +4233,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4952	1407	**LDM** creates a complex hierarchical tree unifying system components, all\nperipheral devices, and their drivers. This tree is exposed to user space via\nthe *sysfs* pseudo-filesystem analogous to how *procfs* exposes some kernel\nand process/thread internal details to user space, and is typically mounted\nunder `/sys`.	text	txt	2024-07-28 10:08:58.621805	0
 4955	1409	A namespace contains the device type and major-minor pair, which form a\nhierarchy. Devices are organized within a tree-like hierarchy within the\nkernel. This hierarchy is first divided based on device type, block or char.\nWithin that we have n major numbers for each type, and each major number is\nfurther classified via some m minor numbers.	text	txt	2024-07-28 10:08:59.213212	0
 4958	1411	Only **Linux Assigned Names And Numbers Authority (LANANA)** can officially\nassign the device node (the type and `{major:minor}` numbers) to devices	text	txt	2024-07-28 10:09:00.04709	0
+3473	828	#include <fstream>\n#include <string>	text	txt	2024-07-28 10:04:56.550328	0
+3474	828	int main()\n{\n    std::string content{"this is a sample content"};\n    std::ofstream file("/tmp/sample.txt", std::ios::out);	text	txt	2024-07-28 10:04:56.571516	0
 4961	1411	A common problem is that of the namespace getting exhausted. Within the misc\nclass (`#10`) live a lot of devices and their corresponding drivers. In\neffect, they share the same major number and rely on a unique minor number to\nidentify themselves.	text	txt	2024-07-28 10:09:00.111256	0
 4964	1414	Critically, they organize and recognize the devices on them. If a new device\nsurfaces, like a pen drive, the USB bus driver will recognize the fact and\nbind it to its device driver.	text	txt	2024-07-28 10:09:00.805888	0
 4967	1416	Write a platform driver, register it with the kernel's `misc` framework and\nthe **platform bus**, a pseudo-bus infrastructure that supports devices that\ndo not physically reside on any physical bus. Several peripherals built into\na modern **SoC** are not on any physical bus, and thus their drivers are\ntypically platform drivers. To get started, look under the kernel source tree\nin `drivers/` for code invoking the `platform_driver_register()` API.	text	txt	2024-07-28 10:09:01.643041	0
@@ -4402,6 +4411,9 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3235	766	int main()\n{\n    std::string pattern{R"(^(?!#)(\\\\w+)\\\\s*=\\\\s*([\\\\w\\\\d]+[\\\\w\\\\d._,:-]*)$)"};\n    std::regex rx{pattern, std::regex_constants::icase};\n    std::smatch match{};	text	txt	2024-07-28 10:04:19.927348	0
 3236	766	    if (std::string variable, value; std::regex_search(text, match, rx))\n    {\n        variable = match[1];\n        value = match[2];\n    }\n}	code	txt	2024-07-28 10:04:19.948681	0
 3237	767	The iterators available in the regular expressions standard library are as follows:	text	txt	2024-07-28 10:04:21.174431	0
+3475	828	    try {\n        if (file.is_open())\n        {\n            file.write(content);\n            file.close();\n        }\n    }\n    catch (std::ios_base::failure const& exp)\n    {\n        std::cerr << exp.what() << std::endl;\n    }\n}	code	txt	2024-07-28 10:04:56.593005	0
+3476	829	#include <fstream>\n#include <vector>\n#include <string>	text	txt	2024-07-28 10:04:57.103578	0
+3477	829	int main()\n{\n    std::vector<unsigned char> buffer;\n    std::ifstream file("/tmp/sample.txt", std::ios::in);	text	txt	2024-07-28 10:04:57.124809	0
 3238	767	* `std::regex_interator`: A constant forward iterator used to iterate through the occurrences of a pattern in a string. It has a pointer to an `std::basic_regex` that must live until the iterator is destroyed. Upon creation and when incremented, the iterator calls `std::regex_search()` and stores a copy of the `std::match_results` object returned by the algorithm.\n* `std::regex_token_iterator`: A constant forward iterator used to iterate through the submatches of every match of a regular expression in a string. Internally, it uses a `std::regex_iterator` to step through the submatches. Since it stores a pointer to an `std::basic_regex` instance, the regular expression object must live until the iterator is destroyed.	text	txt	2024-07-28 10:04:21.198468	0
 3239	767	The token iterators can return the unmatched parts of the string if the index of the subexpressions is -1, in which case it returns an `std::match_results` object that corresponds to the sequence of characters between the last match and the end of the sequence:	text	txt	2024-07-28 10:04:21.219655	0
 3240	767	#include <string>\n#include <regex>	text	txt	2024-07-28 10:04:21.240654	0
@@ -4437,6 +4449,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3269	775	struct foo\n{\n    foo(foo const&) = delete;\n};	text	txt	2024-07-28 10:04:24.98173	0
 3270	775	void func(int) = delete;	code	txt	2024-07-28 10:04:25.001615	0
 3271	776	* **user defined constructor** inhibits **default constructor**: If a user-defined constructor exists, the default constructor is not generated by default.\n* **virtual destructor** inhibits **default constructor**: If a user-defined virtual destructor exists, the default constructor is not generated by default.\n* **user defined move constructor/assignment** inhibits **default copy constructor/assignment**: If a user-defined move constructor or move assignment operator exists, then the copy constructor and copy assignment operator are not generated by default.\n* **user defined copy constructor/assignment, move constructor/assignment, destructor** inhibits **default move constructor/assignment**: If a user-defined copy constructor, move constructor, copy assignment operator, move assignment operator, or destructor exists, then the move constructor and move assignment operator are not generated by default.\n* If a user-defined copy constructor or destructor exists, then the copy assignment operator is generated by default. <span style="color:green">(deprecated)</span>\n* If a user-defined copy assignment operator or destructor exists, then the copy constructor is generated by default. <span style="color:green">(deprecated)</span>	text	txt	2024-07-28 10:04:25.302873	0
+6415	2028	*BlueSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'blue'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:52.381328	0
 3272	776	The rule of thumb, also known as The Rule of Five, for class special member functions is that if you explicitly define any copy constructor, move constructor, copy assignment operator, move assignment operator, or destructor, then you must either explicitly define or default all of them.	text	txt	2024-07-28 10:04:25.324329	0
 3273	777	Declare the copy constructor and the copy assignment operator as `deleted`.	text	txt	2024-07-28 10:04:25.720582	0
 3274	777	class non_copyable\n{\npublic:\n    non_copyable() = default;\n    non_copyable(non_copyable const&) = delete;\n    non_copyable& operator =(non_copyable const&) = delete;\n};	code	txt	2024-07-28 10:04:25.742351	0
@@ -4618,17 +4631,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3464	824	typedef basic_ifstream<char>    ifstream;\ntypedef basic_ifstream<wchar_t> wifstream;\ntypedef basic_ofstream<char>    ofstream;\ntypedef basic_ofstream<wchar_t> wofstream;\ntypedef basic_fstream<char>     fstream;\ntypedef basic_fstream<wchar_t>  wfstream;	code	txt	2024-07-28 10:04:54.537982	0
 3465	825	All constructors except default constructor, call `open()` internally	text	txt	2024-07-28 10:04:54.876968	0
 3466	825	std::basic_fstream(const char*, std::ios_base::openmode);\nstd::basic_fstream(std::string const&, std::ios_base::openmode);\nstd::basic_fstream(std::filesystem::path::value_type const*, std::ios_base::openmode);\ntemplate <class Path> std::basic_fstream(Path const&, sdt::ios_base::openmode);	code	txt	2024-07-28 10:04:54.898252	0
-3467	826	* `std::ios_base::app`\n* `std::ios_base::binary`\n* `std::ios_base::in`\n* `std::ios_base::out`\n* `std::ios_base::trunc`\n* `std::ios_base::ate`	text	txt	2024-07-28 10:04:55.212181	0
-3468	827	#include <fstream>	text	txt	2024-07-28 10:04:55.809739	0
-3469	827	int main()\n{\n    double buffer;\n    std::ifstream file("/tmp/sample.txt");	text	txt	2024-07-28 10:04:55.831116	0
-3470	827	    if (file.is_open())\n    {\n        file.read(reinterpret_cast<char*>(buffer), std::sizeof(buffer));	text	txt	2024-07-28 10:04:55.851641	0
-3471	827	        if (file.gcount == std::sizeof(buffer))\n            std::clog << "successfully read\\\\n";\n        else\n            std::clog << "failed to read completely\\\\n";	text	txt	2024-07-28 10:04:55.873657	0
-3472	827	        file.close();\n    }\n}	code	txt	2024-07-28 10:04:55.894886	0
-3473	828	#include <fstream>\n#include <string>	text	txt	2024-07-28 10:04:56.550328	0
-3474	828	int main()\n{\n    std::string content{"this is a sample content"};\n    std::ofstream file("/tmp/sample.txt", std::ios::out);	text	txt	2024-07-28 10:04:56.571516	0
-3475	828	    try {\n        if (file.is_open())\n        {\n            file.write(content);\n            file.close();\n        }\n    }\n    catch (std::ios_base::failure const& exp)\n    {\n        std::cerr << exp.what() << std::endl;\n    }\n}	code	txt	2024-07-28 10:04:56.593005	0
-3476	829	#include <fstream>\n#include <vector>\n#include <string>	text	txt	2024-07-28 10:04:57.103578	0
-3477	829	int main()\n{\n    std::vector<unsigned char> buffer;\n    std::ifstream file("/tmp/sample.txt", std::ios::in);	text	txt	2024-07-28 10:04:57.124809	0
+6416	2028	*Main.qml*\nimport QtQuick	text	txt	2024-07-28 10:12:52.403381	0
 3478	829	    if (file.is_open())\n    {\n        buffer = std::vector<unsigned char>(std::istreambuf_iterator<char>(file), std::ifstreambuf_iterator<char>());\n        file.close();\n    }\n}	code	txt	2024-07-28 10:04:57.145902	0
 3479	830	#include <vector>\n#include <fstream>	text	txt	2024-07-28 10:04:57.726209	0
 3480	830	int main()\n{\n    std::vector<unsigned char> buffer;\n    std::ifstream file("/tmp/sample.txt", std::ios::in | std::ios::ate);	text	txt	2024-07-28 10:04:57.745947	0
@@ -4675,6 +4678,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3521	837	int main()\n{\n    point<int> p{4, 2};	text	txt	2024-07-28 10:05:02.956206	0
 3522	837	    {\n        using namespace geometry_literals;\n        point<int> origin{"0,0"_p};\n    }\n}	code	txt	2024-07-28 10:05:02.978564	0
 3523	838	Apart from *module interface partition*, there could also be internal\npartitions that do not export anything. Such partition unit is called a\n**module implementation partition**.	text	txt	2024-07-28 10:05:03.987289	0
+6417	2028	DarkSquare {\n    id: root\n    width: 200\n    height: 400	text	txt	2024-07-28 10:12:52.423434	0
 3524	838	It is possible to create internal partitions that do not export anything, but\ncontain code that can be used in the same module.	text	txt	2024-07-28 10:05:04.007724	0
 3525	838	modulename:partitionname;`.	text	txt	2024-07-28 10:05:04.027944	0
 3526	838	*geometry-details.cppm*\nmodule geometry:details;	text	txt	2024-07-28 10:05:04.049023	0
@@ -4869,6 +4873,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3720	899	    ed.assign(ed); // Okay\n    ed.assign(ei); // Error, ei is exact<int> but exact<double> is required	text	txt	2024-07-28 10:05:36.500405	0
 3721	899	    relaxed<double> rd{};\n    relaxed<int> ri{};	text	txt	2024-07-28 10:05:36.522722	0
 3722	899	    rd.assign(rd); // Okay\n    rd.assign(ri); // Okay, int is assignable to double\n}	code	txt	2024-07-28 10:05:36.544585	0
+6418	2028	    Column {\n        id: column\n        anchors.centerIn: parent\n        spacing: 8	text	txt	2024-07-28 10:12:52.44404	0
 3723	900	template<typename T>\nclass base\n{\npublic:\n    // copy constructor with implicit type conversion\n    // does not suppress implicit copy constructor.\n    // when T==U, implicit copy constructor is called.\n    template<typename U>\n    base(base<U> const& x);\n};	text	txt	2024-07-28 10:05:37.094127	0
 3724	900	int main()\n{\n    base<double> bd;\n    base<double> bd2{bd}; // calls implicitly generated copy constructor\n    base<int> bi(bd); // calls class template constructor\n}	code	txt	2024-07-28 10:05:37.115153	0
 3725	901	template<typename T>\nvoid f()\n{\n    T x = T();\n}	text	txt	2024-07-28 10:05:37.596207	0
@@ -4927,6 +4932,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3776	920	#include <tuple>	text	txt	2024-07-28 10:05:47.268289	0
 3777	920	std::tuple<T1, T2, T3,...> t;\nstd::tuple<T1, T2> tp(p);\nstd::tuple<T1, T2, T3,...> t1(vt); // copy constructor\nstd::tuple<T1, T2, T3,...> t2(rvt); // move constructor\nstd::tuple<T1, T2, T3,...> t3(v1, v2, v3,...);\nstd::tuple<T1, T2, T3,...> t4(rv1, rv2, rv3,...);	text	txt	2024-07-28 10:05:47.289331	0
 3779	921	#include <tuple>	text	txt	2024-07-28 10:05:47.667131	0
+6419	2028	        RedSquare {}\n        GreenSquare {}\n        BlueSquare {}\n    }\n}	code	txt	2024-07-28 10:12:52.465438	0
 3780	921	auto t1 = std::make_tuple(v1, v2, v3); // value semantics\nauto t2 = std::make_tuple(std::move(v1), std::move(v2), std::move(v3)); // move semantics\nauto t3 = std::make_tuple(std::ref(v1), std::ref(v2), std::ref(v3)); // reference semantics\nauto t4 = std::make_tuple(std::cref(v1), std::cref(v2), std::cref(v3));	code	txt	2024-07-28 10:05:47.688397	0
 3781	922	#include <tuple>	text	txt	2024-07-28 10:05:48.120442	0
 3782	922	int main()\n{\n    std::tuple<T1, T2, T3> t(value1, value2, value3);	text	txt	2024-07-28 10:05:48.140498	0
@@ -5635,6 +5641,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4440	1198	- Applications to install\n- Architecture to use\n- License restrictions	text	txt	2024-07-28 10:07:31.649612	0
 4441	1199	- Bootloader such as U-Boot, GRUB, Syslinux etc.\n- Linux kernel image with added or removed features as necessary\n- Root filesystem usually called rootfs containing the files\n- List of licenses of packages included in the rootfs\n- The source for distribution to comply on the copyleft requirements	text	txt	2024-07-28 10:07:31.914783	0
 4442	1200	The build system used within the Yocto Project is *Poky* which is composed by\na set of files to provide the information required for the build system to\nwork.	text	txt	2024-07-28 10:07:32.117567	0
+6420	2029	The `Grid` element arranges its children in a grid. By setting the `rows` and\n`columns` properties, the number of rows or columns can be constrained.	text	txt	2024-07-28 10:12:53.728167	0
 4443	1201	- **Metadata** tool is a collection of Shell and Python scripts, and a custom\n  configuration language, informing the steps needed to build, download the\n  source code and other tasks related to a specific software application or\n  library.\n- **BitBake** is the build orchastration tool, responsible to generate, order\n  and run the tasks based on the information gathered from the metadata\n  files.	text	txt	2024-07-28 10:07:32.412335	0
 4444	1202	There are two sub-modules in the Metadata component:	text	txt	2024-07-28 10:07:32.803753	0
 4445	1202	- **OpenEmbedded-Core:** the core infrastructure for the cross-compilation\n  environment and offers the basic set of applications, libraries and\n  utilities ready to used in Linux-based operating systems. Six different\n  processor architectures (ARM, ARM64, x86, x86-64, PowerPC, MIPS and MIPS64)\n  are supported in the system, and all tests and development is done using\n  emulated machines, on QEMU.\n- **Yocto Project's Specific Metadata:** provided by the Yocto Project to\n  configure the build system to fulfill Yocto Project needs and includes a\n  set of board support packages (BSP).	text	txt	2024-07-28 10:07:32.826769	0
@@ -6030,6 +6037,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4825	1362	For example, `add_work()` function is imperative and returns `0` for success or `-EBUSY` for failure.\nOn the other hand, `pci_dev_present()` function is a predicate and returns `1` if it succeeds in finding a matching device or `0` if it doesn't.	text	txt	2024-07-28 10:08:41.892103	0
 4826	1363	Depending on how important the message to print is, `printk()` allowed you to choose between eight log-level messages, defined in `include/linux/kern_levels.h`.	text	txt	2024-07-28 10:08:42.062227	0
 4827	1364	* `pr_<level>(...)`: This is used in regular modules that are not device drivers.\n* `dev_<level>(struct device *dev, ...)`: This is to be used in device drivers that are not network devices.\n* `netdev_<level>(struct net_device *dev, ...)`: This is used in `netdev` drivers exclusively.	text	txt	2024-07-28 10:08:42.301722	0
+6421	2029	By not setting either of them, the other is calculated from the number of\nchild items. For instance, setting rows to 3 and adding 6 child items will\nresult in 2 columns.	text	txt	2024-07-28 10:12:53.748249	0
+6422	2029	The properties `flow` and `layoutDirection` are used to control the order in\nwhich the items are added to the grid, while `spacing` controls the amount of\nspace separating the child items.	text	txt	2024-07-28 10:12:53.768613	0
 4828	1365	* `pr_devel`: Dead code not being compiled, unless `DEBUG` is defined.\n* `pr_debug`, `dev_dbg`, `netdev_dbg`: Used for debug messages.\n* `pr_info`, `dev_info`, `netdev_info`: Used for informational purposes, such as start up information at driver initialization.\n* `pr_notice`, `dev_notice`, `netdev_notice`: Nothing serious but notable. Often used to report security events.\n* `pr_warn`, `dev_warn`, `netdev_warn`: Nothing serious but might indicate problems.\n* `pr_err`, `dev_err`, `netdev_err`: An error condition, often used by drivers to indicate difficulties with hardware.\n* `pr_crit`, `dev_crit`, `netdev_crit`: A critical condition occured, such as a serious hardware/software failure.\n* `pr_alert`, `dev_alert`, `netdev_alert`: Something bad happened and action must be taken immediately.\n* `pr_emerg`, `dev_emerg`, `netdev_emerg`: The system is about to crash or is unstable.	text	txt	2024-07-28 10:08:42.659464	0
 4829	1366	Whenever a message is printed, the kernel compares the message log level with the current console log level;\nif the former is higher (lower value) than the last, the message will be immediately printed to the console.\nYou can check your log-level parameters with the following:	text	txt	2024-07-28 10:08:43.031412	0
 4830	1366	cat /proc/sys/kernel/printk	code	txt	2024-07-28 10:08:43.05172	0
@@ -6189,6 +6198,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5048	1440	* https://linuxtesting.org	text	txt	2024-07-28 10:09:14.266528	0
 5049	1441	uname -r	code	txt	2024-07-28 10:09:14.498011	0
 5050	1442	git log --date-order --graph --tags --simplify-by-decoration	code	txt	2024-07-28 10:09:14.78944	0
+6423	2029	*DarkSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'darkgray'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:53.789798	0
 5051	1443	1. The 5.x stable release is made. Thus, the merge window for the 5.x+1 (mainline) kernel has begun.\n2. The merge window remains open for about 2 weeks and new patches are merged into the mainline.\n3. Once (typically) 2 weeks have elapsed, the merge window is closed.\n4. rc (aka mainline, prepatch) kernels start. 5.x+1-rc1, 5.x+1-rc2, ..., 5.x+1-rcn are released. This process takes anywhere between 6 to 8 weeks.\n5. The stable release has arrived: the new 5.x+1 stable kernel is released.\n6. The release is handed off to the "stable team". Significant bug or security fixes result in the release of 5.x+1.y : 5.x+1.1, 5.x+1.2, ... , 5.x+1.n. Maintained until the next stable release or End Of Life (EOL) date reached.	text	txt	2024-07-28 10:09:15.160956	0
 5052	1444	* -next trees\n* prepatches, also known as -rc or mainline\n* stable kernels\n* distribution and LTS kernels\n* Super LTS (STLS) kernels	text	txt	2024-07-28 10:09:15.516974	0
 5053	1445	curl -L https://kernel.org - https://kernel.org/finger_banner	code	txt	2024-07-28 10:09:15.815612	0
@@ -6228,6 +6238,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5086	1469	This spinning will only happen on multi-core machines because, on a single-core machine, it cannot happen.	text	txt	2024-07-28 10:09:21.518881	0
 5087	1469	A *spinlock* is said to be a lock held by a CPU, in contrast to a *mutex* which is a lock held by a task.	text	txt	2024-07-28 10:09:21.532531	0
 5088	1470	A spinlock operates by disabling the scheduler on the local CPU.	text	txt	2024-07-28 10:09:21.686962	0
+6424	2029	*BlueSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'blue'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:53.809751	0
 5089	1470	This also means that a task currently running on that CPU cannot be preempted except by **interrupt requests (IRQs)** if they are not disabled on the local CPU.\nIn other words, spinlocks protect resources that only one CPU can take/access at a time.	text	txt	2024-07-28 10:09:21.699067	0
 5090	1470	This makes spinlocks suitable for **symmetrical multiprocessing (SMP)** safety and for executing atomic tasks.	text	txt	2024-07-28 10:09:21.714553	0
 5091	1471	A spinlock is created either statically using a `DEFINE_SPINLOCK` macro:	text	txt	2024-07-28 10:09:22.094339	0
@@ -6520,6 +6531,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5374	1606	sudo sudoreplay -l fromdate "last week" todate "next week" user christina	code	txt	2024-07-28 10:10:05.307001	0
 5375	1607	sudo sudoreplay -l user ammy or user jeana	code	txt	2024-07-28 10:10:05.544415	0
 5376	1608	sudo sudoreplay -l (command /usr/bin/sh or command /usr/bin/bash) user alisa	code	txt	2024-07-28 10:10:05.808431	0
+6425	2029	*Main.qml*\nimport QtQuick	text	txt	2024-07-28 10:12:53.830383	0
+6426	2029	DarkSquare {\n    id: root\n    width: 200\n    height: 400	text	txt	2024-07-28 10:12:53.85131	0
 5377	1609	Running shell scripts with sudo will leave lots of ways for unauthorized users to escalate their privileges.\n`sudo` is useful, but a sysadmin who understands when a specific tool won't solve their problem is more useful.	text	txt	2024-07-28 10:10:06.064521	0
 5378	1610	Download and install VirtualBox and the VirtualBox Extension Pack from https://www.virtualbox.org - https://www.virtualbox.org/.	text	txt	2024-07-28 10:10:09.781762	0
 5379	1610	Get version of installed VirtualBox:	text	txt	2024-07-28 10:10:09.802839	0
@@ -6878,6 +6891,13 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6369	2006	`Item` is the base element for all visual elements as such all other visual\nelements inherits from `Item`. The `Item` element is often used as a\ncontainer for other elements, similar to the div element in HTML.	text	txt	2024-07-28 10:12:41.39022	0
 5726	1669	While blocking certain types of ICMP packets is good, blocking all ICMP packets is bad.\nThe harsh reality is that certain types of ICMP messages are necessary for the proper functionality of the network.\nSince the drop all that’s not allowed rule that we’ll eventually create also blocks ICMP packets, we’ll need to create some rules that allow the types of ICMP messages that we have to have.	text	txt	2024-07-28 10:10:45.304398	0
 5727	1669	sudo iptables -A INPUT -m conntrack -p icmp --icmp-type 3 --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT\nsudo iptables -A INPUT -m conntrack -p icmp --icmp-type 11 --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT\nsudo iptables -A INPUT -m conntrack -p icmp --icmp-type 12 --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT	code	txt	2024-07-28 10:10:45.32629	0
+6427	2029	    Grid {\n        id: grid\n        rows: 2\n        columns: 2\n        anchors.centerIn: parent\n        spacing: 8	text	txt	2024-07-28 10:12:53.871733	0
+6428	2029	        BlueSquare {}\n        BlueSquare {}\n        BlueSquare {}\n        BlueSquare {}\n    }\n}	code	txt	2024-07-28 10:12:53.892526	0
+6429	2030	The direction of the flow is controlled using `flow` and `layoutDirection`.	text	txt	2024-07-28 10:12:55.080556	0
+6430	2030	As the items are added in the flow, they are wrapped to form new rows or columns as needed.	text	txt	2024-07-28 10:12:55.099269	0
+6431	2030	In order for a flow to work, it must have a width or a height. This can be set either directly, or though anchor layouts.	text	txt	2024-07-28 10:12:55.119952	0
+6432	2030	*DarkSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'darkgray'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:55.140568	0
+6433	2030	*BlueSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'blue'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:55.160475	0
 5728	1669	* `-m conntrack`: Use the conntrack module to allow packets that are in a certain state. This time, though, instead of just allowing packets from a host to which our server has been connected (`ESTABLISHED`,`RELATED`), we’re also allowing `NEW` packets that other hosts are sending to our server.\n* `-p icmp`: This refers to the ICMP protocol.\n* `--icmp-type`: There are quite a few types of ICMP messages:\n    + **type 3**: These are the **“destination unreachable”** messages. Not only can they tell your server that it can’t reach a certain host, but they can also tell it why. For example, if the server has sent out a packet that’s too large for a network switch to handle, the switch will send back an ICMP message that tells the server to fragment that large packet. Without ICMP, the server would have connectivity problems every time it tries to send out a large packet that needs to be broken up into fragments.\n    + **type 11**: **Time-exceeded** messages let your server know that a packet that it has sent out has either exceeded its **Time-to-Live (TTL)** value before it could reach its destination, or that a fragmented packet couldn’t be reassembled before the **TTL** expiration date.\n    + **type 12**: **Parameter problem** messages indicate that the server had sent a packet with a bad IP header. In other words, the IP header is either missing an option flag or it’s of an invalid length.\n    + **type 0** and **type 8**: These are the infamous ping packets. Actually, type 8 is the **echo request** packet that you would send out to ping a host, while type 0 is the **echo reply** that the host would return to let you know that it’s alive. Of course, allowing ping packets to get through could be a big help when troubleshooting network problems. If that scenario ever comes up, you could just add a couple of iptables rules to temporarily allow pings.\n    + **type 5**: Now, we have the infamous **redirect messages**. Allowing these could be handy if you have a router that can suggest more efficient paths for the server to use, but hackers can also use them to redirect you to someplace that you don’t want to go. So, just block them.	text	txt	2024-07-28 10:10:45.354128	0
 5729	1670	We can set a default `DROP` or `REJECT` policy for the `INPUT` chain, or we can leave the policy set to `ACCEPT` and create a `DROP` or `REJECT` rule at the end of the `INPUT` chain.\nWhich one you choose is really a matter of preference.	text	txt	2024-07-28 10:10:45.708289	0
 5730	1670	To create a `DROP` rule at the end of the `INPUT` chain, use this command:	text	txt	2024-07-28 10:10:45.72831	0
@@ -6911,6 +6931,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5859	1699	sudo firewall-cmd --reload	code	txt	2024-07-28 10:11:01.44174	0
 5758	1674	sudo ip6tables -A INPUT -p icmpv6 --icmpv6-type 134 -j ACCEPT # Router solicitation\nsudo ip6tables -A INPUT -p icmpv6 --icmpv6-type 135 -j ACCEPT # Router advertisement\nsudo ip6tables -A INPUT -p icmpv6 --icmpv6-type 136 -j ACCEPT # Neighbor solicitation\nsudo ip6tables -A INPUT -p icmpv6 --icmpv6-type 141 -j ACCEPT # Neighbor advertisement\nsudo ip6tables -A INPUT -p icmpv6 --icmpv6-type 142 -j ACCEPT	code	txt	2024-07-28 10:10:49.161407	0
 5759	1674	For times when you’re using security certificates to authenticate the routers that are attached to your network, you’ll also need to allow **Secure Neighbor Discovery** (SEND) messages:	text	txt	2024-07-28 10:10:49.182776	0
+6434	2030	*Main.qml*\nimport QtQuick	text	txt	2024-07-28 10:12:55.180513	0
+6435	2030	DarkSquare {\n    id: root\n    width: 300\n    height: 300	text	txt	2024-07-28 10:12:55.202283	0
 5760	1674	sudo ip6tables -A INPUT -p icmpv6 --icmpv6-type 148 -j ACCEPT # Inverse neighbor discovery solicitation\nsudo ip6tables -A INPUT -p icmpv6 --icmpv6-type 149 -j ACCEPT # Inverse neighbor discovery advertisement	code	txt	2024-07-28 10:10:49.203785	0
 5761	1674	We need to allow **Multicast Router Discovery** messages:	text	txt	2024-07-28 10:10:49.224909	0
 5762	1674	sudo ip6tables -A INPUT -p icmpv6 --icmpv6-type 151 -j ACCEPT\nsudo ip6tables -A INPUT -p icmpv6 --icmpv6-type 152 -j ACCEPT\nsudo ip6tables -A INPUT -p icmpv6 --icmpv6-type 153 -j ACCEPT	code	txt	2024-07-28 10:10:49.246135	0
@@ -6954,6 +6976,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5860	1700	sudo firewall-cmd --zone corp --add-service ssh --permanent\nsudo firewall-cmd --reload	code	txt	2024-07-28 10:11:01.707513	0
 5861	1701	sudo firewall-cmd --get-default	code	txt	2024-07-28 10:11:01.917477	0
 6041	1796	$y = f(x)$ ($y$ equals $f$ of $x$)	text	txt	2024-07-28 10:11:29.93286	0
+6436	2030	    Flow {\n        id: flow\n        anchors.fill: parent\n        anchors.margins: 10\n        spacing: 8	text	txt	2024-07-28 10:12:55.223462	0
+6437	2030	        BlueSquare {}\n        BlueSquare {}\n        BlueSquare {}\n        BlueSquare {}\n    }\n}	code	txt	2024-07-28 10:12:55.243422	0
 5800	1680	```\nsudo nft add rule inet ubuntu_filter input ct state established accept sudo nft add rule inet ubuntu_filter input tcp dport 22 ct state new accept sudo nft list table inet ubuntu_filter  table inet ubuntu_filter {  chain input {\ntype filter hook input priority 0; policy drop;\nct state established accept  tcp dport ssh ct state new accept  }  }\n``````	text	txt	2024-07-28 10:10:54.002568	0
 5801	1680	We forgot to create a rule to allow the loopback adapter to accept packets.\nSince we want this rule to be at the top of the rules list, we’ll use insert instead of add:	text	txt	2024-07-28 10:10:54.023719	0
 5802	1680	```\nsudo nft insert rule inet ubuntu_filter input iif lo accept sudo nft list table inet ubuntu_filter\ntable inet ubuntu_filter {  chain input {  type filter hook input priority 0; policy drop;\niif lo accept  ct state established accept  tcp dport ssh ct state new accept  }  }\n``````	text	txt	2024-07-28 10:10:54.04407	0
@@ -7525,32 +7549,6 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6410	2027	        RedSquare {}\n        GreenSquare {}\n        BlueSquare {}\n    }\n}	code	txt	2024-07-28 10:12:50.794159	0
 6411	2028	`spacing` property can be used to distance each of the child elements from\neach other.	text	txt	2024-07-28 10:12:52.29612	0
 6412	2028	*DarkSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'darkgray'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:52.316574	0
-6463	2037	Window {\n    width: 200\n    height: 300\n    visible: true\n    title: qsTr("Note")	text	txt	2024-07-28 10:13:00.397911	0
-6413	2028	*RedSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'red'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:52.337901	0
-6414	2028	*GreenSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'green'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:52.359123	0
-6415	2028	*BlueSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'blue'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:52.381328	0
-6416	2028	*Main.qml*\nimport QtQuick	text	txt	2024-07-28 10:12:52.403381	0
-6417	2028	DarkSquare {\n    id: root\n    width: 200\n    height: 400	text	txt	2024-07-28 10:12:52.423434	0
-6418	2028	    Column {\n        id: column\n        anchors.centerIn: parent\n        spacing: 8	text	txt	2024-07-28 10:12:52.44404	0
-6419	2028	        RedSquare {}\n        GreenSquare {}\n        BlueSquare {}\n    }\n}	code	txt	2024-07-28 10:12:52.465438	0
-6420	2029	The `Grid` element arranges its children in a grid. By setting the `rows` and\n`columns` properties, the number of rows or columns can be constrained.	text	txt	2024-07-28 10:12:53.728167	0
-6421	2029	By not setting either of them, the other is calculated from the number of\nchild items. For instance, setting rows to 3 and adding 6 child items will\nresult in 2 columns.	text	txt	2024-07-28 10:12:53.748249	0
-6422	2029	The properties `flow` and `layoutDirection` are used to control the order in\nwhich the items are added to the grid, while `spacing` controls the amount of\nspace separating the child items.	text	txt	2024-07-28 10:12:53.768613	0
-6423	2029	*DarkSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'darkgray'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:53.789798	0
-6424	2029	*BlueSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'blue'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:53.809751	0
-6425	2029	*Main.qml*\nimport QtQuick	text	txt	2024-07-28 10:12:53.830383	0
-6426	2029	DarkSquare {\n    id: root\n    width: 200\n    height: 400	text	txt	2024-07-28 10:12:53.85131	0
-6427	2029	    Grid {\n        id: grid\n        rows: 2\n        columns: 2\n        anchors.centerIn: parent\n        spacing: 8	text	txt	2024-07-28 10:12:53.871733	0
-6428	2029	        BlueSquare {}\n        BlueSquare {}\n        BlueSquare {}\n        BlueSquare {}\n    }\n}	code	txt	2024-07-28 10:12:53.892526	0
-6429	2030	The direction of the flow is controlled using `flow` and `layoutDirection`.	text	txt	2024-07-28 10:12:55.080556	0
-6430	2030	As the items are added in the flow, they are wrapped to form new rows or columns as needed.	text	txt	2024-07-28 10:12:55.099269	0
-6431	2030	In order for a flow to work, it must have a width or a height. This can be set either directly, or though anchor layouts.	text	txt	2024-07-28 10:12:55.119952	0
-6432	2030	*DarkSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'darkgray'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:55.140568	0
-6433	2030	*BlueSquare.qml*\nRectangle {\n    id: root\n    width: 95\n    height: 95\n    color: 'blue'\n    border.color: Qt.lighter(color)\n}	code	txt	2024-07-28 10:12:55.160475	0
-6434	2030	*Main.qml*\nimport QtQuick	text	txt	2024-07-28 10:12:55.180513	0
-6435	2030	DarkSquare {\n    id: root\n    width: 300\n    height: 300	text	txt	2024-07-28 10:12:55.202283	0
-6436	2030	    Flow {\n        id: flow\n        anchors.fill: parent\n        anchors.margins: 10\n        spacing: 8	text	txt	2024-07-28 10:12:55.223462	0
-6437	2030	        BlueSquare {}\n        BlueSquare {}\n        BlueSquare {}\n        BlueSquare {}\n    }\n}	code	txt	2024-07-28 10:12:55.243422	0
 6438	2031	An element often used with positioners is the `Repeater`. It works like a\nfor-loop and iterates over a model. In the simplest case a model is just a\nvalue providing the number of loops.	text	txt	2024-07-28 10:12:56.931724	0
 6439	2031	Repeaters are best used when having a small amount of static data to be\npresented.	text	txt	2024-07-28 10:12:56.95334	0
 6440	2031	A repeater injects the `index` property into the repeater. It contains the\ncurrent loop-index.	text	txt	2024-07-28 10:12:56.975531	0
@@ -9490,6 +9488,7 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 1297	420	What is an <code>eBPF</code> map?	open	2024-07-28 10:08:16.055989	2024-07-28 10:08:16.055989
 1298	901	Download the Linux kernel for building?	open	2024-07-28 10:08:16.885521	2024-07-28 10:08:16.885521
 1299	901	Describe each directory in the kernel source tree?	open	2024-07-28 10:08:17.48606	2024-07-28 10:08:17.48606
+2146	256	Use the contents of a buffer for standard input or output:	open	2024-07-28 10:13:41.774368	2024-07-28 10:13:41.774368
 1300	901	What assumptions and flags are enabled by <code>kbuild</code> infrastructure based on the target architecture?	open	2024-07-28 10:08:17.911128	2024-07-28 10:08:17.911128
 1301	901	What <code>make</code> target options can be used to configure the kernel?	open	2024-07-28 10:08:18.224362	2024-07-28 10:08:18.224362
 1302	901	Where will be the kernel configurations stored?	open	2024-07-28 10:08:18.398435	2024-07-28 10:08:18.398435
@@ -10336,7 +10335,6 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 2143	256	Use the shorthand for current filename in command prompt:	open	2024-07-28 10:13:41.189846	2024-07-28 10:13:41.189846
 2144	256	Change current filename by filename modifiers:	open	2024-07-28 10:13:41.360776	2024-07-28 10:13:41.360776
 2145	256	Start an interactive shell in Vim:	open	2024-07-28 10:13:41.528902	2024-07-28 10:13:41.528902
-2146	256	Use the contents of a buffer for standard input or output:	open	2024-07-28 10:13:41.774368	2024-07-28 10:13:41.774368
 2147	256	Filter the contents of a buffer through an external command:	open	2024-07-28 10:13:41.987543	2024-07-28 10:13:41.987543
 2148	256	Use a {motion} to filter then contents of a buffer through an external command:	open	2024-07-28 10:13:42.162877	2024-07-28 10:13:42.162877
 2149	257	Inspect buffer list:	open	2024-07-28 10:13:42.36548	2024-07-28 10:13:42.36548
@@ -16614,104 +16612,104 @@ COPY flashback.resource_subjects (resource_id, subject_id) FROM stdin;
 -- Data for Name: resources; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
-COPY flashback.resources (id, name, reference, type, created, updated) FROM stdin;
-1	https://www.youtube.com	https://youtube.com	video	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413
-2	https://www.youtu.be	https://youtube.com	video	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413
-3	https://www.boost.org	https://boost.org	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413
-4	https://www.latex-tutorial.com	https://latex-tutorial.com	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413
-5	https://www.qt.io	https://qt.io	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413
-6	GDB Tips by Greg Law	\N	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413
-7	Daily C++ Bites	\N	mailing list	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413
-8	C++ Daily Bites	\N	mailing list	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413
-9	https://www.cppstories.com	https://www.cppstories.com	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413
-10	https://en.cppreference.com	https://www.cppstories.com	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413
-11	mdadm(1)	Unix Manual	manual	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413
-12	LinkedIn Course: C++ Design Patterns: Creational by Olivia Chiu Stone	https://www.linkedin.com	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413
-13	Kevin Dankwardt's Linux Device Drivers	https://www.linkedin.com/learning/linux-device-drivers	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413
-14	LinkedIn Course: Linux Device Drivers	https://linkedin.com	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413
-15	Learning OpenCV 3	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-16	Calculus: Concepts and Contexts	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-17	Qt6 Deep Dive	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-18	Mastering Embedded Linux Programming	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-19	Teach Yourself C++ in One Hour a Day	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-20	C++20 STL Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-21	Mastering OpenCV 3	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-22	A Common-Sense Guide to Data Structures and Algorithms	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-23	Professional C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-24	Pro Tbb: C++ Parallel Programming with Threading Building Blocks	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-25	Hands-On Design Patterns with C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-26	Learn PostgreSQL	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-27	Docker for Developers	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-28	C++17 STL Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-29	PostgreSQL 13 Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-30	Practical Vim	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-31	OpenCV 4 Computer Vision Programming Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-32	Linux Security and Administration	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-33	Linux System Programming Techniques	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-34	Linux Driver Development for Embedded Processors	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-35	Demystifying Cryptography with OpenSSL 3.0	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-36	C++20: The Complete Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-37	Udemy: SQL and PostgreSQL - The Complete Developer's Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-38	Linux Service Management Made Easy with systemd	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-39	C++20: Get the Details	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-40	Learning eBPF	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-41	Linux Kernel Programming Part 2	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-42	Beginning C++23: From Novice to Professional	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-43	Linux Kernel Programming	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-44	Beginning x64 Assembly Programming	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-45	Docker: Up & Running	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-46	Docker in Practice	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-47	The Linux Programming Interface	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-48	CMake Best Practices	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-49	Linux Device Driver	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-50	Introduction to Linear and Matrix Algebra	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-51	Extreme C	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-52	Mastering Linux Device Driver Development	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-53	The Shellcoder's Handbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-54	Design Patterns in Modern C++20	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-55	The C++ Standard Library	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-56	Docker Deep Dive	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-57	Modern C++ Programming Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-58	Step by Step Learning x64 Assembly Language	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-59	Embedded Linux Development Using Yocto Project	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-60	Practical Binary Analysis	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-61	Learn Docker in a month of Lunches	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-62	Boost.Asio C++ Network Programming Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-63	C++17: The Complete Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-65	Offensive Security Wireless Professional (OSWP)	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-66	Kali Linux Penetration Testing Bible	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-67	Linux Device Driver Development	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-68	The C++ Programming Language	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-69	Mastering Linux Security and Hardening	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-70	The Art of PostgreSQL	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-71	Heading for the Yocto Project	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-72	Introducing Qt6	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-73	C++ Concurrency in Action	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-74	Professional CMake	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-75	Mastering Kali Linux For Advanced Penetration Testing	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-76	Deciphering Object-Oriented Programming with C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-77	Linux Kernel Debugging	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-78	Hands-On Network Programming with C	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-79	Data Abstraction & Problem Solving with C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-80	Udemy - The C++20 Master Class	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-81	PostgreSQL 14 Administration Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-82	Linux Kernel Development	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-83	Sudo Mastery	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-84	A Complete Guide to Standard C++ Algorithms	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-85	Cross-Platform Development with Qt6 and Modern C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-86	Concurrency with Modern C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-87	Thomas' Calculus	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-88	Qt6 QML	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-89	C++ Move Semantics: The Complete Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-90	CMake Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-91	Embedded Linux Full Course by Anisa Institute	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-92	Hands-On Mobile and Embedded Development with Qt5	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-93	GNU Pocket Reference	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-94	Mastering Linux Kernel Development	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-95	Boost.Asio C++ Network Programming 	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-96	Embedded Linux using Yocto	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-97	C++ Templates: The Complete Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368
-98	Modern CMake for C++	https://subscription.packtpub.com/book/programming/9781805121800	book	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115
+COPY flashback.resources (id, name, reference, type, created, updated, section_pattern_id) FROM stdin;
+1	https://www.youtube.com	https://youtube.com	video	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
+2	https://www.youtu.be	https://youtube.com	video	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
+3	https://www.boost.org	https://boost.org	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
+4	https://www.latex-tutorial.com	https://latex-tutorial.com	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
+5	https://www.qt.io	https://qt.io	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
+6	GDB Tips by Greg Law	\N	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
+7	Daily C++ Bites	\N	mailing list	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
+8	C++ Daily Bites	\N	mailing list	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
+9	https://www.cppstories.com	https://www.cppstories.com	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
+10	https://en.cppreference.com	https://www.cppstories.com	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
+11	mdadm(1)	Unix Manual	manual	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
+12	LinkedIn Course: C++ Design Patterns: Creational by Olivia Chiu Stone	https://www.linkedin.com	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
+13	Kevin Dankwardt's Linux Device Drivers	https://www.linkedin.com/learning/linux-device-drivers	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
+14	LinkedIn Course: Linux Device Drivers	https://linkedin.com	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
+15	Learning OpenCV 3	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+16	Calculus: Concepts and Contexts	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+17	Qt6 Deep Dive	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+18	Mastering Embedded Linux Programming	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+19	Teach Yourself C++ in One Hour a Day	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+20	C++20 STL Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+21	Mastering OpenCV 3	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+22	A Common-Sense Guide to Data Structures and Algorithms	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+23	Professional C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+24	Pro Tbb: C++ Parallel Programming with Threading Building Blocks	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+25	Hands-On Design Patterns with C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+26	Learn PostgreSQL	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+27	Docker for Developers	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+28	C++17 STL Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+29	PostgreSQL 13 Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+30	Practical Vim	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+31	OpenCV 4 Computer Vision Programming Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+32	Linux Security and Administration	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+33	Linux System Programming Techniques	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+34	Linux Driver Development for Embedded Processors	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+35	Demystifying Cryptography with OpenSSL 3.0	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+36	C++20: The Complete Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+37	Udemy: SQL and PostgreSQL - The Complete Developer's Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+38	Linux Service Management Made Easy with systemd	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+39	C++20: Get the Details	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+40	Learning eBPF	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+41	Linux Kernel Programming Part 2	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+42	Beginning C++23: From Novice to Professional	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+43	Linux Kernel Programming	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+44	Beginning x64 Assembly Programming	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+45	Docker: Up & Running	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+46	Docker in Practice	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+47	The Linux Programming Interface	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+48	CMake Best Practices	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+49	Linux Device Driver	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+50	Introduction to Linear and Matrix Algebra	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+51	Extreme C	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+52	Mastering Linux Device Driver Development	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+53	The Shellcoder's Handbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+54	Design Patterns in Modern C++20	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+55	The C++ Standard Library	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+56	Docker Deep Dive	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+57	Modern C++ Programming Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+58	Step by Step Learning x64 Assembly Language	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+59	Embedded Linux Development Using Yocto Project	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+60	Practical Binary Analysis	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+61	Learn Docker in a month of Lunches	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+62	Boost.Asio C++ Network Programming Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+63	C++17: The Complete Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+65	Offensive Security Wireless Professional (OSWP)	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	4
+66	Kali Linux Penetration Testing Bible	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+67	Linux Device Driver Development	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+68	The C++ Programming Language	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+69	Mastering Linux Security and Hardening	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+70	The Art of PostgreSQL	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+71	Heading for the Yocto Project	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+72	Introducing Qt6	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+73	C++ Concurrency in Action	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+74	Professional CMake	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+75	Mastering Kali Linux For Advanced Penetration Testing	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+76	Deciphering Object-Oriented Programming with C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+77	Linux Kernel Debugging	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+78	Hands-On Network Programming with C	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+79	Data Abstraction & Problem Solving with C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+93	GNU Pocket Reference	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+80	Udemy - The C++20 Master Class	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+81	PostgreSQL 14 Administration Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+82	Linux Kernel Development	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+83	Sudo Mastery	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+84	A Complete Guide to Standard C++ Algorithms	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+85	Cross-Platform Development with Qt6 and Modern C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+86	Concurrency with Modern C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+87	Thomas' Calculus	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+88	Qt6 QML	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+89	C++ Move Semantics: The Complete Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+90	CMake Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+91	Embedded Linux Full Course by Anisa Institute	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	3
+92	Hands-On Mobile and Embedded Development with Qt5	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+94	Mastering Linux Kernel Development	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+95	Boost.Asio C++ Network Programming 	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+96	Embedded Linux using Yocto	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+97	C++ Templates: The Complete Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+98	Modern CMake for C++	https://subscription.packtpub.com/book/programming/9781805121800	book	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	1
 \.
 
 
@@ -16731,1457 +16729,1457 @@ COPY flashback.section_name_patterns (id, pattern) FROM stdin;
 -- Data for Name: sections; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
-COPY flashback.sections (id, resource_id, state, reference, created, updated, "position", index, name_pattern_id) FROM stdin;
-37	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	1	1
-38	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	2	1
-39	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	3	1
-40	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	4	1
-41	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	5	1
-42	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	6	1
-43	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	7	1
-44	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	8	1
-45	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	9	1
-51	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	6	1
-70	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	6	1
-22	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	22	1
-57	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	12	1
-19	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	19	1
-91	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	27	1
-176	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	10	1
-173	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	7	1
-189	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	3	1
-161	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	29	1
-350	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	15	1
-278	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	6	1
-292	32	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	5	1
-271	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	20	1
-266	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	15	1
-315	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	4	1
-417	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	8	1
-390	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	36	1
-440	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	4	1
-366	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	12	1
-400	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	9	1
-391	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	37	1
-428	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	10	1
-453	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	17	1
-539	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	12	1
-576	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	33	1
-556	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	13	1
-529	46	writing	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	2	1
-578	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	35	1
-508	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	38	1
-534	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	7	1
-501	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	31	1
-545	47	ignored	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	2	1
-528	46	writing	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	1	1
-563	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	20	1
-555	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	12	1
-567	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	24	1
-507	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	37	1
-551	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	8	1
-532	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	5	1
-519	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	6	1
-663	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	3	1
-770	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	9	1
-764	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	3	1
-791	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	6	1
-775	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	2	1
-695	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	21	1
-794	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	9	1
-769	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	8	1
-839	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	2	1
-802	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	17	1
-815	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	13	1
-824	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	9	1
-841	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	4	1
-823	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	8	1
-822	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	7	1
-906	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	6	1
-909	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	9	1
-811	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	9	1
-814	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	12	1
-850	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	7	1
-853	63	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	10	1
-1091	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	9	1
-1075	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	29	1
-1108	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	8	1
-1269	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	9	1
-1307	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	15	1
-1268	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	8	1
-1263	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	3	1
-1289	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	9	1
-1313	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	4	1
-1262	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	2	1
-1287	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	7	1
-1312	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	3	1
-1373	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	12	1
-113	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	1	1
-1431	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	14	1
-1372	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	11	1
-120	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	8	1
-627	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	1	1
-886	65	writing	\N	2024-07-28 09:45:04.811441	2024-07-28 09:45:04.811441	0	1	4
-652	51	writing	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	15	1
-273	31	writing	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	1	1
-951	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	34	1
-758	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	13	1
-1128	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	7	1
-1284	85	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	4	1
-1136	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	3	1
-946	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	29	1
-1003	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	26	1
-1045	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	10	1
-1331	88	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	5	1
-929	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	12	1
-1175	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	7	1
-638	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	1	1
-940	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	23	1
-1018	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	41	1
-632	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	7	1
-658	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	21	1
-1422	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	5	1
-1415	95	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	6	1
-1004	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	27	1
-160	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	28	1
-644	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	7	1
-1368	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	7	1
-357	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	3	1
-1194	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	26	1
-1143	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	10	1
-1463	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	18	1
-307	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	8	1
-1162	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	15	1
-1030	71	ignored	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0	2	1
-1239	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	12	1
-803	60	writing	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	1	1
-305	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	6	1
-54	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	9	1
-181	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	15	1
-743	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	17	1
-10	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	10	1
-35	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	12	1
-963	69	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	2	1
-220	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	16	1
-1278	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	18	1
-1118	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	18	1
-1025	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	48	1
-241	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	1	1
-175	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	9	1
-1007	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	30	1
-596	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	53	1
-285	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	13	1
-50	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	5	1
-13	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	13	1
-1319	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	10	1
-1266	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	6	1
-1104	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	4	1
-487	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	17	1
-2	15	ignored	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	2	1
-699	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	25	1
-246	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	6	1
-75	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	11	1
-128	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	16	1
-1190	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	22	1
-714	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	13	1
-344	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	9	1
-1321	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	12	1
-745	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	19	1
-1078	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	32	1
-152	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	20	1
-1216	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	1	1
-1049	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	3	1
-355	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	1	1
-637	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	12	1
-1279	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	19	1
-1403	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	5	1
-747	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	2	1
-222	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	18	1
-1006	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	29	1
-1324	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	15	1
-1008	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	31	1
-777	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	4	1
-164	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	32	1
-1098	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	16	1
-1325	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	16	1
-922	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	5	1
-787	59	writing	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	2	1
-186	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	20	1
-750	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	5	1
-182	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	16	1
-977	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	16	1
-18	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	18	1
-27	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	4	1
-143	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	11	1
-496	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	26	1
-58	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	13	1
-228	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	4	1
-667	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	7	1
-668	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	8	1
-294	32	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	7	1
-481	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	11	1
-926	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	9	1
-645	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	8	1
-1009	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	32	1
-1460	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	15	1
-607	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	64	1
-438	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	2	1
-382	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	28	1
-258	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	7	1
-378	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	24	1
-483	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	13	1
-1349	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	3	1
-1050	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	4	1
-84	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	20	1
-799	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	14	1
-276	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	4	1
-646	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	9	1
-1259	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	12	1
-1044	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	9	1
-379	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	25	1
-320	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	9	1
-115	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	3	1
-1062	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	16	1
-942	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	25	1
-1458	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	13	1
-97	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	2	1
-108	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	2	1
-59	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	14	1
-589	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	46	1
-127	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	15	1
-1285	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	5	1
-1167	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	20	1
-682	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	8	1
-329	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	6	1
-1144	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	11	1
-816	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	1	1
-1447	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	2	1
-1398	93	writing	\N	2024-07-28 09:45:10.333395	2024-07-28 09:45:10.333395	0	1	1
-676	53	writing	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	2	1
-153	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	21	1
-1022	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	45	1
-778	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	5	1
-944	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	27	1
-214	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	10	1
-847	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	4	1
-419	40	writing	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	1	1
-1336	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	10	1
-664	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	4	1
-1170	80	ignored	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	2	1
-945	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	28	1
-1371	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	10	1
-948	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	31	1
-95	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	31	1
-1434	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	17	1
-259	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	8	1
-1203	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	35	1
-1250	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	3	1
-965	69	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	4	1
-172	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	6	1
-409	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	18	1
-840	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	3	1
-30	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	7	1
-521	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	8	1
-1378	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	2	3
-3	15	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	3	1
-1038	73	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	3	1
-936	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	19	1
-324	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	1	1
-981	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	4	1
-921	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	4	1
-1334	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	8	1
-1221	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	6	1
-1227	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	12	1
-249	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	9	1
-255	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	4	1
-1295	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	3	1
-1126	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	5	1
-1217	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	2	1
-296	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	9	1
-984	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	7	1
-639	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	2	1
-209	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	5	1
-74	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	10	1
-937	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	20	1
-1249	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	2	1
-868	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	25	1
-138	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	6	1
-34	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	11	1
-418	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	9	1
-947	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	30	1
-1411	95	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	2	1
-1229	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	2	1
-978	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	1	1
-972	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	11	1
-761	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	16	1
-407	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	16	1
-1084	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	2	1
-90	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	26	1
-904	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	4	1
-443	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	7	1
-387	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	33	1
-1337	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	11	1
-690	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	16	1
-526	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	13	1
-1209	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	41	1
-1428	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	11	1
-393	38	writing	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	2	1
-524	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	11	1
-312	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	1	1
-1151	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	4	1
-498	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	28	1
-862	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	19	1
-1185	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	17	1
-494	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	24	1
-469	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	12	1
-118	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	6	1
-683	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	9	1
-793	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	8	1
-608	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	1	1
-317	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	6	1
-1265	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	5	1
-702	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	1	1
-488	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	18	1
-126	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	14	1
-1101	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	1	1
-1048	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	2	1
-194	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	8	1
-360	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	6	1
-463	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	6	1
-476	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	6	1
-99	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	4	1
-629	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	4	1
-726	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	25	1
-374	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	20	1
-1146	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	13	1
-1215	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	47	1
-1210	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	42	1
-224	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	20	1
-719	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	18	1
-756	56	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	11	1
-318	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	7	1
-933	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	16	1
-647	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	10	1
-442	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	6	1
-354	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	19	1
-1296	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	4	1
-1238	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	11	1
-593	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	50	1
-12	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	12	1
-479	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	9	1
-293	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	6	1
-1354	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	8	1
-1120	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	20	1
-495	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	25	1
-1257	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	10	1
-154	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	22	1
-1283	85	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	3	1
-657	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	20	1
-234	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	10	1
-474	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	4	1
-1306	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	14	1
-899	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	13	1
-935	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	18	1
-675	53	writing	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	1	1
-748	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	3	1
-696	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	22	1
-969	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	8	1
-1179	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	11	1
-264	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	13	1
-1253	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	6	1
-270	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	19	1
-898	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	12	1
-435	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	6	1
-384	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	30	1
-1145	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	12	1
-351	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	16	1
-116	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	4	1
-970	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	9	1
-732	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	6	1
-837	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	22	1
-826	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	11	1
-431	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	2	1
-1226	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	11	1
-491	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	21	1
-911	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	11	1
-462	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	5	1
-734	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	8	1
-855	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	12	1
-1272	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	12	1
-1248	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	1	1
-436	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	7	1
-180	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	14	1
-1219	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	4	1
-967	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	6	1
-870	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	27	1
-1397	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	15	1
-626	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	2	1
-263	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	12	1
-836	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	21	1
-784	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	11	1
-470	43	writing	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	13	1
-711	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	10	1
-780	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	7	1
-768	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	7	1
-1036	73	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	1	1
-838	62	writing	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	1	1
-478	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	8	1
-149	23	writing	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	17	1
-1301	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	9	1
-577	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	34	1
-505	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	35	1
-280	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	8	1
-88	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	24	1
-188	25	writing	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	2	1
-461	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	4	1
-240	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	16	1
-1057	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	11	1
-328	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	5	1
-717	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	16	1
-525	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	12	1
-634	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	9	1
-1046	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	11	1
-1328	88	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	2	1
-650	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	13	1
-703	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	2	1
-226	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	2	1
-210	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	6	1
-48	18	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	3	1
-1161	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	14	1
-843	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	6	1
-710	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	9	1
-1016	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	39	1
-447	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	11	1
-298	32	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	11	1
-81	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	17	1
-1015	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	38	1
-954	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	37	1
-1218	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	3	1
-800	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	15	1
-204	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	18	1
-1021	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	44	1
-5	15	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	5	1
-1165	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	18	1
-1077	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	31	1
-456	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	20	1
-796	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	11	1
-1281	85	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	1	1
-1247	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	20	1
-531	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	4	1
-1429	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	12	1
-283	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	11	1
-1409	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	11	1
-807	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	5	1
-624	49	writing	\N	2024-07-28 09:45:01.922317	2024-07-28 09:45:01.922317	0	1	1
-546	47	writing	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	3	1
-1427	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	10	1
-686	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	12	1
-297	32	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	10	1
-361	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	7	1
-681	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	7	1
-1173	80	writing	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	5	1
-303	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	4	1
-1261	84	writing	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	1	1
-974	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	13	1
-829	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	14	1
-785	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	12	1
-472	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	2	1
-1406	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	8	1
-643	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	6	1
-444	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	8	1
-537	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	10	1
-233	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	9	1
-1149	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	2	1
-1370	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	9	1
-1115	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	15	1
-1401	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	3	1
-93	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	29	1
-89	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	25	1
-373	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	19	1
-252	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	1	1
-343	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	8	1
-31	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	8	1
-1383	92	writing	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	1	1
-1199	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	31	1
-1345	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	19	1
-1316	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	7	1
-723	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	22	1
-497	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	27	1
-1086	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	4	1
-155	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	23	1
-722	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	21	1
-953	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	36	1
-609	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	2	1
-416	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	7	1
-1286	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	6	1
-195	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	9	1
-1153	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	6	1
-1137	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	4	1
-1097	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	15	1
-199	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	13	1
-369	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	15	1
-1374	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	13	1
-441	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	5	1
-243	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	3	1
-1264	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	4	1
-902	67	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	2	1
-1309	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	17	1
-1142	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	9	1
-1047	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	1	1
-740	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	14	1
-1178	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	10	1
-892	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	6	1
-856	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	13	1
-1083	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	1	1
-230	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	6	1
-503	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	33	1
-1154	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	7	1
-78	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	14	1
-573	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	30	1
-1356	89	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	10	1
-1451	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	6	1
-994	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	17	1
-987	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	10	1
-1099	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	17	1
-852	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	9	1
-250	28	writing	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	10	1
-611	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	4	1
-621	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	14	1
-865	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	22	1
-1246	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	19	1
-1382	91	writing	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	6	3
-1206	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	38	1
-962	69	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	1	1
-106	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	11	1
-1200	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	32	1
-1010	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	33	1
-178	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	12	1
-795	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	10	1
-809	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	7	1
-585	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	42	1
-8	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	8	1
-934	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	17	1
-908	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	8	1
-1310	87	writing	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	1	1
-708	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	7	1
-455	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	19	1
-370	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	16	1
-684	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	10	1
-713	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	12	1
-1135	78	writing	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	2	1
-1205	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	37	1
-1156	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	9	1
-448	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	12	1
-930	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	13	1
-396	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	5	1
-1395	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	13	1
-701	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	27	1
-1092	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	10	1
-132	22	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	20	1
-514	45	ignored	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	1	1
-322	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	11	1
-1414	95	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	5	1
-1234	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	7	1
-854	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	11	1
-389	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	35	1
-1056	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	10	1
-916	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	16	1
-863	63	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	20	1
-114	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	2	1
-60	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	15	1
-1106	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	6	1
-1052	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	6	1
-1413	95	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	4	1
-289	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	2	1
-754	56	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	9	1
-518	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	5	1
-1299	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	7	1
-65	19	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	1	1
-583	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	40	1
-1202	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	34	1
-693	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	19	1
-1400	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	2	1
-98	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	3	1
-744	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	18	1
-715	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	14	1
-1462	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	17	1
-490	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	20	1
-527	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	14	1
-235	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	11	1
-1132	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	11	1
-763	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	2	1
-119	22	ignored	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	7	1
-306	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	7	1
-286	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	14	1
-376	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	22	1
-147	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	15	1
-480	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	10	1
-860	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	17	1
-338	36	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	3	1
-1066	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	20	1
-358	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	4	1
-412	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	3	1
-989	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	12	1
-26	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	3	1
-950	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	33	1
-564	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	21	1
-535	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	8	1
-72	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	8	1
-1168	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	21	1
-1159	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	12	1
-1260	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	13	1
-642	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	5	1
-232	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	8	1
-77	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	13	1
-725	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	24	1
-131	22	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	19	1
-310	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	11	1
-832	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	17	1
-907	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	7	1
-1001	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	24	1
-584	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	41	1
-746	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	1	1
-806	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	4	1
-353	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	18	1
-939	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	22	1
-834	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	19	1
-831	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	16	1
-813	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	11	1
-1164	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	17	1
-1298	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	6	1
-574	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	31	1
-1335	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	9	1
-1443	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	26	1
-225	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	1	1
-1305	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	13	1
-1344	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	18	1
-333	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	10	1
-1446	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	1	1	1
-174	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	8	1
-1375	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	14	1
-891	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	5	1
-134	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	2	1
-1430	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	13	1
-1297	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	5	1
-1419	97	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	2	1
-918	68	writing	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	1	1
-1241	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	14	1
-1293	86	ignored	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	1	1
-975	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	14	1
-36	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	13	1
-848	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	5	1
-1303	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	11	1
-430	41	writing	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	1	1
-102	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	7	1
-1292	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	12	1
-158	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	26	1
-533	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	6	1
-915	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	15	1
-459	43	writing	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	2	1
-207	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	3	1
-979	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	2	1
-123	22	ignored	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	11	1
-1418	97	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	1	1
-1180	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	12	1
-871	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	28	1
-385	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	31	1
-492	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	22	1
-1410	95	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	1	1
-544	47	ignored	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	1	1
-1442	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	25	1
-365	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	11	1
-704	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	3	1
-157	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	25	1
-606	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	63	1
-308	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	9	1
-618	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	11	1
-1072	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	26	1
-313	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	2	1
-1080	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	34	1
-140	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	8	1
-248	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	8	1
-137	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	5	1
-208	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	4	1
-614	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	7	1
-392	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	1	1
-24	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	1	1
-191	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	5	1
-966	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	5	1
-760	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	15	1
-94	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	30	1
-1055	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	9	1
-218	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	14	1
-49	18	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	4	1
-1188	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	20	1
-671	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	11	1
-580	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	37	1
-1131	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	10	1
-742	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	16	1
-912	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	12	1
-846	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	3	1
-938	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	21	1
-1037	73	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	2	1
-1158	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	11	1
-184	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	18	1
-87	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	23	1
-753	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	8	1
-477	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	7	1
-1300	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	8	1
-550	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	7	1
-394	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	3	1
-272	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	21	1
-781	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	8	1
-1437	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	20	1
-1362	90	writing	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	1	1
-867	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	24	1
-190	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	4	1
-858	63	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	15	1
-554	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	11	1
-424	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	6	1
-406	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	15	1
-670	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	10	1
-309	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	10	1
-849	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	6	1
-509	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	39	1
-1366	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	5	1
-1348	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	2	1
-919	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	2	1
-1067	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	21	1
-156	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	24	1
-1096	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	14	1
-932	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	15	1
-1273	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	13	1
-1408	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	10	1
-641	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	4	1
-475	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	5	1
-961	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	44	1
-1433	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	16	1
-888	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	2	1
-1235	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	8	1
-282	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	10	1
-733	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	7	1
-269	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	18	1
-261	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	10	1
-502	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	32	1
-117	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	5	1
-125	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	13	1
-257	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	6	1
-1122	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	1	1
-1426	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	9	1
-700	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	26	1
-1308	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	16	1
-1258	83	open	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	11	1
-1166	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	19	1
-587	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	44	1
-1444	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	27	1
-1090	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	8	1
-349	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	14	1
-187	25	writing	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	1	1
-914	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	14	1
-766	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	5	1
-728	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	2	1
-1150	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	3	1
-1119	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	19	1
-506	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	36	1
-1416	95	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	7	1
-242	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	2	1
-331	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	8	1
-1024	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	47	1
-913	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	13	1
-599	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	56	1
-677	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	3	1
-1461	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	16	16	1
-1232	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	5	1
-1028	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	51	1
-29	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	6	1
-4	15	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	4	1
-698	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	24	1
-96	20	writing	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	1	1
-466	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	9	1
-201	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	15	1
-844	63	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	1	1
-980	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	3	1
-1039	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	4	1
-1201	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	33	1
-631	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	6	1
-1314	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	5	1
-1196	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	28	1
-107	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	1	1
-6	15	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	6	1
-446	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	10	1
-749	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	4	1
-1163	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	16	1
-86	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	22	1
-1148	79	writing	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	1	1
-920	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	3	1
-1058	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	12	1
-219	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	15	1
-363	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	9	1
-1432	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	15	1
-66	19	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	2	1
-231	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	7	1
-340	36	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	5	1
-661	52	writing	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	1	1
-512	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	42	1
-1213	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	45	1
-356	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	2	1
-523	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	10	1
-458	43	writing	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	1	1
-1311	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	2	1
-414	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	5	1
-640	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	3	1
-368	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	14	1
-1053	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	7	1
-1452	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	7	1
-735	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	9	1
-538	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	11	1
-166	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	34	1
-595	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	52	1
-142	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	10	1
-924	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	7	1
-872	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	29	1
-410	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	1	1
-1140	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	7	1
-1054	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	8	1
-792	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	7	1
-1381	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	5	3
-896	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	10	1
-651	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	14	1
-381	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	27	1
-359	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	5	1
-1005	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	28	1
-597	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	54	1
-1291	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	11	1
-193	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	7	1
-1449	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	4	1
-1435	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	18	1
-1012	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	35	1
-730	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	4	1
-548	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	5	1
-1212	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	44	1
-217	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	13	1
-1087	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	5	1
-1457	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	12	1
-47	18	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	2	1
-709	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	8	1
-1105	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	5	1
-177	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	11	1
-1332	88	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	6	1
-727	55	ignored	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	1	1
-985	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	8	1
-1405	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	7	1
-810	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	8	1
-779	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	6	1
-1231	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	4	1
-1276	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	16	1
-1117	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	17	1
-110	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	4	1
-1251	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	4	1
-931	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	14	1
-145	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	13	1
-557	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	14	1
-1189	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	21	1
-718	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	17	1
-485	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	15	1
-623	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	16	1
-1364	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	3	1
-1439	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	22	1
-1388	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	6	1
-1081	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	35	1
-229	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	5	1
-1112	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	12	1
-559	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	16	1
-1315	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	6	1
-304	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	5	1
-1102	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	2	1
-788	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	3	1
-52	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	7	1
-1453	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	8	1
-1198	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	30	1
-633	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	8	1
-341	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	6	1
-450	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	14	1
-900	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	14	1
-405	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	14	1
-1195	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	27	1
-170	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	4	1
-762	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	1	1
-996	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	19	1
-712	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	11	1
-192	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	6	1
-1174	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	6	1
-513	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	43	1
-1197	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	29	1
-101	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	6	1
-473	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	3	1
-1063	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	17	1
-69	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	5	1
-1059	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	13	1
-679	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	5	1
-983	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	6	1
-375	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	21	1
-415	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	6	1
-976	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	15	1
-729	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	3	1
-1242	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	15	1
-680	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	6	1
-408	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	17	1
-1376	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	15	1
-1365	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	4	1
-782	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	9	1
-1160	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	13	1
-689	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	15	1
-1338	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	12	1
-1359	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	13	1
-982	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	5	1
-522	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	9	1
-1079	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	33	1
-674	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	14	1
-1445	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	28	1
-630	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	5	1
-11	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	11	1
-1152	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	5	1
-575	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	32	1
-1330	88	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	4	1
-1384	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	2	1
-821	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	6	1
-401	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	10	1
-1456	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	11	1
-1141	78	writing	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	8	1
-1329	88	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	3	1
-659	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	22	1
-739	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	13	1
-1094	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	12	1
-279	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	7	1
-9	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	9	1
-903	67	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	3	1
-1110	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	10	1
-741	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	15	1
-716	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	15	1
-897	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	11	1
-543	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	16	1
-736	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	10	1
-565	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	22	1
-566	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	23	1
-1130	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	9	1
-457	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	21	1
-85	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	21	1
-592	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	49	1
-1440	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	23	1
-281	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	9	1
-687	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	13	1
-1041	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	6	1
-553	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	10	1
-302	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	3	1
-288	32	ignored	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	1	1
-21	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	21	1
-622	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	15	1
-927	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	10	1
-1027	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	50	1
-774	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	1	1
-1385	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	3	1
-398	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	7	1
-635	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	10	1
-388	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	34	1
-1233	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	6	1
-165	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	33	1
-56	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	11	1
-151	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	19	1
-1346	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	20	1
-820	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	5	1
-1267	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	7	1
-992	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	15	1
-620	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	13	1
-894	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	8	1
-1357	89	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	11	1
-205	26	writing	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	1	1
-245	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	5	1
-67	19	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	3	1
-1326	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	17	1
-1020	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	43	1
-325	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	2	1
-895	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	9	1
-673	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	13	1
-1377	91	writing	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	1	3
-1127	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	6	1
-1060	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	14	1
-1017	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	40	1
-783	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	10	1
-484	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	14	1
-334	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	11	1
-558	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	15	1
-144	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	12	1
-1071	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	25	1
-540	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	13	1
-1224	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	9	1
-168	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	2	1
-471	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	1	1
-598	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	55	1
-1051	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	5	1
-1424	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	7	1
-287	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	15	1
-464	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	7	1
-1109	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	9	1
-167	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	1	1
-277	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	5	1
-290	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	3	1
-300	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	1	1
-1352	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	6	1
-662	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	2	1
-284	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	12	1
-1254	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	7	1
-342	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	7	1
-1133	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	12	1
-1441	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	24	1
-1271	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	11	1
-1035	72	open	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0	3	1
-367	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	13	1
-1073	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	27	1
-588	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	45	1
-1019	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	42	1
-46	18	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	1	1
-439	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	3	1
-206	26	writing	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	2	1
-1389	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	7	1
-586	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	43	1
-572	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	29	1
-53	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	8	1
-32	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	9	1
-336	36	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	1	1
-275	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	3	1
-247	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	7	1
-1412	95	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	3	1
-260	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	9	1
-423	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	5	1
-1240	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	13	1
-136	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	4	1
-139	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	7	1
-1459	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	14	1
-1182	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	14	1
-411	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	2	1
-869	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	26	1
-1033	72	writing	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0	1	1
-864	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	21	1
-425	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	7	1
-672	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	12	1
-825	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	10	1
-1454	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	9	1
-1040	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	5	1
-316	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	5	1
-731	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	5	1
-403	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	12	1
-1282	85	ignored	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	2	1
-256	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	5	1
-1350	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	4	1
-654	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	17	1
-332	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	9	1
-628	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	3	1
-33	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	10	1
-422	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	4	1
-549	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	6	1
-185	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	19	1
-653	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	16	1
-380	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	26	1
-215	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	11	1
-1275	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	15	1
-1107	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	7	1
-1339	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	13	1
-130	22	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	18	1
-1157	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	10	1
-23	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	23	1
-486	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	16	1
-612	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	5	1
-625	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	1	1
-1155	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	8	1
-617	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	10	1
-765	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	4	1
-1277	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	17	1
-552	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	9	1
-887	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	1	1
-959	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	42	1
-819	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	4	1
-314	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	3	1
-817	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	2	1
-386	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	32	1
-1274	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	14	1
-426	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	8	1
-433	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	4	1
-364	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	10	1
-1187	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	19	1
-299	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	12	1
-169	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	3	1
-1123	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	2	1
-1113	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	13	1
-605	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	62	1
-345	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	10	1
-92	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	28	1
-1317	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	8	1
-541	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	14	1
-971	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	10	1
-660	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	23	1
-910	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	10	1
-437	42	writing	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	1	1
-236	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	12	1
-941	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	24	1
-957	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	40	1
-1065	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	19	1
-998	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	21	1
-949	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	32	1
-197	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	11	1
-135	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	3	1
-493	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	23	1
-999	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	22	1
-1064	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	18	1
-707	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	6	1
-665	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	5	1
-454	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	18	1
-759	56	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	14	1
-482	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	12	1
-1193	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	25	1
-227	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	3	1
-500	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	30	1
-1204	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	36	1
-311	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	12	1
-73	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	9	1
-1169	80	ignored	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	1	1
-103	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	8	1
-1252	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	5	1
-1171	80	ignored	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	3	1
-1236	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	9	1
-1138	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	5	1
-1085	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	3	1
-121	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	9	1
-239	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	15	1
-1353	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	7	1
-1255	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	8	1
-420	40	writing	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	2	1
-1438	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	21	1
-1407	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	9	1
-561	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	18	1
-1322	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	13	1
-845	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	2	1
-755	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	10	1
-1031	71	writing	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0	3	1
-1184	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	16	1
-196	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	10	1
-291	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	4	1
-15	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	15	1
-1069	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	23	1
-1361	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	15	1
-1129	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	8	1
-859	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	16	1
-842	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	5	1
-767	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	6	1
-1367	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	6	1
-61	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	16	1
-1043	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	8	1
-244	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	4	1
-602	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	59	1
-1192	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	24	1
-1088	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	6	1
-1124	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	3	1
-691	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	17	1
-468	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	11	1
-697	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	23	1
-1243	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	16	1
-721	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	20	1
-251	29	open	\N	2024-07-28 09:44:57.91634	2024-07-28 09:44:57.91634	0	1	1
-1100	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	18	1
-705	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	4	1
-104	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	9	1
-1270	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	10	1
-1436	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	19	1
-1032	71	ignored	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0	4	1
-960	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	43	1
-171	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	5	1
-397	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	6	1
-604	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	61	1
-427	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	9	1
-786	59	writing	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	1	1
-347	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	12	1
-179	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	13	1
-562	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	19	1
-1455	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	10	1
-636	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	11	1
-1228	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	1	1
-321	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	10	1
-1387	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	5	1
-105	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	10	1
-402	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	11	1
-804	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	2	1
-445	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	9	1
-866	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	23	1
-889	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	3	1
-991	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	14	1
-1391	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	9	1
-776	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	3	1
-467	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	10	1
-327	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	4	1
-253	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	2	1
-1369	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	8	1
-692	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	18	1
-581	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	38	1
-14	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	14	1
-1177	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	9	1
-1121	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	21	1
-109	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	3	1
-133	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	1	1
-1343	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	17	1
-724	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	23	1
-1134	78	writing	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	1	1
-1323	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	14	1
-1237	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	10	1
-1222	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	7	1
-372	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	18	1
-1358	89	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	12	1
-339	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	4	1
-600	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	57	1
-772	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	11	1
-335	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	12	1
-603	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	60	1
-591	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	48	1
-808	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	6	1
-383	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	29	1
-301	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	2	1
-7	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	7	1
-1011	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	34	1
-757	56	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	12	1
-771	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	10	1
-827	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	12	1
-254	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	3	1
-1360	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	14	1
-377	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	23	1
-952	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	35	1
-159	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	27	1
-1402	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	4	1
-1399	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	1	1
-432	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	3	1
-986	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	9	1
-857	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	14	1
-619	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	12	1
-890	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	4	1
-1214	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	46	1
-20	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	20	1
-1394	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	12	1
-1347	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	1	1
-1341	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	15	1
-1061	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	15	1
-319	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	8	1
-1417	96	writing	\N	2024-07-28 09:45:10.605868	2024-07-28 09:45:10.605868	0	1	1
-1	15	ignored	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	1	1
-76	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	12	1
-1074	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	28	1
-517	45	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	4	1
-1111	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	11	1
-1082	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	36	1
-1392	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	10	1
-129	22	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	17	1
-203	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	17	1
-1181	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	13	1
-789	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	4	1
-346	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	11	1
-71	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	7	1
-267	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	16	1
-68	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	4	1
-1002	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	25	1
-773	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	12	1
-1023	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	46	1
-146	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	14	1
-80	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	16	1
-1172	80	writing	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	4	1
-861	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	18	1
-1208	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	40	1
-511	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	41	1
-162	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	30	1
-1351	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	5	1
-738	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	12	1
-1183	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	15	1
-797	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	12	1
-582	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	39	1
-1333	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	7	1
-1095	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	13	1
-1034	72	open	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0	2	1
-943	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	26	1
-1386	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	4	1
-330	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	7	1
-751	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	6	1
-237	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	13	1
-1220	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	5	1
-451	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	15	1
-262	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	11	1
-323	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	12	1
-337	36	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	2	1
-348	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	13	1
-1363	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	2	1
-504	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	34	1
-399	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	8	1
-238	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	14	1
-112	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	6	1
-560	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	17	1
-547	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	4	1
-818	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	3	1
-268	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	17	1
-1042	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	7	1
-613	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	6	1
-737	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	11	1
-1404	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	6	1
-569	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	26	1
-124	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	12	1
-615	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	8	1
-452	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	16	1
-798	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	13	1
-830	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	15	1
-200	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	14	1
-988	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	11	1
-1340	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	14	1
-964	69	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	3	1
-601	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	58	1
-590	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	47	1
-82	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	18	1
-990	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	13	1
-1396	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	14	1
-202	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	16	1
-685	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	11	1
-905	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	5	1
-1379	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	3	3
-973	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	12	1
-610	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	3	1
-79	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	15	1
-1425	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	8	1
-678	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	4	1
-812	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	10	1
-1390	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	8	1
-579	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	36	1
-510	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	40	1
-1448	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	3	1
-1176	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	8	1
-1186	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	18	1
-198	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	12	1
-17	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	17	1
-212	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	8	1
-28	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	5	1
-1116	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	16	1
-1290	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	10	1
-1089	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	7	1
-1380	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	4	3
-1070	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	24	1
-404	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	13	1
-1147	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	14	1
-720	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	19	1
-997	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	20	1
-917	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	17	1
-489	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	19	1
-1029	71	writing	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0	1	1
-1280	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	20	1
-515	45	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	2	1
-1068	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	22	1
-1256	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	9	1
-1000	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	23	1
-1245	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	18	1
-616	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	9	1
-1211	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	43	1
-1393	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	11	1
-706	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	5	1
-83	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	19	1
-63	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	18	1
-1230	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	3	1
-516	45	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	3	1
-571	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	28	1
-1423	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	6	1
-956	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	39	1
-666	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	6	1
-542	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	15	1
-395	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	4	1
-216	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	12	1
-1294	86	writing	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	2	1
-295	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	8	1
-958	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	41	1
-694	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	20	1
-213	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	9	1
-955	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	38	1
-1114	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	14	1
-274	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	2	1
-1304	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	12	1
-801	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	16	1
-163	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	31	1
-1302	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	10	1
-1103	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	3	1
-833	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	18	1
-669	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	9	1
-223	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	19	1
-352	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	17	1
-1244	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	17	1
-362	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	8	1
-221	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	17	1
-752	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	7	1
-1013	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	36	1
-688	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	14	1
-1288	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	8	1
-1207	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	39	1
-594	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	51	1
-460	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	3	1
-499	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	29	1
-265	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	14	1
-111	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	5	1
-1093	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	11	1
-1076	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	30	1
-851	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	8	1
-968	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	7	1
-16	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	16	1
-62	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	17	1
-893	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	7	1
-1318	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	9	1
-993	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	16	1
-326	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	3	1
-568	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	25	1
-371	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	17	1
-805	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	3	1
-655	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	18	1
-1327	88	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	1	1
-1139	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	6	1
-413	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	4	1
-1450	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	5	1
-649	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	12	1
-183	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	17	1
-100	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	5	1
-1225	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	10	1
-1223	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	8	1
-925	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	8	1
-150	23	writing	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	18	1
-1342	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	16	1
-656	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	19	1
-421	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	3	1
-429	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	11	1
-835	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	20	1
-25	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	2	1
-122	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	10	1
-141	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	9	1
-1355	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	9	1
-648	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	11	1
-570	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	27	1
-1026	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	49	1
-923	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	6	1
-995	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	18	1
-434	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	5	1
-211	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	7	1
-1420	97	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	3	1
-1320	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	11	1
-901	67	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	1	1
-1191	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	23	1
-1014	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	37	1
-1125	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	4	1
-530	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	3	1
-928	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	11	1
-536	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	9	1
-465	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	8	1
-449	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	13	1
-520	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	7	1
-64	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	19	1
-1421	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	4	1
-55	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	10	1
-148	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	16	1
-790	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	5	1
-828	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	13	1
+COPY flashback.sections (id, resource_id, state, reference, created, updated, "position", index) FROM stdin;
+37	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	1
+38	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	2
+39	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	3
+40	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	4
+41	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	5
+42	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	6
+43	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	7
+44	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	8
+45	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	0	9
+51	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	6
+70	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	6
+22	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	22
+57	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	12
+19	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	19
+91	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	27
+176	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	10
+173	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	7
+189	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	3
+161	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	29
+350	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	15
+278	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	6
+292	32	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	5
+271	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	20
+266	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	15
+315	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	4
+417	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	8
+390	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	36
+440	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	4
+366	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	12
+400	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	9
+391	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	37
+428	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	10
+453	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	17
+539	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	12
+576	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	33
+556	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	13
+529	46	writing	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	2
+578	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	35
+508	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	38
+534	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	7
+501	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	31
+545	47	ignored	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	2
+528	46	writing	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	1
+563	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	20
+555	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	12
+567	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	24
+507	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	37
+551	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	8
+532	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	5
+519	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	6
+663	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	3
+770	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	9
+764	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	3
+791	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	6
+775	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	2
+695	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	21
+794	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	9
+769	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	8
+839	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	2
+802	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	17
+815	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	13
+824	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	9
+841	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	4
+823	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	8
+822	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	7
+906	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	6
+909	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	9
+811	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	9
+814	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	12
+850	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	7
+853	63	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	10
+1091	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	9
+1075	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	29
+1108	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	8
+1269	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	9
+1307	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	15
+1268	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	8
+1263	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	3
+1289	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	9
+1313	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	4
+1262	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	2
+1287	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	7
+1312	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	3
+1373	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	12
+113	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	1
+1431	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	14
+1372	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	11
+120	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	8
+627	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	1
+886	65	writing	\N	2024-07-28 09:45:04.811441	2024-07-28 09:45:04.811441	0	1
+652	51	writing	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	15
+273	31	writing	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	1
+951	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	34
+758	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	13
+1128	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	7
+1284	85	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	4
+1136	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	3
+946	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	29
+1003	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	26
+1045	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	10
+1331	88	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	5
+929	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	12
+1175	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	7
+638	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	1
+940	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	23
+1018	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	41
+632	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	7
+658	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	21
+1422	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	5
+1415	95	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	6
+1004	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	27
+160	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	28
+644	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	7
+1368	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	7
+357	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	3
+1194	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	26
+1143	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	10
+1463	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	18
+307	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	8
+1162	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	15
+1030	71	ignored	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0	2
+1239	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	12
+803	60	writing	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	1
+305	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	6
+54	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	9
+181	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	15
+743	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	17
+10	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	10
+35	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	12
+963	69	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	2
+220	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	16
+1278	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	18
+1118	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	18
+1025	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	48
+241	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	1
+175	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	9
+1007	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	30
+596	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	53
+285	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	13
+50	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	5
+13	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	13
+1319	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	10
+1266	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	6
+1104	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	4
+487	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	17
+2	15	ignored	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	2
+699	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	25
+246	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	6
+75	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	11
+128	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	16
+1190	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	22
+714	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	13
+344	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	9
+1321	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	12
+745	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	19
+1078	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	32
+152	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	20
+1216	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	1
+1049	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	3
+355	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	1
+637	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	12
+1279	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	19
+1403	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	5
+747	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	2
+222	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	18
+1006	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	29
+1324	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	15
+1008	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	31
+777	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	4
+164	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	32
+1098	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	16
+1325	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	16
+922	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	5
+787	59	writing	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	2
+186	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	20
+750	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	5
+182	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	16
+977	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	16
+18	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	18
+27	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	4
+143	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	11
+496	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	26
+58	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	13
+228	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	4
+667	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	7
+668	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	8
+294	32	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	7
+481	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	11
+926	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	9
+645	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	8
+1009	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	32
+1460	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	15
+607	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	64
+438	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	2
+382	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	28
+258	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	7
+378	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	24
+483	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	13
+1349	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	3
+1050	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	4
+84	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	20
+799	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	14
+276	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	4
+646	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	9
+1259	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	12
+1044	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	9
+379	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	25
+320	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	9
+115	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	3
+1062	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	16
+942	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	25
+1458	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	13
+97	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	2
+108	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	2
+59	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	14
+589	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	46
+127	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	15
+1285	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	5
+1167	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	20
+682	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	8
+329	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	6
+1144	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	11
+816	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	1
+1447	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	2
+1398	93	writing	\N	2024-07-28 09:45:10.333395	2024-07-28 09:45:10.333395	0	1
+676	53	writing	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	2
+153	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	21
+1022	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	45
+778	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	5
+944	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	27
+214	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	10
+847	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	4
+419	40	writing	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	1
+1336	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	10
+664	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	4
+1170	80	ignored	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	2
+945	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	28
+1371	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	10
+948	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	31
+95	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	31
+1434	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	17
+259	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	8
+1203	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	35
+1250	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	3
+965	69	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	4
+172	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	6
+409	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	18
+840	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	3
+30	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	7
+521	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	8
+1378	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	2
+3	15	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	3
+1038	73	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	3
+936	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	19
+324	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	1
+981	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	4
+921	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	4
+1334	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	8
+1221	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	6
+1227	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	12
+249	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	9
+255	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	4
+1295	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	3
+1126	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	5
+1217	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	2
+296	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	9
+984	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	7
+639	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	2
+209	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	5
+74	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	10
+937	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	20
+1249	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	2
+868	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	25
+138	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	6
+34	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	11
+418	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	9
+947	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	30
+1411	95	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	2
+1229	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	2
+978	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	1
+972	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	11
+761	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	16
+407	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	16
+1084	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	2
+90	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	26
+904	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	4
+443	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	7
+387	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	33
+1337	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	11
+690	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	16
+526	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	13
+1209	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	41
+1428	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	11
+393	38	writing	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	2
+524	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	11
+312	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	1
+1151	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	4
+498	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	28
+862	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	19
+1185	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	17
+494	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	24
+469	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	12
+118	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	6
+683	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	9
+793	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	8
+608	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	1
+317	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	6
+1265	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	5
+702	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	1
+488	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	18
+126	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	14
+1101	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	1
+1048	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	2
+194	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	8
+360	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	6
+463	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	6
+476	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	6
+99	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	4
+629	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	4
+726	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	25
+374	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	20
+1146	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	13
+1215	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	47
+1210	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	42
+224	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	20
+719	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	18
+756	56	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	11
+318	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	7
+933	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	16
+647	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	10
+442	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	6
+354	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	19
+1296	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	4
+1238	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	11
+593	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	50
+12	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	12
+479	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	9
+293	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	6
+1354	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	8
+1120	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	20
+495	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	25
+1257	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	10
+154	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	22
+1283	85	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	3
+657	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	20
+234	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	10
+474	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	4
+1306	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	14
+899	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	13
+935	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	18
+675	53	writing	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	1
+748	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	3
+696	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	22
+969	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	8
+1179	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	11
+264	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	13
+1253	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	6
+270	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	19
+898	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	12
+435	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	6
+384	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	30
+1145	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	12
+351	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	16
+116	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	4
+970	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	9
+732	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	6
+837	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	22
+826	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	11
+431	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	2
+1226	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	11
+491	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	21
+911	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	11
+462	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	5
+734	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	8
+855	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	12
+1272	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	12
+1248	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	1
+436	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	7
+180	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	14
+1219	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	4
+967	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	6
+870	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	27
+1397	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	15
+626	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	2
+263	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	12
+836	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	21
+784	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	11
+470	43	writing	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	13
+711	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	10
+780	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	7
+768	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	7
+1036	73	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	1
+838	62	writing	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	1
+478	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	8
+149	23	writing	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	17
+1301	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	9
+577	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	34
+505	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	35
+280	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	8
+88	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	24
+188	25	writing	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	2
+461	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	4
+240	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	16
+1057	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	11
+328	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	5
+717	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	16
+525	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	12
+634	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	9
+1046	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	11
+1328	88	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	2
+650	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	13
+703	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	2
+226	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	2
+210	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	6
+48	18	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	3
+1161	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	14
+843	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	6
+710	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	9
+1016	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	39
+447	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	11
+298	32	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	11
+81	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	17
+1015	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	38
+954	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	37
+1218	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	3
+800	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	15
+204	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	18
+1021	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	44
+5	15	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	5
+1165	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	18
+1077	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	31
+456	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	20
+796	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	11
+1281	85	writing	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	1
+1247	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	20
+531	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	4
+1429	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	12
+283	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	11
+1409	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	11
+807	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	5
+624	49	writing	\N	2024-07-28 09:45:01.922317	2024-07-28 09:45:01.922317	0	1
+546	47	writing	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	3
+1427	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	10
+686	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	12
+297	32	open	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	10
+361	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	7
+681	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	7
+1173	80	writing	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	5
+303	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	4
+1261	84	writing	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	1
+974	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	13
+829	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	14
+785	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	12
+472	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	2
+1406	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	8
+643	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	6
+444	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	8
+537	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	10
+233	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	9
+1149	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	2
+1370	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	9
+1115	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	15
+1401	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	3
+93	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	29
+89	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	25
+373	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	19
+252	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	1
+343	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	8
+31	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	8
+1383	92	writing	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	1
+1199	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	31
+1345	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	19
+1316	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	7
+723	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	22
+497	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	27
+1086	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	4
+155	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	23
+722	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	21
+953	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	36
+609	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	2
+416	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	7
+1286	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	6
+195	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	9
+1153	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	6
+1137	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	4
+1097	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	15
+199	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	13
+369	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	15
+1374	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	13
+441	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	5
+243	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	3
+1264	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	4
+902	67	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	2
+1309	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	17
+1142	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	9
+1047	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	1
+740	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	14
+1178	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	10
+892	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	6
+856	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	13
+1083	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	1
+230	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	6
+503	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	33
+1154	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	7
+78	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	14
+573	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	30
+1356	89	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	10
+1451	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	6
+994	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	17
+987	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	10
+1099	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	17
+852	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	9
+250	28	writing	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	10
+611	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	4
+621	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	14
+865	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	22
+1246	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	19
+1382	91	writing	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	6
+1206	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	38
+962	69	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	1
+106	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	11
+1200	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	32
+1010	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	33
+178	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	12
+795	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	10
+809	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	7
+585	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	42
+8	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	8
+934	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	17
+908	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	8
+1310	87	writing	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	1
+708	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	7
+455	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	19
+370	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	16
+684	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	10
+713	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	12
+1135	78	writing	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	2
+1205	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	37
+1156	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	9
+448	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	12
+930	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	13
+396	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	5
+1395	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	13
+701	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	27
+1092	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	10
+132	22	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	20
+514	45	ignored	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	1
+322	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	11
+1414	95	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	5
+1234	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	7
+854	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	11
+389	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	35
+1056	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	10
+916	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	16
+863	63	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	20
+114	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	2
+60	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	15
+1106	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	6
+1052	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	6
+1413	95	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	4
+289	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	2
+754	56	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	9
+518	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	5
+1299	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	7
+65	19	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	1
+583	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	40
+1202	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	34
+693	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	19
+1400	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	2
+98	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	3
+744	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	18
+715	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	14
+1462	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	17
+490	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	20
+527	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	14
+235	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	11
+1132	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	11
+763	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	2
+119	22	ignored	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	7
+306	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	7
+286	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	14
+376	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	22
+147	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	15
+480	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	10
+860	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	17
+338	36	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	3
+1066	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	20
+358	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	4
+412	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	3
+989	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	12
+26	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	3
+950	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	33
+564	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	21
+535	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	8
+72	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	8
+1168	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	21
+1159	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	12
+1260	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	13
+642	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	5
+232	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	8
+77	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	13
+725	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	24
+131	22	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	19
+310	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	11
+832	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	17
+907	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	7
+1001	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	24
+584	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	41
+746	56	ignored	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	1
+806	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	4
+353	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	18
+939	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	22
+834	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	19
+831	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	16
+813	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	11
+1164	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	17
+1298	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	6
+574	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	31
+1335	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	9
+1443	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	26
+225	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	1
+1305	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	13
+1344	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	18
+333	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	10
+1446	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	1	1
+174	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	8
+1375	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	14
+891	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	5
+134	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	2
+1430	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	13
+1297	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	5
+1419	97	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	2
+918	68	writing	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	1
+1241	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	14
+1293	86	ignored	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	1
+975	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	14
+36	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	13
+848	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	5
+1303	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	11
+430	41	writing	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	1
+102	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	7
+1292	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	12
+158	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	26
+533	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	6
+915	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	15
+459	43	writing	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	2
+207	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	3
+979	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	2
+123	22	ignored	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	11
+1418	97	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	1
+1180	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	12
+871	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	28
+385	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	31
+492	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	22
+1410	95	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	1
+544	47	ignored	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	1
+1442	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	25
+365	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	11
+704	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	3
+157	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	25
+606	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	63
+308	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	9
+618	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	11
+1072	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	26
+313	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	2
+1080	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	34
+140	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	8
+248	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	8
+137	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	5
+208	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	4
+614	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	7
+392	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	1
+24	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	1
+191	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	5
+966	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	5
+760	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	15
+94	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	30
+1055	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	9
+218	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	14
+49	18	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	4
+1188	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	20
+671	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	11
+580	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	37
+1131	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	10
+742	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	16
+912	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	12
+846	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	3
+938	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	21
+1037	73	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	2
+1158	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	11
+184	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	18
+87	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	23
+753	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	8
+477	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	7
+1300	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	8
+550	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	7
+394	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	3
+272	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	21
+781	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	8
+1437	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	20
+1362	90	writing	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	1
+867	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	24
+190	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	4
+858	63	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	15
+554	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	11
+424	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	6
+406	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	15
+670	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	10
+309	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	10
+849	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	6
+509	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	39
+1366	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	5
+1348	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	2
+919	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	2
+1067	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	21
+156	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	24
+1096	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	14
+932	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	15
+1273	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	13
+1408	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	10
+641	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	4
+475	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	5
+961	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	44
+1433	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	16
+888	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	2
+1235	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	8
+282	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	10
+733	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	7
+269	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	18
+261	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	10
+502	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	32
+117	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	5
+125	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	13
+257	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	6
+1122	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	1
+1426	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	9
+700	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	26
+1308	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	16
+1258	83	open	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	11
+1166	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	19
+587	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	44
+1444	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	27
+1090	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	8
+349	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	14
+187	25	writing	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	1
+914	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	14
+766	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	5
+728	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	2
+1150	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	3
+1119	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	19
+506	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	36
+1416	95	writing	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	7
+242	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	2
+331	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	8
+1024	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	47
+913	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	13
+599	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	56
+677	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	3
+1461	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	16	16
+1232	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	5
+1028	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	51
+29	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	6
+4	15	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	4
+698	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	24
+96	20	writing	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	1
+466	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	9
+201	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	15
+844	63	writing	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	1
+980	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	3
+1039	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	4
+1201	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	33
+631	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	6
+1314	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	5
+1196	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	28
+107	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	1
+6	15	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	6
+446	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	10
+749	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	4
+1163	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	16
+86	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	22
+1148	79	writing	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	1
+920	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	3
+1058	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	12
+219	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	15
+363	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	9
+1432	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	15
+66	19	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	2
+231	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	7
+340	36	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	5
+661	52	writing	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	1
+512	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	42
+1213	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	45
+356	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	2
+523	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	10
+458	43	writing	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	1
+1311	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	2
+414	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	5
+640	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	3
+368	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	14
+1053	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	7
+1452	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	7
+735	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	9
+538	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	11
+166	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	34
+595	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	52
+142	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	10
+924	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	7
+872	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	29
+410	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	1
+1140	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	7
+1054	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	8
+792	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	7
+1381	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	5
+896	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	10
+651	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	14
+381	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	27
+359	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	5
+1005	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	28
+597	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	54
+1291	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	11
+193	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	7
+1449	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	4
+1435	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	18
+1012	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	35
+730	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	4
+548	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	5
+1212	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	44
+217	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	13
+1087	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	5
+1457	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	12
+47	18	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	2
+709	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	8
+1105	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	5
+177	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	11
+1332	88	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	6
+727	55	ignored	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	1
+985	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	8
+1405	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	7
+810	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	8
+779	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	6
+1231	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	4
+1276	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	16
+1117	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	17
+110	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	4
+1251	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	4
+931	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	14
+145	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	13
+557	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	14
+1189	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	21
+718	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	17
+485	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	15
+623	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	16
+1364	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	3
+1439	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	22
+1388	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	6
+1081	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	35
+229	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	5
+1112	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	12
+559	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	16
+1315	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	6
+304	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	5
+1102	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	2
+788	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	3
+52	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	7
+1453	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	8
+1198	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	30
+633	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	8
+341	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	6
+450	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	14
+900	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	14
+405	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	14
+1195	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	27
+170	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	4
+762	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	1
+996	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	19
+712	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	11
+192	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	6
+1174	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	6
+513	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	43
+1197	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	29
+101	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	6
+473	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	3
+1063	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	17
+69	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	5
+1059	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	13
+679	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	5
+983	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	6
+375	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	21
+415	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	6
+976	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	15
+729	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	3
+1242	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	15
+680	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	6
+408	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	17
+1376	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	15
+1365	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	4
+782	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	9
+1160	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	13
+689	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	15
+1338	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	12
+1359	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	13
+982	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	5
+522	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	9
+1079	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	33
+674	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	14
+1445	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	28
+630	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	5
+11	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	11
+1152	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	5
+575	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	32
+1330	88	writing	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	4
+1384	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	2
+821	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	6
+401	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	10
+1456	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	11
+1141	78	writing	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	8
+1329	88	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	3
+659	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	22
+739	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	13
+1094	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	12
+279	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	7
+9	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	9
+903	67	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	3
+1110	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	10
+741	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	15
+716	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	15
+897	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	11
+543	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	16
+736	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	10
+565	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	22
+566	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	23
+1130	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	9
+457	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	21
+85	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	21
+592	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	49
+1440	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	23
+281	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	9
+687	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	13
+1041	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	6
+553	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	10
+302	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	3
+288	32	ignored	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	1
+21	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	21
+622	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	15
+927	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	10
+1027	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	50
+774	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	1
+1385	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	3
+398	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	7
+635	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	10
+388	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	34
+1233	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	6
+165	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	33
+56	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	11
+151	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	19
+1346	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	20
+820	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	5
+1267	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	7
+992	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	15
+620	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	13
+894	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	8
+1357	89	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	11
+205	26	writing	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	1
+245	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	5
+67	19	writing	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	3
+1326	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	17
+1020	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	43
+325	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	2
+895	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	9
+673	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	13
+1377	91	writing	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	1
+1127	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	6
+1060	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	14
+1017	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	40
+783	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	10
+484	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	14
+334	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	11
+558	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	15
+144	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	12
+1071	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	25
+540	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	13
+1224	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	9
+168	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	2
+471	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	1
+598	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	55
+1051	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	5
+1424	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	7
+287	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	15
+464	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	7
+1109	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	9
+167	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	1
+277	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	5
+290	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	3
+300	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	1
+1352	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	6
+662	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	2
+284	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	12
+1254	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	7
+342	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	7
+1133	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	12
+1441	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	24
+1271	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	11
+1035	72	open	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0	3
+367	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	13
+1073	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	27
+588	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	45
+1019	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	42
+46	18	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	1
+439	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	3
+206	26	writing	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	2
+1389	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	7
+586	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	43
+572	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	29
+53	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	8
+32	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	9
+336	36	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	1
+275	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	3
+247	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	7
+1412	95	ignored	\N	2024-07-28 09:45:10.562906	2024-07-28 09:45:10.562906	0	3
+260	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	9
+423	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	5
+1240	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	13
+136	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	4
+139	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	7
+1459	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	14
+1182	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	14
+411	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	2
+869	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	26
+1033	72	writing	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0	1
+864	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	21
+425	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	7
+672	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	12
+825	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	10
+1454	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	9
+1040	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	5
+316	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	5
+731	55	writing	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	5
+403	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	12
+1282	85	ignored	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	2
+256	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	5
+1350	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	4
+654	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	17
+332	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	9
+628	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	3
+33	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	10
+422	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	4
+549	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	6
+185	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	19
+653	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	16
+380	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	26
+215	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	11
+1275	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	15
+1107	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	7
+1339	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	13
+130	22	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	18
+1157	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	10
+23	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	23
+486	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	16
+612	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	5
+625	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	1
+1155	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	0	8
+617	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	10
+765	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	4
+1277	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	17
+552	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	9
+887	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	1
+959	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	42
+819	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	4
+314	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	3
+817	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	2
+386	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	32
+1274	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	14
+426	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	8
+433	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	4
+364	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	10
+1187	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	19
+299	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	12
+169	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	3
+1123	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	2
+1113	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	13
+605	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	62
+345	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	10
+92	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	28
+1317	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	8
+541	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	14
+971	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	10
+660	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	23
+910	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	10
+437	42	writing	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	1
+236	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	12
+941	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	24
+957	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	40
+1065	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	19
+998	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	21
+949	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	32
+197	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	11
+135	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	3
+493	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	23
+999	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	22
+1064	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	18
+707	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	6
+665	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	5
+454	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	18
+759	56	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	14
+482	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	12
+1193	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	25
+227	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	3
+500	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	30
+1204	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	36
+311	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	12
+73	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	9
+1169	80	ignored	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	1
+103	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	8
+1252	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	5
+1171	80	ignored	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	3
+1236	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	9
+1138	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	5
+1085	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	3
+121	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	9
+239	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	15
+1353	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	7
+1255	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	8
+420	40	writing	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	2
+1438	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	21
+1407	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	9
+561	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	18
+1322	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	13
+845	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	2
+755	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	10
+1031	71	writing	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0	3
+1184	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	16
+196	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	10
+291	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	4
+15	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	15
+1069	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	23
+1361	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	15
+1129	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	8
+859	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	16
+842	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	0	5
+767	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	6
+1367	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	6
+61	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	16
+1043	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	8
+244	28	open	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	0	4
+602	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	59
+1192	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	24
+1088	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	6
+1124	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	3
+691	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	17
+468	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	11
+697	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	23
+1243	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	16
+721	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	20
+251	29	open	\N	2024-07-28 09:44:57.91634	2024-07-28 09:44:57.91634	0	1
+1100	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	18
+705	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	4
+104	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	9
+1270	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	10
+1436	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	19
+1032	71	ignored	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0	4
+960	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	43
+171	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	5
+397	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	6
+604	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	61
+427	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	9
+786	59	writing	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	1
+347	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	12
+179	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	13
+562	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	19
+1455	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	10
+636	50	open	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	0	11
+1228	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	1
+321	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	10
+1387	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	5
+105	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	10
+402	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	11
+804	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	2
+445	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	9
+866	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	23
+889	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	3
+991	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	14
+1391	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	9
+776	58	open	\N	2024-07-28 09:45:03.658056	2024-07-28 09:45:03.658056	0	3
+467	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	10
+327	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	4
+253	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	2
+1369	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	8
+692	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	18
+581	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	38
+14	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	14
+1177	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	9
+1121	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	21
+109	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	3
+133	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	1
+1343	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	17
+724	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	23
+1134	78	writing	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	1
+1323	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	14
+1237	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	10
+1222	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	7
+372	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	18
+1358	89	open	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	12
+339	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	4
+600	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	57
+772	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	11
+335	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	12
+603	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	60
+591	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	48
+808	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	6
+383	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	29
+301	33	writing	\N	2024-07-28 09:44:58.594555	2024-07-28 09:44:58.594555	0	2
+7	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	7
+1011	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	34
+757	56	open	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	12
+771	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	10
+827	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	12
+254	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	3
+1360	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	14
+377	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	23
+952	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	35
+159	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	27
+1402	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	4
+1399	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	1
+432	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	3
+986	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	9
+857	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	14
+619	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	12
+890	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	4
+1214	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	46
+20	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	20
+1394	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	12
+1347	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	1
+1341	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	15
+1061	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	15
+319	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	8
+1417	96	writing	\N	2024-07-28 09:45:10.605868	2024-07-28 09:45:10.605868	0	1
+1	15	ignored	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	1
+76	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	12
+1074	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	28
+517	45	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	4
+1111	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	11
+1082	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	36
+1392	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	10
+129	22	open	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	17
+203	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	17
+1181	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	13
+789	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	4
+346	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	11
+71	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	7
+267	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	16
+68	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	4
+1002	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	25
+773	57	writing	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	0	12
+1023	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	46
+146	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	14
+80	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	16
+1172	80	writing	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	4
+861	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	18
+1208	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	40
+511	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	41
+162	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	30
+1351	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	5
+738	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	12
+1183	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	15
+797	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	12
+582	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	39
+1333	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	7
+1095	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	13
+1034	72	open	\N	2024-07-28 09:45:06.360937	2024-07-28 09:45:06.360937	0	2
+943	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	26
+1386	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	4
+330	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	7
+751	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	6
+237	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	13
+1220	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	5
+451	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	15
+262	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	11
+323	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	0	12
+337	36	writing	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	2
+348	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	13
+1363	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	0	2
+504	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	34
+399	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	8
+238	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	0	14
+112	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	6
+560	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	17
+547	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	4
+818	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	3
+268	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	17
+1042	73	open	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	0	7
+613	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	6
+737	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	0	11
+1404	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	0	6
+569	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	26
+124	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	12
+615	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	8
+452	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	16
+798	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	13
+830	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	15
+200	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	14
+988	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	11
+1340	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	14
+964	69	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	3
+601	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	58
+590	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	47
+82	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	18
+990	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	13
+1396	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	14
+202	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	16
+685	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	11
+905	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	5
+1379	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	3
+973	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	12
+610	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	3
+79	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	15
+1425	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	8
+678	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	4
+812	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	10
+1390	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	8
+579	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	36
+510	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	40
+1448	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	3
+1176	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	8
+1186	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	18
+198	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	0	12
+17	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	17
+212	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	8
+28	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	5
+1116	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	16
+1290	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	10
+1089	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	7
+1380	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	0	4
+1070	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	24
+404	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	13
+1147	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	14
+720	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	19
+997	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	20
+917	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	17
+489	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	19
+1029	71	writing	\N	2024-07-28 09:45:06.300704	2024-07-28 09:45:06.300704	0	1
+1280	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	0	20
+515	45	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	2
+1068	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	22
+1256	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	0	9
+1000	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	23
+1245	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	18
+616	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	0	9
+1211	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	43
+1393	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	0	11
+706	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	0	5
+83	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	0	19
+63	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	18
+1230	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	3
+516	45	writing	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	3
+571	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	28
+1423	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	6
+956	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	39
+666	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	6
+542	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	15
+395	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	0	4
+216	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	12
+1294	86	writing	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	2
+295	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	0	8
+958	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	41
+694	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	20
+213	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	9
+955	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	38
+1114	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	14
+274	31	open	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	0	2
+1304	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	12
+801	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	16
+163	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	31
+1302	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	0	10
+1103	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	0	3
+833	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	18
+669	52	open	\N	2024-07-28 09:45:02.456043	2024-07-28 09:45:02.456043	0	9
+223	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	19
+352	36	open	\N	2024-07-28 09:44:59.070387	2024-07-28 09:44:59.070387	0	17
+1244	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	0	17
+362	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	8
+221	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	17
+752	56	writing	\N	2024-07-28 09:45:03.381245	2024-07-28 09:45:03.381245	0	7
+1013	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	36
+688	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	0	14
+1288	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	0	8
+1207	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	39
+594	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	51
+460	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	3
+499	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	0	29
+265	30	open	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	0	14
+111	21	open	\N	2024-07-28 09:44:56.428623	2024-07-28 09:44:56.428623	0	5
+1093	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	0	11
+1076	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	0	30
+851	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	0	8
+968	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	0	7
+16	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	0	16
+62	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	17
+893	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	0	7
+1318	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	9
+993	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	16
+326	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	0	3
+568	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	25
+371	37	ignored	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	0	17
+805	60	open	\N	2024-07-28 09:45:04.004299	2024-07-28 09:45:04.004299	0	3
+655	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	18
+1327	88	ignored	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	1
+1139	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	0	6
+413	39	open	\N	2024-07-28 09:44:59.735775	2024-07-28 09:44:59.735775	0	4
+1450	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	0	5
+649	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	12
+183	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	0	17
+100	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	0	5
+1225	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	10
+1223	81	open	\N	2024-07-28 09:45:08.385454	2024-07-28 09:45:08.385454	0	8
+925	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	8
+150	23	writing	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	18
+1342	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	0	16
+656	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	19
+421	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	3
+429	40	open	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	0	11
+835	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	20
+25	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	0	2
+122	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	0	10
+141	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	9
+1355	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	0	9
+648	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	0	11
+570	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	0	27
+1026	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	49
+923	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	6
+995	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	18
+434	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	0	5
+211	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	0	7
+1420	97	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	3
+1320	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	0	11
+901	67	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	0	1
+1191	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	0	23
+1014	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	0	37
+1125	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	0	4
+530	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	3
+928	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	0	11
+536	46	open	\N	2024-07-28 09:45:01.080459	2024-07-28 09:45:01.080459	0	9
+465	43	open	\N	2024-07-28 09:45:00.334809	2024-07-28 09:45:00.334809	0	8
+449	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	0	13
+520	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	0	7
+64	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	19
+1421	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	0	4
+55	18	open	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	0	10
+148	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	0	16
+790	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	0	5
+828	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	0	13
 \.
 
 
@@ -19461,6 +19459,14 @@ ALTER TABLE ONLY flashback.practice_usage
 
 
 --
+-- Name: resources resource_section_pattern_id; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.resources
+    ADD CONSTRAINT resource_section_pattern_id FOREIGN KEY (section_pattern_id) REFERENCES flashback.section_name_patterns(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
 -- Name: resource_subjects resource_subject_rid_pk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
 --
 
@@ -19474,14 +19480,6 @@ ALTER TABLE ONLY flashback.resource_subjects
 
 ALTER TABLE ONLY flashback.resource_subjects
     ADD CONSTRAINT resource_subject_sid_pk FOREIGN KEY (subject_id) REFERENCES flashback.subjects(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: sections sections_name_pattern_id; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
---
-
-ALTER TABLE ONLY flashback.sections
-    ADD CONSTRAINT sections_name_pattern_id FOREIGN KEY (name_pattern_id) REFERENCES flashback.section_name_patterns(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
