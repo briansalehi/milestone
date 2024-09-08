@@ -10,9 +10,14 @@ ApplicationWindow {
     Material.theme: Material.Dark
     minimumHeight: 800
     minimumWidth: 600
+    font.family: "Noto Sans"
 
-    property string fontFamily: "Noto Sans"
+    Workspace {
+        entry_color: window.color
+        entry_font: window.font.family
+    }
 
+    /*
     Login {
         id: login
         heading: "Login"
@@ -23,4 +28,5 @@ ApplicationWindow {
             login.visible = false
         }
     }
+    */
 }
