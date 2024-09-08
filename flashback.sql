@@ -38,6 +38,24 @@ CREATE TYPE flashback.block_type AS ENUM (
 ALTER TYPE flashback.block_type OWNER TO flashback;
 
 --
+-- Name: editing_action; Type: TYPE; Schema: flashback; Owner: flashback
+--
+
+CREATE TYPE flashback.editing_action AS ENUM (
+    'create',
+    'edit',
+    'merge',
+    'split',
+    'reorder',
+    'remove',
+    'watch',
+    'unwatch'
+);
+
+
+ALTER TYPE flashback.editing_action OWNER TO flashback;
+
+--
 -- Name: publication_state; Type: TYPE; Schema: flashback; Owner: flashback
 --
 
@@ -45,6 +63,7 @@ CREATE TYPE flashback.publication_state AS ENUM (
     'open',
     'writing',
     'completed',
+    'validated',
     'approved',
     'released',
     'ignored'
@@ -224,6 +243,26 @@ $$;
 
 
 ALTER FUNCTION flashback.create_user(username_string character varying, email_string character varying, first_name_string character varying, middle_name_string character varying, last_name_string character varying) OWNER TO flashback;
+
+--
+-- Name: get_editor_resources(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_editor_resources(user_index integer) RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, incomplete_sections bigint, updated timestamp without time zone)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select r.id, rs.subject_id, r.name, count(sc.id), max(st.updated)
+    from flashback.resources r
+    join flashback.resource_subjects rs on r.id = rs.resource_id
+    join flashback.sections sc on sc.resource_id = r.id and sc.state in ('open', 'writing')
+    join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
+    group by r.id, rs.subject_id, r.name;
+end; $$;
+
+
+ALTER FUNCTION flashback.get_editor_resources(user_index integer) OWNER TO flashback;
 
 --
 -- Name: get_section_name_patterns(); Type: FUNCTION; Schema: flashback; Owner: flashback
@@ -629,6 +668,35 @@ ALTER TABLE flashback.note_blocks ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTI
 
 
 --
+-- Name: note_editing; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.note_editing (
+    id integer NOT NULL,
+    user_id integer,
+    note_id integer,
+    action flashback.editing_action NOT NULL,
+    updated timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE flashback.note_editing OWNER TO flashback;
+
+--
+-- Name: note_editing_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE flashback.note_editing ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME flashback.note_editing_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: note_references; Type: TABLE; Schema: flashback; Owner: flashback
 --
 
@@ -739,6 +807,35 @@ ALTER TABLE flashback.practice_blocks OWNER TO flashback;
 
 ALTER TABLE flashback.practice_blocks ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME flashback.practice_blocks_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: practice_editing; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.practice_editing (
+    id integer NOT NULL,
+    user_id integer,
+    practice_id integer,
+    action flashback.editing_action NOT NULL,
+    updated timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE flashback.practice_editing OWNER TO flashback;
+
+--
+-- Name: practice_editing_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE flashback.practice_editing ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME flashback.practice_editing_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -876,6 +973,35 @@ ALTER TABLE flashback."references" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENT
 
 
 --
+-- Name: resource_editing; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.resource_editing (
+    id integer NOT NULL,
+    user_id integer,
+    resource_id integer,
+    action flashback.editing_action NOT NULL,
+    updated timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE flashback.resource_editing OWNER TO flashback;
+
+--
+-- Name: resource_editing_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE flashback.resource_editing ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME flashback.resource_editing_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: resource_subjects; Type: TABLE; Schema: flashback; Owner: flashback
 --
 
@@ -886,6 +1012,19 @@ CREATE TABLE flashback.resource_subjects (
 
 
 ALTER TABLE flashback.resource_subjects OWNER TO flashback;
+
+--
+-- Name: resource_watching; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.resource_watching (
+    user_id integer NOT NULL,
+    resource_id integer NOT NULL,
+    update timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE flashback.resource_watching OWNER TO flashback;
 
 --
 -- Name: resources; Type: TABLE; Schema: flashback; Owner: flashback
@@ -910,6 +1049,35 @@ ALTER TABLE flashback.resources OWNER TO flashback;
 
 ALTER TABLE flashback.resources ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME flashback.resources_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: section_editing; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.section_editing (
+    id integer NOT NULL,
+    user_id integer,
+    section_id integer,
+    action flashback.editing_action NOT NULL,
+    updated timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE flashback.section_editing OWNER TO flashback;
+
+--
+-- Name: section_editing_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE flashback.section_editing ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME flashback.section_editing_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -981,9 +1149,8 @@ ALTER TABLE flashback.sections ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY 
 --
 
 CREATE TABLE flashback.studies (
-    id integer NOT NULL,
-    user_id integer,
-    section_id integer,
+    user_id integer NOT NULL,
+    section_id integer NOT NULL,
     updated timestamp without time zone DEFAULT now() NOT NULL
 );
 
@@ -991,11 +1158,26 @@ CREATE TABLE flashback.studies (
 ALTER TABLE flashback.studies OWNER TO flashback;
 
 --
--- Name: studies_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+-- Name: subject_editing; Type: TABLE; Schema: flashback; Owner: flashback
 --
 
-ALTER TABLE flashback.studies ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME flashback.studies_id_seq
+CREATE TABLE flashback.subject_editing (
+    id integer NOT NULL,
+    user_id integer,
+    subject_id integer,
+    action flashback.editing_action NOT NULL,
+    updated timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE flashback.subject_editing OWNER TO flashback;
+
+--
+-- Name: subject_editing_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE flashback.subject_editing ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME flashback.subject_editing_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -1003,6 +1185,19 @@ ALTER TABLE flashback.studies ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     CACHE 1
 );
 
+
+--
+-- Name: subject_watching; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.subject_watching (
+    user_id integer NOT NULL,
+    subject_id integer NOT NULL,
+    update timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE flashback.subject_watching OWNER TO flashback;
 
 --
 -- Name: subjects; Type: TABLE; Schema: flashback; Owner: flashback
@@ -1093,6 +1288,35 @@ ALTER TABLE flashback.tasks ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 
 
 --
+-- Name: topic_editing; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.topic_editing (
+    id integer NOT NULL,
+    user_id integer,
+    topic_id integer,
+    action flashback.editing_action NOT NULL,
+    updated timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE flashback.topic_editing OWNER TO flashback;
+
+--
+-- Name: topic_editing_id_seq; Type: SEQUENCE; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE flashback.topic_editing ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME flashback.topic_editing_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: topics; Type: TABLE; Schema: flashback; Owner: flashback
 --
 
@@ -1130,10 +1354,10 @@ CREATE TABLE flashback.users (
     id integer NOT NULL,
     username character varying(20) NOT NULL,
     first_name character varying(30),
-    middle_name character varying(30),
     last_name character varying(30),
     state flashback.user_state DEFAULT 'active'::flashback.user_state NOT NULL,
-    email character varying(100) DEFAULT NULL::character varying
+    email character varying(100) DEFAULT NULL::character varying,
+    is_author boolean DEFAULT false NOT NULL
 );
 
 
@@ -8005,6 +8229,14 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 
 
 --
+-- Data for Name: note_editing; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.note_editing (id, user_id, note_id, action, updated) FROM stdin;
+\.
+
+
+--
 -- Data for Name: note_references; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
@@ -14279,6 +14511,14 @@ COPY flashback.practice_blocks (id, practice_id, content, type, language, update
 
 
 --
+-- Data for Name: practice_editing; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.practice_editing (id, user_id, practice_id, action, updated) FROM stdin;
+\.
+
+
+--
 -- Data for Name: practice_resources; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
@@ -16502,6 +16742,14 @@ COPY flashback."references" (id, practice_id, origin, type, updated) FROM stdin;
 
 
 --
+-- Data for Name: resource_editing; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.resource_editing (id, user_id, resource_id, action, updated) FROM stdin;
+\.
+
+
+--
 -- Data for Name: resource_subjects; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
@@ -16609,6 +16857,111 @@ COPY flashback.resource_subjects (resource_id, subject_id) FROM stdin;
 
 
 --
+-- Data for Name: resource_watching; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.resource_watching (user_id, resource_id, update) FROM stdin;
+1	1	2024-09-08 15:15:14.413906
+1	2	2024-09-08 15:15:14.413906
+1	3	2024-09-08 15:15:14.413906
+1	4	2024-09-08 15:15:14.413906
+1	5	2024-09-08 15:15:14.413906
+1	6	2024-09-08 15:15:14.413906
+1	7	2024-09-08 15:15:14.413906
+1	8	2024-09-08 15:15:14.413906
+1	9	2024-09-08 15:15:14.413906
+1	10	2024-09-08 15:15:14.413906
+1	11	2024-09-08 15:15:14.413906
+1	12	2024-09-08 15:15:14.413906
+1	13	2024-09-08 15:15:14.413906
+1	14	2024-09-08 15:15:14.413906
+1	15	2024-09-08 15:15:14.413906
+1	65	2024-09-08 15:15:14.413906
+1	98	2024-09-08 15:15:14.413906
+1	16	2024-09-08 15:15:14.413906
+1	17	2024-09-08 15:15:14.413906
+1	18	2024-09-08 15:15:14.413906
+1	19	2024-09-08 15:15:14.413906
+1	20	2024-09-08 15:15:14.413906
+1	21	2024-09-08 15:15:14.413906
+1	22	2024-09-08 15:15:14.413906
+1	23	2024-09-08 15:15:14.413906
+1	24	2024-09-08 15:15:14.413906
+1	25	2024-09-08 15:15:14.413906
+1	26	2024-09-08 15:15:14.413906
+1	27	2024-09-08 15:15:14.413906
+1	28	2024-09-08 15:15:14.413906
+1	29	2024-09-08 15:15:14.413906
+1	30	2024-09-08 15:15:14.413906
+1	31	2024-09-08 15:15:14.413906
+1	32	2024-09-08 15:15:14.413906
+1	33	2024-09-08 15:15:14.413906
+1	34	2024-09-08 15:15:14.413906
+1	35	2024-09-08 15:15:14.413906
+1	36	2024-09-08 15:15:14.413906
+1	37	2024-09-08 15:15:14.413906
+1	38	2024-09-08 15:15:14.413906
+1	39	2024-09-08 15:15:14.413906
+1	40	2024-09-08 15:15:14.413906
+1	41	2024-09-08 15:15:14.413906
+1	42	2024-09-08 15:15:14.413906
+1	43	2024-09-08 15:15:14.413906
+1	44	2024-09-08 15:15:14.413906
+1	45	2024-09-08 15:15:14.413906
+1	46	2024-09-08 15:15:14.413906
+1	47	2024-09-08 15:15:14.413906
+1	48	2024-09-08 15:15:14.413906
+1	49	2024-09-08 15:15:14.413906
+1	50	2024-09-08 15:15:14.413906
+1	51	2024-09-08 15:15:14.413906
+1	52	2024-09-08 15:15:14.413906
+1	53	2024-09-08 15:15:14.413906
+1	54	2024-09-08 15:15:14.413906
+1	55	2024-09-08 15:15:14.413906
+1	56	2024-09-08 15:15:14.413906
+1	57	2024-09-08 15:15:14.413906
+1	58	2024-09-08 15:15:14.413906
+1	59	2024-09-08 15:15:14.413906
+1	60	2024-09-08 15:15:14.413906
+1	61	2024-09-08 15:15:14.413906
+1	62	2024-09-08 15:15:14.413906
+1	63	2024-09-08 15:15:14.413906
+1	66	2024-09-08 15:15:14.413906
+1	67	2024-09-08 15:15:14.413906
+1	68	2024-09-08 15:15:14.413906
+1	69	2024-09-08 15:15:14.413906
+1	70	2024-09-08 15:15:14.413906
+1	71	2024-09-08 15:15:14.413906
+1	72	2024-09-08 15:15:14.413906
+1	73	2024-09-08 15:15:14.413906
+1	74	2024-09-08 15:15:14.413906
+1	75	2024-09-08 15:15:14.413906
+1	76	2024-09-08 15:15:14.413906
+1	77	2024-09-08 15:15:14.413906
+1	78	2024-09-08 15:15:14.413906
+1	79	2024-09-08 15:15:14.413906
+1	93	2024-09-08 15:15:14.413906
+1	80	2024-09-08 15:15:14.413906
+1	81	2024-09-08 15:15:14.413906
+1	82	2024-09-08 15:15:14.413906
+1	83	2024-09-08 15:15:14.413906
+1	84	2024-09-08 15:15:14.413906
+1	85	2024-09-08 15:15:14.413906
+1	86	2024-09-08 15:15:14.413906
+1	87	2024-09-08 15:15:14.413906
+1	88	2024-09-08 15:15:14.413906
+1	89	2024-09-08 15:15:14.413906
+1	90	2024-09-08 15:15:14.413906
+1	92	2024-09-08 15:15:14.413906
+1	94	2024-09-08 15:15:14.413906
+1	95	2024-09-08 15:15:14.413906
+1	96	2024-09-08 15:15:14.413906
+1	97	2024-09-08 15:15:14.413906
+1	91	2024-09-08 15:15:14.413906
+\.
+
+
+--
 -- Data for Name: resources; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
@@ -16627,89 +16980,97 @@ COPY flashback.resources (id, name, reference, type, created, updated, section_p
 12	LinkedIn Course: C++ Design Patterns: Creational by Olivia Chiu Stone	https://www.linkedin.com	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
 13	Kevin Dankwardt's Linux Device Drivers	https://www.linkedin.com/learning/linux-device-drivers	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
 14	LinkedIn Course: Linux Device Drivers	https://linkedin.com	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-15	Learning OpenCV 3	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-16	Calculus: Concepts and Contexts	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-17	Qt6 Deep Dive	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-18	Mastering Embedded Linux Programming	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-19	Teach Yourself C++ in One Hour a Day	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-20	C++20 STL Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-21	Mastering OpenCV 3	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-22	A Common-Sense Guide to Data Structures and Algorithms	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-23	Professional C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-24	Pro Tbb: C++ Parallel Programming with Threading Building Blocks	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-25	Hands-On Design Patterns with C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-26	Learn PostgreSQL	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-27	Docker for Developers	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-28	C++17 STL Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-29	PostgreSQL 13 Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-30	Practical Vim	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-31	OpenCV 4 Computer Vision Programming Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-32	Linux Security and Administration	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-33	Linux System Programming Techniques	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-34	Linux Driver Development for Embedded Processors	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-35	Demystifying Cryptography with OpenSSL 3.0	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-36	C++20: The Complete Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-37	Udemy: SQL and PostgreSQL - The Complete Developer's Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-38	Linux Service Management Made Easy with systemd	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-39	C++20: Get the Details	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-40	Learning eBPF	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-41	Linux Kernel Programming Part 2	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-42	Beginning C++23: From Novice to Professional	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-43	Linux Kernel Programming	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-44	Beginning x64 Assembly Programming	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-45	Docker: Up & Running	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-46	Docker in Practice	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-47	The Linux Programming Interface	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-48	CMake Best Practices	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-49	Linux Device Driver	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-50	Introduction to Linear and Matrix Algebra	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-51	Extreme C	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-52	Mastering Linux Device Driver Development	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-53	The Shellcoder's Handbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-54	Design Patterns in Modern C++20	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-55	The C++ Standard Library	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-56	Docker Deep Dive	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-57	Modern C++ Programming Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-58	Step by Step Learning x64 Assembly Language	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-59	Embedded Linux Development Using Yocto Project	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-60	Practical Binary Analysis	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-61	Learn Docker in a month of Lunches	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-62	Boost.Asio C++ Network Programming Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-63	C++17: The Complete Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-65	Offensive Security Wireless Professional (OSWP)	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	4
-66	Kali Linux Penetration Testing Bible	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-67	Linux Device Driver Development	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-68	The C++ Programming Language	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-69	Mastering Linux Security and Hardening	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-70	The Art of PostgreSQL	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-71	Heading for the Yocto Project	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-72	Introducing Qt6	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-73	C++ Concurrency in Action	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-74	Professional CMake	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-75	Mastering Kali Linux For Advanced Penetration Testing	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-76	Deciphering Object-Oriented Programming with C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-77	Linux Kernel Debugging	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-78	Hands-On Network Programming with C	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-79	Data Abstraction & Problem Solving with C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-93	GNU Pocket Reference	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-80	Udemy - The C++20 Master Class	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-81	PostgreSQL 14 Administration Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-82	Linux Kernel Development	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-83	Sudo Mastery	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-84	A Complete Guide to Standard C++ Algorithms	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-85	Cross-Platform Development with Qt6 and Modern C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-86	Concurrency with Modern C++	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-87	Thomas' Calculus	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-88	Qt6 QML	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-89	C++ Move Semantics: The Complete Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-90	CMake Cookbook	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-91	Embedded Linux Full Course by Anisa Institute	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	3
-92	Hands-On Mobile and Embedded Development with Qt5	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-94	Mastering Linux Kernel Development	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-95	Boost.Asio C++ Network Programming 	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-96	Embedded Linux using Yocto	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-97	C++ Templates: The Complete Guide	\N	unknown	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+15	Learning OpenCV 3	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+65	Offensive Security Wireless Professional (OSWP)	\N	video	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	4
 98	Modern CMake for C++	https://subscription.packtpub.com/book/programming/9781805121800	book	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	1
+16	Calculus: Concepts and Contexts	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+17	Qt6 Deep Dive	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+18	Mastering Embedded Linux Programming	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+19	Teach Yourself C++ in One Hour a Day	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+20	C++20 STL Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+21	Mastering OpenCV 3	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+22	A Common-Sense Guide to Data Structures and Algorithms	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+23	Professional C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+24	Pro Tbb: C++ Parallel Programming with Threading Building Blocks	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+25	Hands-On Design Patterns with C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+26	Learn PostgreSQL	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+27	Docker for Developers	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+28	C++17 STL Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+29	PostgreSQL 13 Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+30	Practical Vim	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+31	OpenCV 4 Computer Vision Programming Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+32	Linux Security and Administration	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+33	Linux System Programming Techniques	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+34	Linux Driver Development for Embedded Processors	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+35	Demystifying Cryptography with OpenSSL 3.0	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+36	C++20: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+37	Udemy: SQL and PostgreSQL - The Complete Developer's Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+38	Linux Service Management Made Easy with systemd	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+39	C++20: Get the Details	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+40	Learning eBPF	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+41	Linux Kernel Programming Part 2	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+42	Beginning C++23: From Novice to Professional	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+43	Linux Kernel Programming	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+44	Beginning x64 Assembly Programming	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+45	Docker: Up & Running	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+46	Docker in Practice	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+47	The Linux Programming Interface	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+48	CMake Best Practices	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+49	Linux Device Driver	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+50	Introduction to Linear and Matrix Algebra	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+51	Extreme C	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+52	Mastering Linux Device Driver Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+53	The Shellcoder's Handbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+54	Design Patterns in Modern C++20	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+55	The C++ Standard Library	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+56	Docker Deep Dive	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+57	Modern C++ Programming Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+58	Step by Step Learning x64 Assembly Language	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+59	Embedded Linux Development Using Yocto Project	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+60	Practical Binary Analysis	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+61	Learn Docker in a month of Lunches	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+62	Boost.Asio C++ Network Programming Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+63	C++17: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+66	Kali Linux Penetration Testing Bible	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+67	Linux Device Driver Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+68	The C++ Programming Language	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+69	Mastering Linux Security and Hardening	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+70	The Art of PostgreSQL	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+71	Heading for the Yocto Project	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+72	Introducing Qt6	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+73	C++ Concurrency in Action	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+74	Professional CMake	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+75	Mastering Kali Linux For Advanced Penetration Testing	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+76	Deciphering Object-Oriented Programming with C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+77	Linux Kernel Debugging	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+78	Hands-On Network Programming with C	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+79	Data Abstraction & Problem Solving with C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+93	GNU Pocket Reference	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+80	Udemy - The C++20 Master Class	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+81	PostgreSQL 14 Administration Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+82	Linux Kernel Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+83	Sudo Mastery	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+84	A Complete Guide to Standard C++ Algorithms	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+85	Cross-Platform Development with Qt6 and Modern C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+86	Concurrency with Modern C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+87	Thomas' Calculus	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+88	Qt6 QML	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+89	C++ Move Semantics: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+90	CMake Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+92	Hands-On Mobile and Embedded Development with Qt5	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+94	Mastering Linux Kernel Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+95	Boost.Asio C++ Network Programming 	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+96	Embedded Linux using Yocto	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+97	C++ Templates: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+91	Embedded Linux Full Course by Anisa Institute	\N	course	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	3
+\.
+
+
+--
+-- Data for Name: section_editing; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.section_editing (id, user_id, section_id, action, updated) FROM stdin;
 \.
 
 
@@ -18187,215 +18548,254 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, "p
 -- Data for Name: studies; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
-COPY flashback.studies (id, user_id, section_id, updated) FROM stdin;
-1	1	6	2024-08-07 22:44:43.138201
-2	1	3	2024-08-07 22:44:43.138201
-3	1	49	2024-08-07 22:44:43.138201
-4	1	48	2024-08-07 22:44:43.138201
-5	1	47	2024-08-07 22:44:43.138201
-6	1	46	2024-08-07 22:44:43.138201
-7	1	67	2024-08-07 22:44:43.138201
-8	1	65	2024-08-07 22:44:43.138201
-9	1	66	2024-08-07 22:44:43.138201
-10	1	96	2024-08-07 22:44:43.138201
-11	1	125	2024-08-07 22:44:43.138201
-12	1	117	2024-08-07 22:44:43.138201
-13	1	128	2024-08-07 22:44:43.138201
-14	1	122	2024-08-07 22:44:43.138201
-15	1	115	2024-08-07 22:44:43.138201
-16	1	127	2024-08-07 22:44:43.138201
-17	1	121	2024-08-07 22:44:43.138201
-18	1	118	2024-08-07 22:44:43.138201
-19	1	124	2024-08-07 22:44:43.138201
-20	1	126	2024-08-07 22:44:43.138201
-21	1	113	2024-08-07 22:44:43.138201
-22	1	120	2024-08-07 22:44:43.138201
-23	1	116	2024-08-07 22:44:43.138201
-24	1	114	2024-08-07 22:44:43.138201
-25	1	150	2024-08-07 22:44:43.138201
-26	1	149	2024-08-07 22:44:43.138201
-27	1	206	2024-08-07 22:44:43.138201
-28	1	205	2024-08-07 22:44:43.138201
-29	1	250	2024-08-07 22:44:43.138201
-30	1	254	2024-08-07 22:44:43.138201
-31	1	258	2024-08-07 22:44:43.138201
-32	1	252	2024-08-07 22:44:43.138201
-33	1	253	2024-08-07 22:44:43.138201
-34	1	255	2024-08-07 22:44:43.138201
-35	1	256	2024-08-07 22:44:43.138201
-36	1	267	2024-08-07 22:44:43.138201
-37	1	257	2024-08-07 22:44:43.138201
-38	1	268	2024-08-07 22:44:43.138201
-39	1	273	2024-08-07 22:44:43.138201
-40	1	295	2024-08-07 22:44:43.138201
-41	1	296	2024-08-07 22:44:43.138201
-42	1	293	2024-08-07 22:44:43.138201
-43	1	289	2024-08-07 22:44:43.138201
-44	1	291	2024-08-07 22:44:43.138201
-45	1	290	2024-08-07 22:44:43.138201
-46	1	299	2024-08-07 22:44:43.138201
-47	1	307	2024-08-07 22:44:43.138201
-48	1	306	2024-08-07 22:44:43.138201
-49	1	311	2024-08-07 22:44:43.138201
-50	1	310	2024-08-07 22:44:43.138201
-51	1	309	2024-08-07 22:44:43.138201
-52	1	305	2024-08-07 22:44:43.138201
-53	1	300	2024-08-07 22:44:43.138201
-54	1	302	2024-08-07 22:44:43.138201
-55	1	304	2024-08-07 22:44:43.138201
-56	1	303	2024-08-07 22:44:43.138201
-57	1	308	2024-08-07 22:44:43.138201
-58	1	301	2024-08-07 22:44:43.138201
-59	1	340	2024-08-07 22:44:43.138201
-60	1	337	2024-08-07 22:44:43.138201
-61	1	336	2024-08-07 22:44:43.138201
-62	1	338	2024-08-07 22:44:43.138201
-63	1	358	2024-08-07 22:44:43.138201
-64	1	376	2024-08-07 22:44:43.138201
-65	1	359	2024-08-07 22:44:43.138201
-66	1	368	2024-08-07 22:44:43.138201
-67	1	361	2024-08-07 22:44:43.138201
-68	1	379	2024-08-07 22:44:43.138201
-69	1	370	2024-08-07 22:44:43.138201
-70	1	378	2024-08-07 22:44:43.138201
-71	1	355	2024-08-07 22:44:43.138201
-72	1	377	2024-08-07 22:44:43.138201
-73	1	356	2024-08-07 22:44:43.138201
-74	1	362	2024-08-07 22:44:43.138201
-75	1	357	2024-08-07 22:44:43.138201
-76	1	363	2024-08-07 22:44:43.138201
-77	1	369	2024-08-07 22:44:43.138201
-78	1	419	2024-08-07 22:44:43.138201
-79	1	420	2024-08-07 22:44:43.138201
-80	1	430	2024-08-07 22:44:43.138201
-81	1	437	2024-08-07 22:44:43.138201
-82	1	459	2024-08-07 22:44:43.138201
-83	1	470	2024-08-07 22:44:43.138201
-84	1	458	2024-08-07 22:44:43.138201
-85	1	474	2024-08-07 22:44:43.138201
-86	1	487	2024-08-07 22:44:43.138201
-87	1	496	2024-08-07 22:44:43.138201
-88	1	481	2024-08-07 22:44:43.138201
-89	1	483	2024-08-07 22:44:43.138201
-90	1	494	2024-08-07 22:44:43.138201
-91	1	488	2024-08-07 22:44:43.138201
-92	1	479	2024-08-07 22:44:43.138201
-93	1	495	2024-08-07 22:44:43.138201
-94	1	491	2024-08-07 22:44:43.138201
-95	1	478	2024-08-07 22:44:43.138201
-96	1	472	2024-08-07 22:44:43.138201
-97	1	497	2024-08-07 22:44:43.138201
-98	1	490	2024-08-07 22:44:43.138201
-99	1	480	2024-08-07 22:44:43.138201
-100	1	492	2024-08-07 22:44:43.138201
-101	1	477	2024-08-07 22:44:43.138201
-102	1	485	2024-08-07 22:44:43.138201
-103	1	473	2024-08-07 22:44:43.138201
-104	1	484	2024-08-07 22:44:43.138201
-105	1	471	2024-08-07 22:44:43.138201
-106	1	486	2024-08-07 22:44:43.138201
-107	1	493	2024-08-07 22:44:43.138201
-108	1	482	2024-08-07 22:44:43.138201
-109	1	489	2024-08-07 22:44:43.138201
-110	1	516	2024-08-07 22:44:43.138201
-111	1	515	2024-08-07 22:44:43.138201
-112	1	529	2024-08-07 22:44:43.138201
-113	1	528	2024-08-07 22:44:43.138201
-114	1	624	2024-08-07 22:44:43.138201
-115	1	625	2024-08-07 22:44:43.138201
-116	1	627	2024-08-07 22:44:43.138201
-117	1	629	2024-08-07 22:44:43.138201
-118	1	626	2024-08-07 22:44:43.138201
-119	1	652	2024-08-07 22:44:43.138201
-120	1	661	2024-08-07 22:44:43.138201
-121	1	676	2024-08-07 22:44:43.138201
-122	1	675	2024-08-07 22:44:43.138201
-123	1	744	2024-08-07 22:44:43.138201
-124	1	729	2024-08-07 22:44:43.138201
-125	1	731	2024-08-07 22:44:43.138201
-126	1	728	2024-08-07 22:44:43.138201
-127	1	730	2024-08-07 22:44:43.138201
-128	1	755	2024-08-07 22:44:43.138201
-129	1	749	2024-08-07 22:44:43.138201
-130	1	758	2024-08-07 22:44:43.138201
-131	1	753	2024-08-07 22:44:43.138201
-132	1	751	2024-08-07 22:44:43.138201
-133	1	752	2024-08-07 22:44:43.138201
-134	1	760	2024-08-07 22:44:43.138201
-135	1	773	2024-08-07 22:44:43.138201
-136	1	763	2024-08-07 22:44:43.138201
-137	1	764	2024-08-07 22:44:43.138201
-138	1	762	2024-08-07 22:44:43.138201
-139	1	768	2024-08-07 22:44:43.138201
-140	1	765	2024-08-07 22:44:43.138201
-141	1	786	2024-08-07 22:44:43.138201
-142	1	787	2024-08-07 22:44:43.138201
-143	1	803	2024-08-07 22:44:43.138201
-144	1	838	2024-08-07 22:44:43.138201
-145	1	844	2024-08-07 22:44:43.138201
-146	1	863	2024-08-07 22:44:43.138201
-147	1	858	2024-08-07 22:44:43.138201
-148	1	853	2024-08-07 22:44:43.138201
-150	1	886	2024-08-07 22:44:43.138201
-151	1	902	2024-08-07 22:44:43.138201
-152	1	903	2024-08-07 22:44:43.138201
-153	1	901	2024-08-07 22:44:43.138201
-154	1	963	2024-08-07 22:44:43.138201
-155	1	962	2024-08-07 22:44:43.138201
-156	1	964	2024-08-07 22:44:43.138201
-157	1	965	2024-08-07 22:44:43.138201
-158	1	1029	2024-08-07 22:44:43.138201
-159	1	1031	2024-08-07 22:44:43.138201
-160	1	1037	2024-08-07 22:44:43.138201
-161	1	1038	2024-08-07 22:44:43.138201
-162	1	1036	2024-08-07 22:44:43.138201
-163	1	1135	2024-08-07 22:44:43.138201
-164	1	1141	2024-08-07 22:44:43.138201
-165	1	1134	2024-08-07 22:44:43.138201
-166	1	1148	2024-08-07 22:44:43.138201
-167	1	1250	2024-08-07 22:44:43.138201
-168	1	1252	2024-08-07 22:44:43.138201
-169	1	1260	2024-08-07 22:44:43.138201
-170	1	1255	2024-08-07 22:44:43.138201
-171	1	1251	2024-08-07 22:44:43.138201
-172	1	1259	2024-08-07 22:44:43.138201
-173	1	1256	2024-08-07 22:44:43.138201
-174	1	1254	2024-08-07 22:44:43.138201
-175	1	1253	2024-08-07 22:44:43.138201
-176	1	1248	2024-08-07 22:44:43.138201
-177	1	1249	2024-08-07 22:44:43.138201
-178	1	1257	2024-08-07 22:44:43.138201
-179	1	1261	2024-08-07 22:44:43.138201
-180	1	1284	2024-08-07 22:44:43.138201
-181	1	1281	2024-08-07 22:44:43.138201
-182	1	1294	2024-08-07 22:44:43.138201
-183	1	1310	2024-08-07 22:44:43.138201
-184	1	1330	2024-08-07 22:44:43.138201
-185	1	1331	2024-08-07 22:44:43.138201
-186	1	1332	2024-08-07 22:44:43.138201
-187	1	1347	2024-08-07 22:44:43.138201
-188	1	1351	2024-08-07 22:44:43.138201
-189	1	1359	2024-08-07 22:44:43.138201
-190	1	1360	2024-08-07 22:44:43.138201
-191	1	1355	2024-08-07 22:44:43.138201
-192	1	1348	2024-08-07 22:44:43.138201
-193	1	1349	2024-08-07 22:44:43.138201
-194	1	1361	2024-08-07 22:44:43.138201
-195	1	1353	2024-08-07 22:44:43.138201
-196	1	1350	2024-08-07 22:44:43.138201
-197	1	1362	2024-08-07 22:44:43.138201
-198	1	1377	2024-08-07 22:44:43.138201
-199	1	1398	2024-08-07 22:44:43.138201
-200	1	1413	2024-08-07 22:44:43.138201
-201	1	1415	2024-08-07 22:44:43.138201
-202	1	1414	2024-08-07 22:44:43.138201
-203	1	1416	2024-08-07 22:44:43.138201
-204	1	1417	2024-08-07 22:44:43.138201
-205	1	1419	2024-08-07 22:44:43.138201
-206	1	1418	2024-08-07 22:44:43.138201
-207	1	1420	2024-08-07 22:44:43.138201
-208	1	1446	2024-08-18 17:15:29.113219
-209	1	1461	2024-08-18 17:15:29.113219
+COPY flashback.studies (user_id, section_id, updated) FROM stdin;
+1	6	2024-08-07 22:44:43.138201
+1	3	2024-08-07 22:44:43.138201
+1	49	2024-08-07 22:44:43.138201
+1	48	2024-08-07 22:44:43.138201
+1	47	2024-08-07 22:44:43.138201
+1	46	2024-08-07 22:44:43.138201
+1	67	2024-08-07 22:44:43.138201
+1	65	2024-08-07 22:44:43.138201
+1	66	2024-08-07 22:44:43.138201
+1	96	2024-08-07 22:44:43.138201
+1	125	2024-08-07 22:44:43.138201
+1	117	2024-08-07 22:44:43.138201
+1	128	2024-08-07 22:44:43.138201
+1	122	2024-08-07 22:44:43.138201
+1	115	2024-08-07 22:44:43.138201
+1	127	2024-08-07 22:44:43.138201
+1	121	2024-08-07 22:44:43.138201
+1	118	2024-08-07 22:44:43.138201
+1	124	2024-08-07 22:44:43.138201
+1	126	2024-08-07 22:44:43.138201
+1	113	2024-08-07 22:44:43.138201
+1	120	2024-08-07 22:44:43.138201
+1	116	2024-08-07 22:44:43.138201
+1	114	2024-08-07 22:44:43.138201
+1	150	2024-08-07 22:44:43.138201
+1	149	2024-08-07 22:44:43.138201
+1	206	2024-08-07 22:44:43.138201
+1	205	2024-08-07 22:44:43.138201
+1	250	2024-08-07 22:44:43.138201
+1	254	2024-08-07 22:44:43.138201
+1	258	2024-08-07 22:44:43.138201
+1	252	2024-08-07 22:44:43.138201
+1	253	2024-08-07 22:44:43.138201
+1	255	2024-08-07 22:44:43.138201
+1	256	2024-08-07 22:44:43.138201
+1	267	2024-08-07 22:44:43.138201
+1	257	2024-08-07 22:44:43.138201
+1	268	2024-08-07 22:44:43.138201
+1	273	2024-08-07 22:44:43.138201
+1	295	2024-08-07 22:44:43.138201
+1	296	2024-08-07 22:44:43.138201
+1	293	2024-08-07 22:44:43.138201
+1	289	2024-08-07 22:44:43.138201
+1	291	2024-08-07 22:44:43.138201
+1	290	2024-08-07 22:44:43.138201
+1	299	2024-08-07 22:44:43.138201
+1	307	2024-08-07 22:44:43.138201
+1	306	2024-08-07 22:44:43.138201
+1	311	2024-08-07 22:44:43.138201
+1	310	2024-08-07 22:44:43.138201
+1	309	2024-08-07 22:44:43.138201
+1	305	2024-08-07 22:44:43.138201
+1	300	2024-08-07 22:44:43.138201
+1	302	2024-08-07 22:44:43.138201
+1	304	2024-08-07 22:44:43.138201
+1	303	2024-08-07 22:44:43.138201
+1	308	2024-08-07 22:44:43.138201
+1	301	2024-08-07 22:44:43.138201
+1	340	2024-08-07 22:44:43.138201
+1	337	2024-08-07 22:44:43.138201
+1	336	2024-08-07 22:44:43.138201
+1	338	2024-08-07 22:44:43.138201
+1	358	2024-08-07 22:44:43.138201
+1	376	2024-08-07 22:44:43.138201
+1	359	2024-08-07 22:44:43.138201
+1	368	2024-08-07 22:44:43.138201
+1	361	2024-08-07 22:44:43.138201
+1	379	2024-08-07 22:44:43.138201
+1	370	2024-08-07 22:44:43.138201
+1	378	2024-08-07 22:44:43.138201
+1	355	2024-08-07 22:44:43.138201
+1	377	2024-08-07 22:44:43.138201
+1	356	2024-08-07 22:44:43.138201
+1	362	2024-08-07 22:44:43.138201
+1	357	2024-08-07 22:44:43.138201
+1	363	2024-08-07 22:44:43.138201
+1	369	2024-08-07 22:44:43.138201
+1	419	2024-08-07 22:44:43.138201
+1	420	2024-08-07 22:44:43.138201
+1	430	2024-08-07 22:44:43.138201
+1	437	2024-08-07 22:44:43.138201
+1	459	2024-08-07 22:44:43.138201
+1	470	2024-08-07 22:44:43.138201
+1	458	2024-08-07 22:44:43.138201
+1	474	2024-08-07 22:44:43.138201
+1	487	2024-08-07 22:44:43.138201
+1	496	2024-08-07 22:44:43.138201
+1	481	2024-08-07 22:44:43.138201
+1	483	2024-08-07 22:44:43.138201
+1	494	2024-08-07 22:44:43.138201
+1	488	2024-08-07 22:44:43.138201
+1	479	2024-08-07 22:44:43.138201
+1	495	2024-08-07 22:44:43.138201
+1	491	2024-08-07 22:44:43.138201
+1	478	2024-08-07 22:44:43.138201
+1	472	2024-08-07 22:44:43.138201
+1	497	2024-08-07 22:44:43.138201
+1	490	2024-08-07 22:44:43.138201
+1	480	2024-08-07 22:44:43.138201
+1	492	2024-08-07 22:44:43.138201
+1	477	2024-08-07 22:44:43.138201
+1	485	2024-08-07 22:44:43.138201
+1	473	2024-08-07 22:44:43.138201
+1	484	2024-08-07 22:44:43.138201
+1	471	2024-08-07 22:44:43.138201
+1	486	2024-08-07 22:44:43.138201
+1	493	2024-08-07 22:44:43.138201
+1	482	2024-08-07 22:44:43.138201
+1	489	2024-08-07 22:44:43.138201
+1	516	2024-08-07 22:44:43.138201
+1	515	2024-08-07 22:44:43.138201
+1	529	2024-08-07 22:44:43.138201
+1	528	2024-08-07 22:44:43.138201
+1	624	2024-08-07 22:44:43.138201
+1	625	2024-08-07 22:44:43.138201
+1	627	2024-08-07 22:44:43.138201
+1	629	2024-08-07 22:44:43.138201
+1	626	2024-08-07 22:44:43.138201
+1	652	2024-08-07 22:44:43.138201
+1	661	2024-08-07 22:44:43.138201
+1	676	2024-08-07 22:44:43.138201
+1	675	2024-08-07 22:44:43.138201
+1	744	2024-08-07 22:44:43.138201
+1	729	2024-08-07 22:44:43.138201
+1	731	2024-08-07 22:44:43.138201
+1	728	2024-08-07 22:44:43.138201
+1	730	2024-08-07 22:44:43.138201
+1	755	2024-08-07 22:44:43.138201
+1	749	2024-08-07 22:44:43.138201
+1	758	2024-08-07 22:44:43.138201
+1	753	2024-08-07 22:44:43.138201
+1	751	2024-08-07 22:44:43.138201
+1	752	2024-08-07 22:44:43.138201
+1	760	2024-08-07 22:44:43.138201
+1	773	2024-08-07 22:44:43.138201
+1	763	2024-08-07 22:44:43.138201
+1	764	2024-08-07 22:44:43.138201
+1	762	2024-08-07 22:44:43.138201
+1	768	2024-08-07 22:44:43.138201
+1	765	2024-08-07 22:44:43.138201
+1	786	2024-08-07 22:44:43.138201
+1	787	2024-08-07 22:44:43.138201
+1	803	2024-08-07 22:44:43.138201
+1	838	2024-08-07 22:44:43.138201
+1	844	2024-08-07 22:44:43.138201
+1	863	2024-08-07 22:44:43.138201
+1	858	2024-08-07 22:44:43.138201
+1	853	2024-08-07 22:44:43.138201
+1	886	2024-08-07 22:44:43.138201
+1	902	2024-08-07 22:44:43.138201
+1	903	2024-08-07 22:44:43.138201
+1	901	2024-08-07 22:44:43.138201
+1	963	2024-08-07 22:44:43.138201
+1	962	2024-08-07 22:44:43.138201
+1	964	2024-08-07 22:44:43.138201
+1	965	2024-08-07 22:44:43.138201
+1	1029	2024-08-07 22:44:43.138201
+1	1031	2024-08-07 22:44:43.138201
+1	1037	2024-08-07 22:44:43.138201
+1	1038	2024-08-07 22:44:43.138201
+1	1036	2024-08-07 22:44:43.138201
+1	1135	2024-08-07 22:44:43.138201
+1	1141	2024-08-07 22:44:43.138201
+1	1134	2024-08-07 22:44:43.138201
+1	1148	2024-08-07 22:44:43.138201
+1	1250	2024-08-07 22:44:43.138201
+1	1252	2024-08-07 22:44:43.138201
+1	1260	2024-08-07 22:44:43.138201
+1	1255	2024-08-07 22:44:43.138201
+1	1251	2024-08-07 22:44:43.138201
+1	1259	2024-08-07 22:44:43.138201
+1	1256	2024-08-07 22:44:43.138201
+1	1254	2024-08-07 22:44:43.138201
+1	1253	2024-08-07 22:44:43.138201
+1	1248	2024-08-07 22:44:43.138201
+1	1249	2024-08-07 22:44:43.138201
+1	1257	2024-08-07 22:44:43.138201
+1	1261	2024-08-07 22:44:43.138201
+1	1284	2024-08-07 22:44:43.138201
+1	1281	2024-08-07 22:44:43.138201
+1	1294	2024-08-07 22:44:43.138201
+1	1310	2024-08-07 22:44:43.138201
+1	1330	2024-08-07 22:44:43.138201
+1	1331	2024-08-07 22:44:43.138201
+1	1332	2024-08-07 22:44:43.138201
+1	1347	2024-08-07 22:44:43.138201
+1	1351	2024-08-07 22:44:43.138201
+1	1359	2024-08-07 22:44:43.138201
+1	1360	2024-08-07 22:44:43.138201
+1	1355	2024-08-07 22:44:43.138201
+1	1348	2024-08-07 22:44:43.138201
+1	1349	2024-08-07 22:44:43.138201
+1	1361	2024-08-07 22:44:43.138201
+1	1353	2024-08-07 22:44:43.138201
+1	1350	2024-08-07 22:44:43.138201
+1	1362	2024-08-07 22:44:43.138201
+1	1377	2024-08-07 22:44:43.138201
+1	1398	2024-08-07 22:44:43.138201
+1	1413	2024-08-07 22:44:43.138201
+1	1415	2024-08-07 22:44:43.138201
+1	1414	2024-08-07 22:44:43.138201
+1	1416	2024-08-07 22:44:43.138201
+1	1417	2024-08-07 22:44:43.138201
+1	1419	2024-08-07 22:44:43.138201
+1	1418	2024-08-07 22:44:43.138201
+1	1420	2024-08-07 22:44:43.138201
+1	1446	2024-08-18 17:15:29.113219
+1	1461	2024-08-18 17:15:29.113219
+\.
+
+
+--
+-- Data for Name: subject_editing; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.subject_editing (id, user_id, subject_id, action, updated) FROM stdin;
+\.
+
+
+--
+-- Data for Name: subject_watching; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.subject_watching (user_id, subject_id, update) FROM stdin;
+1	1	2024-09-08 15:15:39.858664
+1	2	2024-09-08 15:15:39.858664
+1	3	2024-09-08 15:15:39.858664
+1	4	2024-09-08 15:15:39.858664
+1	5	2024-09-08 15:15:39.858664
+1	6	2024-09-08 15:15:39.858664
+1	7	2024-09-08 15:15:39.858664
+1	8	2024-09-08 15:15:39.858664
+1	9	2024-09-08 15:15:39.858664
+1	10	2024-09-08 15:15:39.858664
+1	11	2024-09-08 15:15:39.858664
+1	12	2024-09-08 15:15:39.858664
+1	13	2024-09-08 15:15:39.858664
+1	14	2024-09-08 15:15:39.858664
+1	15	2024-09-08 15:15:39.858664
+1	16	2024-09-08 15:15:39.858664
+1	17	2024-09-08 15:15:39.858664
+1	18	2024-09-08 15:15:39.858664
+1	19	2024-09-08 15:15:39.858664
+1	20	2024-09-08 15:15:39.858664
+1	21	2024-09-08 15:15:39.858664
+1	22	2024-09-08 15:15:39.858664
+1	23	2024-09-08 15:15:39.858664
 \.
 
 
@@ -18443,6 +18843,14 @@ COPY flashback.task_blocks (id, task_id, solution, type, language, creation, upd
 --
 
 COPY flashback.tasks (id, topic_id, heading, creation, updated) FROM stdin;
+\.
+
+
+--
+-- Data for Name: topic_editing; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.topic_editing (id, user_id, topic_id, action, updated) FROM stdin;
 \.
 
 
@@ -18907,8 +19315,8 @@ COPY flashback.topics (id, subject_id, name, creation, update, "position") FROM 
 -- Data for Name: users; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
-COPY flashback.users (id, username, first_name, middle_name, last_name, state, email) FROM stdin;
-1	briansalehi	Brian	\N	Salehi	active	briansalehi@proton.me
+COPY flashback.users (id, username, first_name, last_name, state, email, is_author) FROM stdin;
+1	briansalehi	Brian	Salehi	active	briansalehi@proton.me	t
 \.
 
 
@@ -18948,6 +19356,13 @@ SELECT pg_catalog.setval('flashback.note_blocks_id_seq', 6895, true);
 
 
 --
+-- Name: note_editing_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
+--
+
+SELECT pg_catalog.setval('flashback.note_editing_id_seq', 1, false);
+
+
+--
 -- Name: note_references_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
@@ -18973,6 +19388,13 @@ SELECT pg_catalog.setval('flashback.notes_id_seq', 2257, true);
 --
 
 SELECT pg_catalog.setval('flashback.practice_blocks_id_seq', 3822, true);
+
+
+--
+-- Name: practice_editing_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
+--
+
+SELECT pg_catalog.setval('flashback.practice_editing_id_seq', 1, false);
 
 
 --
@@ -19004,10 +19426,24 @@ SELECT pg_catalog.setval('flashback.references_id_seq', 191, true);
 
 
 --
+-- Name: resource_editing_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
+--
+
+SELECT pg_catalog.setval('flashback.resource_editing_id_seq', 1, false);
+
+
+--
 -- Name: resources_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
 SELECT pg_catalog.setval('flashback.resources_id_seq', 98, true);
+
+
+--
+-- Name: section_editing_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
+--
+
+SELECT pg_catalog.setval('flashback.section_editing_id_seq', 1, false);
 
 
 --
@@ -19025,10 +19461,10 @@ SELECT pg_catalog.setval('flashback.sections_id_seq', 1463, true);
 
 
 --
--- Name: studies_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
+-- Name: subject_editing_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.studies_id_seq', 209, true);
+SELECT pg_catalog.setval('flashback.subject_editing_id_seq', 1, false);
 
 
 --
@@ -19050,6 +19486,13 @@ SELECT pg_catalog.setval('flashback.task_blocks_id_seq', 1, false);
 --
 
 SELECT pg_catalog.setval('flashback.tasks_id_seq', 1, false);
+
+
+--
+-- Name: topic_editing_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
+--
+
+SELECT pg_catalog.setval('flashback.topic_editing_id_seq', 1, false);
 
 
 --
@@ -19123,6 +19566,14 @@ ALTER TABLE ONLY flashback.note_blocks
 
 
 --
+-- Name: note_editing note_editing_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.note_editing
+    ADD CONSTRAINT note_editing_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: note_references note_references_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
 --
 
@@ -19152,6 +19603,14 @@ ALTER TABLE ONLY flashback.notes
 
 ALTER TABLE ONLY flashback.practice_blocks
     ADD CONSTRAINT practice_blocks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: practice_editing practice_editing_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.practice_editing
+    ADD CONSTRAINT practice_editing_pkey PRIMARY KEY (id);
 
 
 --
@@ -19187,6 +19646,14 @@ ALTER TABLE ONLY flashback."references"
 
 
 --
+-- Name: resource_editing resource_editing_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.resource_editing
+    ADD CONSTRAINT resource_editing_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: resource_subjects resource_subject_pk; Type: CONSTRAINT; Schema: flashback; Owner: flashback
 --
 
@@ -19195,11 +19662,27 @@ ALTER TABLE ONLY flashback.resource_subjects
 
 
 --
+-- Name: resource_watching resource_watching_user_id_resource_id_pk; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.resource_watching
+    ADD CONSTRAINT resource_watching_user_id_resource_id_pk PRIMARY KEY (user_id, resource_id);
+
+
+--
 -- Name: resources resources_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
 --
 
 ALTER TABLE ONLY flashback.resources
     ADD CONSTRAINT resources_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: section_editing section_editing_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.section_editing
+    ADD CONSTRAINT section_editing_pkey PRIMARY KEY (id);
 
 
 --
@@ -19231,7 +19714,23 @@ ALTER TABLE ONLY flashback.sections
 --
 
 ALTER TABLE ONLY flashback.studies
-    ADD CONSTRAINT studies_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT studies_pkey PRIMARY KEY (user_id, section_id);
+
+
+--
+-- Name: subject_editing subject_editing_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.subject_editing
+    ADD CONSTRAINT subject_editing_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: subject_watching subject_watching_user_id_subject_id_pk; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.subject_watching
+    ADD CONSTRAINT subject_watching_user_id_subject_id_pk PRIMARY KEY (user_id, subject_id);
 
 
 --
@@ -19264,6 +19763,14 @@ ALTER TABLE ONLY flashback.task_blocks
 
 ALTER TABLE ONLY flashback.tasks
     ADD CONSTRAINT tasks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: topic_editing topic_editing_pkey; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.topic_editing
+    ADD CONSTRAINT topic_editing_pkey PRIMARY KEY (id);
 
 
 --
@@ -19443,6 +19950,22 @@ ALTER TABLE ONLY flashback.logins
 
 
 --
+-- Name: note_editing note_editing_note_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.note_editing
+    ADD CONSTRAINT note_editing_note_id_fk FOREIGN KEY (note_id) REFERENCES flashback.notes(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: note_editing note_editing_user_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.note_editing
+    ADD CONSTRAINT note_editing_user_id_fk FOREIGN KEY (user_id) REFERENCES flashback.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
 -- Name: note_usage note_note_usage_id; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
 --
 
@@ -19451,11 +19974,43 @@ ALTER TABLE ONLY flashback.note_usage
 
 
 --
+-- Name: practice_editing practice_editing_practice_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.practice_editing
+    ADD CONSTRAINT practice_editing_practice_id_fk FOREIGN KEY (practice_id) REFERENCES flashback.practices(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: practice_editing practice_editing_user_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.practice_editing
+    ADD CONSTRAINT practice_editing_user_id_fk FOREIGN KEY (user_id) REFERENCES flashback.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
 -- Name: practice_usage practice_practice_usage_id; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
 --
 
 ALTER TABLE ONLY flashback.practice_usage
     ADD CONSTRAINT practice_practice_usage_id FOREIGN KEY (practice_id) REFERENCES flashback.practices(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: resource_editing resource_editing_resource_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.resource_editing
+    ADD CONSTRAINT resource_editing_resource_id_fk FOREIGN KEY (resource_id) REFERENCES flashback.resources(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: resource_editing resource_editing_user_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.resource_editing
+    ADD CONSTRAINT resource_editing_user_id_fk FOREIGN KEY (user_id) REFERENCES flashback.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -19483,6 +20038,70 @@ ALTER TABLE ONLY flashback.resource_subjects
 
 
 --
+-- Name: resource_watching resource_watching_resource_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.resource_watching
+    ADD CONSTRAINT resource_watching_resource_id_fk FOREIGN KEY (resource_id) REFERENCES flashback.resources(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: resource_watching resource_watching_user_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.resource_watching
+    ADD CONSTRAINT resource_watching_user_id_fk FOREIGN KEY (user_id) REFERENCES flashback.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: section_editing section_editing_section_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.section_editing
+    ADD CONSTRAINT section_editing_section_id_fk FOREIGN KEY (section_id) REFERENCES flashback.sections(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: section_editing section_editing_user_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.section_editing
+    ADD CONSTRAINT section_editing_user_id_fk FOREIGN KEY (user_id) REFERENCES flashback.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: subject_editing subject_editing_subject_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.subject_editing
+    ADD CONSTRAINT subject_editing_subject_id_fk FOREIGN KEY (subject_id) REFERENCES flashback.subjects(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: subject_editing subject_editing_user_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.subject_editing
+    ADD CONSTRAINT subject_editing_user_id_fk FOREIGN KEY (user_id) REFERENCES flashback.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: subject_watching subject_watching_subject_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.subject_watching
+    ADD CONSTRAINT subject_watching_subject_id_fk FOREIGN KEY (subject_id) REFERENCES flashback.subjects(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: subject_watching subject_watching_user_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.subject_watching
+    ADD CONSTRAINT subject_watching_user_id_fk FOREIGN KEY (user_id) REFERENCES flashback.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
 -- Name: task_blocks task_block_task_id; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
 --
 
@@ -19496,6 +20115,22 @@ ALTER TABLE ONLY flashback.task_blocks
 
 ALTER TABLE ONLY flashback.tasks
     ADD CONSTRAINT task_topic_id FOREIGN KEY (topic_id) REFERENCES flashback.topics(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: topic_editing topic_editing_topic_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.topic_editing
+    ADD CONSTRAINT topic_editing_topic_id_fk FOREIGN KEY (topic_id) REFERENCES flashback.topics(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: topic_editing topic_editing_user_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.topic_editing
+    ADD CONSTRAINT topic_editing_user_id_fk FOREIGN KEY (user_id) REFERENCES flashback.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
