@@ -9,14 +9,14 @@ Rectangle {
     property color background_color
     property color foreground_color
     property string entry_font
-    property string headline
+    property string title
     property string updated
 
     color: Qt.lighter(background_color)
 
     Text {
         id: headline_id
-        text: headline
+        text: title
         color: foreground_color
         font.pixelSize:  24
         font.family: entry_font

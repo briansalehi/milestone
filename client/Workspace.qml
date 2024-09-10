@@ -1,4 +1,6 @@
 import QtQuick
+import QtQuick.Controls
+import flashback.entry
 
 Item {
     id: workspace
@@ -12,26 +14,17 @@ Item {
     property color entry_color
     property string entry_font
 
-    Column {
-        id: entries
-        width: parent.width
-        height: parent.height
+    ListView {
+        anchors.fill: parent
+        model: entries
         spacing: 10
 
-        Entry {
+        delegate: EntryView {
             background_color: entry_color
             foreground_color: 'white'
             entry_font: workspace.entry_font
-            headline: "Modern CMake for C++"
-            updated: "2 days ago"
-        }
-
-        Entry {
-            background_color: entry_color
-            foreground_color: 'white'
-            entry_font: workspace.entry_font
-            headline: "Boost.Asio C++ Network Programming Cookbook"
-            updated: "47 days ago"
+            title: headline
+            updated: lastUpdate
         }
     }
 }
