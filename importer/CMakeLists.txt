@@ -1,3 +1,5 @@
+find_package(Boost CONFIG REQUIRED COMPONENTS program_options system)
+
 file(GLOB source_files RELATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR} src/main.cpp)
 add_executable(importer ${source_files})
 target_link_libraries(importer PUBLIC Boost::program_options pq pqxx)

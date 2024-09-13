@@ -2,26 +2,31 @@
 
 EntryList::EntryList(QObject *parent)
     : QAbstractListModel{parent}
-    , m_entries()
 {
 }
 
-int EntryList::rowCount(QModelIndex const&) const
+int EntryList::rowCount(QModelIndex const& parent) const
 {
     return m_entries.size();
 }
 
 QVariant EntryList::data(QModelIndex const& index, int role = Qt::DisplayRole) const
 {
-    if (index.row() < 0 || index.row() >= m_entries.size())
-        return QVariant{};
+    QVariant result{};
 
-    Entry const& entry = m_entries.at(index.row());
+    if (index.row() >= 0 && index.row() < m_entries.size())
+    {
+        Entry const& entry { m_entries.at(index.row())};
 
-    if (role == HeadlineRole)
-        return entry.headline();
-    else if (role == LastUpdateRole)
-        return entry.lastUpdate();
+        if (role == HeadlineRole)
+        {
+            result = entry.headline();
+        }
+        else if (role == LastUpdateRole)
+        {
+            result = entry.lastUpdate();
+        }
+    }
 
     return QVariant{};
 }

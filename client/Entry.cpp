@@ -3,8 +3,6 @@
 
 Entry::Entry(QObject *parent)
     : QObject{parent}
-    , m_headline{}
-    , m_lastUpdate{}
 {
 }
 

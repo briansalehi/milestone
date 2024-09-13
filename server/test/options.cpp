@@ -2,11 +2,12 @@
 #include <gtest/gtest.h>
 #include <array>
 
+
 TEST(Server, Options)
 {
     flashback::options options{};
-    int const argc{8};
-    std::array<char const*, 8> argv{};
+    constexpr int const argc{8};
+    std::array<char const*, argc> argv{};
     argv.at(0) = "server";
     argv.at(1) = "-a";
     argv.at(2) = "127.0.0.1";

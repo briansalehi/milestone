@@ -12,6 +12,7 @@ public:
     options();
     void parse(int argc, char const** argv);
     friend std::ostream& operator<<(std::ostream& buffer, options const& object);
+    operator std::string() const;
 
 public:
     std::string address;

@@ -1,7 +1,4 @@
 find_package(Boost CONFIG REQUIRED COMPONENTS program_options system)
-find_package(GTest REQUIRED)
-
-enable_testing()
 
 file(GLOB source_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} src/*.cpp)
 

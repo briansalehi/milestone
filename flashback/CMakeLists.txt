@@ -1,6 +1,13 @@
-file(GLOB test_files RELATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR} test/*.cpp)
-add_executable(test-flashback EXCLUDE_FROM_ALL ${test_files})
-target_link_libraries(test-flashback PUBLIC gtest gtest_main)
-target_include_directories(test-flashback PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+find_package(PostgreSQL REQUIRED)
+find_package(Boost CONFIG REQUIRED COMPONENTS program_options system)
+
+file(GLOB source_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} src/*.cpp)
+file(GLOB header_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} include/flashback/*.hpp)
+add_library(flashback SHARED ${source_files} ${header_files})
+target_include_directories(flashback PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+file(GLOB test_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} test/*.cpp)
+add_executable(test-flashback ${test_files})
+target_link_libraries(test-flashback PUBLIC gtest gtest_main PRIVATE flashback)
 target_compile_definitions(test-flashback PUBLIC PROGRAM_VERSION=${CMAKE_PROJECT_VERSION})
 add_test(NAME test-flashback COMMAND test-flashback)

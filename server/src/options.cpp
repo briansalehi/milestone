@@ -1,18 +1,13 @@
 #include <flashback/options.hpp>
 #include <stdexcept>
+#include <sstream>
 #include <format>
 
 namespace flashback
 {
 options::options() :
-    all_options{},
     general_options{"General Options"},
     server_options{"Server Options"},
-    positional_options{},
-    arguments{},
-    logfile{},
-    address{},
-    port{},
     ipv4_only{false},
     ipv6_only{false}
 {
@@ -23,7 +18,7 @@ options::options() :
 
     server_options.add_options()
         ("address,a", boost::program_options::value<std::string>()->default_value("localhost"), "address to listen")
-        ("port,p", boost::program_options::value<std::string>()->default_value("4433"), "port to bind")
+        ("port,p", boost::program_options::value<std::string>()->default_value("4000"), "port to bind")
         ("v4,4", "use only IP version 4")
         ("v6,6", "use only IP version 6");
 
@@ -41,17 +36,17 @@ void options::parse(int argc, char const** argv)
     boost::program_options::store(parsed_options, arguments);
     arguments.notify();
 
-    if (arguments.count("help"))
+    if (arguments.count("help") > 0)
     {
         throw std::invalid_argument{std::string{}};
     }
 
-    if (arguments.count("version"))
+    if (arguments.count("version") > 0)
     {
         throw std::runtime_error{std::format("v{}", PROGRAM_VERSION)};
     }
 
-    if (arguments.count("log"))
+    if (arguments.count("log") > 0)
     {
         logfile = arguments["log"].as<std::string>();
     }
@@ -63,12 +58,12 @@ void options::parse(int argc, char const** argv)
     address = arguments["address"].as<std::string>();
     port = std::stoi(arguments["port"].as<std::string>());
 
-    if (arguments.count("v4"))
+    if (arguments.count("v4") > 0)
     {
         ipv4_only = true;
     }
 
-    if (arguments.count("v6"))
+    if (arguments.count("v6") > 0)
     {
         ipv6_only = true;
     }
@@ -77,6 +72,12 @@ void options::parse(int argc, char const** argv)
     {
         throw std::invalid_argument{"v4 and v6 options cannot be both applied"};
     }
+}
+
+options::operator std::string() const
+{
+    std::ostringstream buffer{*this};
+    return buffer.str();
 }
 
 std::ostream& operator<<(std::ostream& buffer, options const& object)

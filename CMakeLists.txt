@@ -8,11 +8,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_CLANG_TIDY /home/brian/.local/bin/clang-tidy -checks=-*,readability-*)
 set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 
-find_package(Boost CONFIG REQUIRED COMPONENTS program_options system)
-find_package(PostgreSQL REQUIRED)
-find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Network)
 find_package(GTest REQUIRED)
 
 add_subdirectory(importer)

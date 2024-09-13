@@ -49,7 +49,7 @@ int main(int argc, char** argv)
                 std::streamoff size{file.tellg()};
                 std::string buffer(size, '\0');
                 file.seekg(0);
-                file.read(&buffer[0], size);
+                file.read(buffer.data(), size);
                 task.exec(std::move(buffer));
                 imported++;
             }

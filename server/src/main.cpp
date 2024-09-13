@@ -1,6 +1,7 @@
-#include <iostream>
 #include <flashback/options.hpp>
-//#include <flashback/server.hpp>
+#include <flashback/server.hpp>
+#include <iostream>
+#include <print>
 
 int main(int argc, char const** argv)
 {
@@ -9,16 +10,15 @@ int main(int argc, char const** argv)
     try
     {
         options.parse(argc, argv);
-        std::cout << options.address << std::endl;
-        std::cout << options.port << std::endl;
-        std::cout << options.logfile << std::endl;
+        std::println("Listening on {}:{}, logging in {}", options.address, options.port, options.logfile.string());
     }
     catch (std::invalid_argument const& exp)
     {
-        std::cerr << options << std::endl;
+        std::string message{options};
+        std::println(std::cerr, "{}", message);
     }
     catch (std::exception const& exp)
     {
-        std::cerr << exp.what() << std::endl;
+        std::println(std::cerr, "{}", exp.what());
     }
 }
