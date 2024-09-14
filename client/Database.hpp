@@ -17,6 +17,10 @@
 #include <QtNetworkAuth/QAbstractOAuth2>
 #include <QtNetworkAuth/QAbstractOAuthReplyHandler>
 
+#include <EntryList.hpp>
+#include <Entry.hpp>
+#include <flashback/flashback.hpp>
+
 class Database : public QObject
 {
     Q_OBJECT
@@ -24,5 +28,11 @@ class Database : public QObject
 public:
     explicit Database(QObject *parent = nullptr);
 
+    EntryList entryList() const;
+
 signals:
+
+private:
+    flashback::database m_database;
+    EntryList m_entryList;
 };

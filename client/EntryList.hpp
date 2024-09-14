@@ -17,10 +17,14 @@ public:
     enum EntryRole
     {
         HeadlineRole = Qt::UserRole + 1,
-        LastUpdateRole
+        IncompleteSections
     };
 
     explicit EntryList(QObject *parent = nullptr);
+    EntryList(EntryList const& other);
+    EntryList& operator=(EntryList const& other);
+    EntryList(EntryList&& other);
+    EntryList& operator=(EntryList&& other);
 
     int rowCount(QModelIndex const& parent) const override;
 
@@ -29,7 +33,6 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     void addEntry(Entry const& entry) &;
-    void addEntry(Entry&& entry) & noexcept;
 
 private:
     std::vector<Entry> m_entries;

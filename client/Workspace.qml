@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
-import flashback.entry
+import Flashback.EntryList
+import Flashback.Entry
 
 Item {
     id: workspace
@@ -15,16 +16,19 @@ Item {
     property string entry_font
 
     ListView {
+        id: list
         anchors.fill: parent
         model: entries
         spacing: 10
 
         delegate: EntryView {
+            id: entry
             background_color: entry_color
             foreground_color: 'white'
             entry_font: workspace.entry_font
-            title: headline
-            updated: lastUpdate
+            name: headline
+            sections: incompleteSections
+            width: ListView.view.width
         }
     }
 }

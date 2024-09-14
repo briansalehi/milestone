@@ -2,21 +2,21 @@ import QtQuick
 
 Rectangle {
     id: entry
-    width: parent.width
     height: 70
     radius: 13
 
     property color background_color
     property color foreground_color
     property string entry_font
-    property string title
-    property string updated
+    property string name
+    property string sections
+    property int entryWidth
 
     color: Qt.lighter(background_color)
 
     Text {
         id: headline_id
-        text: title
+        text: name
         color: foreground_color
         font.pixelSize:  24
         font.family: entry_font
@@ -29,7 +29,7 @@ Rectangle {
 
     Text {
         id: update_id
-        text: updated
+        text: sections
         color: Qt.darker(foreground_color)
         font.pixelSize: 24
         font.family: entry_font

@@ -6,7 +6,7 @@ class Entry : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString headline READ headline WRITE headline NOTIFY headlineChanged);
-    Q_PROPERTY(QString lastUpdate READ lastUpdate WRITE lastUpdate NOTIFY lastUpdateChanged);
+    Q_PROPERTY(QString incompleteSections READ incompleteSections WRITE incompleteSections NOTIFY incompleteSectionsChanged);
 
 public:
     explicit Entry(QObject *parent = nullptr);
@@ -20,14 +20,14 @@ public:
     void headline(QString const& content);
     QString headline() const;
 
-    void lastUpdate(QString const& content);
-    QString lastUpdate() const;
+    void incompleteSections(QString sections);
+    QString incompleteSections() const;
 
 signals:
     void headlineChanged();
-    void lastUpdateChanged();
+    void incompleteSectionsChanged();
 
 private:
     QString m_headline;
-    QString m_lastUpdate;
+    QString m_incompleteSections;
 };
