@@ -4,6 +4,7 @@ find_package(Boost CONFIG REQUIRED COMPONENTS program_options system)
 file(GLOB source_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} src/*.cpp)
 file(GLOB header_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} include/flashback/*.hpp)
 add_library(flashback SHARED ${source_files} ${header_files})
+target_link_libraries(flashback PUBLIC pq pqxx)
 target_include_directories(flashback PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 file(GLOB test_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} test/*.cpp)
