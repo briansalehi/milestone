@@ -144,7 +144,7 @@ ALTER PROCEDURE flashback.create_note(IN resource_index integer, IN section_inde
 -- Name: create_note_with_name(character varying, integer, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
 --
 
-CREATE PROCEDURE flashback.create_note_with_name(IN resource_name character varying, IN index_value integer, IN heading character varying)
+CREATE PROCEDURE flashback.create_note_with_name(IN resource_name character varying, IN section_number integer, IN heading character varying)
     LANGUAGE plpgsql
     AS $$
 declare resource_index integer;
@@ -155,7 +155,7 @@ declare block_index integer;
 declare record record;
 begin
     select r.id into resource_index from flashback.resources r where r.name = resource_name;
-    select s.id into section_index from flashback.sections s where s.index = index_value and s.resource_id = resource_index;
+    select s.id into section_index from flashback.sections s where s.number = section_number and s.resource_id = resource_index;
     select s.state into section_state from flashback.sections s where s.id = section_index;
     insert into flashback.notes (section_id, heading) values (section_index, heading) returning id into note_index;
     insert into flashback.note_blocks (note_id, content, type, language, position) select note_index, t_content, t_type, t_language, row_number from temp_blocks;
@@ -165,7 +165,7 @@ begin
 end; $$;
 
 
-ALTER PROCEDURE flashback.create_note_with_name(IN resource_name character varying, IN index_value integer, IN heading character varying) OWNER TO flashback;
+ALTER PROCEDURE flashback.create_note_with_name(IN resource_name character varying, IN section_number integer, IN heading character varying) OWNER TO flashback;
 
 --
 -- Name: create_practice(character varying, character varying, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
@@ -190,28 +190,10 @@ end; $$;
 ALTER PROCEDURE flashback.create_practice(IN subject_name character varying, IN topic_name character varying, IN practice_heading character varying) OWNER TO flashback;
 
 --
--- Name: create_resource(integer, character varying, flashback.resource_type, integer, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
+-- Name: create_resource(integer, character varying, flashback.resource_type, integer, integer, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
 --
 
-CREATE PROCEDURE flashback.create_resource(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN pattern_index integer, IN resource_reference character varying DEFAULT NULL::character varying)
-    LANGUAGE plpgsql
-    AS $$
-declare resource_index integer;
-begin
-    insert into flashback.resources (name, reference, type, section_pattern_id) values (name_string, resource_reference, type_string, pattern_index) returning id into resource_index;
-    insert into flashback.resource_subjects (subject_id, resource_id) values (subject_index, resource_index);
-    insert into flashback.sections (resource_id, index, reference) select resource_index, t_index, t_reference from temp_sections;
-    delete from temp_sections;
-end; $$;
-
-
-ALTER PROCEDURE flashback.create_resource(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN pattern_index integer, IN resource_reference character varying) OWNER TO flashback;
-
---
--- Name: create_resource_with_sequenced_sections(integer, character varying, flashback.resource_type, integer, integer, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
---
-
-CREATE PROCEDURE flashback.create_resource_with_sequenced_sections(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN section_pattern_index integer, IN sections integer, IN resource_reference character varying DEFAULT NULL::character varying)
+CREATE PROCEDURE flashback.create_resource(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN section_pattern_index integer, IN sections integer, IN resource_reference character varying DEFAULT NULL::character varying)
     LANGUAGE plpgsql
     AS $$
 declare resource_index integer;
@@ -222,7 +204,7 @@ begin
 end; $$;
 
 
-ALTER PROCEDURE flashback.create_resource_with_sequenced_sections(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN section_pattern_index integer, IN sections integer, IN resource_reference character varying) OWNER TO flashback;
+ALTER PROCEDURE flashback.create_resource(IN subject_index integer, IN name_string character varying, IN type_string flashback.resource_type, IN section_pattern_index integer, IN sections integer, IN resource_reference character varying) OWNER TO flashback;
 
 --
 -- Name: create_user(character varying, character varying, character varying, character varying, character varying); Type: FUNCTION; Schema: flashback; Owner: flashback
@@ -263,6 +245,28 @@ end; $$;
 
 
 ALTER FUNCTION flashback.get_editor_resources(user_index integer) OWNER TO flashback;
+
+--
+-- Name: get_resource_notes(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_resource_notes(resource_index integer) RETURNS TABLE(section_number integer, note_id integer, section text, heading character varying, content text)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select sc.number, n.id, concat(p.pattern, ' ', sc.number), n.heading, string_agg(b.content, E'\n')
+    from flashback.resources r
+    join flashback.sections sc on sc.resource_id = r.id
+    join flashback.section_name_patterns p on p.id = r.section_pattern_id
+    join flashback.notes n on n.section_id = sc.id
+    join flashback.note_blocks b on b.note_id = n.id
+    where sc.resource_id = resource_index
+    group by sc.number, p.pattern, n.id, n.heading;
+end $$;
+
+
+ALTER FUNCTION flashback.get_resource_notes(resource_index integer) OWNER TO flashback;
 
 --
 -- Name: get_section_name_patterns(); Type: FUNCTION; Schema: flashback; Owner: flashback
@@ -374,18 +378,18 @@ ALTER FUNCTION flashback.get_user_resources(user_index integer) OWNER TO flashba
 -- Name: get_user_sections(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_user_sections(user_index integer, resource_index integer) RETURNS TABLE(id integer, pattern_id integer, index integer, notes bigint, state flashback.publication_state, pos integer, reference character varying, updated timestamp without time zone)
+CREATE FUNCTION flashback.get_user_sections(user_index integer, resource_index integer) RETURNS TABLE(id integer, pattern_id integer, section_number integer, notes bigint, state flashback.publication_state, reference character varying, updated timestamp without time zone)
     LANGUAGE plpgsql
     AS $$
 begin
     return query
-    select sc.id, r.section_pattern_id, sc.index, count(n.id), sc.state, sc.position, sc.reference, st.updated
+    select sc.id, r.section_pattern_id, sc.number, count(n.id), sc.state, sc.reference, st.updated
     from flashback.sections sc
     join flashback.resources r on r.id = sc.resource_id
     join flashback.notes n on n.section_id = sc.id
     join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
     where sc.resource_id = resource_index and sc.state in ('open', 'writing')
-    group by sc.id, r.section_pattern_id, sc.index, sc.state, sc.position, sc.reference, st.updated;
+    group by sc.id, r.section_pattern_id, sc.number, sc.state, sc.reference, st.updated;
 end; $$;
 
 
@@ -1124,7 +1128,7 @@ CREATE TABLE flashback.sections (
     reference character varying(2000) DEFAULT NULL::character varying,
     created timestamp without time zone DEFAULT now() NOT NULL,
     updated timestamp without time zone DEFAULT now() NOT NULL,
-    index integer DEFAULT 0 NOT NULL
+    number integer DEFAULT 0 NOT NULL
 );
 
 
@@ -17090,7 +17094,7 @@ COPY flashback.section_name_patterns (id, pattern) FROM stdin;
 -- Data for Name: sections; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
-COPY flashback.sections (id, resource_id, state, reference, created, updated, index) FROM stdin;
+COPY flashback.sections (id, resource_id, state, reference, created, updated, number) FROM stdin;
 37	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	1
 38	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	2
 39	17	open	\N	2024-07-28 09:44:55.719932	2024-07-28 09:44:55.719932	3
@@ -18827,6 +18831,7 @@ COPY flashback.subjects (id, name, creation, updated) FROM stdin;
 21	Tmux	2024-07-28 09:44:46.506337	2024-07-28 09:44:46.506337
 22	Valgrind	2024-07-28 09:44:46.506337	2024-07-28 09:44:46.506337
 23	Vim	2024-07-28 09:44:46.506337	2024-07-28 09:44:46.506337
+24	GoogleTest	2024-09-12 10:59:46.423264	2024-09-12 10:59:46.423264
 \.
 
 
@@ -19471,7 +19476,7 @@ SELECT pg_catalog.setval('flashback.subject_editing_id_seq', 1, false);
 -- Name: subjects_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.subjects_id_seq', 23, true);
+SELECT pg_catalog.setval('flashback.subjects_id_seq', 24, true);
 
 
 --
