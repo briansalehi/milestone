@@ -8,15 +8,15 @@ Rectangle {
     property color background_color
     property color foreground_color
     property string entry_font
-    property string name
-    property string sections
+    property string headline_text
+    property string designator_text
     property int entryWidth
 
     color: Qt.lighter(background_color)
 
     Text {
         id: headline_id
-        text: name
+        text: headline_text
         color: foreground_color
         font.pixelSize:  24
         font.family: entry_font
@@ -29,7 +29,7 @@ Rectangle {
 
     Text {
         id: update_id
-        text: sections
+        text: designator_text
         color: Qt.darker(foreground_color)
         font.pixelSize: 24
         font.family: entry_font

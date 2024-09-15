@@ -17,7 +17,7 @@ public:
     enum EntryRole
     {
         HeadlineRole = Qt::UserRole + 1,
-        IncompleteSections
+        DesignatorRole
     };
 
     explicit EntryList(QObject *parent = nullptr);
@@ -33,6 +33,8 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     void addEntry(Entry const& entry) &;
+
+    void clear() noexcept;
 
 private:
     std::vector<Entry> m_entries;

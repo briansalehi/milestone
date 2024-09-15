@@ -1,6 +1,7 @@
 #pragma once
 
 #include <flashback/resource.hpp>
+#include <flashback/subject.hpp>
 #include <pqxx/pqxx>
 #include <string>
 
@@ -17,6 +18,8 @@ public:
     std::string address() const;
 
     std::vector<resource> resources();
+
+    std::vector<subject> subjects();
 
 private:
     pqxx::connection m_connection;

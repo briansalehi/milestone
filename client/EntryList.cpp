@@ -43,7 +43,7 @@ QVariant EntryList::data(QModelIndex const& index, int role = Qt::DisplayRole) c
         switch (role)
         {
         case HeadlineRole: result = entry.headline(); break;
-        case IncompleteSections: result = entry.incompleteSections(); break;
+        case DesignatorRole: result = entry.designator(); break;
         }
     }
 
@@ -54,7 +54,7 @@ QHash<int, QByteArray> EntryList::roleNames() const
 {
     QHash<int, QByteArray> roles;
     roles[HeadlineRole] = "headline";
-    roles[IncompleteSections] = "incompleteSections";
+    roles[DesignatorRole] = "designator";
     return roles;
 }
 
@@ -63,4 +63,9 @@ void EntryList::addEntry(Entry const& entry) &
     beginInsertRows(QModelIndex(), rowCount(QModelIndex{}), rowCount(QModelIndex{}));
     m_entries.push_back(entry);
     endInsertRows();
+}
+
+void EntryList::clear() noexcept
+{
+    m_entries.clear();
 }

@@ -1,4 +1,7 @@
 #include <flashback/flashback.hpp>
+#include <sstream>
+#include <iomanip>
+#include <ctime>
 
 namespace flashback
 {
@@ -32,7 +35,8 @@ std::vector<resource> database::resources()
     pqxx::result result{work.exec(query)};
     work.commit();
 
-    std::vector<resource> resources(result.affected_rows());
+    std::vector<resource> resources{};
+    resources.reserve(result.affected_rows());
 
     for (pqxx::row const& row: result)
     {
@@ -45,6 +49,40 @@ std::vector<resource> database::resources()
     }
 
     return resources;
+}
+
+std::vector<subject> database::subjects()
+{
+    constexpr auto query{R"(
+        select id, name, topics, resources, updated
+        from flashback.get_user_subjects(1)
+        order by updated asc nulls first, topics desc, name asc;
+    )"};
+
+    pqxx::work work{m_connection};
+    pqxx::result result{work.exec(query)};
+    work.commit();
+
+    std::vector<subject> subjects{};
+    subjects.reserve(result.affected_rows());
+
+    for (pqxx::row const& row: result)
+    {
+        subject subject{};
+        subject.id = row.at("id").as<std::uint64_t>();
+        subject.name = row.at("name").as<std::string>();
+        subject.topics = std::vector<topic>(row.at("topics").as<std::uint32_t>());
+        subject.resources = std::vector<resource>(row.at("resources").as<std::uint32_t>());
+
+        std::tm datetime{};
+        std::istringstream datetime_stream{row.at(4).as<std::string>()};
+        datetime_stream >> std::get_time(&datetime, "%Y-%m-%d %H:%M:%S");
+        subject.last_update = std::chrono::system_clock::from_time_t(std::mktime(&datetime));
+
+        subjects.push_back(subject);
+    }
+
+    return subjects;
 }
 
 } // flashback
