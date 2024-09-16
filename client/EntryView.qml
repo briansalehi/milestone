@@ -12,8 +12,9 @@ Rectangle {
     property string headline_text
     property string designator_text
     property int entryWidth
+    signal clicked
 
-    color: Qt.lighter(background_color)
+    color: background_color
 
     Text {
         id: headline_id
@@ -41,5 +42,13 @@ Rectangle {
         anchors.right: parent.right
         anchors.rightMargin: 15
         anchors.verticalCenter: parent.verticalCenter
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        onClicked: { entry.clicked(); }
+        onEntered: { parent.color = Qt.lighter(background_color); }
+        onExited: { parent.color = background_color; }
     }
 }
