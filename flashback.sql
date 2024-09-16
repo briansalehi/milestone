@@ -399,13 +399,14 @@ ALTER FUNCTION flashback.get_user_sections(user_index integer, resource_index in
 -- Name: get_user_subjects(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_user_subjects(user_index integer) RETURNS TABLE(id integer, name character varying, topics bigint, updated timestamp without time zone)
+CREATE FUNCTION flashback.get_user_subjects(user_index integer) RETURNS TABLE(id integer, name character varying, topics bigint, resources bigint, updated timestamp without time zone)
     LANGUAGE plpgsql
     AS $$
 begin
     return query
-    select s.id, s.name, count(t.*) as topics, p.updated
+    select s.id, s.name, count(t.*), count(sr.resource_id), p.updated
     from flashback.subjects s
+    join flashback.subject_resources sr on sr.subject_id = s.id
     join flashback.topics t on t.subject_id = s.id
     join flashback.progress p on p.topic_id = t.id and p.user_id = user_index
     group by s.id, s.name, p.updated
@@ -1007,18 +1008,6 @@ ALTER TABLE flashback.resource_editing ALTER COLUMN id ADD GENERATED ALWAYS AS I
 
 
 --
--- Name: resource_subjects; Type: TABLE; Schema: flashback; Owner: flashback
---
-
-CREATE TABLE flashback.resource_subjects (
-    resource_id integer NOT NULL,
-    subject_id integer NOT NULL
-);
-
-
-ALTER TABLE flashback.resource_subjects OWNER TO flashback;
-
---
 -- Name: resource_watching; Type: TABLE; Schema: flashback; Owner: flashback
 --
 
@@ -1189,6 +1178,18 @@ ALTER TABLE flashback.subject_editing ALTER COLUMN id ADD GENERATED ALWAYS AS ID
     CACHE 1
 );
 
+
+--
+-- Name: subject_resources; Type: TABLE; Schema: flashback; Owner: flashback
+--
+
+CREATE TABLE flashback.subject_resources (
+    subject_id integer NOT NULL,
+    resource_id integer NOT NULL
+);
+
+
+ALTER TABLE flashback.subject_resources OWNER TO flashback;
 
 --
 -- Name: subject_watching; Type: TABLE; Schema: flashback; Owner: flashback
@@ -16754,113 +16755,6 @@ COPY flashback.resource_editing (id, user_id, resource_id, action, updated) FROM
 
 
 --
--- Data for Name: resource_subjects; Type: TABLE DATA; Schema: flashback; Owner: flashback
---
-
-COPY flashback.resource_subjects (resource_id, subject_id) FROM stdin;
-5	19
-6	9
-7	6
-8	6
-9	6
-10	6
-11	13
-12	6
-13	11
-14	11
-15	15
-16	14
-17	10
-18	8
-19	6
-20	6
-21	15
-22	1
-23	6
-24	6
-25	6
-26	18
-27	7
-28	6
-29	18
-30	23
-31	15
-32	13
-33	4
-34	11
-35	20
-36	6
-37	18
-38	13
-39	6
-40	11
-41	11
-42	6
-43	11
-44	2
-45	7
-46	7
-47	4
-48	5
-49	11
-50	14
-51	4
-52	11
-53	4
-53	20
-54	6
-55	6
-56	7
-57	6
-58	1
-59	8
-60	2
-60	20
-61	7
-62	3
-63	6
-65	20
-66	20
-67	11
-68	6
-69	13
-69	20
-70	18
-71	8
-72	19
-73	6
-74	5
-75	20
-76	6
-77	11
-78	4
-79	6
-80	6
-81	18
-82	11
-83	13
-84	6
-84	1
-85	19
-86	6
-87	14
-88	19
-89	6
-90	5
-91	8
-92	19
-93	9
-94	11
-95	3
-96	8
-97	6
-4	12
-3	3
-98	5
-\.
-
-
---
 -- Data for Name: resource_watching; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
@@ -18773,6 +18667,109 @@ COPY flashback.subject_editing (id, user_id, subject_id, action, updated) FROM s
 
 
 --
+-- Data for Name: subject_resources; Type: TABLE DATA; Schema: flashback; Owner: flashback
+--
+
+COPY flashback.subject_resources (subject_id, resource_id) FROM stdin;
+19	5
+9	6
+6	7
+6	8
+6	9
+6	10
+13	11
+6	12
+11	13
+11	14
+15	15
+14	16
+10	17
+8	18
+6	19
+6	20
+15	21
+1	22
+6	23
+6	24
+6	25
+18	26
+7	27
+6	28
+18	29
+23	30
+15	31
+13	32
+4	33
+11	34
+20	35
+6	36
+18	37
+13	38
+6	39
+11	40
+11	41
+6	42
+11	43
+2	44
+7	45
+7	46
+4	47
+5	48
+11	49
+14	50
+4	51
+11	52
+20	53
+6	54
+6	55
+7	56
+6	57
+1	58
+8	59
+20	60
+7	61
+3	62
+6	63
+20	65
+20	66
+11	67
+6	68
+13	69
+18	70
+8	71
+19	72
+6	73
+5	74
+20	75
+6	76
+11	77
+4	78
+6	79
+6	80
+18	81
+11	82
+13	83
+6	84
+19	85
+6	86
+14	87
+19	88
+6	89
+5	90
+8	91
+19	92
+9	93
+11	94
+3	95
+8	96
+6	97
+12	4
+3	3
+5	98
+\.
+
+
+--
 -- Data for Name: subject_watching; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
@@ -19659,14 +19656,6 @@ ALTER TABLE ONLY flashback.resource_editing
 
 
 --
--- Name: resource_subjects resource_subject_pk; Type: CONSTRAINT; Schema: flashback; Owner: flashback
---
-
-ALTER TABLE ONLY flashback.resource_subjects
-    ADD CONSTRAINT resource_subject_pk PRIMARY KEY (resource_id, subject_id);
-
-
---
 -- Name: resource_watching resource_watching_user_id_resource_id_pk; Type: CONSTRAINT; Schema: flashback; Owner: flashback
 --
 
@@ -19728,6 +19717,14 @@ ALTER TABLE ONLY flashback.studies
 
 ALTER TABLE ONLY flashback.subject_editing
     ADD CONSTRAINT subject_editing_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: subject_resources subject_resources_pk; Type: CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.subject_resources
+    ADD CONSTRAINT subject_resources_pk PRIMARY KEY (subject_id, resource_id);
 
 
 --
@@ -20027,22 +20024,6 @@ ALTER TABLE ONLY flashback.resources
 
 
 --
--- Name: resource_subjects resource_subject_rid_pk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
---
-
-ALTER TABLE ONLY flashback.resource_subjects
-    ADD CONSTRAINT resource_subject_rid_pk FOREIGN KEY (resource_id) REFERENCES flashback.resources(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: resource_subjects resource_subject_sid_pk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
---
-
-ALTER TABLE ONLY flashback.resource_subjects
-    ADD CONSTRAINT resource_subject_sid_pk FOREIGN KEY (subject_id) REFERENCES flashback.subjects(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
 -- Name: resource_watching resource_watching_resource_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
 --
 
@@ -20088,6 +20069,22 @@ ALTER TABLE ONLY flashback.subject_editing
 
 ALTER TABLE ONLY flashback.subject_editing
     ADD CONSTRAINT subject_editing_user_id_fk FOREIGN KEY (user_id) REFERENCES flashback.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: subject_resources subject_resources_resource_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.subject_resources
+    ADD CONSTRAINT subject_resources_resource_id_fk FOREIGN KEY (resource_id) REFERENCES flashback.resources(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: subject_resources subject_resources_subject_id_fk; Type: FK CONSTRAINT; Schema: flashback; Owner: flashback
+--
+
+ALTER TABLE ONLY flashback.subject_resources
+    ADD CONSTRAINT subject_resources_subject_id_fk FOREIGN KEY (subject_id) REFERENCES flashback.subjects(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
