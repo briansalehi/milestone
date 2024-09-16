@@ -4,15 +4,10 @@ import Flashback.EntryList
 
 Item {
     id: workspace
-    anchors.horizontalCenter: parent.horizontalCenter
-    anchors.top: parent.top
-    anchors.topMargin: parent.height / 10
-    anchors.bottom: parent.bottom
-    anchors.bottomMargin: parent.height / 10
-    width: parent.width / 10 * 5
 
     property color entry_color
     property string entry_font
+    property int entry_font_size
     property EntryList entries
 
     ListView {
@@ -26,6 +21,7 @@ Item {
             background_color: entry_color
             foreground_color: 'white'
             entry_font: workspace.entry_font
+            font_size: entry_font_size
             headline_text: headline
             designator_text: designator
             width: ListView.view.width

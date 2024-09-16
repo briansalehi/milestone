@@ -3,20 +3,24 @@ import QtQuick
 Rectangle {
     id: space
     color: Qt.lighter(entry_color)
-    width: parent.width / 3
-    height: parent.width / 3
-    radius: parent.width * 5 / 100
 
+    property int minimum_size: 200
+    property int preferred_size
     property color entry_color
     property string entry_font
+    property int entry_font_size
     property string title
     signal clicked()
+
+    width: preferred_size < minimum_size ? minimum_size : preferred_size
+    height: preferred_size < minimum_size ? minimum_size : preferred_size
+    radius: preferred_size * 5 / 100
 
     Text {
         anchors.centerIn: parent
         color: 'white'
         font.family: entry_font
-        font.pixelSize: 42
+        font.pixelSize: entry_font_size
         text: title
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter

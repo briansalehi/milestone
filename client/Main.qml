@@ -12,37 +12,56 @@ ApplicationWindow {
     minimumHeight: 800
     minimumWidth: 600
     font.family: "Noto Sans"
+    font.pixelSize: 42
+
+    property int font_big: 42
+    property int font_medium: 32
+    property int font_regular: 24
+    property int font_small: 18
 
     Database {
         id: database
     }
 
-    Grid {
+    Item {
         id: spaces
-        anchors.fill: workspace
-        spacing: 30
+        anchors.top: parent.top
+        anchors.topMargin: parent.height * 1 / 10
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: parent.height * 1 / 10
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: parent.width * 5 / 10
 
-        Space {
-            title: "Study"
-            entry_font: window.font.family
-            entry_color: window.color
-            onClicked: {
-                workspace.entries = database.resources();
-                spaces.visible = false;
-                controls.visible = true;
-                workspace.visible = true;
+        Flow {
+            spacing: 30
+            anchors.fill: parent
+
+            Space {
+                title: "Study"
+                entry_font: window.font.family
+                entry_color: window.color
+                entry_font_size: font_big
+                preferred_size: parent.width / 3
+                onClicked: {
+                    workspace.entries = database.resources();
+                    spaces.visible = false;
+                    controls.visible = true;
+                    workspace.visible = true;
+                }
             }
-        }
 
-        Space {
-            title: "Practice"
-            entry_font: window.font.family
-            entry_color: window.color
-            onClicked: {
-                workspace.entries = database.subjects();
-                spaces.visible = false;
-                controls.visible = true;
-                workspace.visible = true;
+            Space {
+                title: "Practice"
+                entry_font: window.font.family
+                entry_color: window.color
+                entry_font_size: font_big
+                preferred_size: parent.width / 3
+                onClicked: {
+                    workspace.entries = database.subjects();
+                    spaces.visible = false;
+                    controls.visible = true;
+                    workspace.visible = true;
+                }
             }
         }
     }
@@ -51,7 +70,9 @@ ApplicationWindow {
         id: controls
         visible: false
         anchors.top: parent.top
+        anchors.topMargin: 15
         anchors.bottom: workspace.top
+        anchors.bottomMargin: 15
         anchors.left: workspace.left
         anchors.right: workspace.right
 
@@ -64,14 +85,13 @@ ApplicationWindow {
                 width: controls.width / 3
                 height: controls.height * 2 / 3
                 color: Qt.lighter(window.color)
-                anchors.verticalCenter: parent.verticalCenter
 
                 Text {
                     text: "Back"
                     anchors.centerIn: parent
                     color: "white"
                     font.family: window.font.family
-                    font.pixelSize: 24
+                    font.pixelSize: font_medium
                 }
 
                 MouseArea {
@@ -94,6 +114,13 @@ ApplicationWindow {
         visible: false
         entry_color: window.color
         entry_font: window.font.family
+        entry_font_size: font_regular
+        anchors.top: parent.top
+        anchors.topMargin: parent.height / 10
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: parent.height / 10
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: parent.width * 5 / 10
     }
 
     /*
