@@ -235,19 +235,19 @@ ALTER FUNCTION flashback.get_editor_resources(user_index integer) OWNER TO flash
 -- Name: get_resource_notes(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_resource_notes(resource_index integer) RETURNS TABLE(section_number integer, section text, section_state flashback.publication_state, note_id integer, note_state flashback.publication_state, heading character varying, content text)
+CREATE FUNCTION flashback.get_resource_notes(resource_index integer) RETURNS TABLE(section_id integer, section_number integer, section text, section_state flashback.publication_state, note_id integer, note_state flashback.publication_state, heading character varying, content text)
     LANGUAGE plpgsql
     AS $$
 begin
     return query
-    select sc.number, concat(p.pattern, ' ', sc.number), sc.state as section_state, n.id, n.state as note_state, n.heading, string_agg(b.content, E'\n\n' order by b.position, b.updated)
+    select sc.id, sc.number, concat(p.pattern, ' ', sc.number), sc.state as section_state, n.id, n.state as note_state, n.heading, string_agg(b.content, E'\n\n' order by b.position, b.updated)
     from flashback.resources r
     join flashback.sections sc on sc.resource_id = r.id
     join flashback.section_name_patterns p on p.id = r.section_pattern_id
     join flashback.notes n on n.section_id = sc.id
     join flashback.note_blocks b on b.note_id = n.id
     where sc.resource_id = resource_index
-    group by sc.number, sc.state, p.pattern, n.id, n.state, n.heading;
+    group by sc.id, sc.number, sc.state, p.pattern, n.id, n.state, n.heading;
 end $$;
 
 
@@ -17828,7 +17828,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 913	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	13
 599	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	56
 677	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	3
-1461	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	16
 1232	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	5
 1028	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	51
 29	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	6
@@ -18519,7 +18518,8 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 148	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	16
 790	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	5
 828	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	13
-1361	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	15
+1361	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	15
+1461	98	completed	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	16
 \.
 
 
