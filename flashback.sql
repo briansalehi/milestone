@@ -250,19 +250,19 @@ ALTER FUNCTION flashback.get_editor_resources(user_index integer) OWNER TO flash
 -- Name: get_resource_notes(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_resource_notes(resource_index integer) RETURNS TABLE(section_number integer, note_id integer, section text, heading character varying, content text)
+CREATE FUNCTION flashback.get_resource_notes(resource_index integer) RETURNS TABLE(section_number integer, section text, section_state flashback.publication_state, note_id integer, note_state flashback.publication_state, heading character varying, content text)
     LANGUAGE plpgsql
     AS $$
 begin
     return query
-    select sc.number, n.id, concat(p.pattern, ' ', sc.number), n.heading, string_agg(b.content, E'\n')
+    select sc.number, concat(p.pattern, ' ', sc.number), sc.state as section_state, n.id, n.state as note_state, n.heading, string_agg(b.content, E'\n\n' order by b.position, b.updated)
     from flashback.resources r
     join flashback.sections sc on sc.resource_id = r.id
     join flashback.section_name_patterns p on p.id = r.section_pattern_id
     join flashback.notes n on n.section_id = sc.id
     join flashback.note_blocks b on b.note_id = n.id
     where sc.resource_id = resource_index
-    group by sc.number, p.pattern, n.id, n.heading;
+    group by sc.number, sc.state, p.pattern, n.id, n.state, n.heading;
 end $$;
 
 
@@ -363,12 +363,12 @@ CREATE FUNCTION flashback.get_user_resources(user_index integer) RETURNS TABLE(r
     AS $$
 begin
     return query
-    select r.id, rs.subject_id, r.name, count(sc.id), max(st.updated)
+    select r.id, sr.subject_id, r.name, count(sc.id), max(st.updated)
     from flashback.resources r
-    join flashback.resource_subjects rs on r.id = rs.resource_id
+    join flashback.subject_resources sr on r.id = sr.resource_id
     join flashback.sections sc on sc.resource_id = r.id and sc.state in ('open', 'writing')
     join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
-    group by r.id, rs.subject_id, r.name;
+    group by r.id, sr.subject_id, r.name;
 end; $$;
 
 
@@ -16953,7 +16953,6 @@ COPY flashback.resources (id, name, reference, type, created, updated, section_p
 86	Concurrency with Modern C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
 87	Thomas' Calculus	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
 88	Qt6 QML	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-89	C++ Move Semantics: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
 90	CMake Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
 92	Hands-On Mobile and Embedded Development with Qt5	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
 94	Mastering Linux Kernel Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
@@ -16961,6 +16960,7 @@ COPY flashback.resources (id, name, reference, type, created, updated, section_p
 96	Embedded Linux using Yocto	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
 97	C++ Templates: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
 91	Embedded Linux Full Course by Anisa Institute	\N	course	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	3
+89	C++ Move Semantics: The Complete Guide	https://leanpub.com/cppmove	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
 \.
 
 
