@@ -8199,6 +8199,8 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6874	2248	Command Line >overrides> Preset Variables >overrides> Cache	text	txt	2024-08-18 14:51:01.298839	1
 6875	2249	{\n    "version": 6,\n    "buildPresets": [\n        {\n            "name": "build",\n            "configurePreset": "custom",\n            "jobs": 8,\n            "targets": ["A string", "or array of strings", "that sets targets to build;", "also support macros"],\n            "configuration": "A string that determines the build type for multi-configuration generators (Debug, Release, etc.)",\n            "cleanFirst": true\n        }\n    ]\n}	code	json	2024-08-18 14:51:01.299685	1
 6876	2250	{\n    "version": 6,\n    "testPresets": [\n        {\n            "name": "test",\n            "configurePreset": "custom",\n            "configuration": "A string that determines the build type for multi-configuration generators (Debug, Release, etc.)",\n            "output": {\n                "shortProgress": true,\n                "verbosity": "A string that sets the output verbosity to one of the following levels: default, verbose, extra",\n                "outputOnFailure": true,\n                "quiet": true\n            },\n            "filter": {\n                "include": {\n                    "name": "A string that excludes tests with names matching a regex pattern; supports macros",\n                    "label": "A string that excludes tests with labels matching a regex pattern; supports macros",\n                    "index": "An object that selects tests to run with accepting start, end, and stride integers, and a specificTests",\n                    "useUnion": "A boolean that enables the usage of a union of tests determined by index and name, rather than the intersection"\n                },\n                "exclude": {\n                    "name": "A string that excludes tests with names matching a regex pattern; supports macros",\n                    "label": "A string that excludes tests with labels matching a regex pattern; supports macros",\n                    "fixtures": "An object that determines which fixtures to exclude from the test"\n                }\n            },\n            "execution": {\n                "outputLogFile": "A string that specifies the output log file; supports macros",\n                "stopOnFailure": true,\n                "enableFailover": true,\n                "jobs": 8,\n                "repeat": {\n                    "mode": "until-fail, until-pass, after-timeout",\n                    "count": 10\n                },\n                "scheduleRandom": "",\n                "timeout": 10,\n                "noTestsAction": "default, error, ignore"\n            }\n        }\n    ]\n}	code	json	2024-08-18 14:51:01.300642	1
+6896	2326	On all platforms, a moved-from string is usually empty. However, there is no guarantee and it is only in a valid but unspecified state.	text	txt	2024-09-18 17:20:08.978522	1
+6897	2327	This class extends the possible values of contained type by the abcense of it. This avoids the need to mark one specific value of the type to have this semantics.	text	txt	2024-09-18 17:20:08.983415	1
 6877	2251	{\n    "version": 6,\n    "packagePresets": [\n        {\n            "name": "pack",\n            "configurePreset": "custom",\n            "generators": "ZIP, 7Z, DEB, RPM, etc.",\n            "configuration": "Debug, Release, etc.",\n            "filter": {\n                "include": {\n                    "name": "A string that excludes tests with names matching a regex pattern; supports macros",\n                    "label": "A string that excludes tests with labels matching a regex pattern; supports macros",\n                    "index": "An object that selects tests to run with accepting start, end, and stride integers, and a specificTests",\n                    "useUnion": "A boolean that enables the usage of a union of tests determined by index and name, rather than the intersection"\n                },\n                "exclude": {\n                    "name": "A string that excludes tests with names matching a regex pattern; supports macros",\n                    "label": "A string that excludes tests with labels matching a regex pattern; supports macros",\n                    "fixtures": "An object that determines which fixtures to exclude from the test"\n                }\n            },\n            "packageName": "program",\n            "packageVersion": "1.0.0",\n            "packageDirectory": "",\n            "vendorName": ""\n        }\n    ]\n}	code	json	2024-08-18 14:51:01.301403	1
 6878	2252	There is no `installPresets` in CMake so we have to use `buildPresets` but with the `target` set as `install`.	text	txt	2024-08-18 14:51:01.302148	1
 6879	2252	{\n    "version": 6,\n    "buildPresets" [\n        {\n            "name": "install",\n            "configurePreset": "custom",\n            "targets": "install"\n        }\n    ]\n}	code	json	2024-08-18 14:51:01.302148	2
@@ -8215,6 +8217,32 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6893	2256	6. `anyOf`, `allOf`: checks whether any of or all of the conditions in the `conditions` array are true.	text	txt	2024-08-18 14:51:01.305316	11
 6894	2256	{\n    "condition": {\n        "type": "anyOf",\n        "conditions": [\n            {\n                "type": "equals"\n                "lhs": "${hostSystemName}",\n                "rhs": "Linux"\n            },\n            {\n                "type": "equals"\n                "lhs": "${hostSystemName}",\n                "rhs": "Window"\n            }\n        ]\n    }\n}	code	json	2024-08-18 14:51:01.305316	12
 6895	2257	- `${sourceDir}`\n- `${sourceParentDIr}`\n- `${sourceDirName}`\n- `${presetName}`\n- `${generator}`\n- `${hostSystemName}`: `Linux`, `Windows`, `Darwin`\n- `${fileDir}`: name of the file holding preset\n- `${dollar}`\n- `${pathListSep}`\n- `$env{<var>}`\n- `$penv{<var>}`\n- `$vendor{<name>}`	text	txt	2024-08-18 14:51:01.306221	1
+6898	2328	Optional objects support move semantics. If you move the object as a whole, the state is copied and the contained object is moved.	text	txt	2024-09-18 17:20:08.985051	1
+6899	2328	std::optional<std::string> os;\nstd::string s{"a long string"};\nos = std::move(s); // moves\n\nstd::string s2{*os}; // copies\nstd::string s3{std::move(*os); // moves\n\nstd::optional<std::string> func();\n\nstd::string s4{func().value()}; // moves\nstd::string s5{*func()}; // moves	code	cpp	2024-09-18 17:20:08.985051	2
+6900	2329	namespace std\n{\ntemplate<typename T>\nclass optional\n{\n    constexpr T& operator*() &;\n    constexpr const T& operator*() const&;\n    constexpr T&& operator*() &&;\n    constexpr const T&& operator*() const&&;\n\n    constexpr T& value() &;\n    constexpr const T& value() const&;\n    constexpr T&& value() &&;\n    constexpr const T&& value() const&&;\n};\n}	code	cpp	2024-09-18 17:20:08.986641	1
+6901	2330	Copying a shared pointer is expensive because by each copy, the owner counter increments.	text	txt	2024-09-18 17:20:08.988433	1
+6902	2330	Each time a shared pointer is destroyed or assign a new value, the owner counter is decremented.	text	txt	2024-09-18 17:20:08.988433	2
+6903	2330	Modifying the value of owner counter is expensive because it is an atomic operation to avoid multithreading problems.	text	txt	2024-09-18 17:20:08.988433	3
+6904	2331	It is significantly cheaper to iterate over a collection of shared pointers by reference than using a copy on each iteration:	text	txt	2024-09-18 17:20:08.990052	1
+6905	2331	for (auto const& sp: collection) ...	code	cpp	2024-09-18 17:20:08.990052	2
+6906	2331	std::shared_ptr<std::string> result;\n\nwhile (...)\n{\n    std::shared_ptr<std::string> ptr{std::make_shared<std::string>(getValue())};\n    result = std::move(ptr); // move\n}	code	cpp	2024-09-18 17:20:08.990052	3
+6907	2332	The unique pointer implements the concept of exclusive ownership. Therefore, it can only be moved, and any attempt to copy a unique pointer is disabled.	text	txt	2024-09-18 17:20:08.991308	1
+6908	2332	std::vector<std::unique_ptr<std::string>> container;\nstd::unique_ptr<std::string> another;\ncontainer.push_back(std::move(another));	code	cpp	2024-09-18 17:20:08.991308	2
+6909	2333	Streams do not share their resources over copy operations.	text	txt	2024-09-18 17:20:08.992595	1
+6910	2333	std::ofstream file{"sample.tmp"};\nvoid store(std::ofstream file_stream);\nstore(std::move(file)); // takes file ownership\nassert(file.is_open());	code	cpp	2024-09-18 17:20:08.992595	2
+6911	2334	When passing move-only objects to a function taking parameters by value, the ownership will be transferred. But these functions might also take the argument by reference, which means that it does not take the ownership. In that case we might want to double check the state of the passed argument afterwards.	text	txt	2024-09-18 17:20:08.993885	1
+6912	2334	std::ofstream file{"sample.tmp"};\nstore(file);\nif (file.is_open())\n    file.close();	code	cpp	2024-09-18 17:20:08.993885	2
+6913	2335	std::ofstream{"sample.tmp"} << std::string{"content"};	code	cpp	2024-09-18 17:20:08.995148	1
+6914	2336	std::string firstname, lastname;\nstd::istringstream{"First Last"} >> firstname >> lastname;	code	cpp	2024-09-18 17:20:08.996277	1
+6915	2337	std::string multiline{}, line{};\nstd::getline(std::stringstream{multiline}, line);)	code	cpp	2024-09-18 17:20:08.997255	1
+6916	2338	atomic types, condition variables	text	list	2024-09-18 17:20:08.998145	1
+6917	2339	`std::thread`, `std::jthread`, `std::future`, `std::promise`, `std::packaged_task`	text	list	2024-09-18 17:20:08.999003	1
+6918	2340	By default, the constructor of the thread class copies these arguments. To use move semantics we should explicitly pass parameters as rvalues.	text	txt	2024-09-18 17:20:08.999937	1
+6919	2340	std::string value{"content"};\nstd::vector<std::jthread> runners{};\nrunners.push_back(std::jthread{do_something, value});\nrunners.push_back(std::jthread{do_something, std::move(value)});	code	cpp	2024-09-18 17:20:08.999937	2
+6920	2341	std::promise<std::string> promise{};\nstd::future<std::string> future{promise.get_future()};\n\nvoid print_value(std::future<std::string> f)\n{\n    std::println("{}", f.get());\n};\n\nvoid set_value(std::promise<std::string> p)\n{\n    try\n    {\n        p.set_value_at_thread_exit();\n    }\n    catch (...)\n    {\n        p.set_exception_at_thread_exit(std::current_exception());\n    }\n}\n\nstd::jthread future_thread{print_value, std::move(future)};\nstd::jthread promise_thread{set_value, std::move(promise)};	code	cpp	2024-09-18 17:20:09.000946	1
+6921	2342	When passing string literals to arguments of type const reference, the type of the corresponding parameters become a reference to an array of chars (`const char(&)[N]`). Therefore, type `char[N]` is deduced as type of parameter and used as type of member variable. However, initializing an array member with an array is not possible because you cannot copy arrays.	text	txt	2024-09-18 17:20:09.002003	1
+6922	2342	To deduce the same type for string literals of different length, we need to decay universal reference parameters.	text	txt	2024-09-18 17:20:09.002003	2
+6923	2342	namespace std\n{\ntemplate<typename T1, typename T2>\nconstexpr pair(typename decay_t<T1>, typename decay_t<T2>) make_pair(T1&& a, T2&& b)\n{\n    return pair<decay_t<T1>, decay_t<T2>>(forward<T1>(a), forward<T2>(b));\n}\n} // std	code	cpp	2024-09-18 17:20:09.002003	3
 \.
 
 
@@ -9190,6 +9218,7 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 776	764	When does the compiler generate each of special member functions of a class and what prohibits it?	open	2024-07-28 10:04:25.279364	2024-07-28 10:04:25.279364
 777	764	How to specify that a class is not copyable and implicitly not movable?	open	2024-07-28 10:04:25.699292	2024-07-28 10:04:25.699292
 778	764	How to declare that class that is not copyable, but is movable?	open	2024-07-28 10:04:26.372928	2024-07-28 10:04:26.372928
+2275	1361	What is the state of a moved-from string?	open	2024-09-18 17:08:47.376766	2024-09-18 17:08:47.376766
 779	764	How to declare a class member function `defaulted` outside of the body of that class?	open	2024-07-28 10:04:26.926619	2024-07-28 10:04:26.926619
 780	764	How to define an anonymous lambda as a primitive function in algorithm function templates to count the numbers of a range that are between a minimum and maximum value?	open	2024-07-28 10:04:27.43766	2024-07-28 10:04:27.43766
 781	764	How to define a named lambda as a primitive to be used in algorithm function template to count possitive numbers of a range?	open	2024-07-28 10:04:27.866976	2024-07-28 10:04:27.866976
@@ -9310,6 +9339,7 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 897	729	Use nontype template parameter:	open	2024-07-28 10:05:34.80117	2024-07-28 10:05:34.80117
 898	729	Use `typename` keyword to specify followed expression a type:	open	2024-07-28 10:05:35.381224	2024-07-28 10:05:35.381224
 899	729	Relax the rule of exact match in methods taking an argument with the same type of class, by providing a different template type for the member function:	open	2024-07-28 10:05:36.395657	2024-07-28 10:05:36.395657
+2292	1361	What is the state of a moved-from string?	open	2024-09-18 17:09:19.162754	2024-09-18 17:09:19.162754
 900	729	Prevent implicitly declared copy constructor call when template constructor provided to enable implicit type conversions when objects are copied:	open	2024-07-28 10:05:37.072175	2024-07-28 10:05:37.072175
 901	729	Explicitly initialize fundamendal types in template:	open	2024-07-28 10:05:37.573179	2024-07-28 10:05:37.573179
 902	729	End program without returning from `main()`:	open	2024-07-28 10:05:38.142091	2024-07-28 10:05:38.142091
@@ -9519,6 +9549,7 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 1105	1377	How to build <code>Crosstool-ng</code>?	open	2024-07-28 10:07:01.157713	2024-07-28 10:07:01.157713
 1106	1377	How to list <code>Crosstool-ng</code> sample configurations?	open	2024-07-28 10:07:01.386189	2024-07-28 10:07:01.386189
 1107	1377	How to use <code>Crosstool-ng</code> to show a brief info of current or specified configuration?	open	2024-07-28 10:07:01.81283	2024-07-28 10:07:01.81283
+2309	1361	What is the state of a moved-from string?	open	2024-09-18 17:09:42.49916	2024-09-18 17:09:42.49916
 1108	1377	How to use <code>Crosstool-ng</code> to load a target specific configuration sample?	open	2024-07-28 10:07:02.122103	2024-07-28 10:07:02.122103
 1109	1377	How to use <code>Crosstool-ng</code> to configure selected architecture specific cross-toolchain?	open	2024-07-28 10:07:02.432924	2024-07-28 10:07:02.432924
 1110	1377	How to use <code>Crosstool-ng</code> to print the tuple of the currently configured toolchain?	open	2024-07-28 10:07:02.675159	2024-07-28 10:07:02.675159
@@ -9771,6 +9802,7 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 1357	902	Unload an automatically loaded module?	open	2024-07-28 10:08:38.530993	2024-07-28 10:08:38.530993
 1358	902	List loaded modules?	open	2024-07-28 10:08:39.014878	2024-07-28 10:08:39.014878
 1359	902	Where the error macros defined are defined?	open	2024-07-28 10:08:39.273843	2024-07-28 10:08:39.273843
+2326	1361	What is the state of a moved-from string?	open	2024-09-18 17:20:08.978522	2024-09-18 17:20:08.978522
 1360	902	What is the standard way to return an error in kernel modules?	open	2024-07-28 10:08:39.602605	2024-07-28 10:08:39.602605
 1361	902	Why <code>goto</code> statement is preferable over than nested <code>if</code>s in kernel modules?	open	2024-07-28 10:08:40.393536	2024-07-28 10:08:40.393536
 1362	902	What is the standard way of handling null pointer errors in kernel modules?	open	2024-07-28 10:08:41.679516	2024-07-28 10:08:41.679516
@@ -10667,6 +10699,70 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 2230	1446	Use a CMake utility module?	open	2024-08-18 14:51:01.281705	2024-08-18 14:51:01.281705
 2231	1446	What are the CMake find modules?	open	2024-08-18 14:51:01.282591	2024-08-18 14:51:01.282591
 2232	1446	Get the list of CMake modules?	open	2024-08-18 14:51:01.283356	2024-08-18 14:51:01.283356
+2276	1361	What is the use case of <code>std::optional</code>?	open	2024-09-18 17:08:47.381065	2024-09-18 17:08:47.381065
+2277	1361	How does <code>std::optional</code> take advantage of move semantics?	open	2024-09-18 17:08:47.382923	2024-09-18 17:08:47.382923
+2278	1361	What methods in <code>std::optional</code> overload with move semantics?	open	2024-09-18 17:08:47.384277	2024-09-18 17:08:47.384277
+2279	1361	When does using a <code>std::shared_ptr</code> become expensive?	open	2024-09-18 17:08:47.385635	2024-09-18 17:08:47.385635
+2280	1361	How does move semantics optimize the iteration over a collection of shared pointers?	open	2024-09-18 17:08:47.387076	2024-09-18 17:08:47.387076
+2281	1361	How does <code>std::unique_ptr</code> take advantage of move semantics?	open	2024-09-18 17:08:47.388583	2024-09-18 17:08:47.388583
+2282	1361	How do IOStream objects take advantage of move semantics?	open	2024-09-18 17:08:47.389554	2024-09-18 17:08:47.389554
+2283	1361	Why cannot we be sure if functions take the ownership of passed rvalue objects or not?	open	2024-09-18 17:08:47.390476	2024-09-18 17:08:47.390476
+2284	1361	Use a temporary file stream object to write into a file?	open	2024-09-18 17:08:47.391363	2024-09-18 17:08:47.391363
+2285	1361	Use a temporary string stream object to extract words into separate string objects?	open	2024-09-18 17:08:47.39223	2024-09-18 17:08:47.39223
+2286	1361	Use a temporary string stream object split a multi-line string into separate lines?	open	2024-09-18 17:08:47.39311	2024-09-18 17:08:47.39311
+2287	1361	What types in multithreading are neither copyable nor movable?	open	2024-09-18 17:08:47.393966	2024-09-18 17:08:47.393966
+2288	1361	What types in multithreading are move only?	open	2024-09-18 17:08:47.394819	2024-09-18 17:08:47.394819
+2289	1361	How does the thread constructor take arguments?	open	2024-09-18 17:08:47.395762	2024-09-18 17:08:47.395762
+2290	1361	Use move semantics to pass future and promise types to two different threads passing value?	open	2024-09-18 17:08:47.396696	2024-09-18 17:08:47.396696
+2291	1361	Pass string literals as universal references?	open	2024-09-18 17:08:47.39778	2024-09-18 17:08:47.39778
+2293	1361	What is the use case of <code>std::optional</code>?	open	2024-09-18 17:09:19.167077	2024-09-18 17:09:19.167077
+2294	1361	How does <code>std::optional</code> take advantage of move semantics?	open	2024-09-18 17:09:19.169002	2024-09-18 17:09:19.169002
+2295	1361	What methods in <code>std::optional</code> overload with move semantics?	open	2024-09-18 17:09:19.170611	2024-09-18 17:09:19.170611
+2296	1361	When does using a <code>std::shared_ptr</code> become expensive?	open	2024-09-18 17:09:19.172279	2024-09-18 17:09:19.172279
+2297	1361	How does move semantics optimize the iteration over a collection of shared pointers?	open	2024-09-18 17:09:19.173887	2024-09-18 17:09:19.173887
+2298	1361	How does <code>std::unique_ptr</code> take advantage of move semantics?	open	2024-09-18 17:09:19.175671	2024-09-18 17:09:19.175671
+2299	1361	How do IOStream objects take advantage of move semantics?	open	2024-09-18 17:09:19.176885	2024-09-18 17:09:19.176885
+2300	1361	Why cannot we be sure if functions take the ownership of passed rvalue objects or not?	open	2024-09-18 17:09:19.178012	2024-09-18 17:09:19.178012
+2301	1361	Use a temporary file stream object to write into a file?	open	2024-09-18 17:09:19.179153	2024-09-18 17:09:19.179153
+2302	1361	Use a temporary string stream object to extract words into separate string objects?	open	2024-09-18 17:09:19.180118	2024-09-18 17:09:19.180118
+2303	1361	Use a temporary string stream object split a multi-line string into separate lines?	open	2024-09-18 17:09:19.181282	2024-09-18 17:09:19.181282
+2304	1361	What types in multithreading are neither copyable nor movable?	open	2024-09-18 17:09:19.183328	2024-09-18 17:09:19.183328
+2305	1361	What types in multithreading are move only?	open	2024-09-18 17:09:19.184517	2024-09-18 17:09:19.184517
+2306	1361	How does the thread constructor take arguments?	open	2024-09-18 17:09:19.185643	2024-09-18 17:09:19.185643
+2307	1361	Use move semantics to pass future and promise types to two different threads passing value?	open	2024-09-18 17:09:19.18668	2024-09-18 17:09:19.18668
+2308	1361	Pass string literals as universal references?	open	2024-09-18 17:09:19.188021	2024-09-18 17:09:19.188021
+2310	1361	What is the use case of <code>std::optional</code>?	open	2024-09-18 17:09:42.503108	2024-09-18 17:09:42.503108
+2311	1361	How does <code>std::optional</code> take advantage of move semantics?	open	2024-09-18 17:09:42.504922	2024-09-18 17:09:42.504922
+2312	1361	What methods in <code>std::optional</code> overload with move semantics?	open	2024-09-18 17:09:42.506258	2024-09-18 17:09:42.506258
+2313	1361	When does using a <code>std::shared_ptr</code> become expensive?	open	2024-09-18 17:09:42.507851	2024-09-18 17:09:42.507851
+2314	1361	How does move semantics optimize the iteration over a collection of shared pointers?	open	2024-09-18 17:09:42.510067	2024-09-18 17:09:42.510067
+2315	1361	How does <code>std::unique_ptr</code> take advantage of move semantics?	open	2024-09-18 17:09:42.512331	2024-09-18 17:09:42.512331
+2316	1361	How do IOStream objects take advantage of move semantics?	open	2024-09-18 17:09:42.513962	2024-09-18 17:09:42.513962
+2317	1361	Why cannot we be sure if functions take the ownership of passed rvalue objects or not?	open	2024-09-18 17:09:42.515518	2024-09-18 17:09:42.515518
+2318	1361	Use a temporary file stream object to write into a file?	open	2024-09-18 17:09:42.516519	2024-09-18 17:09:42.516519
+2319	1361	Use a temporary string stream object to extract words into separate string objects?	open	2024-09-18 17:09:42.517428	2024-09-18 17:09:42.517428
+2320	1361	Use a temporary string stream object split a multi-line string into separate lines?	open	2024-09-18 17:09:42.518353	2024-09-18 17:09:42.518353
+2321	1361	What types in multithreading are neither copyable nor movable?	open	2024-09-18 17:09:42.519289	2024-09-18 17:09:42.519289
+2322	1361	What types in multithreading are move only?	open	2024-09-18 17:09:42.520264	2024-09-18 17:09:42.520264
+2323	1361	How does the thread constructor take arguments?	open	2024-09-18 17:09:42.521459	2024-09-18 17:09:42.521459
+2324	1361	Use move semantics to pass future and promise types to two different threads passing value?	open	2024-09-18 17:09:42.522544	2024-09-18 17:09:42.522544
+2325	1361	Pass string literals as universal references?	open	2024-09-18 17:09:42.52375	2024-09-18 17:09:42.52375
+2327	1361	What is the use case of <code>std::optional</code>?	open	2024-09-18 17:20:08.983415	2024-09-18 17:20:08.983415
+2328	1361	How does <code>std::optional</code> take advantage of move semantics?	open	2024-09-18 17:20:08.985051	2024-09-18 17:20:08.985051
+2329	1361	What methods in <code>std::optional</code> overload with move semantics?	open	2024-09-18 17:20:08.986641	2024-09-18 17:20:08.986641
+2330	1361	When does using a <code>std::shared_ptr</code> become expensive?	open	2024-09-18 17:20:08.988433	2024-09-18 17:20:08.988433
+2331	1361	How does move semantics optimize the iteration over a collection of shared pointers?	open	2024-09-18 17:20:08.990052	2024-09-18 17:20:08.990052
+2332	1361	How does <code>std::unique_ptr</code> take advantage of move semantics?	open	2024-09-18 17:20:08.991308	2024-09-18 17:20:08.991308
+2333	1361	How do IOStream objects take advantage of move semantics?	open	2024-09-18 17:20:08.992595	2024-09-18 17:20:08.992595
+2334	1361	Why cannot we be sure if functions take the ownership of passed rvalue objects or not?	open	2024-09-18 17:20:08.993885	2024-09-18 17:20:08.993885
+2335	1361	Use a temporary file stream object to write into a file?	open	2024-09-18 17:20:08.995148	2024-09-18 17:20:08.995148
+2336	1361	Use a temporary string stream object to extract words into separate string objects?	open	2024-09-18 17:20:08.996277	2024-09-18 17:20:08.996277
+2337	1361	Use a temporary string stream object split a multi-line string into separate lines?	open	2024-09-18 17:20:08.997255	2024-09-18 17:20:08.997255
+2338	1361	What types in multithreading are neither copyable nor movable?	open	2024-09-18 17:20:08.998145	2024-09-18 17:20:08.998145
+2339	1361	What types in multithreading are move only?	open	2024-09-18 17:20:08.999003	2024-09-18 17:20:08.999003
+2340	1361	How does the thread constructor take arguments?	open	2024-09-18 17:20:08.999937	2024-09-18 17:20:08.999937
+2341	1361	Use move semantics to pass future and promise types to two different threads passing value?	open	2024-09-18 17:20:09.000946	2024-09-18 17:20:09.000946
+2342	1361	Pass string literals as universal references?	open	2024-09-18 17:20:09.002003	2024-09-18 17:20:09.002003
 \.
 
 
@@ -18109,7 +18205,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 291	32	writing	\N	2024-07-28 09:44:58.452348	2024-07-28 09:44:58.452348	4
 15	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	15
 1069	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	23
-1361	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	15
 1129	77	open	\N	2024-07-28 09:45:07.420686	2024-07-28 09:45:07.420686	8
 859	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	16
 842	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	5
@@ -18424,6 +18519,7 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 148	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	16
 790	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	5
 828	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	13
+1361	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	15
 \.
 
 
@@ -19339,7 +19435,7 @@ SELECT pg_catalog.setval('flashback.logins_id_seq', 3, true);
 -- Name: note_blocks_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.note_blocks_id_seq', 6895, true);
+SELECT pg_catalog.setval('flashback.note_blocks_id_seq', 6923, true);
 
 
 --
@@ -19367,7 +19463,7 @@ SELECT pg_catalog.setval('flashback.note_usage_id_seq', 1, false);
 -- Name: notes_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.notes_id_seq', 2257, true);
+SELECT pg_catalog.setval('flashback.notes_id_seq', 2342, true);
 
 
 --
