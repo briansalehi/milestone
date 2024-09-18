@@ -105,21 +105,6 @@ CREATE TYPE flashback.user_state AS ENUM (
 ALTER TYPE flashback.user_state OWNER TO flashback;
 
 --
--- Name: add_block(text, flashback.block_type, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
---
-
-CREATE PROCEDURE flashback.add_block(IN content text, IN type flashback.block_type, IN language character varying)
-    LANGUAGE plpgsql
-    AS $$
-begin
-    insert into temp_blocks (t_content, t_type, t_language) values (content, type, language);
-end;
-$$;
-
-
-ALTER PROCEDURE flashback.add_block(IN content text, IN type flashback.block_type, IN language character varying) OWNER TO flashback;
-
---
 -- Name: create_note(integer, integer, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
 --
 
