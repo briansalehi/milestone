@@ -2983,6 +2983,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1643	370	| `std::replace` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:11.176005	0
 1644	370	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 10:00:11.197611	0
 1645	370	int main()\n{\n    std::vector<long> range{1,2,1,2,1};\n    std::ranges::replace(range, 2, 0);\n    // {1,0,1,0,1}\n}	code	txt	2024-07-28 10:00:11.218291	0
+6924	2343	atomic variables, threads, locks, condition variables.	text	list	2024-09-19 14:56:13.921899	1
 1646	371	| `std::replace_if` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:11.755233	0
 1647	371	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 10:00:11.776801	0
 1648	371	int main()\n{\n    std::vector<long> range{1,2,1,2,1};\n    std::ranges::replace_if(range, [](long v) { return v > 1; }, 0);\n    // {1,0,1,0,1}\n}	code	txt	2024-07-28 10:00:11.798208	0
@@ -3030,6 +3031,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1688	381	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::adjacent_difference(range.begin(), range.end(), range.begin());\n    // range == {1,1,1,1,1}	text	txt	2024-07-28 10:00:18.724712	0
 1689	381	    std::adjacent_difference(std::execution::par_unseq, range.begin(), range.end(), range.begin());\n    // range == {1,1,1,1,1}	text	txt	2024-07-28 10:00:18.74595	0
 1690	381	    std::vector<long> fibonacci(10,1);\n    std::adjacent_difference(fibonacci.begin(), std::prev(fibonacci.end()), std::next(fibonacci.begin()), std::plus<long>());\n    // fibonacci == {1,1,2,3,5,8,13,21,34,55}\n}	code	txt	2024-07-28 10:00:18.767204	0
+6925	2344	tasks	text	list	2024-09-19 14:56:13.926985	1
 1691	382	| `std::reduce` | standard |\n| --- | --- |\n| introduced | C++17 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | N/A |	text	txt	2024-07-28 10:00:19.375617	0
 1692	382	#include <algorithm>\n#include <numeric>\n#include <vector>	text	txt	2024-07-28 10:00:19.39555	0
 1693	382	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    long sum = std::reduce(range.begin(), range.end(), 0);\n    // sum == 15	text	txt	2024-07-28 10:00:19.417273	0
@@ -3112,6 +3114,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1768	404	| `std::reverse_copy` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:33.71142	0
 1769	404	#include <algorithm>\n#include <iostream>\n#include <iterator>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 10:00:33.73368	0
 1770	404	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::reverse_copy(range, std::ostream_iterator<long>(std::cout, " "));\n    // 5 4 3 2 1\n}	code	txt	2024-07-28 10:00:33.754589	0
+6926	2345	1. The instructions of a program are executed in source code order.	text	list	2024-09-19 14:56:13.929234	1
 1771	405	| `std::rotate_copy` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:34.383646	0
 1772	405	Mirrors the behavior of the `std::rotate` algorithm.	text	txt	2024-07-28 10:00:34.405656	0
 1773	405	#include <algorithm>\n#include <iostream>\n#include <iterator>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 10:00:34.426942	0
@@ -3156,6 +3159,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1816	417	#include <iostream>\n#include <iterator>p\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 10:00:42.541164	0
 1817	417	int main()\n{\n    std::vector<long> range{1,2,3,4,5};	text	txt	2024-07-28 10:00:42.562112	0
 1818	417	    std::ranges::copy(std::views::transform(range, [](long e) -> long { return e*e; }), std::ostream_iterator<long>(std::cout, " "));\n    // 1 4 9 16 25	text	txt	2024-07-28 10:00:42.582803	0
+6927	2345	2. There is a global order for all operations on all threads.	text	list	2024-09-19 14:56:13.929234	2
 1819	417	    std::ranges::copy(range | std::views::transform([](long e) -> long { return e*e; }), std::ostream_iterator<long>(std::cout, " "));\n    // 1 4 9 16 25\n}	code	txt	2024-07-28 10:00:42.603865	0
 1820	418	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 10:00:43.067166	0
 1821	418	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(range | std::views::take(3), std::ostream_iterator<long>(std::cout, " "));\n    // 1 2 3\n}	code	txt	2024-07-28 10:00:43.087256	0
@@ -3601,6 +3605,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2246	518	Therefore, in principle, there is no difference between copying or moving an\narray of numeric values:	text	txt	2024-07-28 10:01:51.943335	0
 2247	519	template<typename T1, typename T2>\nstruct pair\n{\n    T1 first;\n    T2 second;\n};	code	txt	2024-07-28 10:01:52.523365	0
 2248	519	`std::pair` has a default constructor, and copy and move semantics.	text	txt	2024-07-28 10:01:52.543561	0
+6928	2346	Booleans, characters, numbers, and pointers can be of an atomic data type.	text	txt	2024-09-19 14:56:13.931719	1
 2249	519	constexpr pair(const T1& x, const T2& y);\ntemplate<typename U, typename V> constexpr pair(U&& x, V&& y);\ntemplate<typename U, typename V> constexpr pair(const pair<U, V>& p);\ntemplate<typename U, typename V> constexpr pair(pair<U, V>&& p);\ntemplate<typename... Args1, typename... Args2> pair(piecewise_construct_t, tuple<Args1...> first_args, tuple<Args2...> second_args);	code	txt	2024-07-28 10:01:52.564712	0
 2250	519	Therefore, we can use move semantics when constructing a pair.	text	txt	2024-07-28 10:01:52.585443	0
 2251	520	1. You implement the same behavior repeatedly for each different types, you\n   make the same mistakes.\n2. You write general code for a common base type such as `void*`, you lose\n   type checking and lose the control of maitaining derived classes.\n3. You use special preprocessors, code is replaced by stupid text replacement\n   mechanism that has no idea of scope and types.	text	txt	2024-07-28 10:01:52.933492	0
@@ -3832,6 +3837,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2478	568	int main()\n{\n    try\n    {\n        std::filesystem::path working_directory{std::filesystem::current_path()};\n        std::cout << working_directory << std::endl;\n    }\n    catch (std::filesystem::filesystem_error const& exp)\n    {\n        std::cerr << exp.what() << std::endl;\n    }\n}	code	txt	2024-07-28 10:02:24.348646	0
 2479	569	`std::filesystem::canonical()` throws a `std::filesystem_error` type\nexception if the path we want to canonicalize does not exist.	text	txt	2024-07-28 10:02:25.094286	0
 2480	569	#include <iostream>\n#include <exception>\n#include <filesystem>	text	txt	2024-07-28 10:02:25.114721	0
+6929	2346	Atomics establish synchronization and ordering constraints that can hold for non-atomic types.	text	txt	2024-09-19 14:56:13.931719	2
 2481	569	int main()\n{\n    try\n    {\n        std::filesystem::path relative_path{"/usr/././lib/../include"};\n        std::filesystem::path canonical_path{std::filesystem::canonical(relative_path)};\n        std::cout << canonical_path << std::endl;\n    }\n    catch (std::filesystem::filesystem_error const& exp)\n    {\n        std::cerr << exp.what() << std::endl;\n    }\n    catch (std::bad_alloc const& exp)\n    {\n        std::cerr << exp.what() << std::endl;\n    }\n}	code	txt	2024-07-28 10:02:25.136535	0
 2482	570	`std::filesystem::canonical()` accepts a path as an optional second argument.	text	txt	2024-07-28 10:02:25.99131	0
 2483	570	path canonical(path const& p, path const& base = current_path());	code	txt	2024-07-28 10:02:26.012124	0
@@ -3866,6 +3872,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2511	579	#include <iostream>\n#include <map>	text	txt	2024-07-28 10:02:30.836333	0
 2512	579	int main()\n{\n    std::map<int, char const*> letters;\n    letters.insert({0, "first"});\n    letters.insert({1, "second"});\n    letters.insert({2, "third"});	text	txt	2024-07-28 10:02:30.857979	0
 2513	579	    for (const auto& [index, letter]: letters)\n        std::cout << index << ": " << letter << "\\\\n";\n}	code	txt	2024-07-28 10:02:30.87911	0
+6930	2346	std::atomic<int> integral_atomic;	code	cpp	2024-09-19 14:56:13.931719	3
 2514	580	struct some_data\n{\n    int age;\n    char const* name;\n};	text	txt	2024-07-28 10:02:31.449267	0
 2515	580	int main()\n{\n    some_data personal_data{27, "Brian"};	text	txt	2024-07-28 10:02:31.469675	0
 2516	580	    auto const& [a1, n1] = personal_data; // const reference\n    auto const [a2, n2] = personal_data; // const\n    auto& [a3, n3] = personal_data; // non-const reference\n    auto [a4, n4] = personal_data; // copy\n}	code	txt	2024-07-28 10:02:31.491138	0
@@ -3970,6 +3977,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2615	610	std::filesystem::path p{"/src/project/main"};\np.replace_extension(".cpp"); // /src/project/main.cpp	code	txt	2024-07-28 10:02:45.604899	0
 2616	611	std::filesystem::path p;	text	txt	2024-07-28 10:02:46.040458	0
 2617	611	std::string s{"/src/projects/linux"};\np.assign(s);	text	txt	2024-07-28 10:02:46.060634	0
+6931	2346	std::atomic<bool> boolean_atomic;	code	cpp	2024-09-19 14:56:13.931719	4
 2618	611	std::string_view sv{"/src/projects/linux-stable"};\np.assign(sv);	text	txt	2024-07-28 10:02:46.081227	0
 2619	611	std::filesystem::path p2{"/src/projects/linux-hardened"};\np.assign(p2.begin(), p2.end());	code	txt	2024-07-28 10:02:46.103701	0
 2620	612	std::filesystem::path p1;\nstd::filesystem::path p2;	text	txt	2024-07-28 10:02:46.403731	0
@@ -4538,6 +4546,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3147	746	The Mersenne twister engine has a bias toward producing some values repeatedly and omitting others, thus generating numbers not in a uniform distribution, but rather in a binomial or Poisson distribution.	text	txt	2024-07-28 10:04:07.39489	0
 3148	746	#include <random>\n#include <functional>	text	txt	2024-07-28 10:04:07.415923	0
 3149	746	int main()\n{\n    std::random_device seeder;	text	txt	2024-07-28 10:04:07.437675	0
+6932	2347	threads, synchronization primitives for shared data, thread-local data, tasks.	text	list	2024-09-19 14:56:13.933883	1
 3150	746	    std::array<int, std::mt19937::state_size> seed_data{};\n    std::generate(std::begin(seed_data), std::end(seed_data), std::ref(seeder));\n    std::seed_seq seeds(std::begin(seed_data), std::end(seed_data));\n    std::mt19937 generator{seeds};\n    std::uniform_int_distribution<> dist{0, 10}; // [0, 10)\n    int random_number = dist(generator);\n}	code	txt	2024-07-28 10:04:07.459982	0
 3151	747	T operator ""_suffix(unsigned long long int); // biggest integral type\nT operator ""_suffix(long double); // biggest floating-point type\nT operator ""_suffix(char);\nT operator ""_suffix(wchar_t);\nT operator ""_suffix(char16_t);\nT operator ""_suffix(char32_t);\nT operator ""_suffix(char const *, std::size_t);\nT operator ""_suffix(wchar_t const *, std::size_t);\nT operator ""_suffix(char16_t const *, std::size_t);\nT operator ""_suffix(char32_t const *, std::size_t);	code	txt	2024-07-28 10:04:07.899163	0
 3152	748	namespace units\n{\n    inline namespace literals\n    {\n        inline namespace units_literals\n        {\n            constexpr size_t operator ""_KB(unsigned long long const size)\n            {\n                return static_cast<size_t>(size * 1024);\n            }\n        }\n    }\n}	text	txt	2024-07-28 10:04:08.518354	0
@@ -5147,6 +5156,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3777	920	std::tuple<T1, T2, T3,...> t;\nstd::tuple<T1, T2> tp(p);\nstd::tuple<T1, T2, T3,...> t1(vt); // copy constructor\nstd::tuple<T1, T2, T3,...> t2(rvt); // move constructor\nstd::tuple<T1, T2, T3,...> t3(v1, v2, v3,...);\nstd::tuple<T1, T2, T3,...> t4(rv1, rv2, rv3,...);	text	txt	2024-07-28 10:05:47.289331	0
 3779	921	#include <tuple>	text	txt	2024-07-28 10:05:47.667131	0
 6419	2028	        RedSquare {}\n        GreenSquare {}\n        BlueSquare {}\n    }\n}	code	txt	2024-07-28 10:12:52.465438	0
+6933	2348	An `std::thread` represents an independent unit of execution. The execution unit starts immediately on its creation.	text	txt	2024-09-19 14:56:13.936465	1
 3780	921	auto t1 = std::make_tuple(v1, v2, v3); // value semantics\nauto t2 = std::make_tuple(std::move(v1), std::move(v2), std::move(v3)); // move semantics\nauto t3 = std::make_tuple(std::ref(v1), std::ref(v2), std::ref(v3)); // reference semantics\nauto t4 = std::make_tuple(std::cref(v1), std::cref(v2), std::cref(v3));	code	txt	2024-07-28 10:05:47.688397	0
 3781	922	#include <tuple>	text	txt	2024-07-28 10:05:48.120442	0
 3782	922	int main()\n{\n    std::tuple<T1, T2, T3> t(value1, value2, value3);	text	txt	2024-07-28 10:05:48.140498	0
@@ -5246,6 +5256,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3875	949	To have the best effect, in general, your goal should be to maximaze the\ndistance between calling `async()` and calling `get()`. Or, to use the terms\nof *call early and return late*.	text	txt	2024-07-28 10:06:01.942234	0
 3877	950	By explicitly passing a launch policy directing `async()` that it should\ndefinitely start the passed functionality asynchronously the moment it is\ncalled.	text	txt	2024-07-28 10:06:02.36769	0
 3878	950	std::future<long> result = std::async(std::launch::async, do_something);	code	txt	2024-07-28 10:06:02.387916	0
+6934	2348	std::thread runner{callable, args...}; // starts execution	code	cpp	2024-09-19 14:56:13.936465	2
 3879	950	If the asynchronous call is not possible here, the program will throw a\n`std::system_error` exception with the error code\n`resource_unavailable_try_again`, which is equivalent to the POSIX errno\n`EAGAIN`.	text	txt	2024-07-28 10:06:02.40876	0
 3880	951	With the `std::launch::async` policy, you don't necessarily have to call\n`get()` anymore because, if the life time of the returned future ends, the\nprogram will wait for the function to finish. Thus, if you don't call `get()`,\nleaving the scope of the future object will wait for the background task to\nend. Nevertheless, also calling `get()` here before a program ends makes the\nbehavior clearer.	text	txt	2024-07-28 10:06:02.829831	0
 3881	951	{\n    std::future<void> result = std::async(std::launch::async, do_something);\n    // result's destructor blocks at the end of scope\n}	code	txt	2024-07-28 10:06:02.849741	0
@@ -8243,6 +8254,65 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6921	2342	When passing string literals to arguments of type const reference, the type of the corresponding parameters become a reference to an array of chars (`const char(&)[N]`). Therefore, type `char[N]` is deduced as type of parameter and used as type of member variable. However, initializing an array member with an array is not possible because you cannot copy arrays.	text	txt	2024-09-18 17:20:09.002003	1
 6922	2342	To deduce the same type for string literals of different length, we need to decay universal reference parameters.	text	txt	2024-09-18 17:20:09.002003	2
 6923	2342	namespace std\n{\ntemplate<typename T1, typename T2>\nconstexpr pair(typename decay_t<T1>, typename decay_t<T2>) make_pair(T1&& a, T2&& b)\n{\n    return pair<decay_t<T1>, decay_t<T2>>(forward<T1>(a), forward<T2>(b));\n}\n} // std	code	cpp	2024-09-18 17:20:09.002003	3
+6935	2349	The execution unit takes its work package as a callable unit. A callable unit can be a named function, a function object, or a lambda function.	text	txt	2024-09-19 14:56:13.939256	1
+6936	2349	void do_something()\n{\n    std::println("{}", "function running on a separate thread");\n}\n\nstd::thread named_function_runner{do_something};	code	cpp	2024-09-19 14:56:13.939256	2
+6937	2349	struct callable\n{\n    constexpr void operator()()\n    {\n        std::println("{}", "functor running on a separate thread");\n    }\n};\n\nstd::thread function_object_runner{callable{}};	code	cpp	2024-09-19 14:56:13.939256	3
+6938	2349	std::thread lambda_function_runner{[]{ std::println("{}", "lambda running on a separate thread"); }};	code	cpp	2024-09-19 14:56:13.939256	4
+6939	2350	The execution unit of the new thread ends with the end of the callable.	text	txt	2024-09-19 14:56:13.940712	1
+6940	2351	Either the creator waits until the created thread is done by calling `join()` member function, or the creator detaches itself from the created thread by calling `detach()` member function on the thread.	text	txt	2024-09-19 14:56:13.942494	1
+6941	2351	t.join();	code	cpp	2024-09-19 14:56:13.942494	2
+6942	2351	t.detach();	code	cpp	2024-09-19 14:56:13.942494	3
+6943	2352	A thread is joinable if no operation `join()` or `detach()` was performed on it.	text	txt	2024-09-19 14:56:13.943582	1
+6944	2352	if (t.joinable())\n    t.join();	code	cpp	2024-09-19 14:56:13.943582	2
+6945	2353	When a thread is not joined or detached by its caller, the thread will call `std::terminate` in its destructor, and the program terminates.	text	txt	2024-09-19 14:56:13.944609	1
+6946	2353	std::thread t{do_something};\nt.join();	code	cpp	2024-09-19 14:56:13.944609	2
+6947	2354	A thread is a variadic template, it can receive an arbitrary number of arguments.	text	txt	2024-09-19 14:56:13.945567	1
+6948	2354	std::thread{callable, args...};	code	cpp	2024-09-19 14:56:13.945567	2
+6949	2355	A variable that is accessed by more than one thread.	text	txt	2024-09-19 14:56:13.946458	1
+6950	2356	mutexes, locks	text	list	2024-09-19 14:56:13.947647	1
+6951	2357	A mutex locks and unlocks the critical section, to which the shared variable belongs.	text	txt	2024-09-19 14:56:13.948718	1
+6952	2357	C++ has five different mutexes. They can lock recursively, tentatively, with or without time constraints.	text	txt	2024-09-19 14:56:13.948718	2
+6953	2358	By following the RAII idiom, mutexes should be encapsulated in a lock to be released automatically.	text	txt	2024-09-19 14:56:13.949846	1
+6954	2358	std::mutex exclusive_data{};\nstd::lock<std::mutex> lock{exclusive_data};	code	cpp	2024-09-19 14:56:13.949846	2
+6955	2359	`std::lock_guard` and `std::scoped_lock` for the simple, `std::unique_lock`, and `std::shared_lock` for the advanced use cases.	text	txt	2024-09-19 14:56:13.950799	1
+6956	2360	If the shared data is read-only, it's sufficient to initialize it with simple thread-safety mechanisms.	text	txt	2024-09-19 14:56:13.951779	1
+6957	2360	Using a constant expression, a static variable with block scope, or using the functino `std::call_once` in combination with the flag `std::once_flag`.	text	txt	2024-09-19 14:56:13.951779	2
+6958	2361	Declaring a variable as thread-local ensures that each thread gets its own copy. Therefore, there is no shared data.	text	txt	2024-09-19 14:56:13.952791	1
+6959	2361	The lifetime of a thread-local data is bound to the lifetime of its thread.	text	txt	2024-09-19 14:56:13.952791	2
+6960	2361	std::thread_local<std::string> content{};	code	cpp	2024-09-19 14:56:13.952791	3
+6961	2362	Condition variabes enable threads to be synchronized via messages. One thread acts as a sender and another as a receiver, where the receiver blocks waiting for the message from the sender.	text	txt	2024-09-19 14:56:13.953727	1
+6962	2363	Typical use cases are producer-consumer workflows.	text	txt	2024-09-19 14:56:13.954768	1
+6963	2363	A condition variable can be either the sender or the receiver of the message.	text	txt	2024-09-19 14:56:13.954768	2
+6964	2363	Using condition variables correctly is quiet challenging; therefore, tasks are often the easier solution.	text	txt	2024-09-19 14:56:13.954768	3
+6965	2364	Tasks have a lot in common with threads. The C++ runtime automatically handles the lifetime of the task.	text	txt	2024-09-19 14:56:13.95577	1
+6966	2364	Tasks are like data channels between two communication endpoints. They enable thread-safe communication between threads. The promise as one endpoint puts data into the data chennel, the future at the other endpoint picks the value up.	text	txt	2024-09-19 14:56:13.95577	2
+6967	2365	The data can be a value, an exception, or simply a notification.	text	txt	2024-09-19 14:56:13.956706	1
+6968	2366	With C++17, most of the STL algorithms are available in parallel implementation. They can be invoked with a so-called execution policy. This policy specifies whether the algorithm runs sequentially using `std::execution::seq`, in parallel with `std::execution::par`, or in parallel with additional vectorization with `std::execution::par_unseq`.	text	txt	2024-09-19 14:56:13.95767	1
+6969	2366	std::copy(std::execution::par, std::begin(container), std::end(container), std::begin(backup))	code	cpp	2024-09-19 14:56:13.95767	2
+6970	2367	`std::jthread` is an enhanced replacement for `std::thread`. In addition to thread properties, an `std::jthread` can signal an interrupt and can automatically join the started thread.	text	txt	2024-09-19 14:56:13.958641	1
+6971	2368	The smart pointer `std::shared_ptr` and `std::weak_ptr` have a conceptional issue in concurrent programs.	text	txt	2024-09-19 14:56:13.959691	1
+6972	2368	They share intrinsically mutable state; therefore, they are prone to data races and thus, leading to undefined behavior.	text	txt	2024-09-19 14:56:13.959691	2
+6973	2368	Both guarantee that the incrementing and decrementing of the reference counter is an atomic operation and the resource is deleted exactly once, but neither of them can guarantee that the access to its resource is atomic.	text	txt	2024-09-19 14:56:13.959691	3
+6974	2369	std::atomic<std::shared_ptr<T>>{};	code	cpp	2024-09-19 14:56:13.960796	1
+6975	2369	std::atomic<std::weak_ptr<T>>{};	code	cpp	2024-09-19 14:56:13.960796	2
+6976	2370	C++14 has no semaphores, but C++20 provides `std::latch` and `std::barrier` types.	text	txt	2024-09-19 14:56:13.962792	1
+6977	2370	Semaphores are used to control access to a limited number of resources.	text	txt	2024-09-19 14:56:13.962792	2
+6978	2370	You can use latches and barriers for waiting at a synchronization point until the counter becomes zero.	text	txt	2024-09-19 14:56:13.962792	3
+6979	2371	`std::latch` can only be used once while a `std::barrier` can be used more than once. Additionally, a barrier can adjust its counter after each iteration.	text	txt	2024-09-19 14:56:13.964808	1
+6980	2372	A special semaphore which has a counter that is bigger than zero. The counter is initialized when the semaphore is created. Acquiring the semaphore decreases the counter and releasing the semaphore increases the counter.	text	txt	2024-09-19 14:56:13.966494	1
+6981	2373	Coroutines are functions that can suspend and resume their execution while maintaining their state.	text	txt	2024-09-19 14:56:13.968168	1
+6982	2374	Coroutines are often the preferred approach to implement multitasking in operating systems, event loops, infinite lists, or pipelines.	text	txt	2024-09-19 14:56:13.969339	1
+6983	2375	An executor consists of a set of rules about where, when and how to run a callable unit.	text	txt	2024-09-19 14:56:13.970354	1
+6984	2375	They are the basic building blocks to execute and speicify if callables should run on an arbitrary thread, a thread pool, or even single threaded without concurrency.	text	txt	2024-09-19 14:56:13.970354	2
+6985	2376	An extended future becomes ready to be used with `then()`, `when_any()` of its predecessors becomes ready, or `when_all()` of them become ready.	text	txt	2024-09-19 14:56:13.971293	1
+6986	2377	Transactional memory is based on the ideas undelying transactions in database theory.	text	txt	2024-09-19 14:56:13.972298	1
+6987	2377	A transaction is an aciton that provides the first three properties of ACID database transactions: Atomicity, Consistency, and Isolation.	text	txt	2024-09-19 14:56:13.972298	2
+6988	2377	The durability that is a characteristic for databases holds not for the proposed transactional memory in C++.	text	txt	2024-09-19 14:56:13.972298	3
+6989	2378	synchronized blocks, atomic blocks	text	list	2024-09-19 14:56:13.973147	1
+6990	2379	Both synchronized and atomic blocks are executed in total order and behave as if a global lock protected them.	text	txt	2024-09-19 14:56:13.97404	1
+6991	2380	In contrast to synchronized blocks, atomic blocks cannot execute transaction-unsafe code.	text	txt	2024-09-19 14:56:13.974979	1
+6992	2381	Introduced in C++23, task blocks implement the fork-join paradigm in C++. During the execution, you have a fork phase in which you launch tasks and a join phase in which you synchronize them.	text	txt	2024-09-19 14:56:13.975939	1
+6993	2382	The data-parallel programming or Single Instruction Multiple Data (SIMD) means that one operation is performed on many data in parallel.	text	txt	2024-09-19 14:56:13.976861	1
 \.
 
 
@@ -10763,6 +10833,46 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 436	1293	How to use <code>std::atomic_flag</code> to make spinlock mechanism?	open	2024-07-28 10:00:52.225477	2024-07-28 10:00:52.225477
 437	1293	How to use <code>std::mutex</code> to make spinlock mechanism?	open	2024-07-28 10:00:53.372976	2024-07-28 10:00:53.372976
 438	1293	Use condition variables to synchronize two threads?	open	2024-07-28 10:00:54.916437	2024-07-28 10:00:54.916437
+2343	1293	What are the basic building blocks of C++ concurrency?	open	2024-09-19 14:56:13.921899	2024-09-19 14:56:13.921899
+2344	1293	What are the higher abstraction layers of C++ concurrency?	open	2024-09-19 14:56:13.926985	2024-09-19 14:56:13.926985
+2345	1293	What are the sequential consistency guarantees?	open	2024-09-19 14:56:13.929234	2024-09-19 14:56:13.929234
+2346	1293	What is an atomic data type?	open	2024-09-19 14:56:13.931719	2024-09-19 14:56:13.931719
+2347	1293	What does multithreading in C++ consist of?	open	2024-09-19 14:56:13.933883	2024-09-19 14:56:13.933883
+2348	1293	What is an execution unit?	open	2024-09-19 14:56:13.936465	2024-09-19 14:56:13.936465
+2349	1293	What is a callable unit?	open	2024-09-19 14:56:13.939256	2024-09-19 14:56:13.939256
+2350	1293	What is the life-time of an execution unit?	open	2024-09-19 14:56:13.940712	2024-09-19 14:56:13.940712
+2351	1293	How many ending strategies can a thread creator perform on its threads?	open	2024-09-19 14:56:13.942494	2024-09-19 14:56:13.942494
+2352	1293	What is a joinable thread?	open	2024-09-19 14:56:13.943582	2024-09-19 14:56:13.943582
+2353	1293	What happens when a joinable thread execution ends?	open	2024-09-19 14:56:13.944609	2024-09-19 14:56:13.944609
+2354	1293	What does a thread take in its constructor?	open	2024-09-19 14:56:13.945567	2024-09-19 14:56:13.945567
+2355	1293	What is a shared data?	open	2024-09-19 14:56:13.946458	2024-09-19 14:56:13.946458
+2356	1293	What components can be used to coordinate access to a shared data?	open	2024-09-19 14:56:13.947647	2024-09-19 14:56:13.947647
+2357	1293	How a mutex locks access to a shared data?	open	2024-09-19 14:56:13.948718	2024-09-19 14:56:13.948718
+2358	1293	What is the basic use case of a lock?	open	2024-09-19 14:56:13.949846	2024-09-19 14:56:13.949846
+2359	1293	What locks exist in C++?	open	2024-09-19 14:56:13.950799	2024-09-19 14:56:13.950799
+2360	1293	How many ways exist to initialize a read-only variable accessible to multiple threads?	open	2024-09-19 14:56:13.951779	2024-09-19 14:56:13.951779
+2361	1293	What is a thread-local data?	open	2024-09-19 14:56:13.952791	2024-09-19 14:56:13.952791
+2362	1293	What is a condition variable?	open	2024-09-19 14:56:13.953727	2024-09-19 14:56:13.953727
+2363	1293	What are the use cases of condition variables?	open	2024-09-19 14:56:13.954768	2024-09-19 14:56:13.954768
+2364	1293	What is a task?	open	2024-09-19 14:56:13.95577	2024-09-19 14:56:13.95577
+2365	1293	What objects can be transferred in the communication channel made by a task?	open	2024-09-19 14:56:13.956706	2024-09-19 14:56:13.956706
+2366	1293	What are the execution policies?	open	2024-09-19 14:56:13.95767	2024-09-19 14:56:13.95767
+2367	1293	What are the advantages of using jthread?	open	2024-09-19 14:56:13.958641	2024-09-19 14:56:13.958641
+2368	1293	What are the drawbacks of using shared and weak pointers in multiple threads?	open	2024-09-19 14:56:13.959691	2024-09-19 14:56:13.959691
+2369	1293	What are the atomic shared pointers?	open	2024-09-19 14:56:13.960796	2024-09-19 14:56:13.960796
+2370	1293	What are the use cases of latch and barriers?	open	2024-09-19 14:56:13.962792	2024-09-19 14:56:13.962792
+2371	1293	What is the difference between latches and barriers?	open	2024-09-19 14:56:13.964808	2024-09-19 14:56:13.964808
+2372	1293	What is a counting semaphore?	open	2024-09-19 14:56:13.966494	2024-09-19 14:56:13.966494
+2373	1293	What is a coroutine?	open	2024-09-19 14:56:13.968168	2024-09-19 14:56:13.968168
+2374	1293	What are the use cases of coroutines?	open	2024-09-19 14:56:13.969339	2024-09-19 14:56:13.969339
+2375	1293	What is an executors?	open	2024-09-19 14:56:13.970354	2024-09-19 14:56:13.970354
+2376	1293	What member functions are new in extended futures?	open	2024-09-19 14:56:13.971293	2024-09-19 14:56:13.971293
+2377	1293	What is a transactional memory model?	open	2024-09-19 14:56:13.972298	2024-09-19 14:56:13.972298
+2378	1293	What transactional memory block types exist in C++?	open	2024-09-19 14:56:13.973147	2024-09-19 14:56:13.973147
+2379	1293	What is the execution order of transactional memory blocks?	open	2024-09-19 14:56:13.97404	2024-09-19 14:56:13.97404
+2380	1293	What are the differences between existing transactional memory blocks?	open	2024-09-19 14:56:13.974979	2024-09-19 14:56:13.974979
+2381	1293	What is a task block?	open	2024-09-19 14:56:13.975939	2024-09-19 14:56:13.975939
+2382	1293	What is the meaning of data parallel programming?	open	2024-09-19 14:56:13.976861	2024-09-19 14:56:13.976861
 \.
 
 
@@ -18517,9 +18627,9 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 148	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	16
 790	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	5
 828	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	13
+1293	86	completed	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	1
 1361	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	15
 1461	98	completed	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	16
-1293	86	writing	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	1
 \.
 
 
@@ -19435,7 +19545,7 @@ SELECT pg_catalog.setval('flashback.logins_id_seq', 3, true);
 -- Name: note_blocks_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.note_blocks_id_seq', 6923, true);
+SELECT pg_catalog.setval('flashback.note_blocks_id_seq', 6993, true);
 
 
 --
@@ -19463,7 +19573,7 @@ SELECT pg_catalog.setval('flashback.note_usage_id_seq', 1, false);
 -- Name: notes_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.notes_id_seq', 2342, true);
+SELECT pg_catalog.setval('flashback.notes_id_seq', 2382, true);
 
 
 --
