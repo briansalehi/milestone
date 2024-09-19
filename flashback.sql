@@ -343,7 +343,7 @@ ALTER FUNCTION flashback.get_user_practices(user_index integer, topic_index inte
 -- Name: get_user_resources(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_user_resources(user_index integer) RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, incomplete_sections bigint, updated timestamp without time zone)
+CREATE FUNCTION flashback.get_user_resources(user_index integer) RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, incomplete_sections bigint, last_study timestamp without time zone)
     LANGUAGE plpgsql
     AS $$
 begin
@@ -8874,11 +8874,6 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 431	1261	Represent a view of the generated sequence formed by repeatedly incrementing an initial value?	open	2024-07-28 10:00:49.064427	2024-07-28 10:00:49.064427
 432	1261	Represent a view obtained by successively applying the istream input iterator?	open	2024-07-28 10:00:49.547664	2024-07-28 10:00:49.547664
 433	437	Use modules to import the entire standard library functionality?	open	2024-07-28 10:00:50.179428	2024-07-28 10:00:50.179428
-434	1294	What is the foundation of C++ memory model for concurrency?	open	2024-07-28 10:00:50.71788	2024-07-28 10:00:50.71788
-435	1294	What are the levels of expertise in multithreading?	open	2024-07-28 10:00:51.048242	2024-07-28 10:00:51.048242
-436	1294	How to use <code>std::atomic_flag</code> to make spinlock mechanism?	open	2024-07-28 10:00:52.225477	2024-07-28 10:00:52.225477
-437	1294	How to use <code>std::mutex</code> to make spinlock mechanism?	open	2024-07-28 10:00:53.372976	2024-07-28 10:00:53.372976
-438	1294	Use condition variables to synchronize two threads?	open	2024-07-28 10:00:54.916437	2024-07-28 10:00:54.916437
 439	1036	How to create a thread?	open	2024-07-28 10:00:55.778699	2024-07-28 10:00:55.778699
 440	1037	How to launch a thread using callable objects?	open	2024-07-28 10:00:56.824328	2024-07-28 10:00:56.824328
 441	1037	How to wait for a thread to complete?	open	2024-07-28 10:00:57.735647	2024-07-28 10:00:57.735647
@@ -10763,6 +10758,11 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 2340	1361	How does the thread constructor take arguments?	open	2024-09-18 17:20:08.999937	2024-09-18 17:20:08.999937
 2341	1361	Use move semantics to pass future and promise types to two different threads passing value?	open	2024-09-18 17:20:09.000946	2024-09-18 17:20:09.000946
 2342	1361	Pass string literals as universal references?	open	2024-09-18 17:20:09.002003	2024-09-18 17:20:09.002003
+434	1293	What is the foundation of C++ memory model for concurrency?	open	2024-07-28 10:00:50.71788	2024-07-28 10:00:50.71788
+435	1293	What are the levels of expertise in multithreading?	open	2024-07-28 10:00:51.048242	2024-07-28 10:00:51.048242
+436	1293	How to use <code>std::atomic_flag</code> to make spinlock mechanism?	open	2024-07-28 10:00:52.225477	2024-07-28 10:00:52.225477
+437	1293	How to use <code>std::mutex</code> to make spinlock mechanism?	open	2024-07-28 10:00:53.372976	2024-07-28 10:00:53.372976
+438	1293	Use condition variables to synchronize two threads?	open	2024-07-28 10:00:54.916437	2024-07-28 10:00:54.916437
 \.
 
 
@@ -17704,7 +17704,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 1419	97	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	2
 918	68	writing	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	1
 1241	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	14
-1293	86	ignored	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	1
 975	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	14
 36	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	13
 848	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	5
@@ -18520,6 +18519,7 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 828	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	13
 1361	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	15
 1461	98	completed	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	16
+1293	86	writing	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	1
 \.
 
 
