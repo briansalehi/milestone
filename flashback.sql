@@ -1016,7 +1016,8 @@ CREATE TABLE flashback.resources (
     type flashback.resource_type DEFAULT 'unknown'::flashback.resource_type NOT NULL,
     created timestamp without time zone DEFAULT now() NOT NULL,
     updated timestamp without time zone DEFAULT now() NOT NULL,
-    section_pattern_id integer
+    section_pattern_id integer,
+    leading_author character varying(40)
 );
 
 
@@ -17054,104 +17055,104 @@ COPY flashback.resource_watching (user_id, resource_id, update) FROM stdin;
 -- Data for Name: resources; Type: TABLE DATA; Schema: flashback; Owner: flashback
 --
 
-COPY flashback.resources (id, name, reference, type, created, updated, section_pattern_id) FROM stdin;
-1	https://www.youtube.com	https://youtube.com	video	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-2	https://www.youtu.be	https://youtube.com	video	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-3	https://www.boost.org	https://boost.org	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-4	https://www.latex-tutorial.com	https://latex-tutorial.com	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-5	https://www.qt.io	https://qt.io	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-6	GDB Tips by Greg Law	\N	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-7	Daily C++ Bites	\N	mailing list	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-8	C++ Daily Bites	\N	mailing list	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-9	https://www.cppstories.com	https://www.cppstories.com	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-10	https://en.cppreference.com	https://www.cppstories.com	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-11	mdadm(1)	Unix Manual	manual	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-12	LinkedIn Course: C++ Design Patterns: Creational by Olivia Chiu Stone	https://www.linkedin.com	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-13	Kevin Dankwardt's Linux Device Drivers	https://www.linkedin.com/learning/linux-device-drivers	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-14	LinkedIn Course: Linux Device Drivers	https://linkedin.com	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N
-15	Learning OpenCV 3	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-65	Offensive Security Wireless Professional (OSWP)	\N	video	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	4
-62	Boost.Asio C++ Network Programming Cookbook	https://subscription.packtpub.com/book/cloud-and-networking/9781783986545	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-98	Modern CMake for C++	https://subscription.packtpub.com/book/programming/9781805121800	book	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	1
-16	Calculus: Concepts and Contexts	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-17	Qt6 Deep Dive	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-18	Mastering Embedded Linux Programming	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-19	Teach Yourself C++ in One Hour a Day	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-20	C++20 STL Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-21	Mastering OpenCV 3	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-22	A Common-Sense Guide to Data Structures and Algorithms	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-23	Professional C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-24	Pro Tbb: C++ Parallel Programming with Threading Building Blocks	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-25	Hands-On Design Patterns with C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-26	Learn PostgreSQL	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-27	Docker for Developers	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-28	C++17 STL Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-29	PostgreSQL 13 Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-30	Practical Vim	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-31	OpenCV 4 Computer Vision Programming Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-32	Linux Security and Administration	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-33	Linux System Programming Techniques	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-34	Linux Driver Development for Embedded Processors	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-35	Demystifying Cryptography with OpenSSL 3.0	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-36	C++20: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-37	Udemy: SQL and PostgreSQL - The Complete Developer's Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-38	Linux Service Management Made Easy with systemd	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-39	C++20: Get the Details	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-40	Learning eBPF	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-41	Linux Kernel Programming Part 2	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-42	Beginning C++23: From Novice to Professional	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-43	Linux Kernel Programming	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-44	Beginning x64 Assembly Programming	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-45	Docker: Up & Running	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-46	Docker in Practice	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-47	The Linux Programming Interface	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-48	CMake Best Practices	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-49	Linux Device Driver	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-50	Introduction to Linear and Matrix Algebra	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-51	Extreme C	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-52	Mastering Linux Device Driver Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-53	The Shellcoder's Handbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-54	Design Patterns in Modern C++20	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-55	The C++ Standard Library	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-56	Docker Deep Dive	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-57	Modern C++ Programming Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-58	Step by Step Learning x64 Assembly Language	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-59	Embedded Linux Development Using Yocto Project	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-60	Practical Binary Analysis	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-61	Learn Docker in a month of Lunches	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-63	C++17: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-66	Kali Linux Penetration Testing Bible	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-67	Linux Device Driver Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-68	The C++ Programming Language	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-69	Mastering Linux Security and Hardening	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-70	The Art of PostgreSQL	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-71	Heading for the Yocto Project	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-72	Introducing Qt6	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-73	C++ Concurrency in Action	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-74	Professional CMake	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-75	Mastering Kali Linux For Advanced Penetration Testing	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-76	Deciphering Object-Oriented Programming with C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-77	Linux Kernel Debugging	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-78	Hands-On Network Programming with C	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-79	Data Abstraction & Problem Solving with C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-93	GNU Pocket Reference	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-80	Udemy - The C++20 Master Class	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-81	PostgreSQL 14 Administration Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-82	Linux Kernel Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-83	Sudo Mastery	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-84	A Complete Guide to Standard C++ Algorithms	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-85	Cross-Platform Development with Qt6 and Modern C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-86	Concurrency with Modern C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-87	Thomas' Calculus	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-88	Qt6 QML	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-90	CMake Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-92	Hands-On Mobile and Embedded Development with Qt5	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-94	Mastering Linux Kernel Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-95	Boost.Asio C++ Network Programming 	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-96	Embedded Linux using Yocto	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-97	C++ Templates: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
-91	Embedded Linux Full Course by Anisa Institute	\N	course	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	3
-89	C++ Move Semantics: The Complete Guide	https://leanpub.com/cppmove	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1
+COPY flashback.resources (id, name, reference, type, created, updated, section_pattern_id, leading_author) FROM stdin;
+1	https://www.youtube.com	https://youtube.com	video	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N	\N
+2	https://www.youtu.be	https://youtube.com	video	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N	\N
+3	https://www.boost.org	https://boost.org	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N	\N
+4	https://www.latex-tutorial.com	https://latex-tutorial.com	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N	\N
+5	https://www.qt.io	https://qt.io	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N	\N
+6	GDB Tips by Greg Law	\N	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N	\N
+7	Daily C++ Bites	\N	mailing list	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N	\N
+8	C++ Daily Bites	\N	mailing list	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N	\N
+9	https://www.cppstories.com	https://www.cppstories.com	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N	\N
+10	https://en.cppreference.com	https://www.cppstories.com	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N	\N
+11	mdadm(1)	Unix Manual	manual	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N	\N
+12	LinkedIn Course: C++ Design Patterns: Creational by Olivia Chiu Stone	https://www.linkedin.com	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N	\N
+13	Kevin Dankwardt's Linux Device Drivers	https://www.linkedin.com/learning/linux-device-drivers	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N	\N
+14	LinkedIn Course: Linux Device Drivers	https://linkedin.com	course	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	\N	\N
+15	Learning OpenCV 3	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+65	Offensive Security Wireless Professional (OSWP)	\N	video	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	4	\N
+62	Boost.Asio C++ Network Programming Cookbook	https://subscription.packtpub.com/book/cloud-and-networking/9781783986545	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+55	The C++ Standard Library: A Tutorial and Reference	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	Nicolai M. Josuttis
+98	Modern CMake for C++	https://subscription.packtpub.com/book/programming/9781805121800	book	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	1	\N
+16	Calculus: Concepts and Contexts	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+17	Qt6 Deep Dive	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+18	Mastering Embedded Linux Programming	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+19	Teach Yourself C++ in One Hour a Day	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+20	C++20 STL Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+21	Mastering OpenCV 3	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+22	A Common-Sense Guide to Data Structures and Algorithms	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+23	Professional C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+24	Pro Tbb: C++ Parallel Programming with Threading Building Blocks	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+25	Hands-On Design Patterns with C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+26	Learn PostgreSQL	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+27	Docker for Developers	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+28	C++17 STL Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+29	PostgreSQL 13 Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+30	Practical Vim	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+31	OpenCV 4 Computer Vision Programming Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+32	Linux Security and Administration	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+33	Linux System Programming Techniques	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+34	Linux Driver Development for Embedded Processors	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+35	Demystifying Cryptography with OpenSSL 3.0	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+36	C++20: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+37	Udemy: SQL and PostgreSQL - The Complete Developer's Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+38	Linux Service Management Made Easy with systemd	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+39	C++20: Get the Details	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+40	Learning eBPF	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+41	Linux Kernel Programming Part 2	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+42	Beginning C++23: From Novice to Professional	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+43	Linux Kernel Programming	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+44	Beginning x64 Assembly Programming	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+45	Docker: Up & Running	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+46	Docker in Practice	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+47	The Linux Programming Interface	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+48	CMake Best Practices	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+49	Linux Device Driver	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+50	Introduction to Linear and Matrix Algebra	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+51	Extreme C	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+52	Mastering Linux Device Driver Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+53	The Shellcoder's Handbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+54	Design Patterns in Modern C++20	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+56	Docker Deep Dive	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+57	Modern C++ Programming Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+58	Step by Step Learning x64 Assembly Language	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+59	Embedded Linux Development Using Yocto Project	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+60	Practical Binary Analysis	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+61	Learn Docker in a month of Lunches	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+63	C++17: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+66	Kali Linux Penetration Testing Bible	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+67	Linux Device Driver Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+68	The C++ Programming Language	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+69	Mastering Linux Security and Hardening	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+70	The Art of PostgreSQL	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+71	Heading for the Yocto Project	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+72	Introducing Qt6	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+73	C++ Concurrency in Action	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+74	Professional CMake	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+75	Mastering Kali Linux For Advanced Penetration Testing	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+76	Deciphering Object-Oriented Programming with C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+77	Linux Kernel Debugging	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+78	Hands-On Network Programming with C	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+79	Data Abstraction & Problem Solving with C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+93	GNU Pocket Reference	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+80	Udemy - The C++20 Master Class	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+81	PostgreSQL 14 Administration Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+82	Linux Kernel Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+83	Sudo Mastery	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+84	A Complete Guide to Standard C++ Algorithms	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+85	Cross-Platform Development with Qt6 and Modern C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+86	Concurrency with Modern C++	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+87	Thomas' Calculus	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+88	Qt6 QML	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+90	CMake Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+92	Hands-On Mobile and Embedded Development with Qt5	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+94	Mastering Linux Kernel Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+95	Boost.Asio C++ Network Programming 	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+96	Embedded Linux using Yocto	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+97	C++ Templates: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
+91	Embedded Linux Full Course by Anisa Institute	\N	course	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	3	\N
+89	C++ Move Semantics: The Complete Guide	https://leanpub.com/cppmove	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
 \.
 
 
