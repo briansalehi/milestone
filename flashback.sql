@@ -232,17 +232,17 @@ end; $$;
 ALTER FUNCTION flashback.get_editor_resources(user_index integer) OWNER TO flashback;
 
 --
--- Name: get_resource_notes(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+-- Name: get_resource_editing_notes(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_resource_notes(resource_index integer) RETURNS TABLE(section_id integer, section_number integer, section text, section_state flashback.publication_state, note_id integer, note_state flashback.publication_state, heading character varying, content text, last_edit timestamp without time zone)
+CREATE FUNCTION flashback.get_resource_editing_notes(resource_index integer) RETURNS TABLE(section_id integer, section_number integer, section text, section_state flashback.publication_state, note_id integer, note_state flashback.publication_state, heading character varying, content text, last_edit timestamp without time zone)
     LANGUAGE plpgsql
     AS $$
 begin
     return query
     select sc.id, sc.number, concat(p.pattern, ' ', sc.number), sc.state as section_state, n.id, n.state as note_state, n.heading, string_agg(b.content, E'\n\n' order by b.position, b.updated), n.updated timestamp
     from flashback.resources r
-    join flashback.sections sc on sc.resource_id = r.id
+    join flashback.sections sc on sc.resource_id = r.id and sc.state = 'writing'::flashback.publication_state
     join flashback.section_name_patterns p on p.id = r.section_pattern_id
     join flashback.notes n on n.section_id = sc.id
     join flashback.note_blocks b on b.note_id = n.id
@@ -251,7 +251,29 @@ begin
 end $$;
 
 
-ALTER FUNCTION flashback.get_resource_notes(resource_index integer) OWNER TO flashback;
+ALTER FUNCTION flashback.get_resource_editing_notes(resource_index integer) OWNER TO flashback;
+
+--
+-- Name: get_resource_study_notes(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_resource_study_notes(resource_index integer) RETURNS TABLE(section_id integer, section_number integer, section text, section_state flashback.publication_state, note_id integer, note_state flashback.publication_state, heading character varying, content text, last_edit timestamp without time zone)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select sc.id, sc.number, concat(p.pattern, ' ', sc.number), sc.state as section_state, n.id, n.state as note_state, n.heading, string_agg(b.content, E'\n\n' order by b.position, b.updated), n.updated timestamp
+    from flashback.resources r
+    join flashback.sections sc on sc.resource_id = r.id and sc.state = 'completed'::flashback.publication_state
+    join flashback.section_name_patterns p on p.id = r.section_pattern_id
+    join flashback.notes n on n.section_id = sc.id
+    join flashback.note_blocks b on b.note_id = n.id
+    where sc.resource_id = resource_index
+    group by sc.id, sc.number, sc.state, p.pattern, n.id, n.state, n.heading;
+end $$;
+
+
+ALTER FUNCTION flashback.get_resource_study_notes(resource_index integer) OWNER TO flashback;
 
 --
 -- Name: get_section_name_patterns(); Type: FUNCTION; Schema: flashback; Owner: flashback
@@ -1977,6 +1999,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 562	119	; \\\\pre rdi address of string placeholder\n; \\\\pre rsi maximum characters to read\n; \\\\post rax error code\nread:\nsection .data\nnewline db 0xa	text	txt	2024-07-28 09:57:09.93418	0
 563	119	section .bss\n.buffer resb 1      ; hold 1 character from input	text	txt	2024-07-28 09:57:09.954173	0
 564	119	section .text\npush rbp\nmov rbp, rsp	text	txt	2024-07-28 09:57:09.974742	0
+6994	2383	Yocto always builds binary packages.	text	txt	2024-09-22 10:06:26.739554	1
 565	119	push r12            ; callee saved\npush r13            ; callee saved\npush r14            ; callee saved	text	txt	2024-07-28 09:57:09.995296	0
 566	119	mov r12, rdi        ; input string address\nmov r13, rsi        ; max count\nxor r14, r14        ; character counter	text	txt	2024-07-28 09:57:10.015684	0
 567	119	.read:\nmov rax, 0          ; read\nmov rdi, 1          ; stdin\nlea rsi, [.buffer]  ; input address\nmov rdx, 1          ; characters to read\nsyscall	text	txt	2024-07-28 09:57:10.036532	0
@@ -2036,6 +2059,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 622	126	    section .text\n        push rbp\n        mov rbp, rsp	text	txt	2024-07-28 09:57:16.933937	0
 623	126	    %IF CREATE\n        mov rdi, filename\n        call create\n        mov qword[fd], rax      ; save file descriptor\n    %ENDIF	text	txt	2024-07-28 09:57:16.956512	0
 624	126	    %IF WRITE\n        mov rdi, qword[fd]      ; file descriptor\n        mov rsi, text           ; address of string\n        mov rdx, qword[length]  ; length of string\n        call write\n    %ENDIF	text	txt	2024-07-28 09:57:16.97697	0
+7288	2534	If all mirrors fail, build will fail.	text	txt	2024-09-22 10:06:27.073782	2
 625	126	    %IF CLOSE\n        mov rdi, qword[fd]      ; file descriptor\n        call close\n    %ENDIF	code	txt	2024-07-28 09:57:16.998279	0
 626	127		code	txt	2024-07-28 09:57:17.196071	0
 627	128		code	txt	2024-07-28 09:57:17.438187	0
@@ -2571,6 +2595,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1151	239	int read_input(int pts)\n{\nchar rxbuf[1];\nchar txbuf[3];\nint read_bytes = 0;	text	txt	2024-07-28 09:58:38.667219	0
 1152	239	if ((read_bytes = read(pts, rxbuf, 1)) == -1)\n{\nperror("input failed");\nread_bytes = 0;\n}	text	txt	2024-07-28 09:58:38.687249	0
 1153	239	if (read_bytes == 1)\n{\nif ('\\\\r' == rxbuf[0])\n{\nprintf("\\\\n\\\\r");\nsprintf(txbuf, "\\\\n\\\\r");\n}\nelse\n{\nprintf("%c", rxbuf[0]);\nsprintf(txbuf, "%c", rxbuf[0]);\n}	text	txt	2024-07-28 09:58:38.707708	0
+7289	2535	bitbake -c devshell <recipe>	code	sh	2024-09-22 10:06:27.075651	1
 1154	239	fflush(stdout);\nwrite(pts, txbuf, strlen(txbuf));\n}\nelse\n{\nfprintf(stderr, "disconnected\\\\n\\\\r");\n}	text	txt	2024-07-28 09:58:38.728051	0
 1155	239	return read_bytes;\n}	text	txt	2024-07-28 09:58:38.748162	0
 1156	239		code	txt	2024-07-28 09:58:38.7681	0
@@ -2771,6 +2796,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1438	330	#include <algorithm>\n#include <vector>\n#include <list>	text	txt	2024-07-28 09:59:40.832086	0
 1439	330	int main()\n{\n    std::vector<long> random_access{1,2,3,4,5};\n    std::list<long> bidirectional{1,2,3,4,5};	text	txt	2024-07-28 09:59:40.854197	0
 1858	436	To use `std::atomic_flag` it must be initialized to `false` with the constant\n`ATOMIC_FLAG_INIT`.	text	txt	2024-07-28 10:00:52.292049	0
+7290	2536	INHERIT += "buildhistory"	code	bb	2024-09-22 10:06:27.077857	1
 1440	330	    auto random_access_iterator = random_access.begin();\n    random_access_iterator += 3; // OK\n    random_access_iterator++; // OK\n    ssize_t random_difference = random_access_iterator - random_access.begin(); // OK: 4	text	txt	2024-07-28 09:59:40.874647	0
 1441	330	    auto bidirectional_iterator = bidirectional.begin();\n    //bidirectional_iterator += 5; // ERROR\n    std::advance(bidirectional_iterator, 3); // OK\n    bidirectional_iterator++; // OK, all iterators provide advance operation\n    //ssize_t bidirectional_difference = bidirectional_iterator - bidirectional.begin(); // ERROR\n    ssize_t bidirectional_difference = std::distance(bidirectional.begin(), bidirectional_iterator); // OK: 4\n}	code	txt	2024-07-28 09:59:40.895484	0
 1442	331	The benefit of thinking about the returned value as the end iterator of a range is that it removes the potential for corner cases.	text	txt	2024-07-28 09:59:41.418384	0
@@ -2858,6 +2884,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1522	345	If additional memory is available, `stable_sort` remains `O(n log n)`.\nHowever, if it fails to allocate, it will degrade to an `O(n log n log n)` algorithm.	text	txt	2024-07-28 09:59:52.837275	0
 1523	345	#include <algorithm>\n#include <ranges>\n#include <vector>\n#include <string>	text	txt	2024-07-28 09:59:52.858732	0
 1524	345	struct Record\n{\n    std::string label;\n    short rank;\n};	text	txt	2024-07-28 09:59:52.878564	0
+7291	2536	BUILDHISTORY_COMMIT = "1"	code	bb	2024-09-22 10:06:27.077857	2
 1525	345	int main()\n{\n    std::vector<Record> records{{"b", 2}, {"e", 1}, {"c", 2}, {"a", 1}, {"d", 3}};	text	txt	2024-07-28 09:59:52.898988	0
 1526	345	    std::ranges::stable_sort(records, {}, &Record::label);\n    // guaranteed order: a-1, b-2, c-2, d-3, e-1	text	txt	2024-07-28 09:59:52.920309	0
 1527	345	    std::ranges::stable_sort(records, {}, &Record::rank);\n    // guaranteed order: a-1, e-1, b-2, c-2, d-3\n}	code	txt	2024-07-28 09:59:52.94076	0
@@ -3078,6 +3105,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 1731	392	int main()\n{\n    std::vector<long> range(5,0);\n    std::ranges::generate_n(range, 3, []() { return 1; });\n    // range == {1,1,1,0,0}\n}	code	txt	2024-07-28 10:00:25.838181	0
 1732	393	| `std::iota` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++23 |	text	txt	2024-07-28 10:00:26.40426	0
 1733	393	#include <algorithm>\n#include <vector>\n#include <ranges>	text	txt	2024-07-28 10:00:26.424838	0
+7292	2537	buildhistory-diff	code	sh	2024-09-22 10:06:27.079721	1
 1734	393	int main()\n{\n    std::vector<long> range(5,0);\n    std::ranges::iota(range, 1);\n    std::ranges::copy(range, std::ostream_iterator<long>(std::cout, " "));\n}	code	txt	2024-07-28 10:00:26.445923	0
 1735	394	| `std::copy` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:27.093163	0
 1736	394	#include <algorithm>\n#include <ranges>\n#include <vector>\n#include <string>	text	txt	2024-07-28 10:00:27.1141	0
@@ -3568,6 +3596,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 2210	511	    // move assign the values from coll1 to coll2\n    // - not changing any size\n    std::move(coll1.begin(), coll1.end(),   // source range\n              coll2.begin());               // destination range	text	txt	2024-07-28 10:01:46.887362	0
 2211	511	    // coll1 (5 elems): ’?’ ’?’ ’?’ ’?’ ’?’\n    // coll2 (5 elems): ’love’ ’is’ ’all’ ’you’ ’need’	text	txt	2024-07-28 10:01:46.907874	0
 3470	827	    if (file.is_open())\n    {\n        file.read(reinterpret_cast<char*>(buffer), std::sizeof(buffer));	text	txt	2024-07-28 10:04:55.851641	0
+7024	2406	In the build directory, the following directories will be generated:	text	txt	2024-09-22 10:06:26.793665	1
 2212	511	    // move assign the first three values inside coll2 to the end\n    // - not changing any size\n    std::move_backward(coll2.begin(), coll2.begin()+3,  // source range\n                       coll2.end());                    // destination range	text	txt	2024-07-28 10:01:46.929923	0
 2213	511	    // coll1 (5 elems): ’?’ ’?’ ’?’ ’?’ ’?’\n    // coll2 (5 elems): ’?’ ’?’ ’love’ ’is’ ’all’\n}	code	txt	2024-07-28 10:01:46.949994	0
 2214	512	While iterating over elements of a container or range, each access to an\nelement uses `std::move()`. This might be significantly faster but it leaves\nthe element in a valid but unspecified state. You should not use an element\ntwice.	text	txt	2024-07-28 10:01:47.927288	0
@@ -4638,6 +4667,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3475	828	    try {\n        if (file.is_open())\n        {\n            file.write(content);\n            file.close();\n        }\n    }\n    catch (std::ios_base::failure const& exp)\n    {\n        std::cerr << exp.what() << std::endl;\n    }\n}	code	txt	2024-07-28 10:04:56.593005	0
 3476	829	#include <fstream>\n#include <vector>\n#include <string>	text	txt	2024-07-28 10:04:57.103578	0
 3477	829	int main()\n{\n    std::vector<unsigned char> buffer;\n    std::ifstream file("/tmp/sample.txt", std::ios::in);	text	txt	2024-07-28 10:04:57.124809	0
+6995	2384	In most build systems, `make` is the build engine, but in yocto is `bitbake`.	text	txt	2024-09-22 10:06:26.746094	1
 3238	767	* `std::regex_interator`: A constant forward iterator used to iterate through the occurrences of a pattern in a string. It has a pointer to an `std::basic_regex` that must live until the iterator is destroyed. Upon creation and when incremented, the iterator calls `std::regex_search()` and stores a copy of the `std::match_results` object returned by the algorithm.\n* `std::regex_token_iterator`: A constant forward iterator used to iterate through the submatches of every match of a regular expression in a string. Internally, it uses a `std::regex_iterator` to step through the submatches. Since it stores a pointer to an `std::basic_regex` instance, the regular expression object must live until the iterator is destroyed.	text	txt	2024-07-28 10:04:21.198468	0
 3239	767	The token iterators can return the unmatched parts of the string if the index of the subexpressions is -1, in which case it returns an `std::match_results` object that corresponds to the sequence of characters between the last match and the end of the sequence:	text	txt	2024-07-28 10:04:21.219655	0
 3240	767	#include <string>\n#include <regex>	text	txt	2024-07-28 10:04:21.240654	0
@@ -4993,6 +5023,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3612	854	std::copy(std::begin(s), std::end(s), std::insert_iterator{copy_s, std::begin(copy_s)});	code	txt	2024-07-28 10:05:14.746567	0
 3613	855	The standard library provides an `std::reverse_iterator` class template that\niterates through bidirectional or random-access iterator in a reverse\ndirection.	text	txt	2024-07-28 10:05:15.132764	0
 3614	855	An `std::reverse_iterator` is useful mostly with algorithms in the standard\nlibrary or your own functions that have no equivalents that work in reverse\norder.	text	txt	2024-07-28 10:05:15.15383	0
+7088	2444	u-boot, u-boot-ti-staging	text	list	2024-09-22 10:06:26.87544	1
 3616	856	You can always obtain the underlying `std::iterator` from a\n`std::reverse_iterator` by calling its `base()` method. However, because of\nhow `std::reverse_iterator` is implemented, the `std::iterator` returned from\n`base()` always refers to one element past the element referred to by the\n`std::reverse_iterator` on which it's called. To get to the same element, you\nmust subtract one.	text	txt	2024-07-28 10:05:15.78263	0
 3617	856	#include <vector>\n#include <iterator>\n#include <algorithm>	text	txt	2024-07-28 10:05:15.803412	0
 3618	856	std::vector<int> v{11, 22, 33, 22, 11};\nstd::vector<int>::iterator iter1{ std::find(std::begin(v), std::end(v), 22) };\nstd::vector<int>::reverse_iterator iter2{ std::find(std::rbegin(v), std::rend(v), 22) };	text	txt	2024-07-28 10:05:15.825743	0
@@ -5296,6 +5327,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 3914	959	Logging out and then logging in is required for this change to take effect.\nHowever, user can temporarily apply changes to their active shell:	text	txt	2024-07-28 10:06:08.546178	0
 3916	960	docker image ls\ndocker image list	code	txt	2024-07-28 10:06:08.855247	0
 3917	961	This is the command used to start new containers.\nIn its simplest form, it accepts an image and a command as arguments.\nThe image is used to create the container and the command is the application\nthe container will run when it starts.\nThis example will start an Ubuntu container in the foreground,\nand tell it to run the Bash shell:	text	txt	2024-07-28 10:06:09.316662	0
+7286	2533	buildhistory-diff	code	sh	2024-09-22 10:06:27.06979	3
 3918	961	docker container run --interactive --tty ubuntu /bin/bash	code	txt	2024-07-28 10:06:09.337131	0
 3919	961	The `-it` flags tell Docker to make the container interactive and to attach\nthe current shell to the container’s terminal.	text	txt	2024-07-28 10:06:09.357121	0
 3920	962	If you’re logged on to the container and type exit, you’ll terminate the\nBash process and the container will exit (terminate). This is because a\ncontainer cannot exist without its designated main process.	text	txt	2024-07-28 10:06:09.661945	0
@@ -5426,6 +5458,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5010	1423	static int misc_open(struct inode *inode, struct file *fp)\n{\n    char *kbuf = kzalloc(PATH_MAX, GFP_KERNEL);	text	txt	2024-07-28 10:09:08.278231	0
 5015	1423	    dev = misc_dev.this_device;\n}	text	txt	2024-07-28 10:09:08.38684	0
 4014	991	docker login	code	txt	2024-07-28 10:06:22.694578	0
+6996	2384	`bitbake` is written in Python and is a task scheduler like `make`.	text	txt	2024-09-22 10:06:26.746094	2
 4015	992	Docker is opinionated, so by default it pushes images to DockerHub.\nYou can push to other registries, but you have to explicitly set the registry URL as part of the `docker image push` command.	text	txt	2024-07-28 10:06:22.964708	0
 4016	992	docker image push registry/repository/container:latest	code	txt	2024-07-28 10:06:22.985481	0
 4017	993	This command adds an additional tag, it does not overwrite the original.	text	txt	2024-07-28 10:06:23.245725	0
@@ -5517,6 +5550,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4103	1036	docker volume ls\ndocker volume list	code	txt	2024-07-28 10:06:36.133691	0
 4104	1037	docker volume inspect my-storage	code	txt	2024-07-28 10:06:36.418921	0
 4105	1037	If both the `Driver` and `Scope` properties are *local*, it means the volume was created with the local driver and is only available to containers on this Docker host.	text	txt	2024-07-28 10:06:36.439808	0
+6997	2385	`bitbake` parses text files to know what it has to build and how.	text	txt	2024-09-22 10:06:26.748849	1
 4106	1037	The `Mountpoint` property tells us where in the Docker host’s filesystem the volume exists.	text	txt	2024-07-28 10:06:36.461564	0
 4107	1038	docker volume rm\ndocker volume remove	code	txt	2024-07-28 10:06:36.772131	0
 4108	1038	This option lets you specify exactly which volumes you want to delete.\nIt won't delete a volume that is in use by a container or service replica.	text	txt	2024-07-28 10:06:36.792378	0
@@ -5650,6 +5684,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4225	1086	It is platform-independent and performs cross-compiling using the BitBake\ntool, OpenEmbedded Core, and a default set of metadata.	text	txt	2024-07-28 10:06:55.017377	0
 4226	1086	In addition, it provides the mechanism to build and combine thousands of\ndistributed open source projects to form a fully customizable, complete, and\ncoherent Linux software stack.	text	txt	2024-07-28 10:06:55.039296	0
 4227	1087	BitBake is a task scheduler and execution system that parses Python and Shell\nScript code. The code that is parsed generates and runs tasks, which are a\nset of steps ordered per the code’s dependencies.	text	txt	2024-07-28 10:06:55.398531	0
+6998	2386	Text files parsed by bitbake are recipes.	text	txt	2024-09-22 10:06:26.751843	1
 4228	1087	BitBake evaluates all available metadata, managing dynamic variable\nexpansion, dependencies, and code generation. In addition, it keeps track of\nall tasks to ensure their completion, maximizing the use of processing\nresources to reduce build time and predictability.	text	txt	2024-07-28 10:06:55.419302	0
 4229	1087	The source code is in the `bitbake` subdirectory of Poky.	text	txt	2024-07-28 10:06:55.438789	0
 4230	1088	The OpenEmbedded Core metadata collection provides the engine of the Poky\nbuild system. It provides the core features and aims to be generic and as\nlean as possible. It supports seven different processor architectures (ARM,\nARM64, x86, x86-64, PowerPC, PowerPC 64, MIPS, MIPS64, RISC-V32, and RISC-V\n64), only supporting platforms to be emulated by QEMU.	text	txt	2024-07-28 10:06:55.744418	0
@@ -5701,6 +5736,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4276	1114	Obtain the U-Boot source tree from GitHub:	text	txt	2024-07-28 10:07:03.959143	0
 4277	1114	git clone https://github.com - https://github.com/u-boot/u-boot.git\ncd u-boot	code	txt	2024-07-28 10:07:03.98065	0
 4278	1114	Configuration files are stored in `configs/` directory.	text	txt	2024-07-28 10:07:04.001619	0
+7492	2652	LICENSE_CREATE_PACKAGE = "1"	code	bb	2024-09-22 10:06:27.340114	3
 4279	1114	To check if your desired board is already supported by U-Boot, check if there is a match for that board in the `boards.cfg` file.	text	txt	2024-07-28 10:07:04.024748	0
 4280	1114	To use one of the configuration entries in `configs/` use `make` utility:	text	txt	2024-07-28 10:07:04.04571	0
 4281	1114	make CROSS_COMPILE=$(arm-unknown-linux-gnueabihf-gcc -print-sysroot) ARCH=armv6 raspberrypizero_defconfig\nmake CROSS_COMPILE=$(arm-unknown-linux-gnueabihf-gcc -print-sysroot) ARCH=armv6 menuconfig	code	txt	2024-07-28 10:07:04.066728	0
@@ -6265,6 +6301,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4827	1364	* `pr_<level>(...)`: This is used in regular modules that are not device drivers.\n* `dev_<level>(struct device *dev, ...)`: This is to be used in device drivers that are not network devices.\n* `netdev_<level>(struct net_device *dev, ...)`: This is used in `netdev` drivers exclusively.	text	txt	2024-07-28 10:08:42.301722	0
 6421	2029	By not setting either of them, the other is calculated from the number of\nchild items. For instance, setting rows to 3 and adding 6 child items will\nresult in 2 columns.	text	txt	2024-07-28 10:12:53.748249	0
 6422	2029	The properties `flow` and `layoutDirection` are used to control the order in\nwhich the items are added to the grid, while `spacing` controls the amount of\nspace separating the child items.	text	txt	2024-07-28 10:12:53.768613	0
+6999	2386	Each recipe describes how to fetch and build a software component.	text	txt	2024-09-22 10:06:26.751843	2
 4828	1365	* `pr_devel`: Dead code not being compiled, unless `DEBUG` is defined.\n* `pr_debug`, `dev_dbg`, `netdev_dbg`: Used for debug messages.\n* `pr_info`, `dev_info`, `netdev_info`: Used for informational purposes, such as start up information at driver initialization.\n* `pr_notice`, `dev_notice`, `netdev_notice`: Nothing serious but notable. Often used to report security events.\n* `pr_warn`, `dev_warn`, `netdev_warn`: Nothing serious but might indicate problems.\n* `pr_err`, `dev_err`, `netdev_err`: An error condition, often used by drivers to indicate difficulties with hardware.\n* `pr_crit`, `dev_crit`, `netdev_crit`: A critical condition occured, such as a serious hardware/software failure.\n* `pr_alert`, `dev_alert`, `netdev_alert`: Something bad happened and action must be taken immediately.\n* `pr_emerg`, `dev_emerg`, `netdev_emerg`: The system is about to crash or is unstable.	text	txt	2024-07-28 10:08:42.659464	0
 4829	1366	Whenever a message is printed, the kernel compares the message log level with the current console log level;\nif the former is higher (lower value) than the last, the message will be immediately printed to the console.\nYou can check your log-level parameters with the following:	text	txt	2024-07-28 10:08:43.031412	0
 4830	1366	cat /proc/sys/kernel/printk	code	txt	2024-07-28 10:08:43.05172	0
@@ -6370,6 +6407,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 4966	1415	LDM-based drivers should typically register themselves to a kernel framework\nand to a bus. The kernel framework it registers itself to depends on the type\nof the working device. For example, a driver for an RTC chip that resides on\nthe I2C bus will register itself to the kernel's RTC framework (via\n`rtc_register_device()`), and to the I2C bus (via `i2c_register_driver()`). A\ndriver for network adapter on the PCI bus will typically register itself to\nthe kernel's network inftrastructure (via `register_netdev()`) and the PCI\nbus (`pci_register_driver()`).	text	txt	2024-07-28 10:09:01.292599	0
 4969	1417	If a method is left out, and the user space process invokes that method, the\nkernel VFS detects that function pointer is `NULL`, returns an appropriate\nnegative integer, the glibc will multiply this by -1 and set the calling\nprocess's `errno` variable to that value, signaling that the system call\nfailed.	text	txt	2024-07-28 10:09:02.129004	0
 4972	1418	return nonseekable_open(struct inode *inode, struct file *fp);	code	txt	2024-07-28 10:09:02.659641	0
+7000	2386	Recipes might depend on each other.	text	txt	2024-09-22 10:06:26.751843	3
 4975	1419	static int __init miscdev_init(void)\n{\n    int ret = 0;\n    struct device *dev = NULL;	text	txt	2024-07-28 10:09:03.96827	0
 4978	1419	    dev = miscdev.this_device;\n}	text	txt	2024-07-28 10:09:04.029202	0
 4981	1419	MODULE_LICENSE("GPL");\nMODULE_AUTHOR("Brian Salehi <salehibrian@gmail.com");\nMODULE_DESCRIPTION("Sample misc device");\nMODULE_VERSION("0.1");	code	txt	2024-07-28 10:09:04.089441	0
@@ -6850,6 +6888,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5462	1623	On Unix, BSD, and most Linux systems, you would add users to the **wheel** group.	text	txt	2024-07-28 10:10:17.63377	0
 5463	1623	Edit sudo policy file by doing `sudo visudo`:	text	txt	2024-07-28 10:10:17.654201	0
 5464	1623	%wheel ALL=(ALL) ALL	code	txt	2024-07-28 10:10:17.674439	0
+7001	2387	Recipes specify tasks by which perform a specific step in the build.	text	txt	2024-09-22 10:06:26.754733	1
 5465	1623	The percent sign indicates that we’re working with a group.\nThe three appearances of *ALL* mean that members of that group can perform *ALL* commands, as *ALL* users, on *ALL* machines in the network on which this policy is deployed.	text	txt	2024-07-28 10:10:17.694946	0
 5466	1623	%wheel ALL=(ALL) NOPASSWD: ALL	code	txt	2024-07-28 10:10:17.715661	0
 5467	1623	The former snippet means that members of the **wheel** group would be able to perform all of their sudo tasks without ever having to enter any password.\nAvoid doing so, even for home use.	text	txt	2024-07-28 10:10:17.736437	0
@@ -6945,6 +6984,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5557	1639	Another thing to watch out for is that some Linux distributions for IoT devices have this rule in a separate file in the `/etc/sudoers.d` directory, instead of in the main sudoers file.\nEither way, you’ll want to delete this rule, as well as the default user account, when you set up your IoT device.\nAnd of course, you’ll also want to change the root user password, and then lock the root user account.	text	txt	2024-07-28 10:10:27.04408	0
 5558	1640	When you install a SUSE distro you and the root user will both have the same password.	text	txt	2024-07-28 10:10:27.734648	0
 5559	1640	When you do `sudo visudo` on a SUSE machine, you’ll see these two lines that you don’t see on any other Linux distro:	text	txt	2024-07-28 10:10:27.754898	0
+7002	2387	Tasks might also depend on each other.	text	txt	2024-09-22 10:06:26.754733	2
 5560	1640	Defaults targetpw # ask for the password of the target user i.e.\nroot ALL ALL=(ALL) ALL # WARNING! Only use this together with 'Defaults targetpw'!	code	txt	2024-07-28 10:10:27.776564	0
 5561	1640	Replace previous rules with:	text	txt	2024-07-28 10:10:27.796601	0
 5562	1640	%wheel ALL=(ALL:ALL) ALL	code	txt	2024-07-28 10:10:27.817443	0
@@ -7380,6 +7420,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 5976	1755	Let $v, w, z \\\\in \\\\mathbb{R}^n$ be vectors and let $c \\\\in \\\\mathbb{R}$ be a scalar. Then	text	txt	2024-07-28 10:11:19.710263	0
 5977	1755	- $v.w = w.v$ (Commutativity)\n- $v.(w + z) = v.w + v.z$ (Distributivity)\n- $(cv).w = c(v + w)$	text	txt	2024-07-28 10:11:19.730801	0
 5978	1756	$\\\\frac{1}{2}(-6, 12, 4) = \\\\frac{1}{2}(10) = 5$	text	txt	2024-07-28 10:11:19.930257	0
+7003	2388	The input to `bitbake` is called *metadata*.	text	txt	2024-09-22 10:06:26.757109	1
 5979	1757	The length of a vector $\\\\vec{v} = (v_1, v_2, ..., v_n) \\\\in \\\\mathbb{R}^n, denoted by\n\\\\parallel\\\\vec{v}\\\\parallel, is defined by:	text	txt	2024-07-28 10:11:20.351386	0
 5980	1757	$\\\\parallel\\\\vec{v}\\\\parallel = \\\\sqrt{v.v} = \\\\sqrt{v_1^2 + v_2^2 + ... + v_n^2}$	text	txt	2024-07-28 10:11:20.371637	0
 5981	1757	In two dimensions $\\\\parallel\\\\vec{v}\\\\parallel = \\\\sqrt{v_1^2 + v_2^2} = \\\\sqrt{\\\\vec{v}.\\\\vec{v}}$.	text	txt	2024-07-28 10:11:20.391794	0
@@ -7429,6 +7470,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6026	1783	[Fu] = 2uuT-I	text	txt	2024-07-28 10:11:27.143413	0
 6027	1784	[Fu] = 2uuT-I = 2[(0,1)]\\\\[0 1] - [(1,0) (0,1)] = [(-1,0) (0,1)]	text	txt	2024-07-28 10:11:27.301382	0
 6028	1785	[Fu] = 2uuT-I = 2[(1,1,1)]\\\\[1 1 1]/3 - [(1,0,0) (0,1,0) (0,0,1)] = ⅓[(-1,2,2) (2,-1,2) (2,2,-1)]\n[Fu]w = w	text	txt	2024-07-28 10:11:27.503644	0
+7004	2389	Metadata is organized in layers, which can be composed to generate various components.	text	txt	2024-09-22 10:06:26.759875	1
 6029	1786	First compute [Fu]:\nu = (cos(π/3), sin(π/3)) = (1,√3)/2\n[Fu] = 2uuT - I = ½[(1 √3)]\\\\[1 √3] - [(1,0) (0,1)] = ½[(-1,√3) (√3,1)]\n[Fu]v = [Fu]\\\\[(-1,3)]	text	txt	2024-07-28 10:11:27.716278	0
 6030	1787	[Rθ] = Rθ(e₁)|Rθ(e₂)] = [(cos(θ),sin(θ)) (-sin(θ),cos(θ))]	text	txt	2024-07-28 10:11:27.897924	0
 6031	1788	[R^(π/4)]	text	txt	2024-07-28 10:11:28.046827	0
@@ -7542,6 +7584,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6139	1846	    cv::rectangle(image, topleft, bottomright, color, thickness);\n    cv::imshow(window, image);\n    cv::waitKey(0);\n    cv::destroyWindow(window);\n}	code	txt	2024-07-28 10:11:49.074671	0
 6140	1847	#include <opencv2/core.hpp>\n#include <opencv2/imgcodecs.hpp>\n#include <opencv2/imgproc.hpp>\n#include <opencv2/highgui.hpp>	text	txt	2024-07-28 10:11:49.779424	0
 6141	1847	static constexpr auto image_path{"sample.png"};\nstatic constexpr auto window{"Preview"};\nstatic constexpr auto name{"Object"};	text	txt	2024-07-28 10:11:49.799783	0
+7005	2390	`openembedded-core` is the core layer and all other layers are on top of this layer.	text	txt	2024-09-22 10:06:26.761843	1
 6142	1847	int main()\n{\n    cv::Mat image = cv::imread(image_path, cv::IMREAD_COLOR);\n    cv::namedWindow(window);\n    cv::Point topleft{500, 200};\n    cv::Point bottomright{800, 600};\n    int thickness{2};\n    cv::Scalar color{0, 0, 255, 0};\n    double scale{2.0};	text	txt	2024-07-28 10:11:49.821935	0
 6143	1847	    cv::rectangle(image, topleft, bottomright, color, thickness);\n    cv::putText(image, name, position, cv::FONT_HERSHEY_PLAIN, scale, color, thickness);\n    cv::imshow(window, image);\n    cv::waitKey(0);\n    cv::destroyWindow(window);\n}	code	txt	2024-07-28 10:11:49.842696	0
 6144	1848	You need to specify the type of each matrix element. The letter `U` means it\nis unsigned. You can also declare signed numbers by using the letter `S`. For\na color image, you would specify three channels. You can also declare\nintegers (signed or unsigned) of size 16 and 32. You also have access to\n32-bit and 64-bit floating-point numbers	text	txt	2024-07-28 10:11:50.36288	0
@@ -7576,6 +7619,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6173	1867	PostgreSQL stores all of its content in a single filesystem directory known\nas `PGDATA`.	text	txt	2024-07-28 10:11:56.568083	0
 6174	1868	The `PGDATA` directory represents what the cluster is serving as databases, and\nit consists of at least the write-ahead logs (WALs) and the data storage.	text	txt	2024-07-28 10:11:56.769528	0
 6175	1869	It is possible to have a single installation of PostgreSQL and make it switch\nto different `PGDATA` directories to deliver different content.	text	txt	2024-07-28 10:11:56.969283	0
+7006	2390	By default this layer supports qemu for many processor architectures.	text	txt	2024-09-22 10:06:26.761843	2
 6176	1870	The `PGDATA` directory needs to be initialized by creation of the directory\nstructure within it before it can be used by PostgreSQL.	text	txt	2024-07-28 10:11:57.179645	0
 6177	1871	The first single process of PostgreSQL is **postmaster** which waits for incoming\nclient connections.	text	txt	2024-07-28 10:11:57.381265	0
 6178	1872	The postmaster process forks backend processes which each of them serve one\nand only one connection.	text	txt	2024-07-28 10:11:57.589351	0
@@ -7951,6 +7995,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6612	2085	Before any function instructions can be executed, the prolog is executed. In\nessence, the prolog stores some values onto the stack so that the function\ncan execute cleanly. The current value of `EBP` is pushed onto the stack,\nbecause the value of `EBP` must be changed in order to reference values on\nthe stack. When the function has completed, we will need this stored value of\n`EBP` in order to calculate address locations in main. Once `EBP` is stored\non the stack, we are free to copy the current stack pointer (`ESP`) into\n`EBP`. Now we can easily reference addresses local to the stack.	text	txt	2024-07-28 10:13:26.184569	0
 6613	2085	||Low Memory Addresses and Top of the Stack|\n|---|---|\n|Array||\n|EBP||\n|RET||\n|A||\n|B||\n||High Memory Addresses and Bottom of the Stack|	text	txt	2024-07-28 10:13:26.205858	0
 6614	2086	When examining the stack, we’re expecting to see the saved `EBP` and the\nsaved return address (`RET`). But after writing past the array, both `EBP`\nand `RET` values will be overwritten by the value we put past the array.	text	txt	2024-07-28 10:13:27.154855	0
+7007	2391	Is the layer providing the poky reference distribution.	text	txt	2024-09-22 10:06:26.76369	1
 6615	2086	void function(void)\n{\n    //                  top of stack, low memory\n    // 1   x 8 bytes    [index] 0x7fffffffe368\n    // 30  x 8 bytes    [array] 0x7fffffffe360\n    // rbp x 8 bytes            0x7fffffffe460\n    // ret x 8 bytes\n    //                  bottom of stack, high memory	text	txt	2024-07-28 10:13:27.177284	0
 6616	2086	    long array[30];	text	txt	2024-07-28 10:13:27.199528	0
 6617	2086	    unsigned long index = 0;	text	txt	2024-07-28 10:13:27.220004	0
@@ -8286,6 +8331,7 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6963	2363	A condition variable can be either the sender or the receiver of the message.	text	txt	2024-09-19 14:56:13.954768	2
 6964	2363	Using condition variables correctly is quiet challenging; therefore, tasks are often the easier solution.	text	txt	2024-09-19 14:56:13.954768	3
 6965	2364	Tasks have a lot in common with threads. The C++ runtime automatically handles the lifetime of the task.	text	txt	2024-09-19 14:56:13.95577	1
+7008	2392	Is the reference distribution provided by the yocto.	text	txt	2024-09-22 10:06:26.766334	1
 6966	2364	Tasks are like data channels between two communication endpoints. They enable thread-safe communication between threads. The promise as one endpoint puts data into the data chennel, the future at the other endpoint picks the value up.	text	txt	2024-09-19 14:56:13.95577	2
 6967	2365	The data can be a value, an exception, or simply a notification.	text	txt	2024-09-19 14:56:13.956706	1
 6968	2366	With C++17, most of the STL algorithms are available in parallel implementation. They can be invoked with a so-called execution policy. This policy specifies whether the algorithm runs sequentially using `std::execution::seq`, in parallel with `std::execution::par`, or in parallel with additional vectorization with `std::execution::par_unseq`.	text	txt	2024-09-19 14:56:13.95767	1
@@ -8314,6 +8360,524 @@ COPY flashback.note_blocks (id, note_id, content, type, language, updated, "posi
 6991	2380	In contrast to synchronized blocks, atomic blocks cannot execute transaction-unsafe code.	text	txt	2024-09-19 14:56:13.974979	1
 6992	2381	Introduced in C++23, task blocks implement the fork-join paradigm in C++. During the execution, you have a fork phase in which you launch tasks and a join phase in which you synchronize them.	text	txt	2024-09-19 14:56:13.975939	1
 6993	2382	The data-parallel programming or Single Instruction Multiple Data (SIMD) means that one operation is performed on many data in parallel.	text	txt	2024-09-19 14:56:13.976861	1
+7009	2393	The same poky reference system is used for raspberry pi and beagle bone boards, but for beagle bone we will need another meta layer `meta-ti-bsp`.	text	txt	2024-09-22 10:06:26.768297	1
+7010	2394	git clone --branch kirkstone https://git.yoctoproject.org/git/poky	code	sh	2024-09-22 10:06:26.770167	1
+7011	2395	All the scripts required by `bitbake` to run.	text	txt	2024-09-22 10:06:26.772061	1
+7012	2396	Contains the OpenEmbedded-Core metadata.	text	txt	2024-09-22 10:06:26.773937	1
+7013	2397	`meta-skeleton` directory contains recipes for BSP and kernel development.	text	txt	2024-09-22 10:06:26.775795	1
+7014	2398	Holds the configuration for the Poky reference distribution.	text	txt	2024-09-22 10:06:26.777659	1
+7015	2399	Configuration for the Yocto Project reference hardware board support package.	text	txt	2024-09-22 10:06:26.779433	1
+7016	2400	Script to set up the build directory and set environment variables in active shell.	text	txt	2024-09-22 10:06:26.781642	1
+7017	2400	It will create the build directory.	text	txt	2024-09-22 10:06:26.781642	2
+7018	2401	Contains scripts used to set up the environment, development tools, and tools to flash the generated images on the target.	text	txt	2024-09-22 10:06:26.78374	1
+7019	2402	- bitbake: the main build system\n- bitbake-*: utilitie complementing bitbake build system	text	list	2024-09-22 10:06:26.785723	1
+7020	2403	- `core-image-minimal`: boot a device and have access to core command line commands and services.\n- `core-image-sato`: Image with Sato support. Sato is a GNOME mobile-based user interface.\n- `meta-toolchain`: Generates the cross-toolchain in an installable format.\n- `meta-ide-support`: Generates the cross-toolchain and additional tools (gdb, qemu, ...) for IDE integration.	text	list	2024-09-22 10:06:26.787504	1
+7021	2404	- `BUILDDIR`: Absolute path of the build directory.\n- `PATH`: Absolute path to executables in `scripts/` and `bitbake/bin` are prepended to `PATH`.	text	list	2024-09-22 10:06:26.789316	1
+7022	2405	In source directory, only the `conf` directory exists, containing:	text	txt	2024-09-22 10:06:26.791573	1
+7023	2405	- `conf/bblayers.conf`: Explicitly list the layers to use\n- `conf/local.conf`: User related configuration variables; configuration variables can be overriden here\n- `conf/site.conf`: Also like local file but for site settings, eg. network, cpu resource limits	text	list	2024-09-22 10:06:26.791573	2
+7025	2406	- `conf/`: image specific and layer configurations copied into the build without a touch\n- `downloads/`: tarballs downloaded from the fetch stage\n- `sstate-cache/`: shared state cache, use by all builds\n- `tmp/`: bitbake outputs\n- `tmp/work/`: set of specific work directories separated by architecture\n- `tmp/sysroots/`: shared libraries and headers used to compile applications for the target and the host\n- `tmp/deploy/`: final output of the build\n- `tmp/deploy/images/`: the complete images built by the open-embedded build system\n- `tmp/buildstats/`: build statics for all package built\n	text	list	2024-09-22 10:06:26.793665	2
+7026	2407	git clone --branch kirkstone https://git.yoctoproject.org/git/poky.git /tmp/poky\nsource oe-init-build-env [builddir]\nsource /tmp/poky/oe-init-build-env /tmp/build-qemu	code	sh	2024-09-22 10:06:26.795732	1
+7027	2408	bitbake core-image-minimal	code	sh	2024-09-22 10:06:26.798417	1
+7028	2409	git clone --branch kirkstone https://git.yoctoproject.org/git/poky.git	code	sh	2024-09-22 10:06:26.800576	1
+7029	2410	source oe-init-build-env build	code	sh	2024-09-22 10:06:26.802607	1
+7030	2411	MACHINE ?= "qemux86_64"	code	conf	2024-09-22 10:06:26.804735	1
+7031	2411	MACHINE ?= "beaglebone-yocto"	code	conf	2024-09-22 10:06:26.804735	2
+7032	2412	`conf/local.conf` file should be appended with:	text	txt	2024-09-22 10:06:26.806845	1
+7033	2412	BB_NUMBER_THREADS = "8"\nPARALLEL_MAKE = "-j8"	code	conf	2024-09-22 10:06:26.806845	2
+7034	2413	bitbake -h	code	sh	2024-09-22 10:06:26.808627	1
+7035	2414	bitbake core-image-minimal	code	sh	2024-09-22 10:06:26.810619	1
+7036	2415	Using configuration variables.	text	txt	2024-09-22 10:06:26.812938	1
+7037	2416	BUSY_CORES = "${BB_NUMBER_THREADS}"	code	bb	2024-09-22 10:06:26.8149	1
+7038	2417	Variable names are in upper case by convention.	text	txt	2024-09-22 10:06:26.817171	1
+7039	2417	Values are always in string.	text	txt	2024-09-22 10:06:26.817171	2
+7040	2418	Variables defined in configuration files ending in `.conf` have a **global** scope.	text	txt	2024-09-22 10:06:26.819644	1
+7041	2418	Variables defined in **recipes** ending in `.bb`, `.bbappend`, and `.bbclass` have a **local** scope.	text	txt	2024-09-22 10:06:26.819644	2
+7042	2418	It is possible to get access to global scope in recipes.	text	txt	2024-09-22 10:06:26.819644	3
+7043	2419	VAR = "this"\nVAR = "that"	code	bb	2024-09-22 10:06:26.82154	1
+7044	2420	By assining on a variable with `=`, the expansion of this variable happens late on the variable use.	text	txt	2024-09-22 10:06:26.824365	1
+7045	2420	NAME = "foo"\nPACKAGE = "${NAME}"\nBUILD = "packing ${PACKAGE}"\nNAME = "bar"\n# PACKAGE == "packing bar"	code	bb	2024-09-22 10:06:26.824365	2
+7046	2420	By assining on a variable with `:=`, the expansion of this variable happens immediately.	text	txt	2024-09-22 10:06:26.824365	3
+7047	2420	NAME = "foo"\nPACKAGE := "${NAME}"\nBUILD = "packing ${PACKAGE}"\nNAME = "bar"\n# PACKAGE = "packing foo"	code	bb	2024-09-22 10:06:26.824365	4
+7048	2420	Regular expansion is expected in most cases.	text	txt	2024-09-22 10:06:26.824365	5
+7049	2421	VAR += "value" # with space	code	bb	2024-09-22 10:06:26.82672	1
+7050	2421	VAR .= "value" # without space	code	bb	2024-09-22 10:06:26.82672	2
+7051	2422	VAR =+ "value" # with space	code	bb	2024-09-22 10:06:26.82875	1
+7052	2422	VAR =. "value" # without space	code	bb	2024-09-22 10:06:26.82875	2
+7053	2423	VAR ?= "default"	code	bb	2024-09-22 10:06:26.830887	1
+7054	2423	VAR ??= "weak default"	code	bb	2024-09-22 10:06:26.830887	2
+7055	2424	The `??=` operator assigns a value only if the variable has not been assigned when the statement is parsed, not even with `?=` operator.	text	txt	2024-09-22 10:06:26.833559	1
+7056	2425	The parsing order of files is difficult to predict, and the operators apply during parsing. To avoid headache, do not use append and prepend operators in `conf/local.conf`. Use overrides instead.	text	txt	2024-09-22 10:06:26.835627	1
+7057	2426	Overrides allow modification of variables that apply late when the expanding variable is being used.	text	txt	2024-09-22 10:06:26.83779	1
+7058	2426	<VARIABLE>:<override> = "value"	code	bb	2024-09-22 10:06:26.83779	2
+7059	2427	IMAGE_INSTALL:append = " dropbear"	code	bb	2024-09-22 10:06:26.840005	1
+7060	2427	Adds dropbear as one of the packges installed on the image.	text	txt	2024-09-22 10:06:26.840005	2
+7061	2428	FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:	code	bb	2024-09-22 10:06:26.842048	1
+7062	2428	Adds the folder to the set of paths were files that belong to the recipe reside.	text	txt	2024-09-22 10:06:26.842048	2
+7063	2429	IMAGE_INSTALL:remove = "i2c-tools"	code	bb	2024-09-22 10:06:26.843961	1
+7064	2430	It's an alternative to OpenSSH.	text	txt	2024-09-22 10:06:26.845783	1
+7065	2431	The override value will be matched against the values in `OVERRIDES` which includes `MACHINE`, `SOC_FAMILY`, and more.	text	txt	2024-09-22 10:06:26.848246	1
+7066	2431	OVERRIDES = "arm;armv7a:ti-soc:ti33x:beaglebone:poky"	code	bb	2024-09-22 10:06:26.848246	2
+7067	2431	KERNEL_DEVICETREE:beaglebone = "arm335x-bone.dtb" # applied	code	bb	2024-09-22 10:06:26.848246	3
+7068	2431	KERNEL_DEVICETREE:dra7xx-evm = "dra7-evm.dtb" # ignored	code	bb	2024-09-22 10:06:26.848246	4
+7069	2432	Always the most specific assignment takes place.	text	txt	2024-09-22 10:06:26.850927	1
+7070	2432	IMAGE_INSTALL:beaglebone = "busybox mtd-utils i2c-tools" # this applies	code	bb	2024-09-22 10:06:26.850927	2
+7071	2432	IMAGE_INSTALL = "busybox mtd-utils" # ignored	code	bb	2024-09-22 10:06:26.850927	3
+7072	2433	IMAGE_INSTALL = "busybox mtd-utils"	code	bb	2024-09-22 10:06:26.85332	1
+7073	2433	IMAGE_INSTALL:append = "dropbear"	code	bb	2024-09-22 10:06:26.85332	2
+7074	2433	IMAGE_INSTALL:append:beaglebone = "i2c-tools"	code	bb	2024-09-22 10:06:26.85332	3
+7075	2434	1. Regular operators `= := ?= ??= += =+ .= =.`\n2. `:append`\n3. `:prepend`\n4. `:remove`	text	list	2024-09-22 10:06:26.855264	1
+7076	2435	bitbake-getvar MACHINE	code	sh	2024-09-22 10:06:26.85715	1
+7077	2436	bitbake-getvar -r ncurses SRC_URI	code	sh	2024-09-22 10:06:26.859027	1
+7078	2437	bitbake -e ncurses	code	sh	2024-09-22 10:06:26.860989	1
+7079	2438	bitbake-getenv -r tar FILE	code	sh	2024-09-22 10:06:26.862921	1
+7080	2438	bitbake-getenv -r tar-native FILE	code	sh	2024-09-22 10:06:26.862921	2
+7081	2439	bitbake-getenv -r tar PN	code	sh	2024-09-22 10:06:26.865123	1
+7082	2439	bitbake-getenv -r tar-native PN	code	sh	2024-09-22 10:06:26.865123	2
+7083	2440	Through the `PROVIDES` variable.	text	txt	2024-09-22 10:06:26.867296	1
+7084	2441	Several recipes can provide the same virtual name, but only one will be built and installed into the generated image.	text	txt	2024-09-22 10:06:26.86929	1
+7085	2442	Classes provide and abstraction to common code in recipes.	text	txt	2024-09-22 10:06:26.871449	1
+7086	2442	Classes extension is `.bbclass` and they are located in `classes` folder of a layer.	text	txt	2024-09-22 10:06:26.871449	2
+7087	2443	- `virtual/bootloader`\n- `virtual/kernel`\n- `virtual/libc`\n- `virtual/xserver`	text	list	2024-09-22 10:06:26.873595	1
+7089	2445	linux-yocto, linux-yocto-tiny, linux-yocto-rt, linux-ti-staging	text	list	2024-09-22 10:06:26.877458	1
+7090	2446	glibc, musl, newlib	text	list	2024-09-22 10:06:26.879312	1
+7091	2447	xserver-xorg	text	list	2024-09-22 10:06:26.88126	1
+7092	2448	PREFERRED_PROVIDER_virtual/kernel ?= "linux-ti-staging"	code	bb	2024-09-22 10:06:26.883574	1
+7093	2448	PREFERRED_PROVIDER_virtual/libgl ?= "mesa"	code	bb	2024-09-22 10:06:26.883574	2
+7094	2449	Bitbake will build the provider with the highest version number, from the highest priority layer, unless the recipe defines:	text	txt	2024-09-22 10:06:26.885839	1
+7095	2449	DEFAULT_PREFERENCE = "-1"	code	bb	2024-09-22 10:06:26.885839	2
+7096	2450	The package names have to suffix `PREFERRED_VERSION` variable.	text	txt	2024-09-22 10:06:26.888156	1
+7097	2450	`%` can be used as a wildcard.	text	txt	2024-09-22 10:06:26.888156	2
+7098	2450	PREFERRED_VERSION_nginx = "1.20.1"	code	bb	2024-09-22 10:06:26.888156	3
+7099	2450	PREFERRED_VERSION_linux-yocto = "6.2%"	code	bb	2024-09-22 10:06:26.888156	4
+7100	2451	The set of packages installed into the image is defined by the target you choose.	text	txt	2024-09-22 10:06:26.890336	1
+7101	2451	bitbake core-image-minimal	code	sh	2024-09-22 10:06:26.890336	2
+7102	2452	IMAGE_INSTALL	code	bb	2024-09-22 10:06:26.892219	1
+7103	2453	ncurses, ncurses-native	text	txt	2024-09-22 10:06:26.894196	1
+7104	2454	Target is a name possibly with modifiers.	text	txt	2024-09-22 10:06:26.896584	1
+7105	2454	bitbake <target>	code	sh	2024-09-22 10:06:26.896584	2
+7106	2454	bitbake ncurses	code	sh	2024-09-22 10:06:26.896584	3
+7107	2454	bitbake ncurses-native	code	sh	2024-09-22 10:06:26.896584	4
+7108	2455	bitbake -c <task> <recipe>	code	sh	2024-09-22 10:06:26.899199	1
+7109	2455	bitbake -c listtasks ncurses	code	sh	2024-09-22 10:06:26.899199	2
+7110	2455	bitbake -c listtasks virtual/kernel	code	sh	2024-09-22 10:06:26.899199	3
+7111	2455	bitbake -c menuconfig virtual/kernel	code	sh	2024-09-22 10:06:26.899199	4
+7112	2455	Execute given task on the recipe providing the `virtual/kernel` package.	text	txt	2024-09-22 10:06:26.899199	5
+7113	2456	Lists all available recipes with their versions	text	txt	2024-09-22 10:06:26.901655	1
+7114	2456	bitbake -s	code	sh	2024-09-22 10:06:26.901655	2
+7115	2457	Lists all available recipes with their versions	text	txt	2024-09-22 10:06:26.904011	1
+7116	2457	bitbake -c listtasks <recipe>	code	sh	2024-09-22 10:06:26.904011	2
+7117	2457	bitbake -c listtasks virtual/kernel	code	sh	2024-09-22 10:06:26.904011	3
+7118	2458	Forces the given task to be run by removing its stamp file.	text	txt	2024-09-22 10:06:26.906358	1
+7119	2458	bitbake -f	code	sh	2024-09-22 10:06:26.906358	2
+7120	2458	bitbake -f dropbear	code	sh	2024-09-22 10:06:26.906358	3
+7121	2459	Keyword for all recipes.	text	txt	2024-09-22 10:06:26.908528	1
+7122	2459	bitbake world	code	sh	2024-09-22 10:06:26.908528	2
+7123	2460	bitbake --runall=fetch core-image-minimal	code	sh	2024-09-22 10:06:26.910467	1
+7124	2461	do_<name>	text	txt	2024-09-22 10:06:26.912302	1
+7125	2462	- do_fetch\n- do_extract\n- do_configure\n- do_build\n- do_install	text	list	2024-09-22 10:06:26.914375	1
+7126	2463	bitbake --runall=fetch core-image-minimal	code	sh	2024-09-22 10:06:26.916558	1
+7127	2464	Bitbake stores the output of each task in a directory within `SSTATE_CACHE` variable which defaults to `build/sstate-cache`.	text	txt	2024-09-22 10:06:26.919107	1
+7128	2464	After some time this cache direcctory grows unnecessarily, you can clear files inactive more than 30 days:	text	txt	2024-09-22 10:06:26.919107	2
+7129	2464	find build/sstate-cache -type f -atime +30 -delete	code	sh	2024-09-22 10:06:26.919107	3
+7130	2465	SSTATE_DIR	code	bb	2024-09-22 10:06:26.921041	1
+7131	2466	SSTATE_DIR ??= "build/sstate-cache"	code	bb	2024-09-22 10:06:26.922897	1
+7132	2467	Bitbake stores the output of each task in a directory known as the shared state cache.	text	txt	2024-09-22 10:06:26.924743	1
+7133	2468	find build/sstate-cache -type f -atime +30 -delete	code	sh	2024-09-22 10:06:26.926646	1
+7134	2469	A recipe is a set of instructions to describe how to handle a software component.	text	txt	2024-09-22 10:06:26.928782	1
+7135	2469	It also defines what build or runtime dependencies are required.	text	txt	2024-09-22 10:06:26.928782	2
+7136	2470	- fetch\n- patch\n- compile\n- install\n- package	text	list	2024-09-22 10:06:26.930673	1
+7137	2471	<application>_<version>.bb	text	txt	2024-09-22 10:06:26.932745	1
+7138	2472	Set of binary packages with name pattern `<recipe>`, `<recipe>-doc`, `<recipe>-src`, `<recipe>-dbg`.	text	txt	2024-09-22 10:06:26.934843	1
+7139	2473	A recipe contains configuration variables and functions knows as tasks.	text	txt	2024-09-22 10:06:26.936776	1
+7140	2474	BPN # binary package name	code	bb	2024-09-22 10:06:26.940649	1
+7141	2474	PN # ${BPN} possibly with prefix and postfix	code	bb	2024-09-22 10:06:26.940649	2
+7142	2474	PV # package version	code	bb	2024-09-22 10:06:26.940649	3
+7143	2474	BP # ${BPN}-${PV}	code	bb	2024-09-22 10:06:26.940649	4
+7144	2474	With the recipe bash_5.1.bb:	text	txt	2024-09-22 10:06:26.940649	5
+7145	2474	${BPN} = "bash"	code	bb	2024-09-22 10:06:26.940649	6
+7146	2474	${PN} = "bash"	code	bb	2024-09-22 10:06:26.940649	7
+7147	2474	${PV} = "5.1"	code	bb	2024-09-22 10:06:26.940649	8
+7148	2474	${BP} = "bash-5.1"	code	bb	2024-09-22 10:06:26.940649	9
+7149	2475	Each package recipe has a `.inc` file like `tar.inc` which contains version agnostic recipe information like `SRC_URI`.	text	txt	2024-09-22 10:06:26.943478	1
+7150	2475	For each release, packages have another file with the same name appended by an underscore version like `tar_1.26.bb`.	text	txt	2024-09-22 10:06:26.943478	2
+7151	2475	*<application>.inc*	text	txt	2024-09-22 10:06:26.943478	3
+7152	2475		code	bb	2024-09-22 10:06:26.943478	4
+7153	2475	*<application>_<version>.bb*	text	txt	2024-09-22 10:06:26.943478	5
+7154	2475	require <application>.inc\n\n	code	bb	2024-09-22 10:06:26.943478	6
+7155	2476	The first line usually is `require package.inc` which includes version agnostic file for that package.	text	txt	2024-09-22 10:06:26.945954	1
+7156	2476	Licenses are separated into version dependent recipe files.	text	txt	2024-09-22 10:06:26.945954	2
+7157	2477	Run and log files are generated in `temp` directory under the recipe working directory.	text	txt	2024-09-22 10:06:26.948144	1
+7158	2477	`run.do_<task_name>` and `log.do_<task_name>`.	text	txt	2024-09-22 10:06:26.948144	2
+7159	2478	header, sources, tasks	text	txt	2024-09-22 10:06:26.95027	1
+7160	2479	Configuration variables to describe the application:	text	txt	2024-09-22 10:06:26.953329	1
+7161	2479	SUMMARY # short description for the package manager	code	bb	2024-09-22 10:06:26.953329	2
+7162	2479	DESCRIPTION # describes what the software does	code	bb	2024-09-22 10:06:26.953329	3
+7163	2479	HOMEPAGE # URL to application website	code	bb	2024-09-22 10:06:26.953329	4
+7164	2479	SECTION # package category (console, utils)	code	bb	2024-09-22 10:06:26.953329	5
+7165	2479	LICENSE # license using SPDX identifiers (see https://spdx.org/licenses)	code	bb	2024-09-22 10:06:26.953329	6
+7166	2480	This variable is located in `build/conf/local.conf`	text	txt	2024-09-22 10:06:26.955532	1
+7167	2480	SRC_URI = "scheme://url;param1;param2"	code	bb	2024-09-22 10:06:26.955532	2
+7168	2481	file, http, https, git, svn, hg, ftp	text	list	2024-09-22 10:06:26.957417	1
+7169	2482	`git://<url>;protocol=<protocol>;branch=<branch>`	text	txt	2024-09-22 10:06:26.959182	1
+7170	2483	${SOURCEFORGE_MIRROR}	code	bb	2024-09-22 10:06:26.961474	1
+7171	2483	${GNU_MIRROR}	code	bb	2024-09-22 10:06:26.961474	2
+7172	2483	${KERNELORG_MIRROR}	code	bb	2024-09-22 10:06:26.961474	3
+7173	2484	This variable is located in `build/conf/local.conf`	text	txt	2024-09-22 10:06:26.963472	1
+7174	2484	DL_DIR	code	bb	2024-09-22 10:06:26.963472	2
+7175	2485	SRC_URI = "https://example.com/src.tar.bz2;name=tarball"\nSRC_URI:append = "https://example.com/fixes.patch;name=patch"\n\nSRC_URI[tarball.md5sum] = "123..."\nSRC_URI[patch.md5sum] = "123..."	code	bb	2024-09-22 10:06:26.96564	1
+7176	2486	FILESPATH	code	bb	2024-09-22 10:06:26.968076	1
+7177	2486	A list of colon separated paths to look for files.	text	txt	2024-09-22 10:06:26.968076	2
+7178	2486	The order matters, when a file is found in a path, searching stops.	text	txt	2024-09-22 10:06:26.968076	3
+7179	2487	- `${FILE_DIRNAME}/${BP}`\n- `${FILE_DIRNAME}/${BPN}`\n- `${FILE_DIRNAME}/files`\n- Items in `FILESEXTRAPATHS`\n- The overrides in `FILESOVERRIDES`	text	txt	2024-09-22 10:06:26.970001	1
+7180	2488	${TRANSLATED_TARGET_ARCH}:${MACHINEOVERRIDES}:${DISTROOVERRIDES}	code	bb	2024-09-22 10:06:26.971933	1
+7181	2488	arm:armv7a:ti-soc:ti33x:beaglebone:poky	text	txt	2024-09-22 10:06:26.971933	2
+7182	2489	S	code	bb	2024-09-22 10:06:26.974296	1
+7183	2489	When extracting files, `bitbake` locates extracted files in directory `<application>-<version>`.	text	txt	2024-09-22 10:06:26.974296	2
+7184	2489	The `S` variable defines these directories.	text	txt	2024-09-22 10:06:26.974296	3
+7185	2489	The git file schemes must be specified in `S` as `${WORKDIR}/git`.	text	txt	2024-09-22 10:06:26.974296	4
+7186	2490	LC_FILES_CHKSUM = "file://gpl.txt;md5=123..."	code	bb	2024-09-22 10:06:26.97675	1
+7187	2490	LC_FILES_CHKSUM = "file://main.c;beginline=3;endline=21;md5=123..."	code	bb	2024-09-22 10:06:26.97675	2
+7188	2490	LC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=123..."	code	bb	2024-09-22 10:06:26.97675	3
+7189	2491	DEPENDS = recipe-b	code	bb	2024-09-22 10:06:26.978648	1
+7190	2492	RDEPENDS:${PN} = recipe-b	code	bb	2024-09-22 10:06:26.980677	1
+7191	2492	Runtime dependencies must be package specific.	text	txt	2024-09-22 10:06:26.980677	2
+7192	2493	DEPENDS = "recipe-b (>= 1.2)	code	bb	2024-09-22 10:06:26.982994	1
+7193	2493	RDEPENDS:${PN} = "recipe-b (>= 1.2)	code	bb	2024-09-22 10:06:26.982994	2
+7194	2494	bitbake -g -u taskexp core-image-minimal	code	sh	2024-09-22 10:06:26.984972	1
+7195	2495	Default tasks are defined in classes.	text	txt	2024-09-22 10:06:26.986927	1
+7196	2495	- `do_fetch`\n- `do_unpack`\n- `do_patch`\n- `do_configure`\n- `do_compile`\n- `do_install`\n- `do_package`\n- `do_rootfs`	text	list	2024-09-22 10:06:26.986927	2
+7197	2496	bitbake <recipe> -c listtasks	code	sh	2024-09-22 10:06:26.988803	1
+7198	2497	B	code	bb	2024-09-22 10:06:26.990674	1
+7199	2498	D	code	bb	2024-09-22 10:06:26.992512	1
+7200	2499	WORKDIR	code	bb	2024-09-22 10:06:26.994367	1
+7201	2500	do_task() {\n    action1\n    action2\n}	code	bb	2024-09-22 10:06:26.996427	1
+7202	2500	do_compile() {\n    oe_runmake\n}	code	bb	2024-09-22 10:06:26.996427	2
+7203	2500	do_install() {\n    install -d ${D}${bindir}\n    install -d -m 0755 sample ${D}${bindir}\n}	code	bb	2024-09-22 10:06:26.996427	3
+7204	2501	- `do_fetch`: `${DL_DIR}`\n- `do_unpack`: `${DL_DIR}` transfers to `${S}`\n- `do_patch`: `${S}`\n- `do_configure`: `${S}` transfers to `${B}`\n- `do_compile`: `${S}`\n- `do_install`: `${S}` transfers to `${D}`	text	list	2024-09-22 10:06:26.998409	1
+7205	2502	do_mkimage() {\n    uboot-mkimage ...\n}\n\naddtask do_mkimage after do_compile before do_install	code	bb	2024-09-22 10:06:27.00027	1
+7206	2503	When an upstream `Makefile` uses hardcoded `CC` or any other gcc environments we can override them in recipe:	text	txt	2024-09-22 10:06:27.002413	1
+7207	2503	EXTRA_OEMAKE = "-e"	code	bb	2024-09-22 10:06:27.002413	2
+7208	2504	Files with `.patch` and `.diff` extensions or files having the `apply=yes` parameter in `SRC_URI`.	text	txt	2024-09-22 10:06:27.004577	1
+7209	2504	Compressed patches will be extracted automatically.	text	txt	2024-09-22 10:06:27.004577	2
+7210	2504	SRC_URI += "file://joystick-support.patch\nSRC_URI += file://smp-files.diff	code	bb	2024-09-22 10:06:27.004577	3
+7211	2505	PATCHTOOL = "quilt" # default in poky	code	bb	2024-09-22 10:06:27.006869	1
+7212	2505	PATCHTOOL = "patch"	code	bb	2024-09-22 10:06:27.006869	2
+7213	2505	PATCHTOOL = "git"	code	bb	2024-09-22 10:06:27.006869	3
+7214	2506	Either patch can fail which is default in meta-poky:	text	txt	2024-09-22 10:06:27.009292	1
+7215	2506	PATCHRESOLVE = "noop"	code	bb	2024-09-22 10:06:27.009292	2
+7216	2506	Or user interacts:	text	txt	2024-09-22 10:06:27.009292	3
+7217	2506	PATCHRESOLVE = "user"	code	bb	2024-09-22 10:06:27.009292	4
+7218	2507	SUMMARY = "Sample Custom Program"\nDESCRIPTION = "Sample Program"\nHOMEPAGE = ""\nSECTION = "examples"\nLICENSE = "MIT"\n\nSRC_URI = "git://briansalehi@github.com/example.git;protocol=https;branch=main"\nSRCREV = "123..."\nS = "${WORKDIR}/git"\nLIC_FILES_CHKSUM = "file://sample.cpp:beginline=1;endline=20;md5=123..."\n\ndo_compile() {\n    oe_runmake\n}\n\ndo_install() {\n    install -d ${D}${bindir}\n    install -m 0755 program ${D}${bindir}\n}	code	bb	2024-09-22 10:06:27.011378	1
+7219	2508	SUMMARY = "Sample Custom Program"\nDESCRIPTION = "GNU file archiving program"\nHOMEPAGE = "https://www.gnu.org/software/tar"\nSECTION = "base"\n\nSRC_URI = "${GNU_MIRROR}/tar/tar-${PV}.tar.bz2"\n\ndo_configure() { ... }\ndo_compile() { ... }\ndo_install() { ... }	code	bb	2024-09-22 10:06:27.013177	1
+7220	2509	require tar.inc\n\nLICENSE = "GPL-2.0-only"\nLIC_FILES_CHKSUM = file://COPYING;md5=123..."\n\nSRc_URI += "file://avoid_heap_overflow.patch"\nSRC_URI[md5sum] = "123..."	code	bb	2024-09-22 10:06:27.01514	1
+7221	2510	run.do_<task>	text	txt	2024-09-22 10:06:27.017288	1
+7222	2510	log.do_<task>	text	txt	2024-09-22 10:06:27.017288	2
+7223	2511	bitbake-getvar -r <recipe> <variable>	code	sh	2024-09-22 10:06:27.019242	1
+7224	2511	bitbake-getvar -r ncurses SRC_URI	code	sh	2024-09-22 10:06:27.019242	2
+7225	2512	bitbake-getvar -e	code	sh	2024-09-22 10:06:27.020853	1
+7226	2513	bitbake-getvar -e <recipe>	code	sh	2024-09-22 10:06:27.022834	1
+7227	2513	bitbake-getvar -e ncurses	code	sh	2024-09-22 10:06:27.022834	2
+7228	2514	The `bitbake` build engine allows to modify a recipe by extending it.	text	txt	2024-09-22 10:06:27.025138	1
+7287	2534	`DL_DIR`, `PREMIRRORS`, `SRC_URI`, `MIRRORS`.	text	list	2024-09-22 10:06:27.073782	1
+7229	2514	If we already have a recipe `meta/recipes-core/init-ifupdown/init-ifupdown_1.0.bb`,\nwe can extend it by writing a recipe with the same name but with `.bbappend` extension.	text	txt	2024-09-22 10:06:27.025138	2
+7230	2514	`meta-custom/recipes-core/init-ifupdown/init-ifupdown_1.0.bbappend`	text	txt	2024-09-22 10:06:27.025138	3
+7231	2515	Append files must have the same root name as the recipe they extend	text	txt	2024-09-22 10:06:27.027948	1
+7232	2515	Wildcards can be used in extension name but only as minor version:	text	txt	2024-09-22 10:06:27.027948	2
+7233	2515	meta-custom/recipes-core/init-ifupdown/init-ifupdown_1.%.bbappend	code	sh	2024-09-22 10:06:27.027948	3
+7234	2515	Above extension applys to all minor versions of `init-ifupdown` version 1.	text	txt	2024-09-22 10:06:27.027948	4
+7235	2515	The `%` works only just before the `.bbappend` suffix	text	txt	2024-09-22 10:06:27.027948	5
+7236	2515	Append files should be version specific.	text	txt	2024-09-22 10:06:27.027948	6
+7237	2516	`FILESEXTRAPATHS`	text	txt	2024-09-22 10:06:27.030955	1
+7238	2516	Files are looked up in paths referenced in FILESEXTRAPATHS, from left to right.	text	txt	2024-09-22 10:06:27.030955	2
+7239	2516	Prepending a path makes sure it has priority over the recipe's one.	text	txt	2024-09-22 10:06:27.030955	3
+7240	2516	FILESEXTRAPATHS:prepend := "${THISDIR}/files:"	code	bb	2024-09-22 10:06:27.030955	4
+7241	2516	This is analogues to the following which should not be done:	text	txt	2024-09-22 10:06:27.030955	5
+7242	2516	SRC_URI += "file://custom-modification-0.patch"	code	bb	2024-09-22 10:06:27.030955	6
+7243	2516	SRC_URI += "file://custom-modification-1.patch"	code	bb	2024-09-22 10:06:27.030955	7
+7244	2517	Tasks can be extended by appending or prepending.	text	txt	2024-09-22 10:06:27.033461	1
+7245	2517	do_install:append() {\ninstall -d ${D}${sysconfdir}\ninstall -m 0644 hello.conf ${D}${sysconfdir}\n}	code	sh	2024-09-22 10:06:27.033461	2
+7246	2518	inherit <class>	code	bb	2024-09-22 10:06:27.035993	1
+7247	2518	A recipe can inherit from multiple classes.	text	txt	2024-09-22 10:06:27.035993	2
+7248	2519	- `base.bbclass`\n- `kernel.bbclass`\n- `autotools.bbclass`\n- `cmake.bbclass`\n- `meson.bbclass`\n- `native.bbclass`\n- `useradd.bbclass`\n- `systemd.bbclass`	text	txt	2024-09-22 10:06:27.037848	1
+7249	2520	`base.bbclass`	text	txt	2024-09-22 10:06:27.039712	1
+7250	2521	Tasks are chained using dependencies and they will be called in hierarchy. All of them are default implemented in base class:	text	txt	2024-09-22 10:06:27.042298	1
+7251	2521	`fetch`, `unpack`, `patch`, `configure`, `build`, `install`, and other manual tasks like `clean` and `listtasks`.	text	txt	2024-09-22 10:06:27.042298	2
+7252	2521	Base class automatically applies patch files listed in `SRC_URI`.	text	txt	2024-09-22 10:06:27.042298	3
+7253	2521	Defines mirrors like `SOURCEFORGE_MIRROR`, `DEBIAN_MIRROR`, `GNU_MIRROR`, `KERNEL_MIRROR`.	text	txt	2024-09-22 10:06:27.042298	4
+7254	2521	Defines `oe-runmake`, using `EXTRA_OEMAKE` to use custom arguments.	text	txt	2024-09-22 10:06:27.042298	5
+7255	2522	When we want to change make parameters without applying patches.	text	txt	2024-09-22 10:06:27.044257	1
+7256	2523	Defines tasks to configure, compile, install a kernel and its modules.	text	txt	2024-09-22 10:06:27.046382	1
+7257	2523	SRC_URI += file://defconfig	code	bb	2024-09-22 10:06:27.046382	2
+7258	2523	The kernel is devided into several packages like `kernel`, `kernel-base`, `kernel-dev`, `kernel-modules`, etc.	text	txt	2024-09-22 10:06:27.046382	3
+7259	2523	Automatically provides `virtual/kernel`.	text	txt	2024-09-22 10:06:27.046382	4
+7260	2523	Configuration variables like `KERNEL_IMAGETYPE`, `KERNEL_EXTRA_ARGS`, `INITRAMFS_IMAGE`, etc. are availabe.	text	txt	2024-09-22 10:06:27.046382	5
+7261	2524	`do_configure` generates configurations, `do_build` runs `make`, `do_install` runs `make install`.	text	txt	2024-09-22 10:06:27.048528	1
+7262	2524	Compilations flags can be added using `EXTRA_OEMAKE`.	text	txt	2024-09-22 10:06:27.048528	2
+7263	2524	DESCRIPTION = "Custom recipe"\nHOMEPAGE = "https://example.com"\nSECTION = "examples"\nLICENSE  = "BSD"\n\nSRC_URI = "${GNU_MIRROR}/hello/hello-${PV}.tar.gz"\nSRC_URI[md5sum] = "1234..."\nSRC_URI[sha256sum] = "1234..."\nLIC_FILES_CHSUM = "file://COPYING;md5=1234..."\n\ninherit autotools	code	bb	2024-09-22 10:06:27.048528	3
+7264	2525	Adds users to the resulting image.	text	txt	2024-09-22 10:06:27.051225	1
+7265	2525	`USERADD_PACKAGES` must be defined when the `useradd` class is inherited.	text	txt	2024-09-22 10:06:27.051225	2
+7266	2525	At least one of the `USERADD_PARAM` or `GROUPADD_PARAM` variables must be set.	text	txt	2024-09-22 10:06:27.051225	3
+7267	2525	Users and groups are created before the packages perform `do_install`.	text	txt	2024-09-22 10:06:27.051225	4
+7268	2526	`USERADD_PACKAGES` defines individual packages produced by the recipe that need users or groups to be added.	text	txt	2024-09-22 10:06:27.053324	1
+7269	2526	DESCRIPTION = "Custom recipe"\nHOMEPAGE = "https://example.com"\nSECTION = "examples"\nLICENSE  = "BSD"\n\nSRC_URI = "file://bashrc"\nLIC_FILES_CHSUM = "file://COPYING;md5=1234..."\n\ninherit useradd\n\nUSERADD_PACKAGES = "${PN}"\nUSERADD_PARAM:${PN} = "-u 1000 -d /home/brian -s /bin/bash brian"\n\nFILES:${PN} = "/home/brian/.bashrc"\n\nS = "${WORKDIR}"\ndo_install() {\n    install -d ${D}/home/brian\n    install -m 644 bashrc ${D}/home/brian/\n    chown brian:brian ${D}/home/brian/.bashrc\n}	code	bb	2024-09-22 10:06:27.053324	2
+7270	2527	`bin_package.class` simplifies this process.	text	txt	2024-09-22 10:06:27.055826	1
+7271	2527	In this class `do_configure` and `do_compile` tasks are disabled.	text	txt	2024-09-22 10:06:27.055826	2
+7272	2527	`do_install` task copies whatever is in `S`.	text	txt	2024-09-22 10:06:27.055826	3
+7273	2527	Using this class, `LICENSE` should be set to `CLOSED` if applicable.	text	txt	2024-09-22 10:06:27.055826	4
+7274	2527	You should probably also inherit `allarch`.	text	txt	2024-09-22 10:06:27.055826	5
+7275	2528	`BBPATH`	text	txt	2024-09-22 10:06:27.057753	1
+7276	2529	`inherit`, `include`, and `require`.	text	txt	2024-09-22 10:06:27.059945	1
+7277	2529	`inherit` can be used in recipes or classes to inherit the functionality of a class.	text	txt	2024-09-22 10:06:27.059945	2
+7278	2529	`include` and `require` keywords can be used in all files to insert the content of another file at that location.	text	txt	2024-09-22 10:06:27.059945	3
+7279	2530	Inheriting in configuration files is based on the `INHERIT` variable.	text	txt	2024-09-22 10:06:27.062135	1
+7280	2530	INHERIT += "rm_work"	code	bb	2024-09-22 10:06:27.062135	2
+7281	2531	`include` does not produce an error when a file cannot be found, whereas `require` raises a parsing error.	text	txt	2024-09-22 10:06:27.064288	1
+7282	2531	require ninviders.inc\nrequire path/to/file.inc	code	sh	2024-09-22 10:06:27.064288	2
+7283	2532	bitbake -c devshell <recipe>	code	sh	2024-09-22 10:06:27.066709	1
+7284	2533	To understand what changes after a build, enable build history in `local.conf`:	text	txt	2024-09-22 10:06:27.06979	1
+7285	2533	INHERIT += "buildhistory"\ninsert into temp_blocks valuesLDHISTORY_COMMIT = 1	code	conf	2024-09-22 10:06:27.06979	2
+7293	2538	`own-mirrors` class can only add one URL:	text	txt	2024-09-22 10:06:27.082295	1
+7294	2538	INHERITS += "own-mirrors"\nSOURCE_MIRROR_URL = "http://example.com/my-mirror"	code	bb	2024-09-22 10:06:27.082295	2
+7295	2538	For a more complex setup, prepend custom mirrors to the `PREMIRRORS` variable:	text	txt	2024-09-22 10:06:27.082295	3
+7296	2538	PREMIRRORS:prepend = "\\\ngit://.*/.* http://example.com/my-mirror-for-git/ \\\nsvn://.*/.* http://example.com/my-mirror-for-svn/ \\\nhttp://.*/.* http://example.com/my-mirror-for-http/ \\\nhttps://.*/.* http://example.com/my-mirror-for-https/"	code	bb	2024-09-22 10:06:27.082295	4
+7297	2539	Source files downloaded from SCM need to be archived:	text	txt	2024-09-22 10:06:27.084852	1
+7298	2539	BB_GENERATE_MIRROR_TARBALLS = "1"	code	bb	2024-09-22 10:06:27.084852	2
+7299	2540	`do_fetch` is the only network enabled task to make sure no untraced sources are fetched.	text	txt	2024-09-22 10:06:27.086835	1
+7300	2541	BB_NO_NETWORK = "1"	code	bb	2024-09-22 10:06:27.088738	1
+7301	2542	Or restrict bitbake to only download files from the `PREMIRRORS`:	text	txt	2024-09-22 10:06:27.090811	1
+7302	2542	BB_FETCH_PREMIRRORONLY = "1"	code	bb	2024-09-22 10:06:27.090811	2
+7303	2543	bitbake --runall=fetch core-image-minimal	code	sh	2024-09-22 10:06:27.092916	1
+7304	2544	It is a good practice to begin a layer name with the prefix `meta-`.	text	txt	2024-09-22 10:06:27.094913	1
+7305	2545	Recipes and metadata.	text	txt	2024-09-22 10:06:27.096769	1
+7306	2546	- `meta`\n- `meta-skeleton`\n- `meta-poky`\n- `meta-yocto-bsp`	text	txt	2024-09-22 10:06:27.099389	1
+7307	2547	https://layers.openembedded.org	text	link	2024-09-22 10:06:27.101606	1
+7308	2548	The list of layers `bitbake` uses is defined in `$BUILDDIR/conf/bblayers.conf`.	text	txt	2024-09-22 10:06:27.10355	1
+7309	2549	To include a new layer, add its absolute path to the `BBLAYERS` variable.	text	txt	2024-09-22 10:06:27.105798	1
+7310	2549	`bitbake` parses each layer from `BBLAYERS` and adds the recipes, configuration files and classes it contains.	text	txt	2024-09-22 10:06:27.105798	2
+7311	2550	bitbake-layers	code	sh	2024-09-22 10:06:27.10789	1
+7312	2550	The tool resides in `poky/bitbake/bin/` directory.	text	txt	2024-09-22 10:06:27.10789	2
+7313	2551	bitbake-layers show-layers	code	sh	2024-09-22 10:06:27.109875	1
+7314	2552	bitbake-layers add-layer meta-custom	code	sh	2024-09-22 10:06:27.111804	1
+7315	2553	bitbake-layers remove-layer meta-qt5	code	sh	2024-09-22 10:06:27.113716	1
+7316	2554	SoC layers provide support for boards.	text	txt	2024-09-22 10:06:27.116108	1
+7317	2554	- `meta-ti-bsp`\n- `meta-freescale`\n- `meta-st-stm32mp`	text	list	2024-09-22 10:06:27.116108	2
+7318	2555	Many layers offer to support applications not available in poky reference system, e.g:	text	txt	2024-09-22 10:06:27.118633	1
+7319	2555	- `meta-browser` (chromium, firefox)\n- `meta-filesystems`\n- `meta-java`\n- `meta-linaro-toolchain`\n- `meta-qt5`\n- `meta-realtime`\n- `meta-telephony`	text	list	2024-09-22 10:06:27.118633	2
+7320	2556	A layer is a set of files and directories and can be created by hand but best practice is to use `bitbake-layers`:	text	txt	2024-09-22 10:06:27.121077	1
+7321	2556	bitbake-layers create-layer -p <priority> <layer>	code	sh	2024-09-22 10:06:27.121077	2
+7322	2556	The **priority** is used to select which recipe to use when multiple layers contains the same recipe.	text	txt	2024-09-22 10:06:27.121077	3
+7323	2556	Layer priority takes precedence over the recipe version number ordering. This allows to downgrade a recipe in a layer.	text	txt	2024-09-22 10:06:27.121077	4
+7324	2557	- `conf/layer.conf`: mandatory entry point for any layer.\n- `COPYING.MIT`: the license under which the layer is released, defaulted to MIT.\n- `README`: layer description containing at least the email address of its maintainer.	text	txt	2024-09-22 10:06:27.12306	1
+7325	2558	Any metadata matching `meta-<layer>/recipes-<layer>/<layer>/<layer>_<version>.bb` will be parsed by `bitbake` automatically.	text	txt	2024-09-22 10:06:27.124949	1
+7326	2559	LAYERDEPENDS = "basic"	code	bb	2024-09-22 10:06:27.126807	1
+7327	2560	LAYERSERIES_COMPAT = "1.2.3"	code	bb	2024-09-22 10:06:27.128801	1
+7328	2561	BSP layers are a subset of regular layers.	text	txt	2024-09-22 10:06:27.131033	1
+7329	2561	They hold metadata supporting a specific class of hardware devices.	text	txt	2024-09-22 10:06:27.131033	2
+7330	2562	A BSP layer provides one hardware configuration file per machine it supports, located in `meta-<bsp name>/conf/machine/*.conf` and they contain configuration variables related to the architecture and to the machine features.	text	txt	2024-09-22 10:06:27.133818	1
+7331	2562	The machine file name corresponds to the `MACHINE` value in its configuration file.	text	txt	2024-09-22 10:06:27.133818	2
+7332	2562	`meta-ti/meta-ti-bsp/conf/machine/beaglebone.conf`	text	txt	2024-09-22 10:06:27.133818	3
+7333	2562	MACHINE = "beaglebone"	code	conf	2024-09-22 10:06:27.133818	4
+7334	2563	TARGET_ARCH = "x86_64"	code	conf	2024-09-22 10:06:27.135929	1
+7335	2564	PREFERRED_PROVIDER_virtual/kernel = "yocto-linux"	code	conf	2024-09-22 10:06:27.13788	1
+7336	2565	MACHINE_FEATURES = "usbgadget usbhost screen wifi keyboard"	code	conf	2024-09-22 10:06:27.139796	1
+7337	2566	SERIAL_CONSOLES = "115200;ttyS0	code	conf	2024-09-22 10:06:27.141652	1
+7338	2567	KERNEL_IMAGETYPE = "zImage"	code	conf	2024-09-22 10:06:27.143825	1
+7339	2567	Look at `conf/machine/include/cfa10036.inc` and `conf/machine/cfa10057.conf` for an example.	text	txt	2024-09-22 10:06:27.143825	2
+7340	2568	By default, on ARM the bootloader is the mainline of U-Boot, with a fixed version per Poky release.	text	txt	2024-09-22 10:06:27.146159	1
+7341	2568	The U-Boot configurations reside in `meta/recipes-bsp/u-boot/u-boot.inc`.	text	txt	2024-09-22 10:06:27.146159	2
+7342	2569	SPL_BINARY	code	bb	2024-09-22 10:06:27.14812	1
+7343	2570	UBOOT_SUFFIX	code	bb	2024-09-22 10:06:27.150388	1
+7344	2571	UBOOT_MACHINE	code	bb	2024-09-22 10:06:27.152552	1
+7345	2572	UBOOT_ENTRYPOINT	code	bb	2024-09-22 10:06:27.154394	1
+7346	2573	UBOOT_LOADADDRESS	code	bb	2024-09-22 10:06:27.156378	1
+7347	2574	UBOOT_MAKE_TARGET	code	bb	2024-09-22 10:06:27.158537	1
+7348	2574	defaults to `all`.	text	txt	2024-09-22 10:06:27.158537	2
+7349	2575	By creating a custom kernel recipe, inheriting `kernel.bbclass`.	text	txt	2024-09-22 10:06:27.160797	1
+7350	2575	By using the `linux-yocto` packages, provided in Poky.	text	txt	2024-09-22 10:06:27.160797	2
+7351	2576	`linux-yocto` is a set of recipes with advanced features to build a mainline kernel.	text	txt	2024-09-22 10:06:27.163108	1
+7352	2576	PREFERRED_PROVIDER_virtual/kernel = "linux-yocto"	code	bb	2024-09-22 10:06:27.163108	2
+7353	2576	PREFERRED_PROVIDER_linux-yocto = "5.14%"	code	bb	2024-09-22 10:06:27.163108	3
+7354	2577	Another way of configuring `linux-yocto` is by using *Advanced Metadata*.	text	txt	2024-09-22 10:06:27.165612	1
+7355	2577	It is a powerful way of spliting the configuration and the patches into several pieces.	text	txt	2024-09-22 10:06:27.165612	2
+7356	2577	https://docs.yoctoproject.org/kernel-dev/advanced.html#working-with-advanced-metadata-yocto-kernel-cache	text	link	2024-09-22 10:06:27.165612	3
+7357	2578	A way to split the kernel configurations and patches in little pieces each providing support for one feature.	text	txt	2024-09-22 10:06:27.168342	1
+7358	2578	- `LINUX_KERNEL_TYPE`: `standard` for generic kernel, `tiny` bare minimum configuration for small kernels, or `preempt-rt` applies preempt realtime patch.\n- `KERNEL_FEATURES`: list of features to enable. Features are set of patches and configuration fragments.	text	list	2024-09-22 10:06:27.168342	2
+7359	2579	*features/sample.scc*	text	txt	2024-09-22 10:06:27.170754	1
+7360	2579	define KFEATURE_DESCRIPTION "Enable Sample Driver"\n\nkconf hardware enable-sample-driver.cfg\npatch add-sample-driver.patch	code	bb	2024-09-22 10:06:27.170754	2
+7361	2579	KERNEL_FEATURES += "features/sample.scc"	code	bb	2024-09-22 10:06:27.170754	3
+7362	2580	A distribution layer allows to change the defaults that are provided by `openembedded-core` or `poky`.	text	txt	2024-09-22 10:06:27.172827	1
+7363	2581	conf/distro/<distro>.conf	text	path	2024-09-22 10:06:27.17469	1
+7364	2582	DISTRO = "distro"	code	bb	2024-09-22 10:06:27.176714	1
+7365	2583	conf/distro/poky.conf	text	path	2024-09-22 10:06:27.179003	1
+7366	2583	DISTRO_NAME = "distro description"	code	bb	2024-09-22 10:06:27.179003	2
+7367	2583	DISTRO_VERSION = "1.2.3"	code	bb	2024-09-22 10:06:27.179003	3
+7368	2583	MAINTAINER = "Brian Salehi <briansalehi@proton.me>"	code	bb	2024-09-22 10:06:27.179003	4
+7369	2584	DISTRO_FEATURES	code	bb	2024-09-22 10:06:27.180961	1
+7370	2585	COMBINED_FEATURES	code	bb	2024-09-22 10:06:27.183154	1
+7371	2586	TCMODE ??= "default"	code	bb	2024-09-22 10:06:27.185724	1
+7372	2586	The following file is included:	text	txt	2024-09-22 10:06:27.185724	2
+7373	2586	conf/distro/include/tcmode-${TCMODE}.inc	text	list	2024-09-22 10:06:27.185724	3
+7374	2587	poky/meta-poky/conf/bblayers.conf.sample	code	bb	2024-09-22 10:06:27.18779	1
+7375	2587	poky/meta-poky/conf/local.conf.sample	code	bb	2024-09-22 10:06:27.18779	2
+7376	2588	TEMPLATECONF	code	bb	2024-09-22 10:06:27.190291	1
+7377	2588	It is set in:	text	txt	2024-09-22 10:06:27.190291	2
+7378	2588	${OEROOT}/.templateconf	text	list	2024-09-22 10:06:27.190291	3
+7379	2589	An image is the top level recipe.	text	txt	2024-09-22 10:06:27.192416	1
+7380	2589	Image layers are used alongside the machine definition.	text	txt	2024-09-22 10:06:27.192416	2
+7381	2590	machine layer describes the hardware and its capabilities, whereas image layer is architecture agnostic and defines how the root filesystem is built.	text	txt	2024-09-22 10:06:27.194452	1
+7382	2591	meta-*/recipes*/images/*.bb	text	list	2024-09-22 10:06:27.196265	1
+7383	2592	- `core-image-base`\n- `core-image-minimal`\n- `core-image-minimal-dev`\n- `core-image-x11`\n- `core-image-weston`\n- `core-image-rt`	text	list	2024-09-22 10:06:27.198741	1
+7384	2593	A description and a license.	text	txt	2024-09-22 10:06:27.201185	1
+7385	2593	Images inherit from `core-image` class.	text	txt	2024-09-22 10:06:27.201185	2
+7386	2594	core-image	code	bb	2024-09-22 10:06:27.203197	1
+7387	2595	IMAGE_BASENAME ??= "${PN}"	code	bb	2024-09-22 10:06:27.20516	1
+7388	2596	IMAGE_INSTALL	code	bb	2024-09-22 10:06:27.207106	1
+7389	2597	IMAGE_ROOTFS_SIZE	code	bb	2024-09-22 10:06:27.208852	1
+7390	2598	IMAGE_FEATURES	code	bb	2024-09-22 10:06:27.210725	1
+7391	2599	IMAGE_FSTYPES	code	bb	2024-09-22 10:06:27.21256	1
+7392	2600	IMAGE_LINGUAS	code	bb	2024-09-22 10:06:27.2145	1
+7393	2601	IMAGE_PKGTYPE ??= "deb,rpm,ipk,tar"	code	bb	2024-09-22 10:06:27.216646	1
+7394	2602	IMAGE_POSTPROCESS_COMMAND	code	bb	2024-09-22 10:06:27.218739	1
+7395	2603	EXTRA_IMAGEDEPENDS	code	bb	2024-09-22 10:06:27.220622	1
+7396	2604	An empty directory is created for the root filesystem.	text	txt	2024-09-22 10:06:27.222942	1
+7397	2604	Packages from `IMAGE_INSTALL` are installed into it using the package mangaer.	text	txt	2024-09-22 10:06:27.222942	2
+7398	2604	One or more image files are created based on `IMAGE_FSTYPE` value.	text	txt	2024-09-22 10:06:27.222942	3
+7399	2605	Root filesystem creation is specified in the `IMAGE_PKGTYPE` configuration variable.	text	txt	2024-09-22 10:06:27.225086	1
+7400	2605	It should be defined in the image recipe, otherwise the first package type defined in `PACKAGE_CLASSES` will be used.	text	txt	2024-09-22 10:06:27.225086	2
+7401	2606	poky/meta/classes/rootfs_${IMAGE_FSTYPE}.bbclass	text	path	2024-09-22 10:06:27.227033	1
+7402	2607	poky/meta/classes/image_types.bbclass	text	path	2024-09-22 10:06:27.228933	1
+7403	2608	There should be class that inherits `image_types`.	text	txt	2024-09-22 10:06:27.231346	1
+7404	2608	It has to define function `IMAGE_CMD:<type>`.	text	txt	2024-09-22 10:06:27.231346	2
+7405	2608	Append this class to `IMAGE_TYPES` configuration variable.	text	txt	2024-09-22 10:06:27.231346	3
+7406	2609	Common conversion types: `gz`, `bz2`, `sha256sum`, `bmap`.	text	txt	2024-09-22 10:06:27.234757	1
+7407	2609	There should be a class that inherits `image_types`.	text	txt	2024-09-22 10:06:27.234757	2
+7408	2609	It has to define function `CONVERSION_CMD:<type>`.	text	txt	2024-09-22 10:06:27.234757	3
+7409	2609	Append this class to `CONVERSIONTYPES`.	text	txt	2024-09-22 10:06:27.234757	4
+7410	2609	Append valid conversions to `IMAGE_TYPES`.	text	txt	2024-09-22 10:06:27.234757	5
+7411	2610	The final image names end in `.wks` or `.wks.in`.	text	txt	2024-09-22 10:06:27.237105	1
+7412	2610	WKS_FILE = "sample.wks.in"	code	bb	2024-09-22 10:06:27.237105	2
+7413	2610	IMAGE_FSTYPES = "wic.bmap wic"	code	bb	2024-09-22 10:06:27.237105	3
+7414	2611	bmaptool is an alternative to dd, skipping uninitialized contents in partitions.	text	txt	2024-09-22 10:06:27.239235	1
+7415	2612	A package group is a class that inherits from `packagegroup` class.	text	txt	2024-09-22 10:06:27.241394	1
+7416	2612	Generated package group binary files will not be installed, but they require other packages.	text	txt	2024-09-22 10:06:27.241394	2
+7417	2613	PACKAGE_ARCH ?= "all"	code	bb	2024-09-22 10:06:27.243317	1
+7418	2614	- packagegroup-base\n- packagegroup-core-boot\n- packagegroup-core-buildessential\n- packagegroup-core-nfs-client\n- packagegroup-core-nfs-server\n- packagegroup-core-tools-debug\n- packagegroup-core-tools-profile	text	list	2024-09-22 10:06:27.245458	1
+7419	2614	meta/recipes-core/packagegroups/packagegroup-core-tools-debug.bb	text	path	2024-09-22 10:06:27.245458	2
+7420	2615	A sysroot is the logical root directory for headers and libraries where compiler looks for headers and runtime linker looks for libraries.	text	txt	2024-09-22 10:06:27.247772	1
+7421	2615	A sysroot in yocto could hold kernel headers, C libraries and others.	text	txt	2024-09-22 10:06:27.247772	2
+7422	2616	Instead of global sysroot, bitbake implements per-recipe sysroot.	text	txt	2024-09-22 10:06:27.250228	1
+7423	2616	Before the actual build, each recipe prepares its own sysroot.	text	txt	2024-09-22 10:06:27.250228	2
+7424	2617	Contains libraries and headers only for the recipes it `DEPENDS` on.	text	txt	2024-09-22 10:06:27.252418	1
+7425	2618	${WORKDIR}/recipe-sysroot	text	path	2024-09-22 10:06:27.254639	1
+7426	2618	${WORKDIR}/recipe-sysroot-native	text	path	2024-09-22 10:06:27.254639	2
+7427	2619	At the end of the build, each recipe produces its destination sysroot, which can be used as input for other recipes to generate their own sysroot.	text	txt	2024-09-22 10:06:27.256769	1
+7428	2619	${WORKDIR}/sysroot-destdir	text	path	2024-09-22 10:06:27.256769	2
+7429	2620	Python and Shell	text	txt	2024-09-22 10:06:27.258774	1
+7430	2621	`bb`: to access bitbake's internal functions.	text	txt	2024-09-22 10:06:27.26164	1
+7431	2621	`os`: operating system interface	text	txt	2024-09-22 10:06:27.26164	2
+7432	2622	Anonymous Python functions are executed during parsing.	text	txt	2024-09-22 10:06:27.263889	1
+7433	2622	python __anonymous() {\n    if d.getVar("foo", True) == "example":\n        d.setVar("bar", "result")\n}	code	bb	2024-09-22 10:06:27.263889	2
+7434	2623	do_install() {\n    echo "Build OS: "${@os.uname()[0].lower()}"\n}	code	bb	2024-09-22 10:06:27.266215	1
+7435	2624	d.getVar("X", expand=False)	code	python	2024-09-22 10:06:27.269164	1
+7436	2624	d.setVar("X", "value")	code	python	2024-09-22 10:06:27.269164	2
+7437	2624	d.appendVar("X", "value")	code	python	2024-09-22 10:06:27.269164	3
+7438	2624	d.prependVar("X", "value")	code	python	2024-09-22 10:06:27.269164	4
+7439	2624	d.expand(expression)	code	python	2024-09-22 10:06:27.269164	5
+7440	2625	Variable flags can be used to store information on tasks and variables.	text	txt	2024-09-22 10:06:27.271564	1
+7441	2625	More variable flags can be added freely.	text	txt	2024-09-22 10:06:27.271564	2
+7442	2625	VARIABLE[anything] = "value"	code	bb	2024-09-22 10:06:27.271564	3
+7443	2626	VARIABLE[md5sum] = "..."	code	bb	2024-09-22 10:06:27.273581	1
+7444	2627	By making each directory, it would become the new working directory for the task.	text	txt	2024-09-22 10:06:27.275724	1
+7445	2627	As a consequence, the last directory specified in `dirs` becomes the working directory of the task.	text	txt	2024-09-22 10:06:27.275724	2
+7446	2627	do_compile[dirs] = "${B}"	code	bb	2024-09-22 10:06:27.275724	3
+7447	2628	do_settime[noexec] = "1"	code	bb	2024-09-22 10:06:27.277557	1
+7448	2629	The task will always be executed.	text	txt	2024-09-22 10:06:27.279504	1
+7449	2629	do_menuconfig[nostamp] = "1"	code	bb	2024-09-22 10:06:27.279504	2
+7450	2630	do_settime[doc] = "Set the current time in ${TIME}"	code	bb	2024-09-22 10:06:27.281831	1
+7451	2630	Task documentation will be display by `listtasks` recipe.	text	txt	2024-09-22 10:06:27.281831	2
+7452	2631	do_patch[depends] = "quilt-native:do_populate_sysroot"	code	bb	2024-09-22 10:06:27.284881	1
+7453	2632	PACKAGECONFIG[<feature>] = "args"	code	bb	2024-09-22 10:06:27.286951	1
+7454	2632	Takes the list of up to 6 comma-separated arguments.	text	txt	2024-09-22 10:06:27.286951	2
+7455	2633	PACKAGECONFIG[<feature>] = ""	code	bb	2024-09-22 10:06:27.289396	1
+7456	2633	1. if the <feature> is enabled, uses this argument in `do_configuration` task.\n2. if the <feature> is disabled, this argument will be added to `EXTRA_OECONF`.\n3. if the <feature> is enabled, takes this argument as build dependency in `DEPENDS`.\n4. if the <feature> is enabled, takes this argument as runtime dependency in `RDEPENDS`.\n5. if the <feature> is enabled, takes this argument as additional recommendation in `RRECOMMENDS`.\n6. any conflicting `PACKAGECONF` settings for this feature.	text	list	2024-09-22 10:06:27.289396	2
+7457	2633	Unused arguments can be ommited or left blank.	text	txt	2024-09-22 10:06:27.289396	3
+7458	2634	PACKAGECONFIG ??= "wifi bluetooth openvpn"	code	bb	2024-09-22 10:06:27.291505	1
+7459	2634	PACKAGECONFIG[wifi] = "--enable-wifi, --disable-wifi, wpa-supplicant, wpa-supplicant"	code	bb	2024-09-22 10:06:27.291505	2
+7460	2635	PACKAGECONFIG ??= "wifi bluetooth openvpn"	code	bb	2024-09-22 10:06:27.293553	1
+7461	2635	PACKAGECONFIG[bluez] = "--enable-bluetooth, --disable-bluetooth, bluez5, bluez5"	code	bb	2024-09-22 10:06:27.293553	2
+7462	2636	PACKAGECONFIG ??= "wifi bluetooth openvpn"	code	bb	2024-09-22 10:06:27.295605	1
+7463	2636	PACKAGECONFIG[openvpn] = "--enable-openvpn, --disable-openvpn, , openvpn"	code	bb	2024-09-22 10:06:27.295605	2
+7464	2637	PACKAGECONFIG:append = " <feature>"	code	bb	2024-09-22 10:06:27.298136	1
+7465	2638	PACKAGECONFIG:append:pn-<recipe> = " <feature>"	code	bb	2024-09-22 10:06:27.300405	1
+7466	2639	poky/scripts/contrib/list-packageconfig-flags.py	code	sh	2024-09-22 10:06:27.303099	1
+7467	2640	The signature of this function is as follows:	text	txt	2024-09-22 10:06:27.306231	1
+7468	2640	PACKAGECONFIG = "${@bb.utils.contains(<variable>, <value>, <true_value>, <false_value>, d)}"	code	bb	2024-09-22 10:06:27.306231	2
+7469	2640	Example:	text	txt	2024-09-22 10:06:27.306231	3
+7470	2640	PACKAGECONFIG ??= "${@bb.utils.contains('DISTRO_FEATURES', 'bluetooth', 'bluez', '', d)}"	code	bb	2024-09-22 10:06:27.306231	4
+7471	2641	PACKAGECONFIG ??= "${@bb.utils.filter(<variable>, <flag>, d)}"	code	bb	2024-09-22 10:06:27.309147	1
+7472	2641	Example:	text	txt	2024-09-22 10:06:27.309147	2
+7473	2641	PACKAGECONFIG ??= "${@bb.utils.filter('DISTRO_FEATURES', '3g_system', d)}"	code	bb	2024-09-22 10:06:27.309147	3
+7474	2642	PACKAGES = "${PN}-src ${PN}-gdb ${PN}-staticdev ${PN}-ev ${PN}-doc ${PN}-locale ${PACKAGE_BEFORE_PN} ${PN}	code	bb	2024-09-22 10:06:27.311877	1
+7475	2642	`${PACKAGE_BEFORE_PN}` allows to pick files normally included in the default package in another.	text	txt	2024-09-22 10:06:27.311877	2
+7476	2643	PACKAGE_DYNAMIC	code	bb	2024-09-22 10:06:27.314251	1
+7477	2644	ALLOW_EMPTY	code	bb	2024-09-22 10:06:27.316931	1
+7478	2645	CONFLICTS	code	bb	2024-09-22 10:06:27.319538	1
+7479	2646	FILES	code	bb	2024-09-22 10:06:27.321883	1
+7480	2647	LIC_FILES_CHKSUM	code	bb	2024-09-22 10:06:27.324465	1
+7481	2647	LIC_FILES_CHKSUM = "\n    file://COPYING;md5=...\n    file://src/main.c;beginline=3;endline=20;md5sum=..."	code	bb	2024-09-22 10:06:27.324465	2
+7482	2648	Every recipe must have a `LIC_FILES_CHKSUM` unless `LICENSE` is set to `CLOSED`.	text	txt	2024-09-22 10:06:27.327062	1
+7483	2648	LICENSE = "CLOSED"	code	bb	2024-09-22 10:06:27.327062	2
+7484	2649	As an example of a closed source project:	text	txt	2024-09-22 10:06:27.329821	1
+7485	2649	INCOMPATIBLE_LICENSE = "GPL-3.0* LPLG-3.0* AGPL-3.0*"	code	bb	2024-09-22 10:06:27.329821	2
+7486	2650	LICENSE_FLAGS = "commercial"	code	bb	2024-09-22 10:06:27.334467	1
+7487	2650	To build a package with a commercial component, the package must be in the `LICENSE_FLAGS_ACCEPTED`.	text	txt	2024-09-22 10:06:27.334467	2
+7488	2650	LICENSE_FLAGS_ACCEPTED = "commercial_gst-plugins-ugly"	code	bb	2024-09-22 10:06:27.334467	3
+7489	2651	${BUILDDIR}/tmp/deploy/licenses/<image>/license.manifest	text	path	2024-09-22 10:06:27.337151	1
+7490	2652	COPY_LIC_DIRS = "1"	code	bb	2024-09-22 10:06:27.340114	1
+7491	2652	COPY_LIC_MANIFEST = "1"	code	bb	2024-09-22 10:06:27.340114	2
+7493	2653	compilers, linkers, libraries, debuggers, custom utilities.	text	list	2024-09-22 10:06:27.342569	1
+7494	2654	The toolchain in the SDKs is self-contained and objects are linked to an SDK embedded libc.	text	txt	2024-09-22 10:06:27.345425	1
+7495	2654	These SDKs come in the form of a shell script.	text	txt	2024-09-22 10:06:27.345425	2
+7496	2654	Extracting this shell script extracts the tools and sets up the environment.	text	txt	2024-09-22 10:06:27.345425	3
+7497	2655	To develop a bootloader or the kernel, a generic SDK can be used.	text	txt	2024-09-22 10:06:27.34792	1
+7498	2656	The recipe `meta-toolchain` generates a generic SDK.	text	txt	2024-09-22 10:06:27.350954	1
+7499	2656	bitbake meta-toolchain	code	sh	2024-09-22 10:06:27.350954	2
+7500	2657	${BUILDDIR}/tmp/deploy/sdk/	text	path	2024-09-22 10:06:27.353524	1
+7501	2658	The image-based SDKs are used to develop and build applications for a target.	text	txt	2024-09-22 10:06:27.356	1
+7502	2659	populate_sdk	code	bb	2024-09-22 10:06:27.358434	1
+7503	2660	bitbake -c populate_sdk core-image-minimal	code	sh	2024-09-22 10:06:27.360877	1
+7504	2661	List of target packages to be installed:	text	txt	2024-09-22 10:06:27.364051	1
+7505	2661	TOOLCHAIN_TARGET_TASK	code	bb	2024-09-22 10:06:27.364051	2
+7506	2661	List of host packages to be installed:	text	txt	2024-09-22 10:06:27.364051	3
+7507	2661	TOOLCHAIN_HOST_TASK	code	bb	2024-09-22 10:06:27.364051	4
+7508	2661	TOOLCHAIN_HOST_TASK:append = " nativesdk-curl"	code	bb	2024-09-22 10:06:27.364051	5
+7509	2662	To install an SDK, retrieve the generated script and execute it.	text	txt	2024-09-22 10:06:27.367128	1
+7510	2662	The script asks where to install the SDK, having a default path to:	text	txt	2024-09-22 10:06:27.367128	2
+7511	2662	/opt/poky/<version>/	text	path	2024-09-22 10:06:27.367128	3
+7512	2663	source /opt/poky/<version>/environment-setup-cortexa8hf-neon-poky-linux-gnueabi	code	sh	2024-09-22 10:06:27.37016	1
+7513	2663	`PATH` will be updated and environment variables will be exported to help using the SDK.	text	txt	2024-09-22 10:06:27.37016	2
+7514	2664	CC, CFLAGS, CXX, CXXFLAGS, CPP,  CPPFLAGS, LD, LDFLAGS, ARCH, CROSS_COMPILE, GDB, OBJDUMP.	text	list	2024-09-22 10:06:27.37292	1
+7515	2664	The full list is in the environment script.	text	txt	2024-09-22 10:06:27.37292	2
+7516	2665	$CC -o program main.c	code	sh	2024-09-22 10:06:27.375191	1
+7517	2666	The `LDFLAGS` variable is set to be used with the C compiler.	text	txt	2024-09-22 10:06:27.37839	1
+7518	2666	To build the Linux kernel, unset this variable:	text	txt	2024-09-22 10:06:27.37839	2
+7519	2666	unset LDFLAGS	code	sh	2024-09-22 10:06:27.37839	3
+7520	2666	make menuconfig	code	sh	2024-09-22 10:06:27.37839	4
+7521	2666	make	code	sh	2024-09-22 10:06:27.37839	5
+7522	2667	devtool helps to generate a recipe, modify an existing recipe or upgrade a recipe to use a newer upstream.	text	txt	2024-09-22 10:06:27.380755	1
+7523	2668	${BUILDDIR}/workspace	text	path	2024-09-22 10:06:27.383352	1
+7524	2669	${BUILDDIR}/workspace/sources/	text	path	2024-09-22 10:06:27.386335	1
+7525	2669	devtool adds or appends recipes to this layer so that the recipes point to a local path for their sources.	text	txt	2024-09-22 10:06:27.386335	2
+7526	2670	devtool add <recipe> <fetchuri>	code	sh	2024-09-22 10:06:27.388743	1
+7527	2671	devtool modify <recipe>	code	sh	2024-09-22 10:06:27.3911	1
+7528	2672	devtool upgrade -V <version> <recipe>	code	sh	2024-09-22 10:06:27.393414	1
+7529	2673	devtool edit-recipe <recipe>	code	sh	2024-09-22 10:06:27.395933	1
+7530	2674	devtool build <recipe>	code	sh	2024-09-22 10:06:27.398504	1
+7531	2675	devtool build-image <image>	code	sh	2024-09-22 10:06:27.401275	1
+7532	2676	devtool deploy-target <recipe> <target>	code	sh	2024-09-22 10:06:27.403819	1
+7533	2676	Target should be live and running ssh server.	text	txt	2024-09-22 10:06:27.403819	2
+7534	2677	devtool update-recipe <recipe>	code	sh	2024-09-22 10:06:27.406359	1
+7535	2678	devtool reset <recipe>	code	sh	2024-09-22 10:06:27.408624	1
 \.
 
 
@@ -10874,6 +11438,302 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 2380	1293	What are the differences between existing transactional memory blocks?	open	2024-09-19 14:56:13.974979	2024-09-19 14:56:13.974979
 2381	1293	What is a task block?	open	2024-09-19 14:56:13.975939	2024-09-19 14:56:13.975939
 2382	1293	What is the meaning of data parallel programming?	open	2024-09-19 14:56:13.976861	2024-09-19 14:56:13.976861
+2383	1382	What is the output of yocto?	open	2024-09-22 10:06:26.739554	2024-09-22 10:06:26.739554
+2384	1382	What is the name of the build engine in yocto?	open	2024-09-22 10:06:26.746094	2024-09-22 10:06:26.746094
+2385	1382	What does bitbake do?	open	2024-09-22 10:06:26.748849	2024-09-22 10:06:26.748849
+2386	1382	What is the name of the text files parsed by bitbake?	open	2024-09-22 10:06:26.751843	2024-09-22 10:06:26.751843
+2387	1382	What is the building blocks of a recipe?	open	2024-09-22 10:06:26.754733	2024-09-22 10:06:26.754733
+2388	1382	What does bitbake take as an input?	open	2024-09-22 10:06:26.757109	2024-09-22 10:06:26.757109
+2389	1382	What is the building blocks of a metadata?	open	2024-09-22 10:06:26.759875	2024-09-22 10:06:26.759875
+2390	1382	What is the core layer of metadata?	open	2024-09-22 10:06:26.761843	2024-09-22 10:06:26.761843
+2391	1382	What is a poky layer?	open	2024-09-22 10:06:26.76369	2024-09-22 10:06:26.76369
+2392	1382	What is a poky distribution?	open	2024-09-22 10:06:26.766334	2024-09-22 10:06:26.766334
+2393	1382	What meta layer is used to build images for a beagle bone black board?	open	2024-09-22 10:06:26.768297	2024-09-22 10:06:26.768297
+2394	1382	Get poky reference system?	open	2024-09-22 10:06:26.770167	2024-09-22 10:06:26.770167
+2395	1382	What is the contents of <code>bitbake</code> directory in poky source tree?	open	2024-09-22 10:06:26.772061	2024-09-22 10:06:26.772061
+2396	1382	What is the contents of <code>meta</code> directory in poky source tree?	open	2024-09-22 10:06:26.773937	2024-09-22 10:06:26.773937
+2397	1382	What is the contents of <code>meta-skeleton</code> directory in poky source tree?	open	2024-09-22 10:06:26.775795	2024-09-22 10:06:26.775795
+2398	1382	What is the contents of <code>meta-poky</code> directory in poky source tree?	open	2024-09-22 10:06:26.777659	2024-09-22 10:06:26.777659
+2399	1382	What is the contents of <code>meta-yocto-bsp</code> directory in poky source tree?	open	2024-09-22 10:06:26.779433	2024-09-22 10:06:26.779433
+2400	1382	What does the <code>oe-init-build-env</code> file do in poky?	open	2024-09-22 10:06:26.781642	2024-09-22 10:06:26.781642
+2401	1382	What is the contents of <code>script</code> directory in poky source tree?	open	2024-09-22 10:06:26.78374	2024-09-22 10:06:26.78374
+2402	1382	What commands are available after sourcing <code>oe-init-build-env</code> script?	open	2024-09-22 10:06:26.785723	2024-09-22 10:06:26.785723
+2403	1382	What are the common targets in bitbake?	open	2024-09-22 10:06:26.787504	2024-09-22 10:06:26.787504
+2404	1382	What environment variables does <code>oe-init-build-env</code> script provide?	open	2024-09-22 10:06:26.789316	2024-09-22 10:06:26.789316
+2405	1382	What configuration files exist in a bitbake generated build directory?	open	2024-09-22 10:06:26.791573	2024-09-22 10:06:26.791573
+2406	1382	What does the <code>oe-init-build-env</code> script generate?	open	2024-09-22 10:06:26.793665	2024-09-22 10:06:26.793665
+2407	1382	Prepare build environment with poky?	open	2024-09-22 10:06:26.795732	2024-09-22 10:06:26.795732
+2408	1382	Build an image with poky?	open	2024-09-22 10:06:26.798417	2024-09-22 10:06:26.798417
+2409	1382	Get poky repository?	open	2024-09-22 10:06:26.800576	2024-09-22 10:06:26.800576
+2410	1382	Initialize the build directory with poky?	open	2024-09-22 10:06:26.802607	2024-09-22 10:06:26.802607
+2411	1382	What variable defines the architecture of target machine to build for in poky?	open	2024-09-22 10:06:26.804735	2024-09-22 10:06:26.804735
+2412	1382	What are the optional variables to speed up the build process?	open	2024-09-22 10:06:26.806845	2024-09-22 10:06:26.806845
+2413	1382	Get help from bitbake manual?	open	2024-09-22 10:06:26.808627	2024-09-22 10:06:26.808627
+2414	1382	Build an image for a target machine with poky?	open	2024-09-22 10:06:26.810619	2024-09-22 10:06:26.810619
+2415	1382	How does OpenEmbedded build system hold project information?	open	2024-09-22 10:06:26.812938	2024-09-22 10:06:26.812938
+2416	1382	Expand an already assigned variable?	open	2024-09-22 10:06:26.8149	2024-09-22 10:06:26.8149
+2417	1382	What are the properties of variables?	open	2024-09-22 10:06:26.817171	2024-09-22 10:06:26.817171
+2418	1382	What scopes does OpenEmbedded build system have?	open	2024-09-22 10:06:26.819644	2024-09-22 10:06:26.819644
+2419	1382	Assign a value to a variable discarding its previous value?	open	2024-09-22 10:06:26.82154	2024-09-22 10:06:26.82154
+2420	1382	How many different variable expansions exists in OpenEmbedded build system?	open	2024-09-22 10:06:26.824365	2024-09-22 10:06:26.824365
+2421	1382	Append values to a variable with and without spaces?	open	2024-09-22 10:06:26.82672	2024-09-22 10:06:26.82672
+2422	1382	Prepend values to a variable with and without spaces?	open	2024-09-22 10:06:26.82875	2024-09-22 10:06:26.82875
+2423	1382	Make a default value for a variable?	open	2024-09-22 10:06:26.830887	2024-09-22 10:06:26.830887
+2424	1382	What is the difference between default and weak default values?	open	2024-09-22 10:06:26.833559	2024-09-22 10:06:26.833559
+2425	1382	What is the preferred way of modifying a variable?	open	2024-09-22 10:06:26.835627	2024-09-22 10:06:26.835627
+2426	1382	What does override operators do?	open	2024-09-22 10:06:26.83779	2024-09-22 10:06:26.83779
+2427	1382	Append to a variable using override operators?	open	2024-09-22 10:06:26.840005	2024-09-22 10:06:26.840005
+2428	1382	Prepend to a variable using override operators?	open	2024-09-22 10:06:26.842048	2024-09-22 10:06:26.842048
+2429	1382	Remove all occurances of a value within a variable using override operators?	open	2024-09-22 10:06:26.843961	2024-09-22 10:06:26.843961
+2430	1382	What does the dropbear package do?	open	2024-09-22 10:06:26.845783	2024-09-22 10:06:26.845783
+2431	1382	Assign on a variable only for a specific machine?	open	2024-09-22 10:06:26.848246	2024-09-22 10:06:26.848246
+2432	1382	What is the precedence between override assignments and regular assignments?	open	2024-09-22 10:06:26.850927	2024-09-22 10:06:26.850927
+2433	1382	Append to a variable only for a specific machine using override variables?	open	2024-09-22 10:06:26.85332	2024-09-22 10:06:26.85332
+2434	1382	What is the precedence of override operators?	open	2024-09-22 10:06:26.855264	2024-09-22 10:06:26.855264
+2435	1382	Get the list of all places where a variable was modified?	open	2024-09-22 10:06:26.85715	2024-09-22 10:06:26.85715
+2436	1382	Get information from a recipe specific variables?	open	2024-09-22 10:06:26.859027	2024-09-22 10:06:26.859027
+2437	1382	Get information from a recipe specific environment variable?	open	2024-09-22 10:06:26.860989	2024-09-22 10:06:26.860989
+2438	1382	Locate a recipe file?	open	2024-09-22 10:06:26.862921	2024-09-22 10:06:26.862921
+2439	1382	Get package name of a recipe?	open	2024-09-22 10:06:26.865123	2024-09-22 10:06:26.865123
+2440	1382	Which variable holds virtual package names?	open	2024-09-22 10:06:26.867296	2024-09-22 10:06:26.867296
+2441	1382	What recipes can provide virtual packages?	open	2024-09-22 10:06:26.86929	2024-09-22 10:06:26.86929
+2442	1382	What are the building blocks of virtual packages?	open	2024-09-22 10:06:26.871449	2024-09-22 10:06:26.871449
+2443	1382	What are the common virtual packages in Poky?	open	2024-09-22 10:06:26.873595	2024-09-22 10:06:26.873595
+2444	1382	What virtual package variants exist for bootloader?	open	2024-09-22 10:06:26.87544	2024-09-22 10:06:26.87544
+2445	1382	What virtual package variants exist for kernel?	open	2024-09-22 10:06:26.877458	2024-09-22 10:06:26.877458
+2446	1382	What virtual package variants exist for libc?	open	2024-09-22 10:06:26.879312	2024-09-22 10:06:26.879312
+2447	1382	What virtual package variants exist for xserver?	open	2024-09-22 10:06:26.88126	2024-09-22 10:06:26.88126
+2448	1382	Select a variant of a virtual package?	open	2024-09-22 10:06:26.883574	2024-09-22 10:06:26.883574
+2449	1382	Which provider has a higher priority in build?	open	2024-09-22 10:06:26.885839	2024-09-22 10:06:26.885839
+2450	1382	Explicitly select a specific version of a provider when many exist?	open	2024-09-22 10:06:26.888156	2024-09-22 10:06:26.888156
+2451	1382	What packages are included in the install?	open	2024-09-22 10:06:26.890336	2024-09-22 10:06:26.890336
+2452	1382	What variable holds the packages being installed in the image?	open	2024-09-22 10:06:26.892219	2024-09-22 10:06:26.892219
+2453	1382	What are the recipe name modifiers?	open	2024-09-22 10:06:26.894196	2024-09-22 10:06:26.894196
+2454	1382	Run a specific bitbake recipe?	open	2024-09-22 10:06:26.896584	2024-09-22 10:06:26.896584
+2455	1382	Run a specific task in a bitbake recipe?	open	2024-09-22 10:06:26.899199	2024-09-22 10:06:26.899199
+2456	1382	List all recipes?	open	2024-09-22 10:06:26.901655	2024-09-22 10:06:26.901655
+2457	1382	List all tasks within a recipe?	open	2024-09-22 10:06:26.904011	2024-09-22 10:06:26.904011
+2458	1382	Force bitbake to run a recipe regardless of previous runs?	open	2024-09-22 10:06:26.906358	2024-09-22 10:06:26.906358
+2459	1382	What bitbake target can be used to build all recipes?	open	2024-09-22 10:06:26.908528	2024-09-22 10:06:26.908528
+2460	1382	Run a specific task for all recipes?	open	2024-09-22 10:06:26.910467	2024-09-22 10:06:26.910467
+2461	1382	What is the naming pattern of tasks in recipes?	open	2024-09-22 10:06:26.912302	2024-09-22 10:06:26.912302
+2462	1382	What are the common tasks found in recipes?	open	2024-09-22 10:06:26.914375	2024-09-22 10:06:26.914375
+2463	1382	Run a specific task for all recipes of an image?	open	2024-09-22 10:06:26.916558	2024-09-22 10:06:26.916558
+2464	1382	Where does bitbake store cache files?	open	2024-09-22 10:06:26.919107	2024-09-22 10:06:26.919107
+2465	1382	What variable holds the path to cache?	open	2024-09-22 10:06:26.921041	2024-09-22 10:06:26.921041
+2466	1382	What is the default location to cache?	open	2024-09-22 10:06:26.922897	2024-09-22 10:06:26.922897
+2467	1382	What is the content of bitbake cache?	open	2024-09-22 10:06:26.924743	2024-09-22 10:06:26.924743
+2468	1382	Clean up the bitbake cache from builds older than a month?	open	2024-09-22 10:06:26.926646	2024-09-22 10:06:26.926646
+2469	1382	What does a recipe do?	open	2024-09-22 10:06:26.928782	2024-09-22 10:06:26.928782
+2470	1382	What steps do recipes define?	open	2024-09-22 10:06:26.930673	2024-09-22 10:06:26.930673
+2471	1382	What is the pattern in recipe file names?	open	2024-09-22 10:06:26.932745	2024-09-22 10:06:26.932745
+2472	1382	What is the output of a recipe?	open	2024-09-22 10:06:26.934843	2024-09-22 10:06:26.934843
+2473	1382	What a recipe is made of?	open	2024-09-22 10:06:26.936776	2024-09-22 10:06:26.936776
+2474	1382	What configuration variables are already available in a recipe?	open	2024-09-22 10:06:26.940649	2024-09-22 10:06:26.940649
+2475	1382	What is the content of <code>.inc</code> files?	open	2024-09-22 10:06:26.943478	2024-09-22 10:06:26.943478
+2476	1382	What is written in a recipe file?	open	2024-09-22 10:06:26.945954	2024-09-22 10:06:26.945954
+2477	1382	Where are the recipe run and log files located?	open	2024-09-22 10:06:26.948144	2024-09-22 10:06:26.948144
+2478	1382	How many sections does a recipe have?	open	2024-09-22 10:06:26.95027	2024-09-22 10:06:26.95027
+2479	1382	What is written in a recipe header section?	open	2024-09-22 10:06:26.953329	2024-09-22 10:06:26.953329
+2480	1382	What variable defines where and how to retrieve the needed elements within a recipe?	open	2024-09-22 10:06:26.955532	2024-09-22 10:06:26.955532
+2481	1382	What URI schemes exist?	open	2024-09-22 10:06:26.957417	2024-09-22 10:06:26.957417
+2482	1382	What pattern does git scheme have?	open	2024-09-22 10:06:26.959182	2024-09-22 10:06:26.959182
+2483	1382	What variables can be used as mirror locations?	open	2024-09-22 10:06:26.961474	2024-09-22 10:06:26.961474
+2484	1382	What configuration variable defines the location where sources are downloaded?	open	2024-09-22 10:06:26.963472	2024-09-22 10:06:26.963472
+2485	1382	Use checksums to verify integrity of a package?	open	2024-09-22 10:06:26.96564	2024-09-22 10:06:26.96564
+2486	1382	What variable is used to locate source files with file scheme?	open	2024-09-22 10:06:26.968076	2024-09-22 10:06:26.968076
+2487	1382	What paths are automatically appended to <code>FILESPATH</code>?	open	2024-09-22 10:06:26.970001	2024-09-22 10:06:26.970001
+2488	1382	What does <code>FILESOVERRIDES</code> variable contain?	open	2024-09-22 10:06:26.971933	2024-09-22 10:06:26.971933
+2489	1382	What variables defines the source files location?	open	2024-09-22 10:06:26.974296	2024-09-22 10:06:26.974296
+2490	1382	What variable defines the license files location?	open	2024-09-22 10:06:26.97675	2024-09-22 10:06:26.97675
+2491	1382	What variable defines build-time dependencies of a recipe?	open	2024-09-22 10:06:26.978648	2024-09-22 10:06:26.978648
+2492	1382	What variable defines runtime dependencies of a recipe?	open	2024-09-22 10:06:26.980677	2024-09-22 10:06:26.980677
+2493	1382	Reflect the dependency of a recipe on a specific version of another recipe?	open	2024-09-22 10:06:26.982994	2024-09-22 10:06:26.982994
+2494	1382	Inspect the dependencies of an image?	open	2024-09-22 10:06:26.984972	2024-09-22 10:06:26.984972
+2495	1382	What are the default tasks?	open	2024-09-22 10:06:26.986927	2024-09-22 10:06:26.986927
+2496	1382	Get a list of existing tasks from a recipe?	open	2024-09-22 10:06:26.988803	2024-09-22 10:06:26.988803
+2497	1382	What variable defines the location of generated objects during build?	open	2024-09-22 10:06:26.990674	2024-09-22 10:06:26.990674
+2498	1382	What variable defines the location where files are installed?	open	2024-09-22 10:06:26.992512	2024-09-22 10:06:26.992512
+2499	1382	What variable points to the working directory of recipe?	open	2024-09-22 10:06:26.994367	2024-09-22 10:06:26.994367
+2500	1382	What is the general syntax of a task?	open	2024-09-22 10:06:26.996427	2024-09-22 10:06:26.996427
+2501	1382	What each of default tasks work on which location variables?	open	2024-09-22 10:06:26.998409	2024-09-22 10:06:26.998409
+2502	1382	Add a task in a recipe?	open	2024-09-22 10:06:27.00027	2024-09-22 10:06:27.00027
+2503	1382	Take the precedence of gcc arguments without making patches?	open	2024-09-22 10:06:27.002413	2024-09-22 10:06:27.002413
+2504	1382	Which files are always applied after sources are fetched and extracted?	open	2024-09-22 10:06:27.004577	2024-09-22 10:06:27.004577
+2505	1382	Specify a tool to patch the sources listed in <code>SRC_URI</code>	open	2024-09-22 10:06:27.006869	2024-09-22 10:06:27.006869
+2506	1382	Specify how to resolve a conflict in patch?	open	2024-09-22 10:06:27.009292	2024-09-22 10:06:27.009292
+2507	1382	Write a recipe to install an program from GitHub?	open	2024-09-22 10:06:27.011378	2024-09-22 10:06:27.011378
+2508	1382	Write a version agnostic include file for a custom program?	open	2024-09-22 10:06:27.013177	2024-09-22 10:06:27.013177
+2509	1382	Use a version agnostic include file in a recipe?	open	2024-09-22 10:06:27.01514	2024-09-22 10:06:27.01514
+2510	1382	Where the run and log files are located?	open	2024-09-22 10:06:27.017288	2024-09-22 10:06:27.017288
+2511	1382	Get the value of a variable used in a recipe?	open	2024-09-22 10:06:27.019242	2024-09-22 10:06:27.019242
+2512	1382	List the entire environment variables in poky?	open	2024-09-22 10:06:27.020853	2024-09-22 10:06:27.020853
+2513	1382	List the environment variables of a recipe?	open	2024-09-22 10:06:27.022834	2024-09-22 10:06:27.022834
+2514	1382	Extend a recipe in third-party layers?	open	2024-09-22 10:06:27.025138	2024-09-22 10:06:27.025138
+2515	1382	What are the considerations of extending a recipe?	open	2024-09-22 10:06:27.027948	2024-09-22 10:06:27.027948
+2516	1382	Which variable should be changed when new files are added in recipe extension?	open	2024-09-22 10:06:27.030955	2024-09-22 10:06:27.030955
+2517	1382	Extend a task?	open	2024-09-22 10:06:27.033461	2024-09-22 10:06:27.033461
+2518	1382	Use a class in a custome recipe?	open	2024-09-22 10:06:27.035993	2024-09-22 10:06:27.035993
+2519	1382	What are the common classes?	open	2024-09-22 10:06:27.037848	2024-09-22 10:06:27.037848
+2520	1382	Which class is automatically inherited by all recipes?	open	2024-09-22 10:06:27.039712	2024-09-22 10:06:27.039712
+2521	1382	What common tasks are defaulted by base class?	open	2024-09-22 10:06:27.042298	2024-09-22 10:06:27.042298
+2522	1382	Where is <code>EXTRA_OEMAKE</code> useful?	open	2024-09-22 10:06:27.044257	2024-09-22 10:06:27.044257
+2523	1382	What does kernel class do?	open	2024-09-22 10:06:27.046382	2024-09-22 10:06:27.046382
+2524	1382	What does autotools class do?	open	2024-09-22 10:06:27.048528	2024-09-22 10:06:27.048528
+2525	1382	What does useradd class do?	open	2024-09-22 10:06:27.051225	2024-09-22 10:06:27.051225
+2526	1382	Which variable can be used to specify the packages that require their own users?	open	2024-09-22 10:06:27.053324	2024-09-22 10:06:27.053324
+2527	1382	Which class should be used when we need to install pre-built files into the generated root filesystem?	open	2024-09-22 10:06:27.055826	2024-09-22 10:06:27.055826
+2528	1382	Which variables is used to find the files to be included?	open	2024-09-22 10:06:27.057753	2024-09-22 10:06:27.057753
+2529	1382	What keywords are used to include files from recipes?	open	2024-09-22 10:06:27.059945	2024-09-22 10:06:27.059945
+2530	1382	How does inheriting in configuration files work?	open	2024-09-22 10:06:27.062135	2024-09-22 10:06:27.062135
+2531	1382	What is the difference between <code>include</code> and <code>require</code>?	open	2024-09-22 10:06:27.064288	2024-09-22 10:06:27.064288
+2532	1382	Debug build failures by using a development shell?	open	2024-09-22 10:06:27.066709	2024-09-22 10:06:27.066709
+2533	1382	Differenciate two builds?	open	2024-09-22 10:06:27.06979	2024-09-22 10:06:27.06979
+2534	1382	What locations are used by bitbake to retrieve files?	open	2024-09-22 10:06:27.073782	2024-09-22 10:06:27.073782
+2535	1382	Export full environment to a shell to debug a build?	open	2024-09-22 10:06:27.075651	2024-09-22 10:06:27.075651
+2536	1382	Enable build history to differenciate between two builds?	open	2024-09-22 10:06:27.077857	2024-09-22 10:06:27.077857
+2537	1382	Check the difference between two builds?	open	2024-09-22 10:06:27.079721	2024-09-22 10:06:27.079721
+2538	1382	Which class can be used to add mirrors?	open	2024-09-22 10:06:27.082295	2024-09-22 10:06:27.082295
+2539	1382	Create a local mirror by downloading all the sources?	open	2024-09-22 10:06:27.084852	2024-09-22 10:06:27.084852
+2540	1382	Which task is responsible for downloading sources?	open	2024-09-22 10:06:27.086835	2024-09-22 10:06:27.086835
+2541	1382	Disable network access in a recipe?	open	2024-09-22 10:06:27.088738	2024-09-22 10:06:27.088738
+2542	1382	Restrict bitbake to only download files from the <code>PREMIRRORS</code>?	open	2024-09-22 10:06:27.090811	2024-09-22 10:06:27.090811
+2543	1382	Download all the sources to run builds with network disabled?	open	2024-09-22 10:06:27.092916	2024-09-22 10:06:27.092916
+2544	1382	What is the convention in naming layers?	open	2024-09-22 10:06:27.094913	2024-09-22 10:06:27.094913
+2545	1382	What do layers isolate within their boundaries?	open	2024-09-22 10:06:27.096769	2024-09-22 10:06:27.096769
+2546	1382	What are the common layers in Poky?	open	2024-09-22 10:06:27.099389	2024-09-22 10:06:27.099389
+2547	1382	Where is the list of maintained layers?	open	2024-09-22 10:06:27.101606	2024-09-22 10:06:27.101606
+2548	1382	Where are the bitbake layers located?	open	2024-09-22 10:06:27.10355	2024-09-22 10:06:27.10355
+2549	1382	Include another layer?	open	2024-09-22 10:06:27.105798	2024-09-22 10:06:27.105798
+2550	1382	What tool is used to inspect layers?	open	2024-09-22 10:06:27.10789	2024-09-22 10:06:27.10789
+2551	1382	Get a list of layers?	open	2024-09-22 10:06:27.109875	2024-09-22 10:06:27.109875
+2552	1382	Add an existing layer?	open	2024-09-22 10:06:27.111804	2024-09-22 10:06:27.111804
+2553	1382	Remove a layer?	open	2024-09-22 10:06:27.113716	2024-09-22 10:06:27.113716
+2554	1382	What layers provide board support?	open	2024-09-22 10:06:27.116108	2024-09-22 10:06:27.116108
+2555	1382	What layers provide application support?	open	2024-09-22 10:06:27.118633	2024-09-22 10:06:27.118633
+2556	1382	Create a new layer?	open	2024-09-22 10:06:27.121077	2024-09-22 10:06:27.121077
+2557	1382	What is the skeleton of a newly created layer?	open	2024-09-22 10:06:27.12306	2024-09-22 10:06:27.12306
+2558	1382	Which metadata files are parsed by bitbake automatically?	open	2024-09-22 10:06:27.124949	2024-09-22 10:06:27.124949
+2559	1382	Define a new layer dependency?	open	2024-09-22 10:06:27.126807	2024-09-22 10:06:27.126807
+2560	1382	Specify which yocto version a layer is compatible with?	open	2024-09-22 10:06:27.128801	2024-09-22 10:06:27.128801
+2561	1382	What is a BSP layer?	open	2024-09-22 10:06:27.131033	2024-09-22 10:06:27.131033
+2562	1382	What are the machine configurations in a BSP layers?	open	2024-09-22 10:06:27.133818	2024-09-22 10:06:27.133818
+2563	1382	What configuration variable is used to describe target machine architecture?	open	2024-09-22 10:06:27.135929	2024-09-22 10:06:27.135929
+2564	1382	What configuration variable is used to describe target kernel?	open	2024-09-22 10:06:27.13788	2024-09-22 10:06:27.13788
+2565	1382	What configuration variable is used to describe target machine features?	open	2024-09-22 10:06:27.139796	2024-09-22 10:06:27.139796
+2566	1382	What configuration variable is used to describe the serial console used to attach to target devide?	open	2024-09-22 10:06:27.141652	2024-09-22 10:06:27.141652
+2567	1382	What configuration variable is used to describe the target kernel image type?	open	2024-09-22 10:06:27.143825	2024-09-22 10:06:27.143825
+2568	1382	What bootloader is used in Poky by default?	open	2024-09-22 10:06:27.146159	2024-09-22 10:06:27.146159
+2569	1382	What configuration variable is used in UBoot recipe to name of the SPL binary?	open	2024-09-22 10:06:27.14812	2024-09-22 10:06:27.14812
+2570	1382	What configuration variable is used in UBoot recipe as a suffix to bootloader name?	open	2024-09-22 10:06:27.150388	2024-09-22 10:06:27.150388
+2571	1382	What configuration variable is used in UBoot recipe as the target architecture?	open	2024-09-22 10:06:27.152552	2024-09-22 10:06:27.152552
+2572	1382	What configuration variable is used in UBoot recipe as the bootloader entry point?	open	2024-09-22 10:06:27.154394	2024-09-22 10:06:27.154394
+2573	1382	What configuration variable is used in UBoot recipe as the bootloader load address?	open	2024-09-22 10:06:27.156378	2024-09-22 10:06:27.156378
+2574	1382	What configuration variable is used in UBoot recipe as the make target used to build the bootloader?	open	2024-09-22 10:06:27.158537	2024-09-22 10:06:27.158537
+2575	1382	In how many ways the kernel can be built with yocto?	open	2024-09-22 10:06:27.160797	2024-09-22 10:06:27.160797
+2576	1382	Use <code>linux-yocto</code> to build a specific kernel in an image?	open	2024-09-22 10:06:27.163108	2024-09-22 10:06:27.163108
+2577	1382	What is the advanced metadata?	open	2024-09-22 10:06:27.165612	2024-09-22 10:06:27.165612
+2578	1382	What is a Kernel Metadata?	open	2024-09-22 10:06:27.168342	2024-09-22 10:06:27.168342
+2579	1382	Write a simple kernel metadata specifying a configuration and a patch?	open	2024-09-22 10:06:27.170754	2024-09-22 10:06:27.170754
+2580	1382	What is advantage of creating a distribution layer?	open	2024-09-22 10:06:27.172827	2024-09-22 10:06:27.172827
+2581	1382	Where is the configuration for a distro layer?	open	2024-09-22 10:06:27.17469	2024-09-22 10:06:27.17469
+2582	1382	What configuration variable is mandatory in a distro layer config file?	open	2024-09-22 10:06:27.176714	2024-09-22 10:06:27.176714
+2583	1382	What informational configuration variables are used in a distro layer config file?	open	2024-09-22 10:06:27.179003	2024-09-22 10:06:27.179003
+2584	1382	What configuration variable is used in distro layers to toggle features?	open	2024-09-22 10:06:27.180961	2024-09-22 10:06:27.180961
+2585	1382	What configuration variable holds the intersection of distro and machine features?	open	2024-09-22 10:06:27.183154	2024-09-22 10:06:27.183154
+2586	1382	Define a toolchain in a distro layer?	open	2024-09-22 10:06:27.185724	2024-09-22 10:06:27.185724
+2587	1382	What sample files are created in distro layers?	open	2024-09-22 10:06:27.18779	2024-09-22 10:06:27.18779
+2588	1382	What configuration variable holds the path to sample config files?	open	2024-09-22 10:06:27.190291	2024-09-22 10:06:27.190291
+2589	1382	What is an image?	open	2024-09-22 10:06:27.192416	2024-09-22 10:06:27.192416
+2590	1382	What is the difference between an image and a machine layer?	open	2024-09-22 10:06:27.194452	2024-09-22 10:06:27.194452
+2591	1382	Where is the location of images?	open	2024-09-22 10:06:27.196265	2024-09-22 10:06:27.196265
+2592	1382	What are the common images used in poky?	open	2024-09-22 10:06:27.198741	2024-09-22 10:06:27.198741
+2593	1382	What an image is made of?	open	2024-09-22 10:06:27.201185	2024-09-22 10:06:27.201185
+2594	1382	What class is inherited by images?	open	2024-09-22 10:06:27.203197	2024-09-22 10:06:27.203197
+2595	1382	What configuration variable is used in an image as the generated image name?	open	2024-09-22 10:06:27.20516	2024-09-22 10:06:27.20516
+2596	1382	What configuration variable is used in an image to hold the list of packages to be installed?	open	2024-09-22 10:06:27.207106	2024-09-22 10:06:27.207106
+2597	1382	What configuration variable is used in an image as the root filesystem size?	open	2024-09-22 10:06:27.208852	2024-09-22 10:06:27.208852
+2598	1382	What configuration variable is used in an image to hold the list of features used in the image?	open	2024-09-22 10:06:27.210725	2024-09-22 10:06:27.210725
+2599	1382	What configuration variable is used in an image to hold the list of formats to be used to create the image?	open	2024-09-22 10:06:27.21256	2024-09-22 10:06:27.21256
+2600	1382	What configuration variable is used in an image to hold the list of locales to be supported?	open	2024-09-22 10:06:27.2145	2024-09-22 10:06:27.2145
+2601	1382	What configuration variable is used in an image as the package type used by the build system?	open	2024-09-22 10:06:27.216646	2024-09-22 10:06:27.216646
+2602	1382	What configuration variable is used in an image as shell commands to run at post process?	open	2024-09-22 10:06:27.218739	2024-09-22 10:06:27.218739
+2603	1382	What configuration variable is used in an image as recipes to be built with the image?	open	2024-09-22 10:06:27.220622	2024-09-22 10:06:27.220622
+2604	1382	What is the first steps of image creation?	open	2024-09-22 10:06:27.222942	2024-09-22 10:06:27.222942
+2605	1382	What variables change how root filesystem is created?	open	2024-09-22 10:06:27.225086	2024-09-22 10:06:27.225086
+2606	1382	Where are the root filesystem related files located in poky?	open	2024-09-22 10:06:27.227033	2024-09-22 10:06:27.227033
+2607	1382	Where are the image type instructions located?	open	2024-09-22 10:06:27.228933	2024-09-22 10:06:27.228933
+2608	1382	What are the steps to creating an image type?	open	2024-09-22 10:06:27.231346	2024-09-22 10:06:27.231346
+2609	1382	What are the steps to creating an image conversion type?	open	2024-09-22 10:06:27.234757	2024-09-22 10:06:27.234757
+2610	1382	Use wic to create a flashable image?	open	2024-09-22 10:06:27.237105	2024-09-22 10:06:27.237105
+2611	1382	What is the use cases of bmaptool?	open	2024-09-22 10:06:27.239235	2024-09-22 10:06:27.239235
+2612	1382	What is the structure of a package group?	open	2024-09-22 10:06:27.241394	2024-09-22 10:06:27.241394
+2613	1382	What is the required configuration variable in a package group class?	open	2024-09-22 10:06:27.243317	2024-09-22 10:06:27.243317
+2614	1382	What are the common package groups?	open	2024-09-22 10:06:27.245458	2024-09-22 10:06:27.245458
+2615	1382	Where is a sysroot directory?	open	2024-09-22 10:06:27.247772	2024-09-22 10:06:27.247772
+2616	1382	What is the concept of per-recipe sysroot?	open	2024-09-22 10:06:27.250228	2024-09-22 10:06:27.250228
+2617	1382	What a recipe sysroot is made of?	open	2024-09-22 10:06:27.252418	2024-09-22 10:06:27.252418
+2618	1382	Where is the recipe sysroot located?	open	2024-09-22 10:06:27.254639	2024-09-22 10:06:27.254639
+2619	1382	What is the output recipe sysroot used by other dependent recipes?	open	2024-09-22 10:06:27.256769	2024-09-22 10:06:27.256769
+2620	1382	In what script languages can recipes be written?	open	2024-09-22 10:06:27.258774	2024-09-22 10:06:27.258774
+2621	1382	What Python modules are automatically included when used?	open	2024-09-22 10:06:27.26164	2024-09-22 10:06:27.26164
+2622	1382	Write an anonymous Python function in a recipe?	open	2024-09-22 10:06:27.263889	2024-09-22 10:06:27.263889
+2623	1382	Write an inline Python function in a recipe?	open	2024-09-22 10:06:27.266215	2024-09-22 10:06:27.266215
+2624	1382	Access <code>D</code> configuration variable in recipe tasks?	open	2024-09-22 10:06:27.269164	2024-09-22 10:06:27.269164
+2625	1382	What are the use cases of variable flags?	open	2024-09-22 10:06:27.271564	2024-09-22 10:06:27.271564
+2626	1382	What variable flag is used to store the result of md5 hash?	open	2024-09-22 10:06:27.273581	2024-09-22 10:06:27.273581
+2627	1382	What variable flag can be used to make a directory before a task runs?	open	2024-09-22 10:06:27.275724	2024-09-22 10:06:27.275724
+2628	1382	What variable flag can be used to disable the execution of the task?	open	2024-09-22 10:06:27.277557	2024-09-22 10:06:27.277557
+2629	1382	What variable flag can be used to disable timestamp modification each time a task runs?	open	2024-09-22 10:06:27.279504	2024-09-22 10:06:27.279504
+2630	1382	What variable flag can be used to store task documentation?	open	2024-09-22 10:06:27.281831	2024-09-22 10:06:27.281831
+2631	1382	What variable flag can be used to add a dependency between specific tasks?	open	2024-09-22 10:06:27.284881	2024-09-22 10:06:27.284881
+2632	1382	What configuration variable controls build on a per feature granularity?	open	2024-09-22 10:06:27.286951	2024-09-22 10:06:27.286951
+2633	1382	What are the arguments used by <code>PACKAGECONIFG</code> configuration variable?	open	2024-09-22 10:06:27.289396	2024-09-22 10:06:27.289396
+2634	1382	Conditionally configure wifi feature in a package if it is enabled?	open	2024-09-22 10:06:27.291505	2024-09-22 10:06:27.291505
+2635	1382	Conditionally configure bluetooth feature in a package if it is enabled?	open	2024-09-22 10:06:27.293553	2024-09-22 10:06:27.293553
+2636	1382	Conditionally configure openvpn feature in a package if it is enabled?	open	2024-09-22 10:06:27.295605	2024-09-22 10:06:27.295605
+2637	1382	Add a feature in a recipe configuration?	open	2024-09-22 10:06:27.298136	2024-09-22 10:06:27.298136
+2638	1382	Add a feature in a distro configuration?	open	2024-09-22 10:06:27.300405	2024-09-22 10:06:27.300405
+2639	1382	List available <code>PACKAGECONFIG</code> flags?	open	2024-09-22 10:06:27.303099	2024-09-22 10:06:27.303099
+2640	1382	Check if a value exists in varaible?	open	2024-09-22 10:06:27.306231	2024-09-22 10:06:27.306231
+2641	1382	Using inline Python functions return all the values of a variable for a specific flag?	open	2024-09-22 10:06:27.309147	2024-09-22 10:06:27.309147
+2642	1382	What configuration variable holds the list of packages to be built?	open	2024-09-22 10:06:27.311877	2024-09-22 10:06:27.311877
+2643	1382	What configuration variable allows to check dependencies?	open	2024-09-22 10:06:27.314251	2024-09-22 10:06:27.314251
+2644	1382	What configuration variable allows creation of empty packages?	open	2024-09-22 10:06:27.316931	2024-09-22 10:06:27.316931
+2645	1382	What configuration variable is used to prevent overwriting during the update process?	open	2024-09-22 10:06:27.319538	2024-09-22 10:06:27.319538
+2646	1382	What configuration variable lists the files to be included in a package?	open	2024-09-22 10:06:27.321883	2024-09-22 10:06:27.321883
+2647	1382	What configuration variable tracks the changes in licenses?	open	2024-09-22 10:06:27.324465	2024-09-22 10:06:27.324465
+2648	1382	Which recipes should contain licensing information?	open	2024-09-22 10:06:27.327062	2024-09-22 10:06:27.327062
+2649	1382	Specify which licenses cannot be integrated into the image?	open	2024-09-22 10:06:27.329821	2024-09-22 10:06:27.329821
+2650	1382	Define a license for commercial components?	open	2024-09-22 10:06:27.334467	2024-09-22 10:06:27.334467
+2651	1382	Where does bitbake generate the manifest of all licenses?	open	2024-09-22 10:06:27.337151	2024-09-22 10:06:27.337151
+2652	1382	Include the license manifest into the root filesystem?	open	2024-09-22 10:06:27.340114	2024-09-22 10:06:27.340114
+2653	1382	What tools does an SDK provide?	open	2024-09-22 10:06:27.342569	2024-09-22 10:06:27.342569
+2654	1382	What is the form of an SDK generated by poky?	open	2024-09-22 10:06:27.345425	2024-09-22 10:06:27.345425
+2655	1382	What SDK can be used to do low level development?	open	2024-09-22 10:06:27.34792	2024-09-22 10:06:27.34792
+2656	1382	Create a generic SDK for bootloader and kernel development?	open	2024-09-22 10:06:27.350954	2024-09-22 10:06:27.350954
+2657	1382	Where will be the generated generic SDK stored?	open	2024-09-22 10:06:27.353524	2024-09-22 10:06:27.353524
+2658	1382	What SDK can be used to develop applications running on a target?	open	2024-09-22 10:06:27.356	2024-09-22 10:06:27.356
+2659	1382	What task is responsible for generating an SDK?	open	2024-09-22 10:06:27.358434	2024-09-22 10:06:27.358434
+2660	1382	Generate an SDK for an image?	open	2024-09-22 10:06:27.360877	2024-09-22 10:06:27.360877
+2661	1382	What configuration variables control what will be installed in an SDK?	open	2024-09-22 10:06:27.364051	2024-09-22 10:06:27.364051
+2662	1382	Install an SDK?	open	2024-09-22 10:06:27.367128	2024-09-22 10:06:27.367128
+2663	1382	Use an installed SDK?	open	2024-09-22 10:06:27.37016	2024-09-22 10:06:27.37016
+2664	1382	What environment variables will be exported by an SDK?	open	2024-09-22 10:06:27.37292	2024-09-22 10:06:27.37292
+2665	1382	Use a SDK to build an application for a target?	open	2024-09-22 10:06:27.375191	2024-09-22 10:06:27.375191
+2666	1382	Use a SDK to build kernel?	open	2024-09-22 10:06:27.37839	2024-09-22 10:06:27.37839
+2667	1382	What are the advantages of using devtool?	open	2024-09-22 10:06:27.380755	2024-09-22 10:06:27.380755
+2668	1382	Where is devtool located?	open	2024-09-22 10:06:27.383352	2024-09-22 10:06:27.383352
+2669	1382	Where does devtool manage sources?	open	2024-09-22 10:06:27.386335	2024-09-22 10:06:27.386335
+2670	1382	Create a new recipe with devtool?	open	2024-09-22 10:06:27.388743	2024-09-22 10:06:27.388743
+2671	1382	Modify a recipe with devtool?	open	2024-09-22 10:06:27.3911	2024-09-22 10:06:27.3911
+2672	1382	Upgrade a recipe with devtool?	open	2024-09-22 10:06:27.393414	2024-09-22 10:06:27.393414
+2673	1382	Edit a recipe with an editor using devtool?	open	2024-09-22 10:06:27.395933	2024-09-22 10:06:27.395933
+2674	1382	Build a recipe with devtool?	open	2024-09-22 10:06:27.398504	2024-09-22 10:06:27.398504
+2675	1382	Build an image with the additional devtool recipes?	open	2024-09-22 10:06:27.401275	2024-09-22 10:06:27.401275
+2676	1382	Upload the recipes packages to the target using devtool?	open	2024-09-22 10:06:27.403819	2024-09-22 10:06:27.403819
+2677	1382	Generate patches from git commits made locally with devtool?	open	2024-09-22 10:06:27.406359	2024-09-22 10:06:27.406359
+2678	1382	Remove a recipe from devtool?	open	2024-09-22 10:06:27.408624	2024-09-22 10:06:27.408624
 \.
 
 
@@ -17698,7 +18558,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 621	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	14
 865	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	22
 1246	82	open	\N	2024-07-28 09:45:08.59921	2024-07-28 09:45:08.59921	19
-1382	91	writing	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	6
 1206	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	38
 962	69	writing	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	1
 106	20	open	\N	2024-07-28 09:44:56.341743	2024-07-28 09:44:56.341743	11
@@ -18631,6 +19490,7 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 1293	86	completed	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	1
 1361	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	15
 1461	98	completed	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	16
+1382	91	completed	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	6
 \.
 
 
@@ -19546,7 +20406,7 @@ SELECT pg_catalog.setval('flashback.logins_id_seq', 3, true);
 -- Name: note_blocks_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.note_blocks_id_seq', 6993, true);
+SELECT pg_catalog.setval('flashback.note_blocks_id_seq', 7535, true);
 
 
 --
@@ -19574,7 +20434,7 @@ SELECT pg_catalog.setval('flashback.note_usage_id_seq', 1, false);
 -- Name: notes_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.notes_id_seq', 2382, true);
+SELECT pg_catalog.setval('flashback.notes_id_seq', 2678, true);
 
 
 --
