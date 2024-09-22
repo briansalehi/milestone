@@ -2,38 +2,50 @@ import QtQuick
 
 Item {
     id: menu
-    anchors.top: parent.top
-    anchors.topMargin: parent.height * 2 / 10
-    anchors.bottom: parent.bottom
-    anchors.bottomMargin: parent.height * 2 / 10
-    anchors.horizontalCenter: parent.horizontalCenter
-    width: parent.width * 5 / 10
 
-    signal clicked
+    property font font
+    property color color
+    property color text_color
+    property int space_size: parent.width * 31 / 100
+    signal spaceSelected(string space)
 
     Flow {
-        spacing: 30
+        spacing: parent.width * 3 / 100
         anchors.fill: parent
 
         Space {
-            title: "Study"
-            entry_font: window.font.family
-            entry_color: window.color
-            entry_font_size: font_big
-            preferred_size: parent.width / 3
+            id: practice
+            text: "Practice"
+            font: menu.font
+            text_color: menu.text_color
+            color: menu.color
+            preferred_size: menu.space_size
             onClicked: {
-                menu.clicked();
+                menu.spaceSelected("practice");
             }
         }
 
         Space {
-            title: "Practice"
-            entry_font: window.font.family
-            entry_color: window.color
-            entry_font_size: font_big
-            preferred_size: parent.width / 3
+            id: study
+            text: "Study"
+            font: menu.font
+            text_color: menu.text_color
+            color: menu.color
+            preferred_size: menu.space_size
             onClicked: {
-                menu.clicked();
+                menu.spaceSelected("study");
+            }
+        }
+
+        Space {
+            id: edit
+            text: "Edit"
+            font: menu.font
+            text_color: menu.text_color
+            color: menu.color
+            preferred_size: menu.space_size
+            onClicked: {
+                menu.spaceSelected("edit");
             }
         }
     }

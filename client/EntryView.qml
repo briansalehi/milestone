@@ -1,54 +1,54 @@
 import QtQuick
 
-Rectangle {
+Item {
     id: entry
     height: 70
-    radius: 13
 
-    property color background_color
-    property color foreground_color
-    property string entry_font
-    property int font_size
+    property color color
+    property font font
     property string headline_text
+    property color heading_color
     property string designator_text
-    property int entryWidth
+    property color designator_color
     signal clicked
 
-    color: background_color
-
-    Text {
-        id: headline_id
-        text: headline_text
-        color: foreground_color
-        font.pixelSize: font_size
-        font.family: entry_font
-        verticalAlignment: Text.AlignVCenter
-        horizontalAlignment: Text.AlignHCenter
-        elide: Text.ElideRight
-        anchors.left: parent.left
-        anchors.leftMargin: 15
-        anchors.right: update_id.left
-        anchors.rightMargin: 10
-        anchors.verticalCenter: parent.verticalCenter
-    }
-
-    Text {
-        id: update_id
-        text: designator_text
-        color: Qt.darker(foreground_color)
-        font.pixelSize: 24
-        font.family: entry_font
-        elide: Text.ElideRight
-        anchors.right: parent.right
-        anchors.rightMargin: 15
-        anchors.verticalCenter: parent.verticalCenter
-    }
-
-    MouseArea {
+    Rectangle {
         anchors.fill: parent
-        hoverEnabled: true
-        onClicked: { entry.clicked(); }
-        onEntered: { parent.color = Qt.lighter(background_color); }
-        onExited: { parent.color = background_color; }
+        radius: 13
+        color: entry.color
+
+        Text {
+            id: headline_id
+            text: entry.headline_text
+            color: entry.heading_color
+            font: entry.font
+            verticalAlignment: Text.AlignVCenter
+            horizontalAlignment: Text.AlignHCenter
+            elide: Text.ElideRight
+            anchors.left: parent.left
+            anchors.leftMargin: 15
+            anchors.right: update_id.left
+            anchors.rightMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+        }
+
+        Text {
+            id: update_id
+            text: entry.designator_text
+            color: entry.designator_color
+            font: entry.font
+            elide: Text.ElideRight
+            anchors.right: parent.right
+            anchors.rightMargin: 15
+            anchors.verticalCenter: parent.verticalCenter
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: { entry.clicked(); }
+            onEntered: { parent.color = Qt.lighter(entry.color); }
+            onExited: { parent.color = entry.color; }
+        }
     }
 }

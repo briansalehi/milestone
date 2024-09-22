@@ -4,7 +4,7 @@
 
 Database::Database(QObject *parent)
     : QObject{parent}
-    , m_database{"postgresql://localhost/flashback"}
+    , m_database{"postgresql://flashback@localhost/flashback"}
 {
 }
 
@@ -29,11 +29,32 @@ EntryList* Database::subjects()
     return subjects;
 }
 
-EntryList* Database::resources()
+EntryList* Database::studying_resources()
 {
     EntryList* resources{new EntryList{}};
 
-    for (flashback::resource const& resource: m_database.resources())
+    for (flashback::resource const& resource: m_database.studying_resources())
+    {
+        Entry entry{};
+        entry.headline(QString::fromStdString(resource.name));
+        entry.designator(QString::number(resource.incomplete_sections));
+
+        if (entry.headline().size() == 0)
+        {
+            qDebug() << "Empty resource entry from database";
+            continue;
+        }
+        resources->addEntry(entry);
+    }
+
+    return resources;
+}
+
+EntryList *Database::editing_resources()
+{
+    EntryList* resources{new EntryList{}};
+
+    for (flashback::resource const& resource: m_database.editing_resources())
     {
         Entry entry{};
         entry.headline(QString::fromStdString(resource.name));

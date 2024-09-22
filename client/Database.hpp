@@ -29,7 +29,8 @@ public:
     explicit Database(QObject *parent = nullptr);
 
     Q_INVOKABLE EntryList* subjects();
-    Q_INVOKABLE EntryList* resources();
+    Q_INVOKABLE EntryList* studying_resources();
+    Q_INVOKABLE EntryList* editing_resources();
 
 signals:
 

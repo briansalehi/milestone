@@ -20,16 +20,9 @@ ApplicationWindow {
 
     WorkSpace {
         id: workspace
-        visible: false
-        entry_color: Qt.lighter(window.color)
-        entry_font: window.font.family
-        entry_font_size: font_regular
-        anchors.top: parent.top
-        anchors.topMargin: parent.height * 10 / 100
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: parent.height * 10 / 100
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: parent.width * 5 / 10
+        color: Qt.lighter(window.color)
+        font: window.font
+        text_color: "white"
     }
 
     /*

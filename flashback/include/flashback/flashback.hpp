@@ -17,7 +17,9 @@ public:
 
     std::string address() const;
 
-    std::vector<resource> resources();
+    std::vector<resource> studying_resources();
+
+    std::vector<resource> editing_resources();
 
     std::vector<subject> subjects();
 

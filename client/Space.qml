@@ -1,37 +1,40 @@
 import QtQuick
 
-Rectangle {
+Item {
     id: space
-    color: Qt.lighter(entry_color)
+    width: space.size
+    height: space.size
 
     property int minimum_size: 200
     property int preferred_size
-    property color entry_color
-    property string entry_font
-    property int entry_font_size
-    property string title
+    property int size: preferred_size < minimum_size ? minimum_size : preferred_size
+    property color color
+    property font font
+    property string text
+    property color text_color
     signal clicked()
 
-    width: preferred_size < minimum_size ? minimum_size : preferred_size
-    height: preferred_size < minimum_size ? minimum_size : preferred_size
-    radius: preferred_size * 5 / 100
-
-    Text {
-        anchors.centerIn: parent
-        color: 'white'
-        font.family: entry_font
-        font.pixelSize: entry_font_size
-        text: title
-        horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
-    }
-
-    MouseArea {
-        id: area
+    Rectangle {
         anchors.fill: parent
-        hoverEnabled: true
-        onClicked: { space.clicked(); }
-        onEntered: { parent.color = Qt.lighter(parent.color, 1.5); }
-        onExited: { parent.color = Qt.lighter(entry_color); }
+        color: space.color
+        radius: space.size * 8 / 100
+
+        Text {
+            text: space.text
+            color: space.text_color
+            font: space.font
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            anchors.centerIn: parent
+        }
+
+        MouseArea {
+            id: area
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: { space.clicked(); }
+            onEntered: { parent.color = Qt.lighter(space.color, 1.5); }
+            onExited: { parent.color = space.color; }
+        }
     }
 }
