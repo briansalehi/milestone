@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 16.3
--- Dumped by pg_dump version 16.3
+-- Dumped from database version 16.4
+-- Dumped by pg_dump version 16.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -235,12 +235,12 @@ ALTER FUNCTION flashback.get_editor_resources(user_index integer) OWNER TO flash
 -- Name: get_resource_notes(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_resource_notes(resource_index integer) RETURNS TABLE(section_id integer, section_number integer, section text, section_state flashback.publication_state, note_id integer, note_state flashback.publication_state, heading character varying, content text)
+CREATE FUNCTION flashback.get_resource_notes(resource_index integer) RETURNS TABLE(section_id integer, section_number integer, section text, section_state flashback.publication_state, note_id integer, note_state flashback.publication_state, heading character varying, content text, last_edit timestamp without time zone)
     LANGUAGE plpgsql
     AS $$
 begin
     return query
-    select sc.id, sc.number, concat(p.pattern, ' ', sc.number), sc.state as section_state, n.id, n.state as note_state, n.heading, string_agg(b.content, E'\n\n' order by b.position, b.updated)
+    select sc.id, sc.number, concat(p.pattern, ' ', sc.number), sc.state as section_state, n.id, n.state as note_state, n.heading, string_agg(b.content, E'\n\n' order by b.position, b.updated), n.updated timestamp
     from flashback.resources r
     join flashback.sections sc on sc.resource_id = r.id
     join flashback.section_name_patterns p on p.id = r.section_pattern_id
@@ -9619,6 +9619,7 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 1108	1377	How to use <code>Crosstool-ng</code> to load a target specific configuration sample?	open	2024-07-28 10:07:02.122103	2024-07-28 10:07:02.122103
 1109	1377	How to use <code>Crosstool-ng</code> to configure selected architecture specific cross-toolchain?	open	2024-07-28 10:07:02.432924	2024-07-28 10:07:02.432924
 1110	1377	How to use <code>Crosstool-ng</code> to print the tuple of the currently configured toolchain?	open	2024-07-28 10:07:02.675159	2024-07-28 10:07:02.675159
+2149	257	Inspect buffer list:	open	2024-07-28 10:13:42.36548	2024-07-28 10:13:42.36548
 1111	1377	How to use <code>Crosstool-ng</code> to separate downloading source files from building stage?	open	2024-07-28 10:07:02.895912	2024-07-28 10:07:02.895912
 1112	1377	How to use <code>Crosstool-ng</code> to build the desired architecture specific cross-toolchain?	open	2024-07-28 10:07:03.167434	2024-07-28 10:07:03.167434
 1113	1377	How to set library and headers path for a cross-compiled GNU GCC compiler?	open	2024-07-28 10:07:03.422944	2024-07-28 10:07:03.422944
@@ -9811,6 +9812,7 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 1300	901	What assumptions and flags are enabled by <code>kbuild</code> infrastructure based on the target architecture?	open	2024-07-28 10:08:17.911128	2024-07-28 10:08:17.911128
 1301	901	What <code>make</code> target options can be used to configure the kernel?	open	2024-07-28 10:08:18.224362	2024-07-28 10:08:18.224362
 1302	901	Where will be the kernel configurations stored?	open	2024-07-28 10:08:18.398435	2024-07-28 10:08:18.398435
+2150	257	Switch to alternate buffer:	open	2024-07-28 10:13:42.565566	2024-07-28 10:13:42.565566
 1303	901	Generate a preconfigured <code>.config</code> file tuned for a specific platform in the kernel source tree?	open	2024-07-28 10:08:18.897062	2024-07-28 10:08:18.897062
 1304	901	Revert configuration changes in kernel source tree after generating new <code>.config</code> file?	open	2024-07-28 10:08:19.127857	2024-07-28 10:08:19.127857
 1305	901	Create a new default configuration target in kernel source tree?	open	2024-07-28 10:08:19.614339	2024-07-28 10:08:19.614339
@@ -9942,6 +9944,7 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 1430	458	What is the BPF frontend?	open	2024-07-28 10:09:11.514264	2024-07-28 10:09:11.514264
 1431	458	What kernel version started supporting BPF?	open	2024-07-28 10:09:11.744683	2024-07-28 10:09:11.744683
 1432	458	What is the important dependency of BPF on a Linux system?	open	2024-07-28 10:09:11.969885	2024-07-28 10:09:11.969885
+2151	257	Jump directly to a buffer using number:	open	2024-07-28 10:13:42.744556	2024-07-28 10:13:42.744556
 1433	458	What tool is used as automated test suite and static and dynamic analysis for kernel modules?	open	2024-07-28 10:09:12.189633	2024-07-28 10:09:12.189633
 1434	458	What is the name of cross toolchain required to build the kernel?	open	2024-07-28 10:09:12.449849	2024-07-28 10:09:12.449849
 1435	458	What is the name of emulator required to run kernel on it?	open	2024-07-28 10:09:12.740584	2024-07-28 10:09:12.740584
@@ -10010,6 +10013,7 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 1498	1249	What rules match in sudo when multiple rules exist in sudoers file?	open	2024-07-28 10:09:31.828741	2024-07-28 10:09:31.828741
 1499	1249	How to use negate operator to exclude one item from a list in sudoers file?	open	2024-07-28 10:09:32.034752	2024-07-28 10:09:32.034752
 1500	1249	What must be written in the last line of sudoers file to be accepted by visudo?	open	2024-07-28 10:09:32.211899	2024-07-28 10:09:32.211899
+2152	258	Open another file in vim to edit:	open	2024-07-28 10:13:43.000603	2024-07-28 10:13:43.000603
 1501	1250	What editor does the <code>visudo</code> use to edit <code>/etc/sudoers</code> file?	open	2024-07-28 10:09:32.50831	2024-07-28 10:09:32.50831
 1502	1250	How to keep editing <code>/etc/sudoers</code> file after making a syntactical error in <code>visudo</code> and save it?	open	2024-07-28 10:09:32.6974	2024-07-28 10:09:32.6974
 1503	1250	How to retain older <code>/etc/sudoers</code> file after attempting to save incorrect changes by <code>visudo</code>?	open	2024-07-28 10:09:32.905111	2024-07-28 10:09:32.905111
@@ -10065,6 +10069,7 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 1553	1254	Hw Set configuration type can be used in /etc/sudo.conf file?	open	2024-07-28 10:09:48.922815	2024-07-28 10:09:48.922815
 1554	1254	How to enable core dumps from setuid programs on FreeBSD, OpenBSD and Linux systems?	open	2024-07-28 10:09:49.411201	2024-07-28 10:09:49.411201
 1555	1255	What environment variables do <code>sudo</code> exclude from the list of user ennvironment variables for the shell instance running by <code>sudo</code>?	open	2024-07-28 10:09:49.807495	2024-07-28 10:09:49.807495
+2153	258	Inspect current working directory in vim:	open	2024-07-28 10:13:43.258817	2024-07-28 10:13:43.258817
 1556	1255	How to define a list of environment variables that <code>sudo</code> should retain when running a shell instance in case whitelisting environment variables is desired?	open	2024-07-28 10:09:50.048736	2024-07-28 10:09:50.048736
 1557	1255	How to allow users to retian all of their envinronment variables <code>/etc/sudoers</code> file when blacklisting environment variables is desired?	open	2024-07-28 10:09:50.371244	2024-07-28 10:09:50.371244
 1558	1255	How to delete specific environment variables in <code>/etc/sudoers</code> file when blacklisting environment variables is desired?	open	2024-07-28 10:09:50.691703	2024-07-28 10:09:50.691703
@@ -10295,6 +10300,7 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 1783	629	What is the linear transformation of reflection of a space through a line in the direction of the unit vector u?	open	2024-07-28 10:11:27.122513	2024-07-28 10:11:27.122513
 1784	629	Find the standard matrices of the linear transformations that reflect through the lines in the direction of u = (0,1) \\in \\mathbb{R}^2?	open	2024-07-28 10:11:27.278141	2024-07-28 10:11:27.278141
 1785	629	Find the standard matrices of the linear transformations that reflect through the lines in the direction of w = (1,1,1) \\in \\mathbb{R}^2?	open	2024-07-28 10:11:27.481766	2024-07-28 10:11:27.481766
+2154	258	Open a file in path relative to editing file:	open	2024-07-28 10:13:43.546517	2024-07-28 10:13:43.546517
 1786	629	Find the entries of the vector that is obtained by reflecting v = (-1,3) through the line going through the origin at an angle of π/3 counter-clockwise from the x-axis.	open	2024-07-28 10:11:27.694011	2024-07-28 10:11:27.694011
 1787	629	What is the linear transformation of rotation in two dimensions?	open	2024-07-28 10:11:27.877496	2024-07-28 10:11:27.877496
 1788	629	Find the standard matrix of the linear transformation that rotates R^2 by π/4 radians counter-clockwise?	open	2024-07-28 10:11:28.026385	2024-07-28 10:11:28.026385
@@ -10657,12 +10663,6 @@ COPY flashback.notes (id, section_id, heading, state, creation, updated) FROM st
 2145	256	Start an interactive shell in Vim:	open	2024-07-28 10:13:41.528902	2024-07-28 10:13:41.528902
 2147	256	Filter the contents of a buffer through an external command:	open	2024-07-28 10:13:41.987543	2024-07-28 10:13:41.987543
 2148	256	Use a {motion} to filter then contents of a buffer through an external command:	open	2024-07-28 10:13:42.162877	2024-07-28 10:13:42.162877
-2149	257	Inspect buffer list:	open	2024-07-28 10:13:42.36548	2024-07-28 10:13:42.36548
-2150	257	Switch to alternate buffer:	open	2024-07-28 10:13:42.565566	2024-07-28 10:13:42.565566
-2151	257	Jump directly to a buffer using number:	open	2024-07-28 10:13:42.744556	2024-07-28 10:13:42.744556
-2152	258	Open another file in vim to edit:	open	2024-07-28 10:13:43.000603	2024-07-28 10:13:43.000603
-2153	258	Inspect current working directory in vim:	open	2024-07-28 10:13:43.258817	2024-07-28 10:13:43.258817
-2154	258	Open a file in path relative to editing file:	open	2024-07-28 10:13:43.546517	2024-07-28 10:13:43.546517
 2155	258	Configure `path` for finding files:	open	2024-07-28 10:13:43.868517	2024-07-28 10:13:43.868517
 2156	258	Find a file by its filename in vim:	open	2024-07-28 10:13:44.138715	2024-07-28 10:13:44.138715
 2157	258	Navigate file explorer in vim by opening a directory:	open	2024-07-28 10:13:44.457245	2024-07-28 10:13:44.457245
