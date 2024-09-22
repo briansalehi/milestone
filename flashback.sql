@@ -287,6 +287,26 @@ CREATE FUNCTION flashback.get_section_name_patterns() RETURNS TABLE(id integer, 
 ALTER FUNCTION flashback.get_section_name_patterns() OWNER TO flashback;
 
 --
+-- Name: get_user_editing_resources(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_user_editing_resources(user_index integer) RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, incomplete_sections bigint, last_study timestamp without time zone)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select r.id, sr.subject_id, r.name, count(sc.id), max(st.updated)
+    from flashback.resources r
+    join flashback.subject_resources sr on r.id = sr.resource_id
+    join flashback.sections sc on sc.resource_id = r.id and sc.state = 'writing'::flashback.publication_state
+    join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
+    group by r.id, sr.subject_id, r.name;
+end; $$;
+
+
+ALTER FUNCTION flashback.get_user_editing_resources(user_index integer) OWNER TO flashback;
+
+--
 -- Name: get_user_note_blocks(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
@@ -362,26 +382,6 @@ end; $$;
 ALTER FUNCTION flashback.get_user_practices(user_index integer, topic_index integer) OWNER TO flashback;
 
 --
--- Name: get_user_resources(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
---
-
-CREATE FUNCTION flashback.get_user_resources(user_index integer) RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, incomplete_sections bigint, last_study timestamp without time zone)
-    LANGUAGE plpgsql
-    AS $$
-begin
-    return query
-    select r.id, sr.subject_id, r.name, count(sc.id), max(st.updated)
-    from flashback.resources r
-    join flashback.subject_resources sr on r.id = sr.resource_id
-    join flashback.sections sc on sc.resource_id = r.id and sc.state in ('open', 'writing')
-    join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
-    group by r.id, sr.subject_id, r.name;
-end; $$;
-
-
-ALTER FUNCTION flashback.get_user_resources(user_index integer) OWNER TO flashback;
-
---
 -- Name: get_user_sections(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
@@ -401,6 +401,26 @@ end; $$;
 
 
 ALTER FUNCTION flashback.get_user_sections(user_index integer, resource_index integer) OWNER TO flashback;
+
+--
+-- Name: get_user_studying_resources(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_user_studying_resources(user_index integer) RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, incomplete_sections bigint, last_study timestamp without time zone)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select r.id, sr.subject_id, r.name, count(sc.id), max(st.updated)
+    from flashback.resources r
+    join flashback.subject_resources sr on r.id = sr.resource_id
+    join flashback.sections sc on sc.resource_id = r.id and sc.state = 'completed'::flashback.publication_state
+    join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
+    group by r.id, sr.subject_id, r.name;
+end; $$;
+
+
+ALTER FUNCTION flashback.get_user_studying_resources(user_index integer) OWNER TO flashback;
 
 --
 -- Name: get_user_subjects(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
