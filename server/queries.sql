@@ -1,7 +1,7 @@
 -- user::resources
-select * from get_user_resources(1) order by updated asc nulls first, incomplete_sections desc, subject_id, resource_id;
+select * from get_user_resources(1) order by subject_id, last_study asc nulls first, incomplete_sections desc, resource_id;
 -- user::resources.sections.notes.blocks
-select section, heading, null as spacing, content from get_resource_notes(0) order by section_number, note_id;
+select * from get_resource_notes(0) order by section_number, note_id;
 -- user::resource.sections
 select * from get_user_sections(1, 0) order by updated asc nulls first, section_number asc;
 -- user::resource.section.notes
