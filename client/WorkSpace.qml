@@ -6,7 +6,7 @@ import Flashback.EntryList
 Item {
     id: workspace
     anchors.top: parent.top
-    anchors.topMargin: parent.height * 10 / 100
+    anchors.topMargin: parent.height * 20 / 100
     anchors.bottom: parent.bottom
     anchors.bottomMargin: parent.height * 10 / 100
     anchors.left: parent.left
@@ -24,6 +24,16 @@ Item {
         initialItem: menu
     }
 
+    SpaceControl {
+        id: controls
+        color: workspace.color
+        text_color: workspace.text_color
+        anchors.top: parent.top
+        anchors.bottom: workspace.top
+        font: workspace.font
+        onClicked: { }
+    }
+
     Component {
         id: menu
 
@@ -36,14 +46,51 @@ Item {
                 switch (space)
                 {
                 case "practice":
-                    stack.push(practice);
+                    stack.push(practice, {}, StackView.Immediate);
                     break;
                 case "study":
-                    stack.push(study);
+                    stack.push(study, {}, StackView.Immediate);
                     break;
                 case "edit":
-                    stack.push(edit);
+                    stack.push(edit, {}, StackView.Immediate);
                     break;
+                }
+            }
+        }
+    }
+
+    Component {
+        id: practice
+
+        ListView {
+            id: list
+
+            Database {
+                id: database;
+            }
+
+            model: database.subjects()
+            spacing: 10
+
+            delegate: EntryView {
+                id: entry
+                color: workspace.color
+                font {
+                    family: workspace.font.family
+                    pixelSize: workspace.font.pixelSize * 70 / 100
+                }
+                headline_text: headline
+                heading_color: "white"
+                designator_text: designator
+                designator_color: "white"
+                width: ListView.view.width
+                onSelected: {
+                    var selected_entry = list.itemAtIndex(index);
+
+                    if (selected_entry)
+                    {
+                        console.log("selected", selected_entry.headline_text)
+                    }
                 }
             }
         }
@@ -55,8 +102,9 @@ Item {
         ListView {
             id: list
 
-            property EntryList entries
-            Database { id: database; }
+            Database {
+                id: database
+            }
 
             model: database.studying_resources()
             spacing: 10
@@ -72,8 +120,16 @@ Item {
                 heading_color: "white"
                 designator_text: designator
                 designator_color: "white"
+                id_number: id
                 width: ListView.view.width
-                onClicked: { }
+                onSelected: {
+                    var selected_entry = list.itemAtIndex(index);
+
+                    if (selected_entry)
+                    {
+                        console.log("selected", selected_entry.headline_text)
+                    }
+                }
             }
         }
     }
@@ -84,8 +140,9 @@ Item {
         ListView {
             id: list
 
-            property EntryList entries
-            Database { id: database; }
+            Database {
+                id: database;
+            }
 
             model: database.editing_resources()
             spacing: 10
@@ -102,7 +159,14 @@ Item {
                 designator_text: designator
                 designator_color: "white"
                 width: ListView.view.width
-                onClicked: { }
+                onSelected: {
+                    var selected_entry = list.itemAtIndex(index);
+
+                    if (selected_entry)
+                    {
+                        console.log("selected", selected_entry.headline_text)
+                    }
+                }
             }
         }
     }
@@ -137,19 +201,5 @@ Item {
         visible: false
     }
 
-    SpaceControl {
-        id: controls
-        visible: false
-        anchors.top: parent.top
-        anchors.bottom: workspace.top
-        button_color: Qt.lighter(window.color)
-        font_size: font_medium
-        font_family: window.font.family
-        onClicked: {
-            controls.visible = false
-            workspace.visible = false
-            spaces.visible = true
-        }
-    }
     */
 }

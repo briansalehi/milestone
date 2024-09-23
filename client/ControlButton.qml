@@ -2,26 +2,24 @@ import QtQuick
 
 Rectangle {
     id: button
-    width: button_size
+    width: button.size
     height: parent.height * 2 / 3
     anchors.verticalCenter: parent.verticalCenter
     radius: 10
-    color: button_color
+    color: button.color
 
-    property color button_color: "black"
-    property string button_text: "Button"
-    property string button_font: "Nato Sans"
-    property string button_font_color: "white"
-    property int button_size: 100
-    property int button_font_size: 24
+    property string text
+    property font font
+    property int size
+    property color color
+    property color text_color: "white"
 
     signal clicked
 
     Text {
-        text: button_text
-        color: button_font_color
-        font.family: button_font
-        font.pixelSize: button_font_size
+        text: button.text
+        color: button.text_color
+        font: button.font
         anchors.fill: parent
         anchors.leftMargin: 5
         anchors.rightMargin: 5
@@ -34,7 +32,7 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         onClicked: { button.clicked(); }
-        onEntered: { parent.color = Qt.lighter(button_color); }
-        onExited: { parent.color = button_color; }
+        onEntered: { parent.color = Qt.lighter(button.color); }
+        onExited: { parent.color = button.color; }
     }
 }

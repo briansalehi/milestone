@@ -8,17 +8,19 @@ Item {
     anchors.leftMargin: parent.width * 20 / 100
     anchors.rightMargin: parent.width * 20 / 100
 
+    property color color
     property color text_color
-    property string text_font
-    property int text_size
+    property font font
+    property int size
+    property string text
 
     Column {
         anchors.fill: parent
 
         Heading {
-            color: text_color
-            font: text_font
-            size: text_size
+            text: page.text
+            font: page.font
+            color: page.text_color
         }
     }
 }

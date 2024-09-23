@@ -44,6 +44,7 @@ QVariant EntryList::data(QModelIndex const& index, int role = Qt::DisplayRole) c
         {
         case HeadlineRole: result = entry.headline(); break;
         case DesignatorRole: result = entry.designator(); break;
+        case IdRole: result = entry.id(); break;
         }
     }
 
@@ -55,6 +56,7 @@ QHash<int, QByteArray> EntryList::roleNames() const
     QHash<int, QByteArray> roles;
     roles[HeadlineRole] = "headline";
     roles[DesignatorRole] = "designator";
+    roles[IdRole] = "id";
     return roles;
 }
 

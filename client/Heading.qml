@@ -22,8 +22,6 @@ Item {
             id: data_placeholder
             width: placeholder.width // should be changed when new element is placed nearby
             height: placeholder.height
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.left: parent.left
             color: heading.background
 
             Text {

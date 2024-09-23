@@ -6,9 +6,9 @@ Item {
     width: parent.width * 5 / 10
     height: parent.height * 10 / 100
 
-    property string font_family
-    property int font_size
-    property color button_color
+    property font font
+    property color color
+    property color text_color
     signal clicked
 
     Row {
@@ -17,23 +17,21 @@ Item {
 
         ControlButton {
             id: back
-            button_size: parent.width / 3
-            button_text: "Back"
-            button_color: controls.button_color
-            button_font: font_family
-            button_font_size: font_size
-            button_font_color: "white"
+            size: parent.width / 3
+            text: "Back"
+            color: controls.color
+            font: controls.font
+            text_color: controls.text_color
             onClicked: { controls.clicked(); }
         }
 
         ControlButton {
             id: next
-            button_size: parent.width / 3
-            button_text: "Next"
-            button_color: controls.button_color
-            button_font: font_family
-            button_font_size: font_size
-            button_font_color: "white"
+            size: parent.width / 3
+            text: "Next"
+            color: controls.color
+            font: controls.font
+            text_color: controls.text_color
             onClicked: { controls.clicked(); }
         }
     }

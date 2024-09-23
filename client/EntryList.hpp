@@ -17,7 +17,8 @@ public:
     enum EntryRole
     {
         HeadlineRole = Qt::UserRole + 1,
-        DesignatorRole
+        DesignatorRole,
+        IdRole
     };
 
     explicit EntryList(QObject *parent = nullptr);

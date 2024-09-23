@@ -10,7 +10,11 @@ Item {
     property color heading_color
     property string designator_text
     property color designator_color
-    signal clicked
+    property bool doubleClicked: false
+
+    signal selected
+
+    property int id_number
 
     Rectangle {
         anchors.fill: parent
@@ -46,9 +50,26 @@ Item {
         MouseArea {
             anchors.fill: parent
             hoverEnabled: true
-            onClicked: { entry.clicked(); }
-            onEntered: { parent.color = Qt.lighter(entry.color); }
-            onExited: { parent.color = entry.color; }
+            onClicked: {
+                if (entry.doubleClicked) {
+                    entry.selected();
+                    entry.doubleClicked = false
+                }
+                else {
+                    entry.doubleClicked = true
+                }
+
+                parent.color = Qt.lighter(entry.color, 2);
+            }
+            onDoubleClicked: {
+                entry.selected();
+            }
+            onEntered: {
+                parent.color = Qt.lighter(entry.color, 1.5);
+            }
+            onExited: {
+                parent.color = entry.color;
+            }
         }
     }
 }
