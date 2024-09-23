@@ -183,9 +183,9 @@ CREATE PROCEDURE flashback.create_resource(IN subject_index integer, IN name_str
     AS $$
 declare resource_index integer;
 begin
-    insert into flashback.resources (name, reference, type, section_pattern_id) values (name_string, resource_reference, type_string, section_pattern_index) returning id into resource_index;
-    insert into flashback.resource_subjects (subject_id, resource_id) values (subject_index, resource_index);
-    insert into flashback.sections (resource_id, index) select resource_index, generate_series(1, sections);
+    insert into flashback.resources(name, reference, type, section_pattern_id) values (name_string, resource_reference, type_string, section_pattern_index) returning id into resource_index;
+    insert into flashback.subject_resources(subject_id, resource_id) values (subject_index, resource_index);
+    insert into flashback.sections(resource_id, number) select resource_index, generate_series(1, sections);
 end; $$;
 
 
