@@ -406,7 +406,7 @@ ALTER FUNCTION flashback.get_user_sections(user_index integer, resource_index in
 -- Name: get_user_studying_resources(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_user_studying_resources(user_index integer) RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, incomplete_sections bigint, last_study timestamp without time zone)
+CREATE FUNCTION flashback.get_user_studying_resources(user_index integer) RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, completed_sections bigint, last_study timestamp without time zone)
     LANGUAGE plpgsql
     AS $$
 begin
@@ -19901,6 +19901,7 @@ COPY flashback.subjects (id, name, creation, updated) FROM stdin;
 22	Valgrind	2024-07-28 09:44:46.506337	2024-07-28 09:44:46.506337
 23	Vim	2024-07-28 09:44:46.506337	2024-07-28 09:44:46.506337
 24	GoogleTest	2024-09-12 10:59:46.423264	2024-09-12 10:59:46.423264
+25	OpenGL	2024-09-23 17:59:59.23805	2024-09-23 17:59:59.23805
 \.
 
 
@@ -20545,7 +20546,7 @@ SELECT pg_catalog.setval('flashback.subject_editing_id_seq', 1, false);
 -- Name: subjects_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.subjects_id_seq', 24, true);
+SELECT pg_catalog.setval('flashback.subjects_id_seq', 25, true);
 
 
 --
