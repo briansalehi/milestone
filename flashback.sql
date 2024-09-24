@@ -63,6 +63,7 @@ CREATE TYPE flashback.publication_state AS ENUM (
     'open',
     'writing',
     'completed',
+    'revised',
     'validated',
     'approved',
     'released',
@@ -212,6 +213,26 @@ $$;
 ALTER FUNCTION flashback.create_user(username_string character varying, email_string character varying, first_name_string character varying, middle_name_string character varying, last_name_string character varying) OWNER TO flashback;
 
 --
+-- Name: get_editing_resources(); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_editing_resources() RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, incomplete_sections bigint, last_study timestamp without time zone)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select r.id, sr.subject_id, r.name, count(sc.id), max(st.updated)
+    from flashback.resources r
+    join flashback.subject_resources sr on r.id = sr.resource_id
+    join flashback.sections sc on sc.resource_id = r.id and sc.state = 'writing'::flashback.publication_state
+    join flashback.studies st on st.section_id = sc.id
+    group by r.id, sr.subject_id, r.name;
+end; $$;
+
+
+ALTER FUNCTION flashback.get_editing_resources() OWNER TO flashback;
+
+--
 -- Name: get_editor_resources(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
@@ -287,24 +308,24 @@ CREATE FUNCTION flashback.get_section_name_patterns() RETURNS TABLE(id integer, 
 ALTER FUNCTION flashback.get_section_name_patterns() OWNER TO flashback;
 
 --
--- Name: get_user_editing_resources(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+-- Name: get_studying_resources(); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_user_editing_resources(user_index integer) RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, incomplete_sections bigint, last_study timestamp without time zone)
+CREATE FUNCTION flashback.get_studying_resources() RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, completed_sections bigint, last_study timestamp without time zone)
     LANGUAGE plpgsql
     AS $$
 begin
     return query
-    select r.id, sr.subject_id, r.name, count(sc.id), max(st.updated)
+    select  r.id, sr.subject_id, r.name, count(sc.id), max(st.updated)
     from flashback.resources r
     join flashback.subject_resources sr on r.id = sr.resource_id
-    join flashback.sections sc on sc.resource_id = r.id and sc.state = 'writing'::flashback.publication_state
-    join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
+    join flashback.sections sc on sc.resource_id = r.id and sc.state = 'completed'::flashback.publication_state
+    join flashback.studies st on st.section_id = sc.id
     group by r.id, sr.subject_id, r.name;
 end; $$;
 
 
-ALTER FUNCTION flashback.get_user_editing_resources(user_index integer) OWNER TO flashback;
+ALTER FUNCTION flashback.get_studying_resources() OWNER TO flashback;
 
 --
 -- Name: get_user_note_blocks(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
@@ -401,26 +422,6 @@ end; $$;
 
 
 ALTER FUNCTION flashback.get_user_sections(user_index integer, resource_index integer) OWNER TO flashback;
-
---
--- Name: get_user_studying_resources(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
---
-
-CREATE FUNCTION flashback.get_user_studying_resources(user_index integer) RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, completed_sections bigint, last_study timestamp without time zone)
-    LANGUAGE plpgsql
-    AS $$
-begin
-    return query
-    select r.id, sr.subject_id, r.name, count(sc.id), max(st.updated)
-    from flashback.resources r
-    join flashback.subject_resources sr on r.id = sr.resource_id
-    join flashback.sections sc on sc.resource_id = r.id and sc.state = 'completed'::flashback.publication_state
-    join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
-    group by r.id, sr.subject_id, r.name;
-end; $$;
-
-
-ALTER FUNCTION flashback.get_user_studying_resources(user_index integer) OWNER TO flashback;
 
 --
 -- Name: get_user_subjects(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
@@ -18279,7 +18280,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 258	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	7
 378	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	24
 483	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	13
-1349	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	3
 1050	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	4
 84	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	20
 799	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	14
@@ -18704,7 +18704,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 1305	86	open	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	13
 1344	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	18
 333	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	10
-1446	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	1
 174	24	open	\N	2024-07-28 09:44:57.174797	2024-07-28 09:44:57.174797	8
 1375	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	14
 891	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	5
@@ -18791,7 +18790,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 849	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	6
 509	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	39
 1366	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	5
-1348	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	2
 919	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	2
 1067	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	21
 156	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	24
@@ -18801,6 +18799,7 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 1408	94	open	\N	2024-07-28 09:45:10.464301	2024-07-28 09:45:10.464301	10
 641	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	4
 475	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	5
+1348	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	2
 961	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	44
 1433	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	16
 888	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	2
@@ -18978,7 +18977,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 1160	79	open	\N	2024-07-28 09:45:07.799258	2024-07-28 09:45:07.799258	13
 689	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	15
 1338	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	12
-1359	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	13
 982	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	5
 522	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	9
 1079	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	33
@@ -19118,7 +19116,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 403	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	12
 1282	85	ignored	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	2
 256	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	5
-1350	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	4
 654	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	17
 332	35	open	\N	2024-07-28 09:44:58.870197	2024-07-28 09:44:58.870197	9
 628	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	3
@@ -19198,7 +19195,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 1085	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	3
 121	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	9
 239	27	open	\N	2024-07-28 09:44:57.748862	2024-07-28 09:44:57.748862	15
-1353	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	7
 1255	83	writing	\N	2024-07-28 09:45:08.749863	2024-07-28 09:45:08.749863	8
 420	40	writing	\N	2024-07-28 09:44:59.873074	2024-07-28 09:44:59.873074	2
 1438	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	21
@@ -19294,7 +19290,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 771	57	open	\N	2024-07-28 09:45:03.518283	2024-07-28 09:45:03.518283	10
 827	61	open	\N	2024-07-28 09:45:04.229409	2024-07-28 09:45:04.229409	12
 254	30	writing	\N	2024-07-28 09:44:58.142892	2024-07-28 09:44:58.142892	3
-1360	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	14
 377	37	writing	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	23
 952	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	35
 159	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	27
@@ -19308,7 +19303,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 1214	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	46
 20	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	20
 1394	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	12
-1347	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	1
 1341	88	open	\N	2024-07-28 09:45:09.694204	2024-07-28 09:45:09.694204	15
 1061	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	15
 319	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	8
@@ -19338,7 +19332,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 1208	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	40
 511	44	open	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	41
 162	23	open	\N	2024-07-28 09:44:56.96975	2024-07-28 09:44:56.96975	30
-1351	89	writing	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	5
 738	55	open	\N	2024-07-28 09:45:03.195427	2024-07-28 09:45:03.195427	12
 1183	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	15
 797	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	12
@@ -19401,6 +19394,8 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 1448	98	open	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	3
 1176	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	8
 1186	80	open	\N	2024-07-28 09:45:08.243111	2024-07-28 09:45:08.243111	18
+1351	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	5
+1360	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	14
 198	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	12
 17	15	open	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	17
 212	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	8
@@ -19531,6 +19526,12 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 1361	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	15
 1461	98	completed	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	16
 1382	91	completed	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	6
+1446	98	completed	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	1
+1347	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	1
+1349	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	3
+1350	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	4
+1353	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	7
+1359	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	13
 1468	99	open	\N	2024-09-23 20:32:01.286448	2024-09-23 20:32:01.286448	5
 1469	99	open	\N	2024-09-23 20:32:01.286448	2024-09-23 20:32:01.286448	6
 1470	99	open	\N	2024-09-23 20:32:01.286448	2024-09-23 20:32:01.286448	7

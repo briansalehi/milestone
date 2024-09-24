@@ -1,6 +1,6 @@
 -- user::resources
-select * from get_user_studying_resources(1) order by subject_id, last_study asc nulls first, incomplete_sections desc, resource_id;
-select * from get_user_editing_resources(1) order by subject_id, last_study asc nulls first, incomplete_sections desc, resource_id;
+select * from get_studying_resources() order by subject_id, last_study asc nulls first, incomplete_sections desc, resource_id;
+select * from get_editing_resources() order by subject_id, last_study asc nulls first, incomplete_sections desc, resource_id;
 -- user::resources.sections.notes.blocks
 select * from get_resource_study_notes(0) order by section_number, note_id;
 select * from get_resource_editing_notes(0) order by section_number, note_id;
