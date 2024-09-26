@@ -2,37 +2,38 @@ import QtQuick
 
 Item {
     id: controls
-    anchors.horizontalCenter: parent.horizontalCenter
-    width: parent.width * 5 / 10
-    height: parent.height * 10 / 100
 
     property font font
     property color color
     property color text_color
-    signal clicked
+    property bool next_disabled
+    property bool back_disabled
+    signal nextClicked
+    signal backClicked
 
-    Row {
-        spacing: 15
-        anchors.fill: parent
+    ControlButton {
+        id: back
+        size: parent.width / 3
+        text: "Back"
+        color: controls.color
+        default_color: controls.color
+        font: controls.font
+        text_color: controls.text_color
+        disabled: controls.back_disabled
+        anchors.top: parent.top
+        onClicked: { controls.backClicked(); }
+    }
 
-        ControlButton {
-            id: back
-            size: parent.width / 3
-            text: "Back"
-            color: controls.color
-            font: controls.font
-            text_color: controls.text_color
-            onClicked: { controls.clicked(); }
-        }
-
-        ControlButton {
-            id: next
-            size: parent.width / 3
-            text: "Next"
-            color: controls.color
-            font: controls.font
-            text_color: controls.text_color
-            onClicked: { controls.clicked(); }
-        }
+    ControlButton {
+        id: next
+        size: parent.width / 3
+        text: "Next"
+        color: controls.color
+        default_color: controls.color
+        font: controls.font
+        text_color: controls.text_color
+        disabled: controls.next_disabled
+        anchors.bottom: parent.bottom
+        onClicked: { controls.nextClicked(); }
     }
 }

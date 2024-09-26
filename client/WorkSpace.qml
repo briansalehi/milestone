@@ -21,6 +21,16 @@ Item {
     property int selected_section_id
     property int selected_note_id
 
+    function next_page()
+    {
+        console.log("next pushed");
+    }
+
+    function back_page()
+    {
+        stack.pop(StackView.Immediate);
+    }
+
     StackView {
         id: stack
         anchors.fill: parent
@@ -29,16 +39,6 @@ Item {
 
     Database {
         id: database
-    }
-
-    SpaceControl {
-        id: controls
-        color: workspace.color
-        text_color: workspace.text_color
-        anchors.top: parent.top
-        anchors.bottom: workspace.top
-        font: workspace.font
-        onClicked: { }
     }
 
     Component {
@@ -212,36 +212,13 @@ Item {
                     onLoaded: {
                         item.heading = heading;
                         item.blocks = blocks;
+                        // note_id
+                        // state
+                        // creation
+                        // last_update
                     }
                 }
             }
-
-            /*
-            Item {
-                height: studying_note_view.height * 20 / 100
-                width: studying_note_view.width
-
-                Row {
-                    ControlButton {
-                        text: "Previous"
-                        disabled: true
-                        color: workspace.color
-                        font: workspace.font
-                        size: 80
-                        text_color: "white"
-                    }
-
-                    ControlButton {
-                        text: "Next"
-                        disabled: true
-                        color: workspace.color
-                        font: workspace.font
-                        size: 80
-                        text_color: "white"
-                    }
-                }
-            }
-            */
         }
     }
 
@@ -256,6 +233,10 @@ Item {
 
             property string heading
             property string blocks
+            // note_id
+            // state
+            // creation
+            // last_update
 
             Rectangle {
                 id: head
@@ -311,12 +292,6 @@ Item {
                     }
                 }
             }
-            // note_id_value: note_id
-            // heading_value: heading
-            // state_value: state
-            // creation_value: creation
-            // last_update_value: last_update
-            // blocks_value: blocks
         }
     }
 }

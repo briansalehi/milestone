@@ -3,19 +3,19 @@ import QtQuick
 Rectangle {
     id: button
     width: button.size
-    height: parent.height * 2 / 3
-    anchors.verticalCenter: parent.verticalCenter
+    height: button.size
     radius: 10
-    color: disabled ? Qt.darker(button.color) : button.color
 
     property string text
     property font font
     property int size
-    property color color
     property color text_color
     property bool disabled
+    property color default_color
 
     signal clicked
+
+    color: disabled ? Qt.darker(button.color) : button.color
 
     Text {
         text: button.text
@@ -38,13 +38,13 @@ Rectangle {
         onEntered: {
             if (!button.disabled)
             {
-                parent.color = Qt.lighter(button.color);
+                parent.color = Qt.lighter(button.default_color);
             }
         }
         onExited: {
             if (!button.disabled)
             {
-                parent.color = button.color;
+                parent.color = button.default_color;
             }
         }
     }
