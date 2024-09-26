@@ -197,84 +197,29 @@ Item {
     Component {
         id: studying_notes
 
-        ListView {
-            id: studying_note_list
+        SwipeView {
+            id: studying_note_view
             spacing: 10
-            model: database.section_studying_notes(selected_note_id)
+            orientation: Qt.Horizontal
 
-            delegate: Item {
-                id: note
-                height: ListView.view.height
-                width: ListView.view.width
+            Repeater {
+                id: repeater
+                model: database.section_studying_notes(selected_note_id)
 
-                Rectangle {
-                    id: head
-                    color: workspace.color
-                    radius: 20
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    height: head_text.implicitHeight + 30
-
-                    Text {
-                        id: head_text
-                        text: heading
-                        anchors.fill: parent
-                        anchors.margins: 30
-                        verticalAlignment: Text.AlignVCenter
-                        horizontalAlignment: Text.AlignLeft
-                        wrapMode: Text.WordWrap
-                        font {
-                            family: workspace.font.family
-                            pixelSize: workspace.font.pixelSize * 70 / 100
-                        }
-                        color: workspace.text_color
+                Loader {
+                    active: SwipeView.isCurrentItem || SwipeView.isNextItem || SwipeView.isPreviousItem
+                    sourceComponent: note_model
+                    onLoaded: {
+                        item.heading = heading;
+                        item.blocks = blocks;
                     }
                 }
-
-                Rectangle {
-                    id: body
-                    color: workspace.color
-                    radius: 20
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: head.bottom
-                    anchors.topMargin: 20
-                    anchors.bottom: parent.bottom
-
-                    Flickable {
-                        anchors.fill: parent
-                        contentWidth: parent.width
-                        contentHeight: parent.height - 30
-                        clip: true
-
-                        Text {
-                            id: blocks_text
-                            text: blocks
-                            anchors.fill: parent
-                            anchors.margins: 30
-                            verticalAlignment: Text.AlignLeft
-                            horizontalAlignment: Text.AlignTop
-                            wrapMode: Text.WordWrap
-                            font {
-                                family: workspace.font.family
-                                pixelSize: workspace.font.pixelSize * 70 / 100
-                            }
-                            color: workspace.text_color
-                        }
-                    }
-                }
-                // note_id_value: note_id
-                // heading_value: heading
-                // state_value: state
-                // creation_value: creation
-                // last_update_value: last_update
-                // blocks_value: blocks
             }
 
+            /*
             Item {
-                height: studying_note_list.height * 20 / 100
-                width: studying_note_list.width
+                height: studying_note_view.height * 20 / 100
+                width: studying_note_view.width
 
                 Row {
                     ControlButton {
@@ -296,6 +241,82 @@ Item {
                     }
                 }
             }
+            */
+        }
+    }
+
+    Component {
+        id: note_model
+
+        Item {
+            id: note_placeholder
+
+            height: parent.height
+            width: parent.width
+
+            property string heading
+            property string blocks
+
+            Rectangle {
+                id: head
+                color: workspace.color
+                radius: 20
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: head_text.implicitHeight + 30
+
+                Text {
+                    id: head_text
+                    text: note_placeholder.heading
+                    anchors.fill: parent
+                    anchors.margins: 30
+                    verticalAlignment: Text.AlignVCenter
+                    horizontalAlignment: Text.AlignLeft
+                    wrapMode: Text.WordWrap
+                    font {
+                        family: workspace.font.family
+                        pixelSize: workspace.font.pixelSize * 70 / 100
+                    }
+                    color: workspace.text_color
+                }
+            }
+
+            Rectangle {
+                id: body
+                color: workspace.color
+                radius: 20
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: head.bottom
+                anchors.topMargin: 20
+                anchors.bottom: parent.bottom
+
+                ScrollView {
+                    anchors.fill: parent
+                    anchors.margins: 30
+                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
+                    TextArea {
+                        id: blocks_text
+                        text: note_placeholder.blocks
+                        verticalAlignment: Text.AlignLeft
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignTop
+                        font {
+                            family: workspace.font.family
+                            pixelSize: workspace.font.pixelSize * 60 / 100
+                        }
+                        color: workspace.text_color
+                    }
+                }
+            }
+            // note_id_value: note_id
+            // heading_value: heading
+            // state_value: state
+            // creation_value: creation
+            // last_update_value: last_update
+            // blocks_value: blocks
         }
     }
 }
