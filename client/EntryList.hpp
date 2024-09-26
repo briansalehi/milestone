@@ -16,9 +16,9 @@ class EntryList : public QAbstractListModel
 public:
     enum EntryRole
     {
-        HeadlineRole = Qt::UserRole + 1,
-        DesignatorRole,
-        IdRole
+        Headline = Qt::UserRole + 1,
+        Designator,
+        Id
     };
 
     explicit EntryList(QObject *parent = nullptr);

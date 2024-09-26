@@ -6,13 +6,14 @@ Rectangle {
     height: parent.height * 2 / 3
     anchors.verticalCenter: parent.verticalCenter
     radius: 10
-    color: button.color
+    color: disabled ? Qt.darker(button.color) : button.color
 
     property string text
     property font font
     property int size
     property color color
-    property color text_color: "white"
+    property color text_color
+    property bool disabled
 
     signal clicked
 
@@ -31,8 +32,20 @@ Rectangle {
     MouseArea {
         anchors.fill: parent
         hoverEnabled: true
-        onClicked: { button.clicked(); }
-        onEntered: { parent.color = Qt.lighter(button.color); }
-        onExited: { parent.color = button.color; }
+        onClicked: {
+            button.clicked();
+        }
+        onEntered: {
+            if (!button.disabled)
+            {
+                parent.color = Qt.lighter(button.color);
+            }
+        }
+        onExited: {
+            if (!button.disabled)
+            {
+                parent.color = button.color;
+            }
+        }
     }
 }

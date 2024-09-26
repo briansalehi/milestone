@@ -10,10 +10,17 @@ Item {
     property font font
     property int size
 
-    Page {
-        anchors.fill: parent
+    property int note_id_value
+    property string heading_value
+    property string state_value
+    property string creation_value
+    property string last_update_value
+    property string blocks_value
 
-        text: note.text
+    BasicPage {
+        id: page
+
+        heading: note.heading_value
         color: note.color
         text_color: note.text_color
         font: note.font

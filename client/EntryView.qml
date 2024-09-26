@@ -11,10 +11,9 @@ Item {
     property string designator_text
     property color designator_color
     property bool doubleClicked: false
-
+    property int id_number
     signal selected
 
-    property int id_number
 
     Rectangle {
         anchors.fill: parent

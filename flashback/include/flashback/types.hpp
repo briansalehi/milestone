@@ -7,6 +7,7 @@ enum class publication_state
     open,
     writing,
     completed,
+    revised,
     validated,
     approved,
     released,

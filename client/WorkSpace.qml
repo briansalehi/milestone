@@ -2,11 +2,12 @@ import QtQuick
 import QtQuick.Controls
 import Flashback.Database
 import Flashback.EntryList
+import Flashback.NoteModel
 
 Item {
     id: workspace
     anchors.top: parent.top
-    anchors.topMargin: parent.height * 20 / 100
+    anchors.topMargin: parent.height * 10 / 100
     anchors.bottom: parent.bottom
     anchors.bottomMargin: parent.height * 10 / 100
     anchors.left: parent.left
@@ -17,11 +18,17 @@ Item {
     property font font
     property color color
     property color text_color
+    property int selected_section_id
+    property int selected_note_id
 
     StackView {
         id: stack
         anchors.fill: parent
         initialItem: menu
+    }
+
+    Database {
+        id: database
     }
 
     SpaceControl {
@@ -63,54 +70,11 @@ Item {
         id: practice
 
         ListView {
-            id: list
-
-            Database {
-                id: database;
-            }
-
+            id: practice_list
+            spacing: 10
             model: database.subjects()
-            spacing: 10
 
             delegate: EntryView {
-                id: entry
-                color: workspace.color
-                font {
-                    family: workspace.font.family
-                    pixelSize: workspace.font.pixelSize * 70 / 100
-                }
-                headline_text: headline
-                heading_color: "white"
-                designator_text: designator
-                designator_color: "white"
-                width: ListView.view.width
-                onSelected: {
-                    var selected_entry = list.itemAtIndex(index);
-
-                    if (selected_entry)
-                    {
-                        console.log("selected", selected_entry.headline_text)
-                    }
-                }
-            }
-        }
-    }
-
-    Component {
-        id: study
-
-        ListView {
-            id: list
-
-            Database {
-                id: database
-            }
-
-            model: database.studying_resources()
-            spacing: 10
-
-            delegate: EntryView {
-                id: entry
                 color: workspace.color
                 font {
                     family: workspace.font.family
@@ -123,11 +87,43 @@ Item {
                 id_number: id
                 width: ListView.view.width
                 onSelected: {
-                    var selected_entry = list.itemAtIndex(index);
+                    var selected_entry = practice_list.itemAtIndex(index);
 
                     if (selected_entry)
                     {
-                        console.log("selected", selected_entry.headline_text)
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: study
+
+        ListView {
+            id: study_list
+            spacing: 10
+            model: database.studying_resources()
+
+            delegate: EntryView {
+                color: workspace.color
+                font {
+                    family: workspace.font.family
+                    pixelSize: workspace.font.pixelSize * 70 / 100
+                }
+                headline_text: headline
+                heading_color: "white"
+                designator_text: designator
+                designator_color: "white"
+                id_number: id
+                width: ListView.view.width
+                onSelected: {
+                    var selected_entry = study_list.itemAtIndex(index);
+
+                    if (selected_entry)
+                    {
+                        selected_section_id = selected_entry.id_number;
+                        stack.push(studying_sections, {}, StackView.Immediate);
                     }
                 }
             }
@@ -138,17 +134,42 @@ Item {
         id: edit
 
         ListView {
-            id: list
-
-            Database {
-                id: database;
-            }
-
-            model: database.editing_resources()
+            id: edit_list
             spacing: 10
+            model: database.editing_resources()
 
             delegate: EntryView {
-                id: entry
+                color: workspace.color
+                font {
+                    family: workspace.font.family
+                    pixelSize: workspace.font.pixelSize * 70 / 100
+                }
+                headline_text: headline
+                heading_color: "white"
+                designator_text: designator
+                id_number: id
+                designator_color: "white"
+                width: ListView.view.width
+                onSelected: {
+                    var selected_entry = edit_list.itemAtIndex(index);
+
+                    if (selected_entry)
+                    {
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: studying_sections
+
+        ListView {
+            id: studying_section_list
+            spacing: 10
+            model: database.get_studying_sections(selected_section_id)
+
+            delegate: EntryView {
                 color: workspace.color
                 font {
                     family: workspace.font.family
@@ -158,48 +179,123 @@ Item {
                 heading_color: "white"
                 designator_text: designator
                 designator_color: "white"
+                id_number: id
                 width: ListView.view.width
                 onSelected: {
-                    var selected_entry = list.itemAtIndex(index);
+                    var selected_entry = studying_section_list.itemAtIndex(index);
 
                     if (selected_entry)
                     {
-                        console.log("selected", selected_entry.headline_text)
+                        selected_note_id = selected_entry.id_number;
+                        stack.push(studying_notes, {}, StackView.Immediate);
                     }
                 }
             }
         }
     }
 
-    /*
-    ListView {
-        id: list
-        visible: false
-        anchors.top: parent.top
-        anchors.bottom: page_control.top
-        anchors.bottomMargin: parent.height * 2 / 100
-        anchors.left: parent.left
-        anchors.right: parent.right
-        model: workspace.entries
-        spacing: 10
+    Component {
+        id: studying_notes
 
-        delegate: EntryView {
-            id: entry
-            background_color: entry_color
-            foreground_color: "white"
-            entry_font: workspace.entry_font
-            font_size: entry_font_size
-            headline_text: headline
-            designator_text: designator
-            width: ListView.view.width
-            onClicked: { page_control.visible = true; }
+        ListView {
+            id: studying_note_list
+            spacing: 10
+            model: database.section_studying_notes(selected_note_id)
+
+            delegate: Item {
+                id: note
+                height: ListView.view.height
+                width: ListView.view.width
+
+                Rectangle {
+                    id: head
+                    color: workspace.color
+                    radius: 20
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    height: head_text.implicitHeight + 30
+
+                    Text {
+                        id: head_text
+                        text: heading
+                        anchors.fill: parent
+                        anchors.margins: 30
+                        verticalAlignment: Text.AlignVCenter
+                        horizontalAlignment: Text.AlignLeft
+                        wrapMode: Text.WordWrap
+                        font {
+                            family: workspace.font.family
+                            pixelSize: workspace.font.pixelSize * 70 / 100
+                        }
+                        color: workspace.text_color
+                    }
+                }
+
+                Rectangle {
+                    id: body
+                    color: workspace.color
+                    radius: 20
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: head.bottom
+                    anchors.topMargin: 20
+                    anchors.bottom: parent.bottom
+
+                    Flickable {
+                        anchors.fill: parent
+                        contentWidth: parent.width
+                        contentHeight: parent.height - 30
+                        clip: true
+
+                        Text {
+                            id: blocks_text
+                            text: blocks
+                            anchors.fill: parent
+                            anchors.margins: 30
+                            verticalAlignment: Text.AlignLeft
+                            horizontalAlignment: Text.AlignTop
+                            wrapMode: Text.WordWrap
+                            font {
+                                family: workspace.font.family
+                                pixelSize: workspace.font.pixelSize * 70 / 100
+                            }
+                            color: workspace.text_color
+                        }
+                    }
+                }
+                // note_id_value: note_id
+                // heading_value: heading
+                // state_value: state
+                // creation_value: creation
+                // last_update_value: last_update
+                // blocks_value: blocks
+            }
+
+            Item {
+                height: studying_note_list.height * 20 / 100
+                width: studying_note_list.width
+
+                Row {
+                    ControlButton {
+                        text: "Previous"
+                        disabled: true
+                        color: workspace.color
+                        font: workspace.font
+                        size: 80
+                        text_color: "white"
+                    }
+
+                    ControlButton {
+                        text: "Next"
+                        disabled: true
+                        color: workspace.color
+                        font: workspace.font
+                        size: 80
+                        text_color: "white"
+                    }
+                }
+            }
         }
     }
-
-    SpaceMenu {
-        id: menu
-        visible: false
-    }
-
-    */
 }

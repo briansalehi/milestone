@@ -4,6 +4,7 @@
 #include <Database.hpp>
 #include <EntryList.hpp>
 #include <Entry.hpp>
+#include <NoteModel.hpp>
 
 int main(int argc, char *argv[])
 {
@@ -11,6 +12,8 @@ int main(int argc, char *argv[])
 
     qmlRegisterType<Database>("Flashback.Database", 1, 0, "Database");
     qmlRegisterType<EntryList>("Flashback.EntryList", 1, 0, "EntryList");
+    qmlRegisterType<NoteModel>("Flashback.NoteModel", 1, 0, "NoteModel");
+    qmlRegisterType<Note>("Flashback.Note", 1, 0, "Note");
     qmlRegisterType<Entry>("Flashback.Entry", 1, 0, "Entry");
 
     QQmlApplicationEngine engine;

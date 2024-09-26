@@ -17,7 +17,7 @@
 //#include <QtNetworkAuth/QAbstractOAuthReplyHandler>
 
 #include <EntryList.hpp>
-#include <Entry.hpp>
+#include <NoteModel.hpp>
 #include <flashback/flashback.hpp>
 #include <flashback/subject.hpp>
 
@@ -31,6 +31,9 @@ public:
     Q_INVOKABLE EntryList* subjects();
     Q_INVOKABLE EntryList* studying_resources();
     Q_INVOKABLE EntryList* editing_resources();
+    Q_INVOKABLE EntryList* get_studying_sections(std::uint64_t const resource_id);
+    Q_INVOKABLE EntryList* editing_sections(std::uint64_t const resource_id);
+    Q_INVOKABLE NoteModel* section_studying_notes(std::uint64_t const section_id);
 
 signals:
 
