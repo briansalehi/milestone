@@ -1,11 +1,14 @@
 # Miletsone
 
-Knowledge training application.
+Technical references training program
 
 ## Introduction
 
-Using Flashback you can write technical notes in order to frequently review them and
-practice the subjects of your interest, so that you are always ready for a challenge.
+- Select technical subjects you are interested in
+- Find a reference to learn that subject
+- Write notes while reading
+- Make progress throughout your readings by reviewing previous notes first
+- Practice topics within each subject until you fully master all the details
 
 ## License
 
