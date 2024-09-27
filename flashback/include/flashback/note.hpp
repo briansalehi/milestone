@@ -1,7 +1,7 @@
 #pragma once
 
 #include <flashback/types.hpp>
-#include <flashback/note_block.hpp>
+#include <flashback/block.hpp>
 #include <string>
 #include <cstdint>
 #include <chrono>
@@ -24,6 +24,6 @@ struct note
     publication_state state;
     std::chrono::time_point<std::chrono::system_clock> creation;
     std::chrono::time_point<std::chrono::system_clock> last_update;
-    std::vector<note_block> blocks;
+    std::vector<block> blocks;
 };
 } // flashback

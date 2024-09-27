@@ -11,6 +11,7 @@ class Entry : public QObject
 
 public:
     explicit Entry(QObject *parent = nullptr);
+    explicit Entry(quint64 const id, QString const headline, QString const designator);
 
     Entry(Entry const& copy);
     Entry& operator=(Entry const& copy);
@@ -24,8 +25,8 @@ public:
     void designator(QString sections);
     QString designator() const;
 
-    void id(int const value);
-    int id() const;
+    void id(quint64 const value);
+    quint64 id() const;
 
 signals:
     void headlineChanged();
@@ -35,5 +36,5 @@ signals:
 private:
     QString m_headline;
     QString m_designator;
-    int m_id;
+    quint64 m_id;
 };

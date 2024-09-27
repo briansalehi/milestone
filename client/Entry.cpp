@@ -6,6 +6,14 @@ Entry::Entry(QObject *parent)
 {
 }
 
+Entry::Entry(const quint64 id, const QString headline, const QString designator)
+    : QObject{nullptr}
+    , m_id{id}
+    , m_headline{std::move(headline)}
+    , m_designator{std::move(designator)}
+{
+}
+
 Entry::Entry(Entry const& copy)
     : QObject{nullptr}
     , m_headline{copy.m_headline}
@@ -66,13 +74,13 @@ QString Entry::designator() const
     return m_designator;
 }
 
-void Entry::id(const int value)
+void Entry::id(const quint64 value)
 {
     m_id = value;
     emit idChanged();
 }
 
-int Entry::id() const
+quint64 Entry::id() const
 {
     return m_id;
 }

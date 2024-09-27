@@ -36,17 +36,5 @@ Item {
                 menu.spaceSelected("study");
             }
         }
-
-        Space {
-            id: edit
-            text: "Edit"
-            font: menu.font
-            text_color: menu.text_color
-            color: menu.color
-            preferred_size: menu.space_size
-            onClicked: {
-                menu.spaceSelected("edit");
-            }
-        }
     }
 }

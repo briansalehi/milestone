@@ -8,15 +8,15 @@
 
 namespace flashback
 {
-struct note_block
+struct block
 {
-    constexpr note_block() = default;
-    constexpr note_block(note_block const&) = default;
-    constexpr note_block(note_block&&) noexcept = default;
-    constexpr note_block& operator=(note_block const&) = default;
-    constexpr note_block& operator=(note_block&&) noexcept = default;
+    constexpr block() = default;
+    constexpr block(block const&) = default;
+    constexpr block(block&&) noexcept = default;
+    constexpr block& operator=(block const&) = default;
+    constexpr block& operator=(block&&) noexcept = default;
 
-    constexpr auto operator<=>(note_block const&) const noexcept = default;
+    constexpr auto operator<=>(block const&) const noexcept = default;
 
     std::uint64_t id;
     std::uint32_t position;

@@ -10,62 +10,62 @@ Note::Note(QObject *parent)
 
 Note::Note(const flashback::note &note)
 {
-    this->note = note;
+    m_note = note;
 }
 
 Note::Note(flashback::note &&note)
 {
-    this->note = std::move(note);
+    m_note = std::move(note);
 }
 
 Note::Note(const Note &other)
-    : note{other.note}
+    : m_note{other.m_note}
 {
 }
 
 Note &Note::operator=(const Note &other)
 {
-    note = other.note;
+    m_note = other.m_note;
     return *this;
 }
 
 Note::Note(Note &&other) noexcept
-    : note{std::move(other.note)}
+    : m_note{std::move(other.m_note)}
 {
 }
 
 Note& Note::operator=(Note&& other) noexcept
 {
-    note = std::move(other.note);
+    m_note = std::move(other.m_note);
     return *this;
 }
 
 
 quint64 Note::id() const
 {
-    return note.id;
+    return m_note.id;
 }
 
 void Note::id(const quint64 &id)
 {
-    note.id = id;
+    m_note.id = id;
 }
 
 QString Note::heading() const
 {
-    return QString::fromStdString(note.heading);
+    return QString::fromStdString(m_note.heading);
 }
 
 void Note::heading(const QString &heading)
 {
-    note.heading = heading.toStdString();
+    m_note.heading = heading.toStdString();
 }
 
 QString Note::state() const
 {
     QString current_state{};
 
-    switch (note.state)
+    switch (m_note.state)
     {
     using flashback::publication_state;
     case publication_state::open: current_state = "open"; break;
@@ -83,19 +83,19 @@ QString Note::state() const
 
 void Note::state(const QString &state)
 {
-    if (state == "open") note.state = flashback::publication_state::open;
-    else if (state == "writing") note.state = flashback::publication_state::writing;
-    else if (state == "completed") note.state = flashback::publication_state::completed;
-    else if (state == "revised") note.state = flashback::publication_state::revised;
-    else if (state == "approved") note.state = flashback::publication_state::approved;
-    else if (state == "validated") note.state = flashback::publication_state::validated;
-    else if (state == "released") note.state = flashback::publication_state::released;
-    else if (state == "ignored") note.state = flashback::publication_state::ignored;
+    if (state == "open") m_note.state = flashback::publication_state::open;
+    else if (state == "writing") m_note.state = flashback::publication_state::writing;
+    else if (state == "completed") m_note.state = flashback::publication_state::completed;
+    else if (state == "revised") m_note.state = flashback::publication_state::revised;
+    else if (state == "approved") m_note.state = flashback::publication_state::approved;
+    else if (state == "validated") m_note.state = flashback::publication_state::validated;
+    else if (state == "released") m_note.state = flashback::publication_state::released;
+    else if (state == "ignored") m_note.state = flashback::publication_state::ignored;
 }
 
 QString Note::creation() const
 {
-    std::string formated_date{std::format("{}", note.creation)};
+    std::string formated_date{std::format("{}", m_note.creation)};
     return QString::fromStdString(formated_date);
 }
 
@@ -105,7 +105,7 @@ void Note::creation(const QString &creation)
 
 QString Note::lastUpdate() const
 {
-    std::string formated_date{std::format("{}", note.last_update)};
+    std::string formated_date{std::format("{}", m_note.last_update)};
     return QString::fromStdString(formated_date);
 }
 
@@ -116,7 +116,7 @@ void Note::lastUpdate(const QString &lastUpdate)
 QString Note::blocks() const
 {
     std::stringstream buffer;
-    for (flashback::note_block const& block: note.blocks)
+    for (flashback::block const& block: m_note.blocks)
     {
         buffer << block.content << "\n\n";
     }

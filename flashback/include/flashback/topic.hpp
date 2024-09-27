@@ -1,5 +1,6 @@
 #pragma once
 
+#include <flashback/practice.hpp>
 #include <cstdint>
 #include <string>
 #include <chrono>
@@ -21,5 +22,6 @@ struct topic
     std::uint32_t position;
     std::chrono::time_point<std::chrono::system_clock> creation;
     std::chrono::time_point<std::chrono::system_clock> last_update;
+    std::vector<practice> practices;
 };
 } // flashback

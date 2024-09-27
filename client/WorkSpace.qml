@@ -18,8 +18,10 @@ Item {
     property font font
     property color color
     property color text_color
+    property int selected_subject_id
+    property int selected_topic_id
+    property int selected_resource_id
     property int selected_section_id
-    property int selected_note_id
 
     function next_page()
     {
@@ -53,13 +55,10 @@ Item {
                 switch (space)
                 {
                 case "practice":
-                    stack.push(practice, {}, StackView.Immediate);
+                    stack.push(subject_list, {}, StackView.Immediate);
                     break;
                 case "study":
-                    stack.push(study, {}, StackView.Immediate);
-                    break;
-                case "edit":
-                    stack.push(edit, {}, StackView.Immediate);
+                    stack.push(resource_list, {}, StackView.Immediate);
                     break;
                 }
             }
@@ -67,10 +66,10 @@ Item {
     }
 
     Component {
-        id: practice
+        id: subject_list
 
         ListView {
-            id: practice_list
+            id: subjects_list_view
             spacing: 10
             model: database.subjects()
 
@@ -87,10 +86,12 @@ Item {
                 id_number: id
                 width: ListView.view.width
                 onSelected: {
-                    var selected_entry = practice_list.itemAtIndex(index);
+                    var selected_entry = subjects_list_view.itemAtIndex(index);
 
                     if (selected_entry)
                     {
+                        selected_subject_id = selected_entry.id_number;
+                        stack.push(topic_list, {}, StackView.Immediate);
                     }
                 }
             }
@@ -98,12 +99,12 @@ Item {
     }
 
     Component {
-        id: study
+        id: resource_list
 
         ListView {
-            id: study_list
+            id: resources_list_view
             spacing: 10
-            model: database.studying_resources()
+            model: database.resources()
 
             delegate: EntryView {
                 color: workspace.color
@@ -118,12 +119,78 @@ Item {
                 id_number: id
                 width: ListView.view.width
                 onSelected: {
-                    var selected_entry = study_list.itemAtIndex(index);
+                    var selected_entry = resources_list_view.itemAtIndex(index);
+
+                    if (selected_entry)
+                    {
+                        selected_resource_id = selected_entry.id_number;
+                        stack.push(section_list, {}, StackView.Immediate);
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: topic_list
+
+        ListView {
+            id: topics_list_view
+            spacing: 10
+            model: database.topics(selected_subject_id)
+
+            delegate: EntryView {
+                color: workspace.color
+                font {
+                    family: workspace.font.family
+                    pixelSize: workspace.font.pixelSize * 70 / 100
+                }
+                headline_text: headline
+                heading_color: "white"
+                designator_text: designator
+                designator_color: "white"
+                id_number: id
+                width: ListView.view.width
+                onSelected: {
+                    var selected_entry = topics_list_view.itemAtIndex(index);
+
+                    if (selected_entry)
+                    {
+                        selected_topic_id = selected_entry.id_number;
+                        stack.push(practice_list, {}, StackView.Immediate);
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: section_list
+
+        ListView {
+            id: section_list_view
+            spacing: 10
+            model: database.sections(selected_resource_id)
+
+            delegate: EntryView {
+                color: workspace.color
+                font {
+                    family: workspace.font.family
+                    pixelSize: workspace.font.pixelSize * 70 / 100
+                }
+                headline_text: headline
+                heading_color: "white"
+                designator_text: designator
+                designator_color: "white"
+                id_number: id
+                width: ListView.view.width
+                onSelected: {
+                    var selected_entry = section_list_view.itemAtIndex(index);
 
                     if (selected_entry)
                     {
                         selected_section_id = selected_entry.id_number;
-                        stack.push(studying_sections, {}, StackView.Immediate);
+                        stack.push(note_list, {}, StackView.Immediate);
                     }
                 }
             }
@@ -131,84 +198,19 @@ Item {
     }
 
     Component {
-        id: edit
-
-        ListView {
-            id: edit_list
-            spacing: 10
-            model: database.editing_resources()
-
-            delegate: EntryView {
-                color: workspace.color
-                font {
-                    family: workspace.font.family
-                    pixelSize: workspace.font.pixelSize * 70 / 100
-                }
-                headline_text: headline
-                heading_color: "white"
-                designator_text: designator
-                id_number: id
-                designator_color: "white"
-                width: ListView.view.width
-                onSelected: {
-                    var selected_entry = edit_list.itemAtIndex(index);
-
-                    if (selected_entry)
-                    {
-                    }
-                }
-            }
-        }
-    }
-
-    Component {
-        id: studying_sections
-
-        ListView {
-            id: studying_section_list
-            spacing: 10
-            model: database.get_studying_sections(selected_section_id)
-
-            delegate: EntryView {
-                color: workspace.color
-                font {
-                    family: workspace.font.family
-                    pixelSize: workspace.font.pixelSize * 70 / 100
-                }
-                headline_text: headline
-                heading_color: "white"
-                designator_text: designator
-                designator_color: "white"
-                id_number: id
-                width: ListView.view.width
-                onSelected: {
-                    var selected_entry = studying_section_list.itemAtIndex(index);
-
-                    if (selected_entry)
-                    {
-                        selected_note_id = selected_entry.id_number;
-                        stack.push(studying_notes, {}, StackView.Immediate);
-                    }
-                }
-            }
-        }
-    }
-
-    Component {
-        id: studying_notes
+        id: practice_list
 
         SwipeView {
-            id: studying_note_view
             spacing: 10
             orientation: Qt.Horizontal
 
             Repeater {
                 id: repeater
-                model: database.section_studying_notes(selected_note_id)
+                model: database.practices(selected_topic_id)
 
                 Loader {
-                    active: SwipeView.isCurrentItem || SwipeView.isNextItem || SwipeView.isPreviousItem
-                    sourceComponent: note_model
+                    // active: SwipeView.isCurrentItem || SwipeView.isNextItem || SwipeView.isPreviousItem
+                    sourceComponent: page_model
                     onLoaded: {
                         item.heading = heading;
                         item.blocks = blocks;
@@ -223,7 +225,34 @@ Item {
     }
 
     Component {
-        id: note_model
+        id: note_list
+
+        SwipeView {
+            spacing: 10
+            orientation: Qt.Horizontal
+
+            Repeater {
+                id: repeater
+                model: database.notes(selected_section_id)
+
+                Loader {
+                    // active: SwipeView.isCurrentItem || SwipeView.isNextItem || SwipeView.isPreviousItem
+                    sourceComponent: page_model
+                    onLoaded: {
+                        item.heading = heading;
+                        item.blocks = blocks;
+                        // note_id
+                        // state
+                        // creation
+                        // last_update
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: page_model
 
         Item {
             id: note_placeholder

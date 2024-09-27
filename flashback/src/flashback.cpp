@@ -25,7 +25,7 @@ std::string database::address() const
     return m_connection.connection_string();
 }
 
-std::string database::get_section_pattern(std::uint64_t const resource_id)
+std::string database::section_pattern(std::uint64_t const resource_id)
 {
     std::string pattern{};
 
@@ -42,39 +42,7 @@ std::string database::get_section_pattern(std::uint64_t const resource_id)
     return pattern;
 }
 
-std::vector<resource> database::editing_resources()
-{
-    constexpr auto query{R"(
-        select *
-        from get_user_editing_resources(1)
-        order by subject_id, last_study asc nulls first, incomplete_sections desc, resource_id;
-    )"};
-    pqxx::work work(m_connection);
-    pqxx::result result{work.exec(query)};
-    work.commit();
-
-    std::vector<resource> resources;
-    resources.reserve(result.affected_rows());
-
-    for (pqxx::row const& row: result)
-    {
-        resource resource{};
-        resource.id = row.at("resource_id").as<std::uint64_t>();
-        resource.name = row.at("resource").as<std::string>();
-        resource.incomplete_sections = row.at("incomplete_sections").as<std::uint32_t>();
-
-        std::tm datetime{};
-        std::istringstream datetime_stream{row.at("last_study").as<std::string>()};
-        datetime_stream >> std::get_time(&datetime, "%Y-%m-%d %H:%M:%S");
-        resource.last_study = std::chrono::system_clock::from_time_t(std::mktime(&datetime));
-
-        resources.push_back(resource);
-    }
-
-    return resources;
-}
-
-std::vector<resource> database::studying_resources()
+std::vector<resource> database::resources()
 {
     constexpr auto query{R"(
         select *
@@ -140,19 +108,78 @@ std::vector<subject> database::subjects()
     return subjects;
 }
 
-std::vector<section> database::studying_sections(uint64_t const resource_id)
+std::vector<topic> database::topics(std::uint64_t subject_id)
 {
+    constexpr std::uint64_t user_id{1};
+
     std::string query{std::format(R"(
-        select *
-        from get_studying_sections({})
-        order by section_number;
-    )", resource_id)};
-    pqxx::work work(m_connection);
+        select subject_id, topic_id, topic_position, name, practices, updated
+        from flashback.get_user_topics({}, {})
+        order by updated asc nulls first, topic_position asc, practices desc, topic_id asc;
+    )", user_id, subject_id)};
+
+    pqxx::work work{m_connection};
     pqxx::result result{work.exec(query)};
     work.commit();
 
-    //query = R"(select pattern from get_resource_section_pattern({});)";
-    //std::string section_pattern{work.exec1(query).at("pattern").as<std::string>()};
+    std::vector<topic> topics;
+    topics.reserve(result.affected_rows());
+
+    for (pqxx::row const& row: result)
+    {
+        topic topic{};
+        topic.id = row.at("topic_id").as<std::uint64_t>();
+        topic.name = row.at("name").as<std::string>();
+        topic.position = row.at("topic_position").as<std::uint32_t>();
+        topic.practices.clear();
+        topic.practices.resize(row.at("practices").as<std::uint64_t>());
+
+        topics.push_back(topic);
+    }
+
+    return topics;
+}
+
+std::vector<practice> database::practices(std::uint64_t topic_id)
+{
+    constexpr std::uint64_t user_id{1};
+
+    std::string query{std::format(R"(
+        select id, heading, pos, content, updated
+        from flashback.get_user_practices({}, {})
+        order by updated asc nulls first, pos asc, heading asc;
+    )", user_id, topic_id)};
+
+    pqxx::work work{m_connection};
+    pqxx::result result{work.exec(query)};
+    work.commit();
+
+    std::vector<practice> practices;
+    practices.reserve(result.affected_rows());
+
+    for (pqxx::row const& row: result)
+    {
+        practice practice{};
+        practice.id = row.at("id").as<std::uint64_t>();
+        practice.heading = row.at("heading").as<std::string>();
+        practice.position = row.at("pos").as<std::uint32_t>();
+        std::stringstream blocks(row.at("content").as<std::string>());
+        block block{};
+        block.content = blocks.str();
+        practice.blocks.push_back(block);
+
+        practices.push_back(practice);
+    }
+
+    return practices;
+}
+
+std::vector<section> database::sections(uint64_t const resource_id)
+{
+    std::string query{std::format(R"(select * from get_sections({}) order by section_number;)", resource_id)};
+    pqxx::work work(m_connection);
+    pqxx::result result{work.exec(query)};
+    work.commit();
 
     std::vector<section> sections;
     sections.reserve(result.affected_rows());
@@ -177,44 +204,7 @@ std::vector<section> database::studying_sections(uint64_t const resource_id)
     return sections;
 }
 
-std::vector<section> database::editing_sections(uint64_t const resource_id)
-{
-    std::string query{std::format(R"(
-        select *
-        from get_editing_sections({})
-        order by section_number;
-    )", resource_id)};
-    pqxx::work work(m_connection);
-    pqxx::result result{work.exec(query)};
-    work.commit();
-
-    //query = R"(select pattern from get_resource_section_pattern({});)";
-    //std::string section_pattern{work.exec1(query).at("pattern").as<std::string>()};
-
-    std::vector<section> sections;
-    sections.reserve(result.affected_rows());
-
-    for (pqxx::row const& row: result)
-    {
-        section section{};
-        section.id = row.at("section_id").as<std::uint64_t>();
-        section.number = row.at("section_number").as<std::uint32_t>();
-        std::string state{row.at("section_state").as<std::string>()};
-        if (state == "open") section.state = publication_state::open;
-        else if (state == "writing") section.state = publication_state::writing;
-        else if (state == "completed") section.state = publication_state::completed;
-        else if (state == "revised") section.state = publication_state::revised;
-        else if (state == "validated") section.state = publication_state::validated;
-        else if (state == "approved") section.state = publication_state::approved;
-        else if (state == "released") section.state = publication_state::released;
-        else if (state == "ignored") section.state = publication_state::ignored;
-        sections.push_back(section);
-    }
-
-    return sections;
-}
-
-std::vector<note> database::section_studying_notes(const uint64_t section_id)
+std::vector<note> database::notes(const uint64_t section_id)
 {
     std::string query{std::format(R"(select * from get_section_study_notes({}) order by creation asc;)", section_id)};
     pqxx::work work(m_connection);
@@ -240,7 +230,7 @@ std::vector<note> database::section_studying_notes(const uint64_t section_id)
         else if (state == "ignored") note.state = publication_state::ignored;
 
         note.heading = row.at("heading").as<std::string>();
-        note_block block{};
+        block block{};
         block.content = row.at("content").as<std::string>();
         note.blocks.push_back(block);
 
@@ -257,11 +247,6 @@ std::vector<note> database::section_studying_notes(const uint64_t section_id)
     }
 
     return notes;
-}
-
-std::vector<note> database::section_editing_notes(const uint64_t section_id)
-{
-    return {};
 }
 
 } // flashback
