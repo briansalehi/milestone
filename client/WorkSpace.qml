@@ -303,16 +303,21 @@ Item {
                 anchors.bottom: parent.bottom
 
                 ScrollView {
+                    id: body_view
                     anchors.fill: parent
                     anchors.margins: 30
                     ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
-                    TextArea {
+                    TextEdit {
                         id: blocks_text
+                        readOnly: true
+                        focus: false
+                        enabled: false
                         text: note_placeholder.blocks
                         verticalAlignment: Text.AlignLeft
-                        wrapMode: Text.WordWrap
                         horizontalAlignment: Text.AlignTop
+                        wrapMode: Text.WordWrap
+                        width: body_view.width
                         font {
                             family: workspace.font.family
                             pixelSize: workspace.font.pixelSize * 60 / 100
