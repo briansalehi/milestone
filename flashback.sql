@@ -213,24 +213,24 @@ $$;
 ALTER FUNCTION flashback.create_user(username_string character varying, email_string character varying, first_name_string character varying, middle_name_string character varying, last_name_string character varying) OWNER TO flashback;
 
 --
--- Name: get_editing_resources(); Type: FUNCTION; Schema: flashback; Owner: flashback
+-- Name: get_editing_sections(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_editing_resources() RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, incomplete_sections bigint, last_study timestamp without time zone)
+CREATE FUNCTION flashback.get_editing_sections(resource_index integer) RETURNS TABLE(section_id integer, section_number integer, section_state flashback.publication_state)
     LANGUAGE plpgsql
     AS $$
 begin
     return query
-    select r.id, sr.subject_id, r.name, count(sc.id), max(st.updated)
+    select sc.id, sc.number, sc.state as section_state
     from flashback.resources r
-    join flashback.subject_resources sr on r.id = sr.resource_id
-    join flashback.sections sc on sc.resource_id = r.id and sc.state = 'writing'::flashback.publication_state
-    join flashback.studies st on st.section_id = sc.id
-    group by r.id, sr.subject_id, r.name;
-end; $$;
+    join flashback.sections sc on sc.resource_id = r.id and sc.state in ('open'::flashback.publication_state, 'writing'::flashback.publication_state)
+    join flashback.section_name_patterns p on p.id = r.section_pattern_id
+    where sc.resource_id = resource_index
+    group by sc.id, sc.number, sc.state, p.pattern;
+end $$;
 
 
-ALTER FUNCTION flashback.get_editing_resources() OWNER TO flashback;
+ALTER FUNCTION flashback.get_editing_sections(resource_index integer) OWNER TO flashback;
 
 --
 -- Name: get_editor_resources(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
@@ -308,24 +308,74 @@ CREATE FUNCTION flashback.get_section_name_patterns() RETURNS TABLE(id integer, 
 ALTER FUNCTION flashback.get_section_name_patterns() OWNER TO flashback;
 
 --
--- Name: get_studying_resources(); Type: FUNCTION; Schema: flashback; Owner: flashback
+-- Name: get_section_pattern(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_studying_resources() RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, completed_sections bigint, last_study timestamp without time zone)
+CREATE FUNCTION flashback.get_section_pattern(resource_index integer) RETURNS TABLE(pattern character varying)
+    LANGUAGE plpgsql
+    AS $$ begin return query select p.pattern from resources r join section_name_patterns p on r.section_pattern_id = p.id where r.id = resource_index; end; $$;
+
+
+ALTER FUNCTION flashback.get_section_pattern(resource_index integer) OWNER TO flashback;
+
+--
+-- Name: get_section_study_notes(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_section_study_notes(section_index integer) RETURNS TABLE(note_id integer, note_state flashback.publication_state, heading character varying, content text, creation timestamp without time zone, last_update timestamp without time zone)
     LANGUAGE plpgsql
     AS $$
 begin
     return query
-    select  r.id, sr.subject_id, r.name, count(sc.id), max(st.updated)
+    select n.id, n.state, n.heading, string_agg(b.content, E'\n\n' order by b.position, b.updated), n.creation, n.updated
+    from flashback.notes n
+    join flashback.note_blocks b on b.note_id = n.id
+    where n.section_id = section_index
+    group by n.id, n.state, n.heading, n.creation, n.updated;
+end $$;
+
+
+ALTER FUNCTION flashback.get_section_study_notes(section_index integer) OWNER TO flashback;
+
+--
+-- Name: get_sections(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_sections(resource_index integer) RETURNS TABLE(section_id integer, section_number integer, section_state flashback.publication_state)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select sc.id, sc.number, sc.state as section_state
     from flashback.resources r
-    join flashback.subject_resources sr on r.id = sr.resource_id
+    join flashback.sections sc on sc.resource_id = r.id
+    join flashback.section_name_patterns p on p.id = r.section_pattern_id
+    where sc.resource_id = resource_index
+    group by sc.id, sc.number, sc.state, p.pattern;
+end $$;
+
+
+ALTER FUNCTION flashback.get_sections(resource_index integer) OWNER TO flashback;
+
+--
+-- Name: get_studying_sections(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_studying_sections(resource_index integer) RETURNS TABLE(section_id integer, section_number integer, section_state flashback.publication_state)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select sc.id, sc.number, sc.state as section_state
+    from flashback.resources r
     join flashback.sections sc on sc.resource_id = r.id and sc.state = 'completed'::flashback.publication_state
-    join flashback.studies st on st.section_id = sc.id
-    group by r.id, sr.subject_id, r.name;
-end; $$;
+    join flashback.section_name_patterns p on p.id = r.section_pattern_id
+    where sc.resource_id = resource_index
+    group by sc.id, sc.number, sc.state, p.pattern;
+end $$;
 
 
-ALTER FUNCTION flashback.get_studying_resources() OWNER TO flashback;
+ALTER FUNCTION flashback.get_studying_sections(resource_index integer) OWNER TO flashback;
 
 --
 -- Name: get_user_note_blocks(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
@@ -388,15 +438,17 @@ ALTER FUNCTION flashback.get_user_practice_blocks(user_index integer, topic_inde
 -- Name: get_user_practices(integer, integer); Type: FUNCTION; Schema: flashback; Owner: flashback
 --
 
-CREATE FUNCTION flashback.get_user_practices(user_index integer, topic_index integer) RETURNS TABLE(id integer, heading character varying, pos integer, updated timestamp without time zone)
+CREATE FUNCTION flashback.get_user_practices(user_index integer, topic_index integer) RETURNS TABLE(id integer, heading character varying, pos integer, content text, updated timestamp without time zone)
     LANGUAGE plpgsql
     AS $$
 begin
     return query
-    select pr.id, pr.heading, pr.position, p.updated
+    select pr.id, pr.heading, pr.position, string_agg(pb.content, E'\n\n' order by pb.position), p.updated
     from flashback.practices pr
+    join flashback.practice_blocks pb on pb.practice_id = pr.id
     left join flashback.progress p on p.topic_id = pr.topic_id and p.user_id = user_index
-    where pr.topic_id = topic_index;
+    where pr.topic_id = topic_index
+    group by pr.id, pr.heading, pr.position, p.updated;
 end; $$;
 
 
@@ -422,6 +474,26 @@ end; $$;
 
 
 ALTER FUNCTION flashback.get_user_sections(user_index integer, resource_index integer) OWNER TO flashback;
+
+--
+-- Name: get_user_studying_resources(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
+--
+
+CREATE FUNCTION flashback.get_user_studying_resources(user_index integer) RETURNS TABLE(resource_id integer, subject_id integer, resource character varying, completed_sections bigint, last_study timestamp without time zone)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    return query
+    select  r.id, sr.subject_id, r.name, count(sc.id), max(st.updated)
+    from flashback.resources r
+    join flashback.subject_resources sr on r.id = sr.resource_id
+    join flashback.sections sc on sc.resource_id = r.id
+    join flashback.studies st on st.section_id = sc.id and st.user_id = user_index
+    group by r.id, sr.subject_id, r.name;
+end; $$;
+
+
+ALTER FUNCTION flashback.get_user_studying_resources(user_index integer) OWNER TO flashback;
 
 --
 -- Name: get_user_subjects(integer); Type: FUNCTION; Schema: flashback; Owner: flashback
@@ -453,14 +525,13 @@ CREATE FUNCTION flashback.get_user_topics(user_index integer, subject_index inte
     AS $$
 begin
     return query
-    select s.id as subject_id, t.id as topic_id, t.position, t.name, count(pr.*) as practices, p.updated
+    select s.id, t.id, t.position, t.name, count(pr.*), p.updated
     from flashback.subjects s
     join flashback.topics t on t.subject_id = s.id
     join flashback.practices pr on pr.topic_id = t.id
     left join flashback.progress p on p.topic_id = t.id and p.user_id = user_index
     where s.id = subject_index
-    group by s.id, t.id, t.name, p.updated
-    order by p.updated desc nulls first, count(pr.*) desc, s.id, t.position, t.id;
+    group by s.id, t.id, t.position, t.name, p.updated;
 end; $$;
 
 
@@ -478,22 +549,22 @@ CREATE FUNCTION flashback.search_subject(pattern character varying) RETURNS TABL
 ALTER FUNCTION flashback.search_subject(pattern character varying) OWNER TO flashback;
 
 --
--- Name: set_section_as_complete(character varying, character varying); Type: PROCEDURE; Schema: flashback; Owner: flashback
+-- Name: set_section_as_complete(character varying, integer); Type: PROCEDURE; Schema: flashback; Owner: flashback
 --
 
-CREATE PROCEDURE flashback.set_section_as_complete(IN resource_name character varying, IN section_headline character varying)
+CREATE PROCEDURE flashback.set_section_as_complete(IN resource_name character varying, IN section_number integer)
     LANGUAGE plpgsql
     AS $$
 declare resource_index integer;
 declare section_index integer;
 begin
     select id into resource_index from flashback.resources where name = resource_name;
-    select id into section_index from flashback.sections where resource_id = resource_index and headline = section_headline;
+    select id into section_index from flashback.sections where resource_id = resource_index and number = section_number;
     update flashback.sections set state = 'completed' where id = section_index;
 end; $$;
 
 
-ALTER PROCEDURE flashback.set_section_as_complete(IN resource_name character varying, IN section_headline character varying) OWNER TO flashback;
+ALTER PROCEDURE flashback.set_section_as_complete(IN resource_name character varying, IN section_number integer) OWNER TO flashback;
 
 --
 -- Name: user_login(character varying, character varying); Type: FUNCTION; Schema: flashback; Owner: flashback
@@ -18051,9 +18122,10 @@ COPY flashback.resources (id, name, reference, type, created, updated, section_p
 95	Boost.Asio C++ Network Programming 	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
 96	Embedded Linux using Yocto	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
 97	C++ Templates: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
-91	Embedded Linux Full Course by Anisa Institute	\N	course	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	3	\N
 89	C++ Move Semantics: The Complete Guide	https://leanpub.com/cppmove	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
 99	OpenGL and GLSL Fundamentals with C++	https://subscription.packtpub.com/video/game-development/9781838647889	video	2024-09-23 20:32:01.286448	2024-09-23 20:32:01.286448	4	\N
+100	Yocto Project and OpenEmbedded Training Course	https://bootlin.com/training/yocto	course	2024-09-27 08:13:12.835493	2024-09-27 08:13:12.835493	3	Bootlin
+91	Embedded Linux Training Course	https://bootlin.com/training/embedded-linux	course	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	3	Bootlin
 \.
 
 
@@ -18331,7 +18403,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 840	62	open	\N	2024-07-28 09:45:04.316203	2024-07-28 09:45:04.316203	3
 30	16	open	\N	2024-07-28 09:44:55.607323	2024-07-28 09:44:55.607323	7
 521	45	open	\N	2024-07-28 09:45:00.906893	2024-07-28 09:45:00.906893	8
-1378	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	2
 3	15	writing	\N	2024-07-28 09:44:55.45901	2024-07-28 09:44:55.45901	3
 1038	73	writing	\N	2024-07-28 09:45:06.494438	2024-07-28 09:45:06.494438	3
 936	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	19
@@ -18889,7 +18960,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 1140	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	7
 1054	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	8
 792	59	open	\N	2024-07-28 09:45:03.853918	2024-07-28 09:45:03.853918	7
-1381	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	5
 896	66	open	\N	2024-07-28 09:45:04.96819	2024-07-28 09:45:04.96819	10
 651	51	open	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	14
 381	37	open	\N	2024-07-28 09:44:59.43286	2024-07-28 09:44:59.43286	27
@@ -19381,7 +19451,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 202	25	open	\N	2024-07-28 09:44:57.364303	2024-07-28 09:44:57.364303	16
 685	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	11
 905	67	open	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	5
-1379	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	3
 973	69	open	\N	2024-07-28 09:45:05.749702	2024-07-28 09:45:05.749702	12
 610	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	3
 79	19	open	\N	2024-07-28 09:44:56.217196	2024-07-28 09:44:56.217196	15
@@ -19403,7 +19472,6 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 1116	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	16
 1290	85	open	\N	2024-07-28 09:45:09.104434	2024-07-28 09:45:09.104434	10
 1089	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	7
-1380	91	open	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	4
 1070	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	24
 404	38	open	\N	2024-07-28 09:44:59.624804	2024-07-28 09:44:59.624804	13
 1147	78	open	\N	2024-07-28 09:45:07.577903	2024-07-28 09:45:07.577903	14
@@ -19525,13 +19593,13 @@ COPY flashback.sections (id, resource_id, state, reference, created, updated, nu
 1293	86	completed	\N	2024-07-28 09:45:09.295457	2024-07-28 09:45:09.295457	1
 1361	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	15
 1461	98	completed	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	16
-1382	91	completed	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	6
 1446	98	completed	\N	2024-08-18 14:51:01.210115	2024-08-18 14:51:01.210115	1
 1347	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	1
 1349	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	3
 1350	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	4
 1353	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	7
 1359	89	completed	\N	2024-07-28 09:45:09.867651	2024-07-28 09:45:09.867651	13
+1382	100	writing	\N	2024-07-28 09:45:10.124092	2024-07-28 09:45:10.124092	1
 1468	99	open	\N	2024-09-23 20:32:01.286448	2024-09-23 20:32:01.286448	5
 1469	99	open	\N	2024-09-23 20:32:01.286448	2024-09-23 20:32:01.286448	6
 1470	99	open	\N	2024-09-23 20:32:01.286448	2024-09-23 20:32:01.286448	7
@@ -19982,7 +20050,6 @@ COPY flashback.studies (user_id, section_id, updated) FROM stdin;
 1	840	2024-09-23 20:36:18.228435
 1	30	2024-09-23 20:36:18.228435
 1	521	2024-09-23 20:36:18.228435
-1	1378	2024-09-23 20:36:18.228435
 1	936	2024-09-23 20:36:18.228435
 1	324	2024-09-23 20:36:18.228435
 1	981	2024-09-23 20:36:18.228435
@@ -20449,7 +20516,6 @@ COPY flashback.studies (user_id, section_id, updated) FROM stdin;
 1	1140	2024-09-23 20:36:18.228435
 1	1054	2024-09-23 20:36:18.228435
 1	792	2024-09-23 20:36:18.228435
-1	1381	2024-09-23 20:36:18.228435
 1	896	2024-09-23 20:36:18.228435
 1	651	2024-09-23 20:36:18.228435
 1	381	2024-09-23 20:36:18.228435
@@ -20885,7 +20951,6 @@ COPY flashback.studies (user_id, section_id, updated) FROM stdin;
 1	202	2024-09-23 20:36:18.228435
 1	685	2024-09-23 20:36:18.228435
 1	905	2024-09-23 20:36:18.228435
-1	1379	2024-09-23 20:36:18.228435
 1	973	2024-09-23 20:36:18.228435
 1	610	2024-09-23 20:36:18.228435
 1	79	2024-09-23 20:36:18.228435
@@ -20905,7 +20970,6 @@ COPY flashback.studies (user_id, section_id, updated) FROM stdin;
 1	1116	2024-09-23 20:36:18.228435
 1	1290	2024-09-23 20:36:18.228435
 1	1089	2024-09-23 20:36:18.228435
-1	1380	2024-09-23 20:36:18.228435
 1	1070	2024-09-23 20:36:18.228435
 1	404	2024-09-23 20:36:18.228435
 1	1147	2024-09-23 20:36:18.228435
@@ -21104,7 +21168,6 @@ COPY flashback.subject_resources (subject_id, resource_id) FROM stdin;
 7	56
 6	57
 1	58
-8	59
 20	60
 7	61
 3	62
@@ -21115,7 +21178,6 @@ COPY flashback.subject_resources (subject_id, resource_id) FROM stdin;
 6	68
 13	69
 18	70
-8	71
 19	72
 6	73
 5	74
@@ -21140,12 +21202,15 @@ COPY flashback.subject_resources (subject_id, resource_id) FROM stdin;
 9	93
 11	94
 3	95
-8	96
 6	97
 12	4
 3	3
 5	98
 25	99
+26	59
+26	71
+26	96
+26	100
 \.
 
 
@@ -21210,6 +21275,7 @@ COPY flashback.subjects (id, name, creation, updated) FROM stdin;
 23	Vim	2024-07-28 09:44:46.506337	2024-07-28 09:44:46.506337
 24	GoogleTest	2024-09-12 10:59:46.423264	2024-09-12 10:59:46.423264
 25	OpenGL	2024-09-23 17:59:59.23805	2024-09-23 17:59:59.23805
+26	Yocto	2024-09-27 10:13:16.039172	2024-09-27 10:13:16.039172
 \.
 
 
@@ -21819,7 +21885,7 @@ SELECT pg_catalog.setval('flashback.resource_editing_id_seq', 1, false);
 -- Name: resources_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.resources_id_seq', 99, true);
+SELECT pg_catalog.setval('flashback.resources_id_seq', 100, true);
 
 
 --
@@ -21854,7 +21920,7 @@ SELECT pg_catalog.setval('flashback.subject_editing_id_seq', 1, false);
 -- Name: subjects_id_seq; Type: SEQUENCE SET; Schema: flashback; Owner: flashback
 --
 
-SELECT pg_catalog.setval('flashback.subjects_id_seq', 25, true);
+SELECT pg_catalog.setval('flashback.subjects_id_seq', 26, true);
 
 
 --
