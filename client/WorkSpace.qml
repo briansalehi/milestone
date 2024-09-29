@@ -9,7 +9,6 @@ Item {
     anchors.top: parent.top
     anchors.topMargin: parent.height * 10 / 100
     anchors.bottom: parent.bottom
-    anchors.bottomMargin: parent.height * 10 / 100
     anchors.left: parent.left
     anchors.leftMargin: parent.width * 25 / 100
     anchors.right: parent.right
@@ -35,7 +34,11 @@ Item {
 
     StackView {
         id: stack
-        anchors.fill: parent
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: page_indicator.top
+        anchors.bottomMargin: Math.min(20, parent.height * 2 / 100)
         initialItem: menu
     }
 
@@ -230,7 +233,6 @@ Item {
         SwipeView {
             spacing: 10
             orientation: Qt.Horizontal
-
             Repeater {
                 id: repeater
                 model: database.notes(selected_section_id)
@@ -241,12 +243,18 @@ Item {
                     onLoaded: {
                         item.heading = heading;
                         item.blocks = blocks;
+                        page_indicator.page_count = repeater.count
+                        page_indicator.set_page(0);
                         // note_id
                         // state
                         // creation
                         // last_update
                     }
                 }
+            }
+
+            onCurrentIndexChanged: {
+                page_indicator.set_page(currentIndex);
             }
         }
     }
@@ -324,6 +332,50 @@ Item {
                         }
                         color: workspace.text_color
                     }
+                }
+            }
+        }
+    }
+
+    Item {
+        id: page_indicator
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: parent.height * 10 / 100
+
+        property int page_count
+        property var read_pages: []
+
+        function set_page(index) {
+            var item = indicator_repeater.itemAt(index)
+            if (item)
+                item.color = Qt.lighter(workspace.color, 2);
+
+            var current_index = read_pages.indexOf(index)
+            if (current_index !== -1)
+                read_pages.splice(current_index, 1)
+
+            read_pages.forEach(function(page) {
+                indicator_repeater.itemAt(page).color = Qt.lighter(workspace.color, 1.5);
+            });
+
+            read_pages.push(index);
+        }
+
+        Flow {
+            anchors.fill: parent
+            spacing: Math.max(3, parent.width * 1 / 100)
+
+            Repeater {
+                id: indicator_repeater
+                model: page_indicator.page_count
+
+                Rectangle {
+                    width: Math.max(20, parent.width * 2 / 100)
+                    height: width / 2
+                    radius: width / 3
+                    color: workspace.color
                 }
             }
         }
