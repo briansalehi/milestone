@@ -30,6 +30,7 @@ Item {
     function back_page()
     {
         stack.pop(StackView.Immediate);
+        page_indicator.clear();
     }
 
     StackView {
@@ -346,6 +347,10 @@ Item {
 
         property int page_count
         property var read_pages: []
+
+        function clear() {
+            page_count = 0;
+        }
 
         function set_page(index) {
             var item = indicator_repeater.itemAt(index)
