@@ -57,8 +57,9 @@ EntryList* Database::resources()
     {
         Entry entry{};
         entry.headline(QString::fromStdString(resource.name));
-        entry.designator(QString::number(resource.incomplete_sections));
-        entry.designator(QString::number(resource.incomplete_sections));
+        QString incompletes{QString::number(resource.incomplete_sections + resource.completed_sections)};
+        QString total{QString::number(resource.sections.size())};
+        entry.designator(QString{"%1/%2"}.arg(incompletes, total));
         entry.id(resource.id);
 
         if (entry.headline().size() == 0)

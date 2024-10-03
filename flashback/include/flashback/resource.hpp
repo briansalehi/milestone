@@ -20,8 +20,8 @@ struct resource
 
     std::uint64_t id;
     std::string name;
-    std::uint32_t incomplete_sections;
-    std::uint32_t completed_sections;
+    std::uint64_t incomplete_sections;
+    std::uint64_t completed_sections;
     std::chrono::time_point<std::chrono::system_clock> last_study;
     std::vector<section> sections;
 };

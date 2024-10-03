@@ -47,7 +47,7 @@ std::vector<resource> database::resources()
     constexpr auto query{R"(
         select *
         from get_user_studying_resources(1)
-        order by subject_id, last_study asc nulls first, completed_sections desc, resource_id;
+        order by last_study desc nulls last, incomplete_sections desc, completed_sections desc, total_sections desc;
     )"};
     pqxx::work work(m_connection);
     pqxx::result result{work.exec(query)};
@@ -61,7 +61,10 @@ std::vector<resource> database::resources()
         resource resource{};
         resource.id = row.at("resource_id").as<std::uint64_t>();
         resource.name = row.at("resource").as<std::string>();
-        resource.incomplete_sections = row.at("completed_sections").as<std::uint32_t>();
+        resource.completed_sections = row.at("completed_sections").as<std::uint64_t>();
+        resource.incomplete_sections = row.at("incomplete_sections").as<std::uint64_t>();
+
+        resource.sections.resize(row.at("total_sections").as<std::uint64_t>());
 
         std::tm datetime{};
         std::istringstream datetime_stream{row.at("last_study").as<std::string>()};
