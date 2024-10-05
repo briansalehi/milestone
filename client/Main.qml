@@ -144,21 +144,60 @@ ApplicationWindow {
         }
     }
 
-    ControlButton {
+    Rectangle {
         id: back
-        size: parent.width / 3
-        text: "<"
         color: Qt.lighter(window.color)
-        default_color: Qt.lighter(window.color)
-        font: window.font
-        text_color: "white"
-        disabled: false
         anchors.right: workspace.left
         anchors.rightMargin: 30
         anchors.verticalCenter: parent.verticalCenter
-        width: 60
-        height: workspace.height / 3
-        onClicked: { workspace.back_page(); }
+        height: Math.max(100, workspace.height / 4)
+        width: height / 4
+
+        Canvas {
+            anchors.fill: parent
+            onPaint: {
+                var ctx = getContext("2d");
+
+                // Clear the canvas before drawing
+                ctx.clearRect(0, 0, width, height);
+
+                // Begin path for the triangle
+                ctx.beginPath();
+                ctx.moveTo(0, height / 2);  // Top point
+                ctx.lineTo(0, 0);  // Bottom left point
+                ctx.lineTo(width, 0); // Bottom right point
+                ctx.closePath();
+
+                // Fill the triangle with a color
+                ctx.fillStyle = window.color;
+                ctx.fill();
+
+                // Begin path for the triangle
+                ctx.beginPath();
+                ctx.moveTo(0, height / 2);  // Top point
+                ctx.lineTo(0, height);  // Bottom left point
+                ctx.lineTo(width, height); // Bottom right point
+                ctx.closePath();
+
+                // Fill the triangle with a color
+                ctx.fillStyle = window.color;
+                ctx.fill();
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: {
+                    workspace.back_page();
+                }
+                onEntered: {
+                    back.color = Qt.lighter(window.color, 2);
+                }
+                onExited: {
+                    back.color = Qt.lighter(window.color);
+                }
+            }
+        }
     }
 
     WorkSpace {
@@ -168,21 +207,60 @@ ApplicationWindow {
         text_color: "white"
     }
 
-    ControlButton {
+    Rectangle {
         id: next
-        size: parent.width / 3
-        text: ">"
         color: Qt.lighter(window.color)
-        default_color: Qt.lighter(window.color)
-        font: window.font
-        text_color: "white"
-        disabled: false
         anchors.left: workspace.right
         anchors.leftMargin: 30
         anchors.verticalCenter: parent.verticalCenter
-        width: 60
-        height: workspace.height / 3
-        onClicked: { workspace.next_page(); }
+        height: Math.max(100, workspace.height / 4)
+        width: height / 4
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: {
+                workspace.next_page();
+            }
+            onEntered: {
+                next.color = Qt.lighter(window.color, 2);
+            }
+            onExited: {
+                next.color = Qt.lighter(window.color);
+            }
+        }
+
+        Canvas {
+            anchors.fill: parent
+            onPaint: {
+                var ctx = getContext("2d");
+
+                // Clear the canvas before drawing
+                ctx.clearRect(0, 0, width, height);
+
+                // Begin path for the triangle
+                ctx.beginPath();
+                ctx.moveTo(0, 0);  // Top point
+                ctx.lineTo(width, 0);  // Bottom left point
+                ctx.lineTo(width, height / 2); // Bottom right point
+                ctx.closePath();
+
+                // Fill the triangle with a color
+                ctx.fillStyle = window.color;
+                ctx.fill();
+
+                // Begin path for the triangle
+                ctx.beginPath();
+                ctx.moveTo(0, height);  // Top point
+                ctx.lineTo(width, height);  // Bottom left point
+                ctx.lineTo(width, height / 2); // Bottom right point
+                ctx.closePath();
+
+                // Fill the triangle with a color
+                ctx.fillStyle = window.color;
+                ctx.fill();
+            }
+        }
     }
 
     /*
