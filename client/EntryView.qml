@@ -68,6 +68,7 @@ Item {
             }
             onExited: {
                 parent.color = entry.color;
+                entry.doubleClicked = false
             }
         }
     }
