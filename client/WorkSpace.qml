@@ -47,7 +47,6 @@ Item {
         anchors.bottomMargin: Math.min(20, parent.height * 2 / 100)
         initialItem: menu
         onCurrentItemChanged: {
-            console.log(depth);
             if (depth > 1)
             {
                 workspace.showBack();
