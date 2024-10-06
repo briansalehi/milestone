@@ -146,6 +146,7 @@ ApplicationWindow {
 
     Rectangle {
         id: back
+        visible: false
         color: Qt.lighter(window.color)
         anchors.right: workspace.left
         anchors.rightMargin: 30
@@ -205,10 +206,17 @@ ApplicationWindow {
         color: Qt.lighter(window.color)
         font: window.font
         text_color: "white"
+        onShowBack: {
+            back.visible = true
+        }
+        onHideBack: {
+            back.visible = false
+        }
     }
 
     Rectangle {
         id: next
+        visible: false
         color: Qt.lighter(window.color)
         anchors.left: workspace.right
         anchors.leftMargin: 30

@@ -22,6 +22,11 @@ Item {
     property int selected_resource_id
     property int selected_section_id
 
+    signal showBack
+    signal hideBack
+    signal showNext
+    signal hideNext
+
     function next_page()
     {
         console.log("next pushed");
@@ -41,6 +46,17 @@ Item {
         anchors.bottom: page_indicator.top
         anchors.bottomMargin: Math.min(20, parent.height * 2 / 100)
         initialItem: menu
+        onCurrentItemChanged: {
+            console.log(depth);
+            if (depth > 1)
+            {
+                workspace.showBack();
+            }
+            else
+            {
+                workspace.hideBack();
+            }
+        }
     }
 
     Database {
