@@ -1,4 +1,5 @@
 #include <flashback/flashback.hpp>
+#include <stdexcept>
 #include <sstream>
 #include <iomanip>
 #include <ctime>
@@ -250,6 +251,15 @@ std::vector<note> database::notes(const uint64_t section_id)
     }
 
     return notes;
+}
+
+void database::section_study_completed(const uint64_t section_id)
+{
+    constexpr std::uint64_t user_id{1};
+    std::string statement{std::format(R"(call flashback.section_study_completed({}, {});)", user_id, section_id)};
+    pqxx::work work{m_connection};
+    pqxx::result result{work.exec(statement)};
+    work.commit();
 }
 
 } // flashback

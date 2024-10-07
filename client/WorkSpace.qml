@@ -270,7 +270,15 @@ Item {
             }
 
             onCurrentIndexChanged: {
+                var total = count - 1;
                 page_indicator.set_page(currentIndex);
+
+                console.log(currentIndex, total, selected_section_id);
+                // log study completion when reached last section
+                if (total !== 0 && currentIndex === total)
+                {
+                    database.section_study_completed(selected_section_id);
+                }
             }
         }
     }
@@ -377,7 +385,11 @@ Item {
                 read_pages.splice(current_index, 1)
 
             read_pages.forEach(function(page) {
-                indicator_repeater.itemAt(page).color = Qt.lighter(workspace.color, 1.5);
+                var item = indicator_repeater.itemAt(page);
+                if (item)
+                {
+                    item.color = Qt.lighter(workspace.color, 1.5);
+                }
             });
 
             read_pages.push(index);

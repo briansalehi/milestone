@@ -123,3 +123,8 @@ NoteModel* Database::notes(const uint64_t section_id)
 
     return model;
 }
+
+void Database::section_study_completed(const uint64_t section_id)
+{
+    m_database.section_study_completed(section_id);
+}

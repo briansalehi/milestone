@@ -40,6 +40,7 @@ public:
     Q_INVOKABLE EntryList* resources();
     Q_INVOKABLE EntryList* sections(std::uint64_t const resource_id);
     Q_INVOKABLE NoteModel* notes(std::uint64_t const section_id);
+    Q_INVOKABLE void section_study_completed(std::uint64_t const section_id);
 
 signals:
 

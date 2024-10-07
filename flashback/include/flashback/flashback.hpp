@@ -27,6 +27,8 @@ public:
     std::vector<section> sections(std::uint64_t const resource_id);
     std::vector<note> notes(std::uint64_t const section_id);
 
+    void section_study_completed(std::uint64_t const section_id);
+
 private:
     pqxx::connection m_connection;
 };
