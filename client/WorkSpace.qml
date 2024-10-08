@@ -273,7 +273,6 @@ Item {
                 var total = count - 1;
                 page_indicator.set_page(currentIndex);
 
-                console.log(currentIndex, total, selected_section_id);
                 // log study completion when reached last section
                 if (total !== 0 && currentIndex === total)
                 {
