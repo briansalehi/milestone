@@ -369,17 +369,19 @@ Item {
 
         property int page_count
         property var read_pages: []
+        property int current_index
 
         function clear() {
             page_count = 0;
+            read_pages = [];
         }
 
         function set_page(index) {
             var item = indicator_repeater.itemAt(index)
             if (item)
-                item.color = Qt.lighter(workspace.color, 2);
+                item.color = Qt.lighter(workspace.color, 2.2);
 
-            var current_index = read_pages.indexOf(index)
+            current_index = read_pages.indexOf(index)
             if (current_index !== -1)
                 read_pages.splice(current_index, 1)
 
@@ -406,7 +408,7 @@ Item {
                     width: Math.max(20, parent.width * 2 / 100)
                     height: width / 2
                     radius: width / 3
-                    color: workspace.color
+                    color: Qt.darker(workspace.color, 1.1)
                 }
             }
         }
