@@ -18,6 +18,7 @@ ApplicationWindow {
     property int font_medium: 32
     property int font_regular: 24
     property int font_small: 18
+    property color font_color: 'lightgray'
 
     Rectangle {
         id: titlebar
@@ -30,10 +31,10 @@ ApplicationWindow {
         Text {
             id: window_name
             text: "Milestone"
-            color: "white"
+            color: window.font_color
             width: Math.max(100, parent.width * 10 / 100)
             elide: Text.ElideRight
-            font.pixelSize: font_small
+            font.pixelSize: window.font_small
             anchors.left: parent.left
             anchors.leftMargin: 20
             anchors.verticalCenter: parent.verticalCenter
@@ -57,9 +58,9 @@ ApplicationWindow {
 
                 Text {
                     text: "-"
-                    color: "white"
+                    color: window.font_color
                     font.family: window.font.family
-                    font.pixelSize: font_small
+                    font.pixelSize: window.font_small
                     font.bold: true
                     anchors.fill: parent
                     verticalAlignment: Text.AlignVCenter
@@ -82,9 +83,9 @@ ApplicationWindow {
 
                 Text {
                     text: window.visibility === Window.Maximized ? "o" : "O"
-                    color: "white"
+                    color: window.font_color
                     font.family: window.font.family
-                    font.pixelSize: font_small
+                    font.pixelSize: window.font_small
                     font.bold: true
                     anchors.fill: parent
                     verticalAlignment: Text.AlignVCenter
@@ -107,9 +108,9 @@ ApplicationWindow {
 
                 Text {
                     text: "X"
-                    color: "white"
+                    color: window.font_color
                     font.family: window.font.family
-                    font.pixelSize: font_small
+                    font.pixelSize: window.font_small
                     font.bold: true
                     anchors.fill: parent
                     verticalAlignment: Text.AlignVCenter
@@ -205,7 +206,7 @@ ApplicationWindow {
         id: workspace
         color: Qt.lighter(window.color)
         font: window.font
-        text_color: "white"
+        text_color: window.font_color
         onShowBack: {
             back.visible = true
         }

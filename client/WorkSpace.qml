@@ -99,9 +99,9 @@ Item {
                     pixelSize: workspace.font.pixelSize * 70 / 100
                 }
                 headline_text: headline
-                heading_color: "white"
+                heading_color: workspace.text_color
                 designator_text: designator
-                designator_color: "white"
+                designator_color: workspace.text_color
                 id_number: id
                 width: ListView.view.width
                 onSelected: {
@@ -132,9 +132,9 @@ Item {
                     pixelSize: workspace.font.pixelSize * 70 / 100
                 }
                 headline_text: headline
-                heading_color: "white"
+                heading_color: workspace.text_color
                 designator_text: designator
-                designator_color: "white"
+                designator_color: workspace.text_color
                 id_number: id
                 width: ListView.view.width
                 onSelected: {
@@ -165,9 +165,9 @@ Item {
                     pixelSize: workspace.font.pixelSize * 70 / 100
                 }
                 headline_text: headline
-                heading_color: "white"
+                heading_color: workspace.text_color
                 designator_text: designator
-                designator_color: "white"
+                designator_color: workspace.text_color
                 id_number: id
                 width: ListView.view.width
                 onSelected: {
@@ -198,9 +198,9 @@ Item {
                     pixelSize: workspace.font.pixelSize * 70 / 100
                 }
                 headline_text: headline
-                heading_color: "white"
+                heading_color: workspace.text_color
                 designator_text: designator
-                designator_color: "white"
+                designator_color: workspace.text_color
                 id_number: id
                 width: ListView.view.width
                 onSelected: {
