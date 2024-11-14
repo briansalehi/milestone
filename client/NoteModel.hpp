@@ -27,9 +27,9 @@ public:
     NoteModel(NoteModel&& other) noexcept;
     NoteModel& operator=(NoteModel&& other) noexcept;
 
-    int rowCount(const QModelIndex &parent) const override;
+    int rowCount(QModelIndex const& parent) const override;
 
-    QVariant data(const QModelIndex &index, int role) const override;
+    QVariant data(QModelIndex const& index, int role) const override;
 
     QHash<int, QByteArray> roleNames() const override;
 

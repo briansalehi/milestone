@@ -1,7 +1,7 @@
 #pragma once
 
-#include <QObject>
 #include <flashback/note.hpp>
+#include <QObject>
 
 class Note : public QObject
 {

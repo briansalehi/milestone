@@ -128,3 +128,51 @@ void Database::section_study_completed(const uint64_t section_id)
 {
     m_database.section_study_completed(section_id);
 }
+
+BoxModel *Database::note_blocks(const uint64_t note_id)
+{
+    BoxModel* model{new BoxModel{}};
+
+    for (flashback::block const& block: m_database.note_blocks(note_id))
+    {
+        Box box;
+
+        box.id(block.id);
+        box.position(block.position);
+        box.content(QString::fromStdString(block.content));
+        box.language(QString::fromStdString(block.language));
+        box.last_update();
+
+        switch (block.type)
+        {
+        case flashback::block_type::code: box.type("Code");
+        case flashback::block_type::text: box.type("Text");
+        }
+    }
+
+    return model;
+}
+
+BoxModel *Database::practice_blocks(const uint64_t practice_id)
+{
+    BoxModel* model{new BoxModel{}};
+
+    for (flashback::block const& block: m_database.practice_blocks(practice_id))
+    {
+        Box box;
+
+        box.id(block.id);
+        box.position(block.position);
+        box.content(QString::fromStdString(block.content));
+        box.language(QString::fromStdString(block.language));
+        box.last_update();
+
+        switch (block.type)
+        {
+        case flashback::block_type::code: box.type("Code");
+        case flashback::block_type::text: box.type("Text");
+        }
+    }
+
+    return model;
+}

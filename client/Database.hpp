@@ -19,6 +19,7 @@
 #include <EntryList.hpp>
 #include <NoteModel.hpp>
 #include <PracticeModel.hpp>
+#include <BoxModel.hpp>
 #include <flashback/flashback.hpp>
 #include <flashback/subject.hpp>
 #include <flashback/topic.hpp>
@@ -41,6 +42,8 @@ public:
     Q_INVOKABLE EntryList* sections(std::uint64_t const resource_id);
     Q_INVOKABLE NoteModel* notes(std::uint64_t const section_id);
     Q_INVOKABLE void section_study_completed(std::uint64_t const section_id);
+    Q_INVOKABLE BoxModel* note_blocks(std::uint64_t const note_id);
+    Q_INVOKABLE BoxModel* practice_blocks(std::uint64_t const practice_id);
 
 signals:
 

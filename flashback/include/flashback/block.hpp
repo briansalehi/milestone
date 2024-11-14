@@ -22,7 +22,7 @@ struct block
     std::uint32_t position;
     std::string content;
     block_type type;
-    char language[10];
+    std::string language;
     std::chrono::time_point<std::chrono::system_clock> last_update;
     std::vector<std::string> references;
 };

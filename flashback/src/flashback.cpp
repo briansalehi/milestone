@@ -178,6 +178,39 @@ std::vector<practice> database::practices(std::uint64_t topic_id)
     return practices;
 }
 
+std::vector<block> database::practice_blocks(uint64_t practice_id)
+{
+    std::string query{std::format(R"(select * from get_practice_blocks({}) order by block_position asc;)", practice_id)};
+    pqxx::work work(m_connection);
+    pqxx::result result{work.exec(query)};
+    work.commit();
+
+    std::vector<block> blocks;
+    blocks.reserve(result.affected_rows());
+
+    for (pqxx::row const& row: result)
+    {
+        block block{};
+        block.id = row.at("id").as<std::uint64_t>();
+        block.position = row.at("block_position").as<std::uint32_t>();
+        block.content = row.at("content").as<std::string>();
+        block.language = row.at("language").as<std::string>();
+
+        std::string type{row.at("block_type").as<std::string>()};
+        if (type == "code") block.type = block_type::code;
+        else if (type == "text") block.type = block_type::text;
+
+        std::tm datetime{};
+        std::istringstream last_update_stream{row.at("last_update").as<std::string>()};
+        last_update_stream >> std::get_time(&datetime, "%Y-%m-%d %H:%M:%S");
+        block.last_update = std::chrono::system_clock::from_time_t(std::mktime(&datetime));
+
+        blocks.push_back(block);
+    }
+
+    return blocks;
+}
+
 std::vector<section> database::sections(uint64_t const resource_id)
 {
     std::string query{std::format(R"(select * from get_sections({}) order by section_number;)", resource_id)};
@@ -251,6 +284,39 @@ std::vector<note> database::notes(const uint64_t section_id)
     }
 
     return notes;
+}
+
+std::vector<block> database::note_blocks(const uint64_t note_id)
+{
+    std::string query{std::format(R"(select * from get_note_blocks({}) order by block_position asc;)", note_id)};
+    pqxx::work work(m_connection);
+    pqxx::result result{work.exec(query)};
+    work.commit();
+
+    std::vector<block> blocks;
+    blocks.reserve(result.affected_rows());
+
+    for (pqxx::row const& row: result)
+    {
+        block block{};
+        block.id = row.at("id").as<std::uint64_t>();
+        block.position = row.at("block_position").as<std::uint32_t>();
+        block.content = row.at("content").as<std::string>();
+        block.language = row.at("language").as<std::string>();
+
+        std::string type{row.at("block_type").as<std::string>()};
+        if (type == "code") block.type = block_type::code;
+        else if (type == "text") block.type = block_type::text;
+
+        std::tm datetime{};
+        std::istringstream last_update_stream{row.at("last_update").as<std::string>()};
+        last_update_stream >> std::get_time(&datetime, "%Y-%m-%d %H:%M:%S");
+        block.last_update = std::chrono::system_clock::from_time_t(std::mktime(&datetime));
+
+        blocks.push_back(block);
+    }
+
+    return blocks;
 }
 
 void database::section_study_completed(const uint64_t section_id)

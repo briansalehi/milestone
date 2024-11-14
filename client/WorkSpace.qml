@@ -232,7 +232,7 @@ Item {
                     sourceComponent: page_model
                     onLoaded: {
                         item.heading = heading;
-                        item.blocks = blocks;
+                        item.blocks = database.note_blocks(item.id);
                         // note_id
                         // state
                         // creation
@@ -258,7 +258,7 @@ Item {
                     sourceComponent: page_model
                     onLoaded: {
                         item.heading = heading;
-                        item.blocks = blocks;
+                        item.blocks = database.note_blocks(item.id);
                         page_indicator.page_count = repeater.count
                         page_indicator.set_page(0);
                         // note_id
@@ -291,36 +291,20 @@ Item {
             height: parent.height
             width: parent.width
 
+            property int block_id
             property string heading
-            property string blocks
-            // note_id
+            property var blocks
             // state
             // creation
             // last_update
 
-            Rectangle {
+            Box {
                 id: head
-                color: workspace.color
-                radius: 20
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                height: head_text.implicitHeight + 30
-
-                Text {
-                    id: head_text
-                    text: note_placeholder.heading
-                    anchors.fill: parent
-                    anchors.margins: 30
-                    verticalAlignment: Text.AlignVCenter
-                    horizontalAlignment: Text.AlignLeft
-                    wrapMode: Text.WordWrap
-                    font {
-                        family: workspace.font.family
-                        pixelSize: workspace.font.pixelSize * 70 / 100
-                    }
-                    color: workspace.text_color
-                }
+                color: workspace.text_color
+                background: workspace.color
+                text: note_placeholder.heading
+                font.family: workspace.font.family
+                font.pixelSize: workspace.font.pixelSize * 70 / 100
             }
 
             Rectangle {
@@ -339,21 +323,19 @@ Item {
                     anchors.margins: 30
                     ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
-                    TextEdit {
-                        id: blocks_text
-                        readOnly: true
-                        focus: false
-                        enabled: false
-                        text: note_placeholder.blocks
-                        verticalAlignment: Text.AlignLeft
-                        horizontalAlignment: Text.AlignTop
-                        wrapMode: Text.WordWrap
-                        width: body_view.width
-                        font {
-                            family: workspace.font.family
-                            pixelSize: workspace.font.pixelSize * 60 / 100
+                    Repeater {
+                        id: page_body_repeater
+                        model: blocks
+
+                        Loader {
+                            sourceComponent: Box {
+                                color: workspace.text_color
+                                background: workspace.color
+                                text: blocks.text
+                                font.family: workspace.font.family
+                                font.pixelSize: workspace.font.pixelSize * 70 / 100
+                            }
                         }
-                        color: workspace.text_color
                     }
                 }
             }
