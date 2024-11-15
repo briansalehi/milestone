@@ -18,7 +18,7 @@ ApplicationWindow {
     property int font_medium: 32
     property int font_regular: 24
     property int font_small: 18
-    property color font_color: 'lightgray'
+    property color font_color: '#B0B0B0'
 
     Rectangle {
         id: titlebar

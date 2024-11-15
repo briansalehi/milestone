@@ -328,6 +328,7 @@ Item {
 
                 block_id: page.block_id
                 content: page.heading
+                type: 'Text'
             }
 
             Rectangle {
@@ -346,30 +347,35 @@ Item {
                     anchors.fill: parent
                     anchors.margins: parent.radius * 80 / 100
 
-                    Column {
+                    SwipeView {
                         spacing: 20
+                        orientation: Qt.Vertical
                         anchors.fill: parent
                         anchors.margins: 20
 
-                        Repeater {
-                            model: page.model
-                            delegate: Box {
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                font.family: workspace.font.family
-                                font.pixelSize: workspace.font.pixelSize * 55 / 100
-                                radius: body_frame.radius * 80 / 100
-                                text_color: workspace.text_color
-                                background: workspace.foreground
-                                vertical_alignment: Text.AlignTop
-                                horizontal_alignment: Text.AlignLeft
+                        Column {
+                            spacing: 20
 
-                                block_id: model.block_id
-                                position: model.position
-                                content: model.content
-                                type: model.type
-                                language: model.language
-                                last_update: model.last_update
+                            Repeater {
+                                model: page.model
+                                delegate: Box {
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    font.family: workspace.font.family
+                                    font.pixelSize: workspace.font.pixelSize * 55 / 100
+                                    radius: body_frame.radius * 80 / 100
+                                    text_color: workspace.text_color
+                                    background: workspace.foreground
+                                    vertical_alignment: Text.AlignTop
+                                    horizontal_alignment: Text.AlignLeft
+
+                                    block_id: model.block_id
+                                    position: model.position
+                                    content: model.content
+                                    type: model.type
+                                    language: model.language
+                                    last_update: model.last_update
+                                }
                             }
                         }
                     }

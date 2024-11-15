@@ -2,7 +2,6 @@ import QtQuick
 
 Item {
     id: box
-    height: text.implicitHeight * 2
 
     /* database properties */
     property int block_id
@@ -33,11 +32,15 @@ Item {
             color: box.text_color
             verticalAlignment: box.vertical_alignment
             horizontalAlignment: box.horizontal_alignment
-            wrapMode: Text.WordWrap
             anchors.fill: parent
-            anchors.margins: box.height * 20 / 100
-            readOnly: true
+            anchors.margins: 15
             focus: false
+            onContentSizeChanged: box.height = contentHeight + 30
+
+            wrapMode: box.type === 'Code' ? Text.NoWrap : Text.WordWrap
+            textFormat: box.type === 'Text' ? TextEdit.MarkdownText : TextEdit.PlainText
+
+            readOnly: true
             enabled: false
         }
     }
