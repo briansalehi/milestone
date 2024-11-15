@@ -3,6 +3,7 @@ import QtQuick.Controls
 import Flashback.Database
 import Flashback.EntryList
 import Flashback.NoteModel
+import Flashback.BoxModel
 
 Item {
     id: workspace
@@ -15,7 +16,8 @@ Item {
     anchors.rightMargin: parent.width * 25 / 100
 
     property font font
-    property color color
+    property color foreground
+    property color background
     property color text_color
     property int selected_subject_id
     property int selected_topic_id
@@ -67,7 +69,7 @@ Item {
 
         SpaceMenu {
             id: space
-            color: workspace.color
+            color: workspace.foreground
             font: workspace.font
             text_color: workspace.text_color
             onSpaceSelected: function(space) {
@@ -93,7 +95,7 @@ Item {
             model: database.subjects()
 
             delegate: EntryView {
-                color: workspace.color
+                color: workspace.foreground
                 font {
                     family: workspace.font.family
                     pixelSize: workspace.font.pixelSize * 70 / 100
@@ -126,7 +128,7 @@ Item {
             model: database.resources()
 
             delegate: EntryView {
-                color: workspace.color
+                color: workspace.foreground
                 font {
                     family: workspace.font.family
                     pixelSize: workspace.font.pixelSize * 70 / 100
@@ -159,7 +161,7 @@ Item {
             model: database.topics(selected_subject_id)
 
             delegate: EntryView {
-                color: workspace.color
+                color: workspace.foreground
                 font {
                     family: workspace.font.family
                     pixelSize: workspace.font.pixelSize * 70 / 100
@@ -192,7 +194,7 @@ Item {
             model: database.sections(selected_resource_id)
 
             delegate: EntryView {
-                color: workspace.color
+                color: workspace.foreground
                 font {
                     family: workspace.font.family
                     pixelSize: workspace.font.pixelSize * 70 / 100
@@ -231,8 +233,14 @@ Item {
                     // active: SwipeView.isCurrentItem || SwipeView.isNextItem || SwipeView.isPreviousItem
                     sourceComponent: page_model
                     onLoaded: {
+                        item.block_id = id;
+                        item.model = database.practice_blocks(id);
                         item.heading = heading;
-                        item.blocks = database.note_blocks(item.id);
+                        item.font.family = workspace.font.family
+                        item.font.pixelSize = workspace.font.pixelSize * 70 / 100
+                        item.text_color = workspace.text_color
+                        item.background = workspace.background
+                        item.foreground = workspace.foreground
                         // note_id
                         // state
                         // creation
@@ -249,6 +257,7 @@ Item {
         SwipeView {
             spacing: 10
             orientation: Qt.Horizontal
+
             Repeater {
                 id: repeater
                 model: database.notes(selected_section_id)
@@ -257,8 +266,15 @@ Item {
                     // active: SwipeView.isCurrentItem || SwipeView.isNextItem || SwipeView.isPreviousItem
                     sourceComponent: page_model
                     onLoaded: {
+                        item.block_id = id;
+                        item.model = database.note_blocks(id);
                         item.heading = heading;
-                        item.blocks = database.note_blocks(item.id);
+                        item.font.family = workspace.font.family
+                        item.font.pixelSize = workspace.font.pixelSize * 70 / 100
+                        item.text_color = workspace.text_color
+                        item.background = workspace.background
+                        item.foreground = workspace.foreground
+
                         page_indicator.page_count = repeater.count
                         page_indicator.set_page(0);
                         // note_id
@@ -286,30 +302,36 @@ Item {
         id: page_model
 
         Item {
-            id: note_placeholder
-
+            id: page
             height: parent.height
             width: parent.width
 
             property int block_id
             property string heading
-            property var blocks
-            // state
-            // creation
-            // last_update
+            property font font
+            property var model
+            property color text_color
+            property color background
+            property color foreground
 
             Box {
                 id: head
-                color: workspace.text_color
-                background: workspace.color
-                text: note_placeholder.heading
-                font.family: workspace.font.family
-                font.pixelSize: workspace.font.pixelSize * 70 / 100
+                text_color: page.text_color
+                background: page.foreground
+                font: page.font
+                radius: 20
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                vertical_alignment: Text.AlignVCenter
+                horizontal_alignment: Text.AlignLeft
+
+                block_id: page.block_id
+                content: page.heading
             }
 
             Rectangle {
-                id: body
-                color: workspace.color
+                color: page.foreground
                 radius: 20
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -317,23 +339,37 @@ Item {
                 anchors.topMargin: 20
                 anchors.bottom: parent.bottom
 
-                ScrollView {
-                    id: body_view
+                Rectangle {
+                    id: body_frame
+                    color: page.background
+                    radius: parent.radius * 80 / 100
                     anchors.fill: parent
-                    anchors.margins: 30
-                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                    anchors.margins: parent.radius * 80 / 100
 
-                    Repeater {
-                        id: page_body_repeater
-                        model: blocks
+                    Column {
+                        spacing: 20
+                        anchors.fill: parent
+                        anchors.margins: 20
 
-                        Loader {
-                            sourceComponent: Box {
-                                color: workspace.text_color
-                                background: workspace.color
-                                text: blocks.text
+                        Repeater {
+                            model: page.model
+                            delegate: Box {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
                                 font.family: workspace.font.family
-                                font.pixelSize: workspace.font.pixelSize * 70 / 100
+                                font.pixelSize: workspace.font.pixelSize * 55 / 100
+                                radius: body_frame.radius * 80 / 100
+                                text_color: workspace.text_color
+                                background: workspace.foreground
+                                vertical_alignment: Text.AlignTop
+                                horizontal_alignment: Text.AlignLeft
+
+                                block_id: model.block_id
+                                position: model.position
+                                content: model.content
+                                type: model.type
+                                language: model.language
+                                last_update: model.last_update
                             }
                         }
                     }
@@ -361,7 +397,7 @@ Item {
         function set_page(index) {
             var item = indicator_repeater.itemAt(index)
             if (item)
-                item.color = Qt.lighter(workspace.color, 2.2);
+                item.color = Qt.lighter(workspace.foreground, 2.2);
 
             current_index = read_pages.indexOf(index)
             if (current_index !== -1)
@@ -371,7 +407,7 @@ Item {
                 var item = indicator_repeater.itemAt(page);
                 if (item)
                 {
-                    item.color = Qt.lighter(workspace.color, 1.5);
+                    item.color = Qt.lighter(workspace.foreground, 1.5);
                 }
             });
 
@@ -390,7 +426,7 @@ Item {
                     width: Math.max(20, parent.width * 2 / 100)
                     height: width / 2
                     radius: width / 3
-                    color: Qt.darker(workspace.color, 1.1)
+                    color: Qt.darker(workspace.foreground, 1.1)
                 }
             }
         }

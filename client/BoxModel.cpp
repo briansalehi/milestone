@@ -55,7 +55,7 @@ QVariant BoxModel::data(const QModelIndex &index, int role) const
 QHash<int, QByteArray> BoxModel::roleNames() const
 {
     QHash<int, QByteArray> roles{};
-    roles[Id] = "id";
+    roles[Id] = "block_id";
     roles[Position] = "position";
     roles[Content] = "content";
     roles[Type] = "type";

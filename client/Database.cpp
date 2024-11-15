@@ -148,6 +148,8 @@ BoxModel *Database::note_blocks(const uint64_t note_id)
         case flashback::block_type::code: box.type("Code");
         case flashback::block_type::text: box.type("Text");
         }
+
+        model->addBox(box);
     }
 
     return model;
@@ -172,6 +174,8 @@ BoxModel *Database::practice_blocks(const uint64_t practice_id)
         case flashback::block_type::code: box.type("Code");
         case flashback::block_type::text: box.type("Text");
         }
+
+        model->addBox(box);
     }
 
     return model;

@@ -204,7 +204,8 @@ ApplicationWindow {
 
     WorkSpace {
         id: workspace
-        color: Qt.lighter(window.color)
+        foreground: Qt.lighter(window.color)
+        background: window.color
         font: window.font
         text_color: window.font_color
         onShowBack: {

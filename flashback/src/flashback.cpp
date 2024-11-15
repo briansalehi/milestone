@@ -196,7 +196,7 @@ std::vector<block> database::practice_blocks(uint64_t practice_id)
         block.content = row.at("content").as<std::string>();
         block.language = row.at("language").as<std::string>();
 
-        std::string type{row.at("block_type").as<std::string>()};
+        std::string type{row.at("type").as<std::string>()};
         if (type == "code") block.type = block_type::code;
         else if (type == "text") block.type = block_type::text;
 
@@ -304,7 +304,7 @@ std::vector<block> database::note_blocks(const uint64_t note_id)
         block.content = row.at("content").as<std::string>();
         block.language = row.at("language").as<std::string>();
 
-        std::string type{row.at("block_type").as<std::string>()};
+        std::string type{row.at("type").as<std::string>()};
         if (type == "code") block.type = block_type::code;
         else if (type == "text") block.type = block_type::text;
 

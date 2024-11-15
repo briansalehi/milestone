@@ -2,32 +2,40 @@ import QtQuick
 
 Item {
     id: box
+    height: text.implicitHeight * 2
 
-    property string text
-    property color color
+    /* database properties */
+    property int block_id
+    property int position
+    property string content
+    property string type
+    property string language
+    property string last_update
+
+    /* customization properties */
+    property color text_color
     property color background
     property font font
+    property int radius
+    property var vertical_alignment
+    property var horizontal_alignment
 
     Rectangle {
-        id: box_area
         color: box.background
-        radius: 20
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        height: box_text.implicitHeight + 30
+        radius: box.radius
+        anchors.fill: parent
 
         TextEdit {
-            id: box_text
-            text: box.text
+            id: text
+            text: box.content
             font.family: box.font.family
-            font.pixelSize: box.font.pixelSize * 60 / 100
-            color: box.color
-            verticalAlignment: Text.AlignLeft
-            horizontalAlignment: Text.AlignTop
+            font.pixelSize: box.font.pixelSize
+            color: box.text_color
+            verticalAlignment: box.vertical_alignment
+            horizontalAlignment: box.horizontal_alignment
             wrapMode: Text.WordWrap
             anchors.fill: parent
-            anchors.margins: 30
+            anchors.margins: box.height * 20 / 100
             readOnly: true
             focus: false
             enabled: false
