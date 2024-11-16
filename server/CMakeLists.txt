@@ -1,5 +1,3 @@
-find_package(Boost CONFIG REQUIRED COMPONENTS program_options system)
-
 file(GLOB source_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} src/*.cpp)
 
 add_executable(server ${source_files})

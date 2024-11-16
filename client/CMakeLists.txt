@@ -1,5 +1,3 @@
-find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Network)
-
 file(GLOB source_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
 file(GLOB qml_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.qml)
 
