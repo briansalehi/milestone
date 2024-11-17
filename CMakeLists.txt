@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.30)
-project(Milestone VERSION 0.7 LANGUAGES CXX DESCRIPTION "Technical References Training Program")
+project(Milestone VERSION 0.8 LANGUAGES CXX DESCRIPTION "Technical References Training Program")
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
