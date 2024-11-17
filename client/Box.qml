@@ -38,7 +38,7 @@ Item {
             onContentSizeChanged: box.height = contentHeight + 30
 
             wrapMode: box.type === 'Code' ? Text.NoWrap : Text.WordWrap
-            textFormat: box.type === 'Text' ? TextEdit.MarkdownText : TextEdit.PlainText
+            // textFormat: box.type === 'Text' ? TextEdit.MarkdownText : TextEdit.PlainText
 
             readOnly: true
             enabled: false

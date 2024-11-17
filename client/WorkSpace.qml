@@ -347,14 +347,18 @@ Item {
                     anchors.fill: parent
                     anchors.margins: parent.radius * 80 / 100
 
-                    SwipeView {
-                        spacing: 20
-                        orientation: Qt.Vertical
+                    Flickable {
                         anchors.fill: parent
                         anchors.margins: 20
+                        flickableDirection: Flickable.VerticalFlick
+                        contentWidth: width
+                        contentHeight: page_container.height
+                        clip: true
 
                         Column {
-                            spacing: 20
+                            id: page_container
+                            width: parent.width
+                            spacing: 10
 
                             Repeater {
                                 model: page.model
