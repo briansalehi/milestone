@@ -9,10 +9,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib ${CMAKE_INSTALL_PREFIX}/lib64)
 #set(CMAKE_CXX_CLANG_TIDY /home/brian/.local/bin/clang-tidy -checks=-*,readability-*)
 
-find_package(GTest 1.14.0 REQUIRED)
-find_package(Boost 1.80.0 REQUIRED COMPONENTS program_options system)
+find_package(GTest 1.14.0 CONFIG REQUIRED)
+find_package(Boost 1.80.0 CONFIG REQUIRED COMPONENTS program_options system)
 find_package(PostgreSQL 16.4.0 REQUIRED)
-find_package(Qt6 6.8.0 REQUIRED COMPONENTS Core Qml Quick Network)
+find_package(Qt6 6.8.0 CONFIG REQUIRED COMPONENTS Core Qml Quick Network)
 
 enable_testing()
 
