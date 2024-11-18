@@ -329,6 +329,7 @@ Item {
                 block_id: page.block_id
                 content: page.heading
                 type: 'Text'
+                format: TextEdit.RichText
             }
 
             Rectangle {

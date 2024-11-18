@@ -307,6 +307,7 @@ std::vector<block> database::note_blocks(const uint64_t note_id)
         std::string type{row.at("type").as<std::string>()};
         if (type == "code") block.type = block_type::code;
         else if (type == "text") block.type = block_type::text;
+        else throw std::runtime_error("block type not retrieved");
 
         std::tm datetime{};
         std::istringstream last_update_stream{row.at("last_update").as<std::string>()};

@@ -145,8 +145,9 @@ BoxModel *Database::note_blocks(const uint64_t note_id)
 
         switch (block.type)
         {
-        case flashback::block_type::code: box.type("Code");
-        case flashback::block_type::text: box.type("Text");
+        case flashback::block_type::code: box.type("Code"); break;
+        case flashback::block_type::text: box.type("Text"); break;
+        default: throw std::runtime_error("block type not specified");
         }
 
         model->addBox(box);

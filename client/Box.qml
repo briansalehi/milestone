@@ -13,6 +13,7 @@ Item {
 
     /* customization properties */
     property color text_color
+    property var format
     property color background
     property font font
     property int radius
@@ -38,7 +39,23 @@ Item {
             onContentSizeChanged: box.height = contentHeight + 30
 
             wrapMode: box.type === 'Code' ? Text.NoWrap : Text.WordWrap
-            // textFormat: box.type === 'Text' ? TextEdit.MarkdownText : TextEdit.PlainText
+            Component.onCompleted: {
+                switch (box.type)
+                {
+                case 'Text': ;
+                    text.textFormat = box.format ? box.format : TextEdit.MarkdownText
+                    break
+                case 'Code': ;
+                    text.textFormat = TextEdit.PlainText
+                    break
+                default:
+                    if (box.block_id > 0)
+                    {
+                        console.log('block_id:', box.block_id, 'does not have either of type Code or Text, assuming plain text.')
+                    }
+                    text.textFormat = TextEdit.PlainText
+                }
+            }
 
             readOnly: true
             enabled: false
