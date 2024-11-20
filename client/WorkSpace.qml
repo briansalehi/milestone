@@ -126,7 +126,6 @@ Item {
             id: resources_list_view
             spacing: 10
             model: database.resources()
-
             delegate: EntryView {
                 color: workspace.foreground
                 font {
