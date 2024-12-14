@@ -38,7 +38,8 @@ Item {
             focus: false
             onContentSizeChanged: box.height = contentHeight + 30
 
-            wrapMode: box.type === 'Code' ? Text.NoWrap : Text.WordWrap
+            wrapMode: box.type === 'Code' ? Text.WrapAnywhere : Text.WordWrap
+
             Component.onCompleted: {
                 switch (box.type)
                 {
