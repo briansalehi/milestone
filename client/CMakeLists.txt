@@ -20,7 +20,7 @@ include(CMakePackageConfigHelpers)
 write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/ClientConfig.cmake COMPATIBILITY SameMajorVersion)
 
 install(TARGETS milestone EXPORT Client COMPONENT Client:: RUNTIME CONFIGURATIONS Release MinSizeRel)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ClientConfig.cmake CONFIGURATIONS Release MinSizeRel DESTINATION ${CMAKE_INSTALL_DIRS}/milestone/cmake)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ClientConfig.cmake CONFIGURATIONS Release MinSizeRel DESTINATION ${CMAKE_INSTALL_LIBDIR}/milestone/cmake)
 
 set(CPACK_PACKAGE_VENDOR "Brian Salehi <briansalehi@proton.me>")
 set(CPACK_PACKAGE_CONTACT "briansalehi@proton.me")

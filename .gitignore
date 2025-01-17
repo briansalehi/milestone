@@ -78,3 +78,9 @@ CMakeLists.txt.user*
 html/
 build*/
 .cache/
+_CPack_Packages/
+*.zip
+*.tar.*
+*.deb
+*.rpm
+*.tar
