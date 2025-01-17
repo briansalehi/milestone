@@ -19,6 +19,14 @@ ApplicationWindow {
     property int font_regular: 24
     property int font_small: 18
     property color font_color: '#B0B0B0'
+    property int short_side: height > width ? width : height
+    property int long_side:  height < width ? width : height
+    property string orientation: height > width ? "vertical" : "horizontal"
+
+    function percent(value, percentage)
+    {
+        return value * percentage / 100;
+    }
 
     Rectangle {
         id: titlebar
@@ -26,7 +34,7 @@ ApplicationWindow {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: parent.height * 4 / 100
+        height: window.percent(parent.height, 4)
 
         Text {
             id: window_name
@@ -150,10 +158,10 @@ ApplicationWindow {
         visible: false
         color: Qt.lighter(window.color)
         anchors.right: workspace.left
-        anchors.rightMargin: 30
+        anchors.rightMargin: 20
         anchors.verticalCenter: parent.verticalCenter
-        height: Math.max(100, workspace.height / 4)
-        width: height / 4
+        height: Math.max(100, window.percent(window.long_side, 15))
+        width: window.percent(back.height, 25)
 
         Canvas {
             anchors.fill: parent
@@ -208,6 +216,15 @@ ApplicationWindow {
         background: window.color
         font: window.font
         text_color: window.font_color
+
+        anchors.top: parent.top
+        anchors.topMargin: window.orientation == "vertical" ? window.percent(window.long_side, 8) : window.percent(window.short_side, 10)
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.leftMargin: window.orientation == "vertical" ? window.percent(window.short_side, 10) : window.percent(window.long_side, 20)
+        anchors.right: parent.right
+        anchors.rightMargin: window.orientation == "vertical" ? window.percent(window.short_side, 10) : window.percent(window.long_side, 20)
+
         onShowBack: {
             back.visible = true
         }
@@ -221,10 +238,10 @@ ApplicationWindow {
         visible: false
         color: Qt.lighter(window.color)
         anchors.left: workspace.right
-        anchors.leftMargin: 30
+        anchors.leftMargin: 20
         anchors.verticalCenter: parent.verticalCenter
-        height: Math.max(100, workspace.height / 4)
-        width: height / 4
+        height: Math.max(100, window.percent(window.long_side, 15))
+        width: window.percent(back.height, 25)
 
         MouseArea {
             anchors.fill: parent
@@ -272,17 +289,4 @@ ApplicationWindow {
             }
         }
     }
-
-    /*
-    Login {
-        id: login
-        heading: "Login"
-        fontFamily: window.fontFamily
-        fontSize: 58
-        onClicked: {
-            heading = "Logging in"
-            login.visible = false
-        }
-    }
-    */
 }
