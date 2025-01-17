@@ -4,7 +4,7 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 6.8.0 CONFIG REQUIRED COMPONENTS Core Qml Quick Network)
+find_package(Qt6 6.4.2 CONFIG REQUIRED COMPONENTS Core Qml Quick Network)
 
 file(GLOB source_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
 file(GLOB qml_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.qml)
