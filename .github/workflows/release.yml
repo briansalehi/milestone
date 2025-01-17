@@ -13,7 +13,7 @@ jobs:
       - name: Checkout Source
         uses: actions/checkout@v4
       - name: Configure
-        run: cmake -B . -S build -D CMAKE_BUILD_TYPE=Release
+        run: cmake -B build -D CMAKE_BUILD_TYPE=Release
       - name: Build
         run: cmake --build build --parallel --target milestone
       - name: Create Release
