@@ -1,4 +1,3 @@
-find_package(PostgreSQL 16.4.0 REQUIRED)
 find_package(Boost 1.80.0 CONFIG REQUIRED COMPONENTS program_options system)
 
 file(GLOB source_files RELATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR} src/main.cpp)
