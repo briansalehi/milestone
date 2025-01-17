@@ -1,20 +1,10 @@
 #pragma once
 
+#include <memory>
+
 #include <QObject>
-//#include <QNetworkReply>
-//#include <QNetworkRequest>
-//#include <QNetworkRequestFactory>
-//#include <QNetworkAddressEntry>
-//#include <QNetworkAccessManager>
-//#include <QNetworkCookie>
-//#include <QNetworkInformation>
-//#include <QNetworkInterface>
-//#include <QNetworkCookieJar>
-//#include <QtNetworkAuth/QtNetworkAuth>
-//#include <QtNetworkAuth/QtNetworkAuthDepends>
-//#include <QtNetworkAuth/QtNetworkAuthVersion>
-//#include <QtNetworkAuth/QAbstractOAuth2>
-//#include <QtNetworkAuth/QAbstractOAuthReplyHandler>
+#include <QTimer>
+#include <QTimerEvent>
 
 #include <EntryList.hpp>
 #include <NoteModel.hpp>
@@ -34,6 +24,7 @@ class Database : public QObject
 
 public:
     explicit Database(QObject *parent = nullptr);
+    virtual ~Database() override;
 
     Q_INVOKABLE EntryList* subjects();
     Q_INVOKABLE EntryList* topics(std::uint64_t const subject_id);
@@ -45,8 +36,14 @@ public:
     Q_INVOKABLE BoxModel* note_blocks(std::uint64_t const note_id);
     Q_INVOKABLE BoxModel* practice_blocks(std::uint64_t const practice_id);
 
+protected:
+    void connect_database();
+
 signals:
+    void connection_state_changed(flashback::database::connection_state const);
 
 private:
-    flashback::database m_database;
+    std::unique_ptr<flashback::database> m_database;
+    std::unique_ptr<QTimer> m_connection_timer;
+    flashback::database::connection_state m_last_connection_state;
 };

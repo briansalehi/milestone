@@ -7,13 +7,18 @@ import Flashback.BoxModel
 
 Item {
     id: workspace
+
+    property int short_side: parent.height > parent.width ? parent.width : parent.height
+    property int long_side:  parent.height < parent.width ? parent.width : parent.height
+    property string orientation: parent.height > parent.width ? "vertical" : "horizontal"
+
     anchors.top: parent.top
-    anchors.topMargin: parent.height * 10 / 100
+    anchors.topMargin: orientation == "vertical" ? long_side * 10 / 100 : short_side * 10 / 100
     anchors.bottom: parent.bottom
     anchors.left: parent.left
-    anchors.leftMargin: parent.width * 25 / 100
+    anchors.leftMargin: orientation == "vertical" ? short_side * 15 / 100 : long_side * 20 / 100
     anchors.right: parent.right
-    anchors.rightMargin: parent.width * 25 / 100
+    anchors.rightMargin: orientation == "vertical" ? short_side * 15 / 100 : long_side * 20 / 100
 
     property font font
     property color foreground
@@ -102,8 +107,8 @@ Item {
                 }
                 headline_text: headline
                 heading_color: workspace.text_color
-                designator_text: designator
-                designator_color: workspace.text_color
+                // designator_text: designator
+                // designator_color: workspace.text_color
                 id_number: id
                 width: ListView.view.width
                 onSelected: {

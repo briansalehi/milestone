@@ -42,7 +42,7 @@ Item {
             font: entry.font
             elide: Text.ElideRight
             anchors.right: parent.right
-            anchors.rightMargin: 15
+            anchors.rightMargin: text == "" ? 5 : 15
             anchors.verticalCenter: parent.verticalCenter
         }
 

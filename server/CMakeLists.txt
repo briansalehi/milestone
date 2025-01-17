@@ -1,3 +1,7 @@
+find_package(Boost 1.80.0 CONFIG REQUIRED COMPONENTS program_options system)
+find_package(PostgreSQL 16.4.0 REQUIRED)
+find_package(GTest 1.14.0 CONFIG)
+
 file(GLOB source_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} src/*.cpp)
 
 add_executable(server ${source_files})

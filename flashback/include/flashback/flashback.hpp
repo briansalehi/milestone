@@ -1,21 +1,25 @@
 #pragma once
 
+#include <string>
+#include <memory>
+#include <pqxx/pqxx>
+
 #include <flashback/subject.hpp>
 #include <flashback/topic.hpp>
 #include <flashback/practice.hpp>
 #include <flashback/resource.hpp>
 #include <flashback/section.hpp>
 #include <flashback/note.hpp>
-#include <pqxx/pqxx>
-#include <string>
 
 namespace flashback
 {
 class database
 {
 public:
-    database();
+    enum class connection_state { connected, disconnected };
+
     explicit database(std::string const& address);
+    virtual ~database();
     bool is_connected() const noexcept;
     std::string address() const;
 
@@ -32,6 +36,6 @@ public:
     void section_study_completed(std::uint64_t const section_id);
 
 private:
-    pqxx::connection m_connection;
+    std::unique_ptr<pqxx::connection> m_connection;
 };
 } // flashback

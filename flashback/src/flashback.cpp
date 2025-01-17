@@ -7,23 +7,27 @@
 namespace flashback
 {
 
-database::database()
+database::database(std::string const& address)
+    : m_connection{std::make_unique<pqxx::connection>(address)}
 {
 }
 
-database::database(std::string const& address)
-    : m_connection{address}
+database::~database()
 {
+    if (m_connection != nullptr)
+    {
+        m_connection->close();
+    }
 }
 
 bool database::is_connected() const noexcept
 {
-    return m_connection.is_open();
+    return m_connection->is_open();
 }
 
 std::string database::address() const
 {
-    return m_connection.connection_string();
+    return m_connection->connection_string();
 }
 
 std::string database::section_pattern(std::uint64_t const resource_id)
@@ -32,7 +36,7 @@ std::string database::section_pattern(std::uint64_t const resource_id)
 
     try
     {
-        pqxx::work work(m_connection);
+        pqxx::work work(*m_connection);
         std::string query{std::format(R"(select pattern from get_section_pattern({});)", resource_id)};
         pattern = work.exec1(query).at("pattern").as<std::string>();
     }
@@ -50,7 +54,7 @@ std::vector<resource> database::resources()
         from get_user_studying_resources(1)
         order by last_study desc nulls last, incomplete_sections desc, completed_sections desc, total_sections desc;
     )"};
-    pqxx::work work(m_connection);
+    pqxx::work work(*m_connection);
     pqxx::result result{work.exec(query)};
     work.commit();
 
@@ -86,7 +90,7 @@ std::vector<subject> database::subjects()
         order by updated asc nulls first, topics desc, name asc;
     )"};
 
-    pqxx::work work{m_connection};
+    pqxx::work work{*m_connection};
     pqxx::result result{work.exec(query)};
     work.commit();
 
@@ -122,7 +126,7 @@ std::vector<topic> database::topics(std::uint64_t subject_id)
         order by updated asc nulls first, topic_position asc, practices desc, topic_id asc;
     )", user_id, subject_id)};
 
-    pqxx::work work{m_connection};
+    pqxx::work work{*m_connection};
     pqxx::result result{work.exec(query)};
     work.commit();
 
@@ -154,7 +158,7 @@ std::vector<practice> database::practices(std::uint64_t topic_id)
         order by updated asc nulls first, pos asc, heading asc;
     )", user_id, topic_id)};
 
-    pqxx::work work{m_connection};
+    pqxx::work work{*m_connection};
     pqxx::result result{work.exec(query)};
     work.commit();
 
@@ -181,7 +185,7 @@ std::vector<practice> database::practices(std::uint64_t topic_id)
 std::vector<block> database::practice_blocks(uint64_t practice_id)
 {
     std::string query{std::format(R"(select * from get_practice_blocks({}) order by block_position asc;)", practice_id)};
-    pqxx::work work(m_connection);
+    pqxx::work work(*m_connection);
     pqxx::result result{work.exec(query)};
     work.commit();
 
@@ -214,7 +218,7 @@ std::vector<block> database::practice_blocks(uint64_t practice_id)
 std::vector<section> database::sections(uint64_t const resource_id)
 {
     std::string query{std::format(R"(select * from get_sections({}) order by section_number;)", resource_id)};
-    pqxx::work work(m_connection);
+    pqxx::work work(*m_connection);
     pqxx::result result{work.exec(query)};
     work.commit();
 
@@ -244,7 +248,7 @@ std::vector<section> database::sections(uint64_t const resource_id)
 std::vector<note> database::notes(const uint64_t section_id)
 {
     std::string query{std::format(R"(select * from get_section_study_notes({}) order by creation asc;)", section_id)};
-    pqxx::work work(m_connection);
+    pqxx::work work(*m_connection);
     pqxx::result result{work.exec(query)};
     work.commit();
 
@@ -289,7 +293,7 @@ std::vector<note> database::notes(const uint64_t section_id)
 std::vector<block> database::note_blocks(const uint64_t note_id)
 {
     std::string query{std::format(R"(select * from get_note_blocks({}) order by block_position asc;)", note_id)};
-    pqxx::work work(m_connection);
+    pqxx::work work(*m_connection);
     pqxx::result result{work.exec(query)};
     work.commit();
 
@@ -324,7 +328,7 @@ void database::section_study_completed(const uint64_t section_id)
 {
     constexpr std::uint64_t user_id{1};
     std::string statement{std::format(R"(call flashback.section_study_completed({}, {});)", user_id, section_id)};
-    pqxx::work work{m_connection};
+    pqxx::work work{*m_connection};
     pqxx::result result{work.exec(statement)};
     work.commit();
 }
