@@ -1,0 +1,63 @@
+name: Deployment
+permissions:
+  contents: write
+on:
+  push:
+    tags:
+      - 'v*'
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Dependencies
+        run: apt update && apt install --yes --no-install-recommends libboost-system-dev qt6-dev libpq libpqxx
+      - name: Checkout Source
+        uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B . -S build -D CMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --parallel --target milestone
+      - name: Create Release
+        id: create-release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: "Release ${{ github.ref_name }}"
+          body: "Release packages for ${{ github.ref_name }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Packages
+        run: cpack -G "DEB;RPM" -B packages --config build/CPackConfig.cmake
+      - name: Collect Package Information
+        run: |
+          debian_package_path="$(ls packages/*.deb)"
+          rpm_package_path="$(ls packages/*.rpm)"
+          debian_package_name="$(basename "$debian_package_path")"
+          rpm_package_name="$(basename "$rpm_package_path")"
+          package_version="$(cut -d'-' -f2 <<< "$rpm_package_name")"
+          echo "debian-package-path=${debian_package_path}" >> "$GITHUB_ENV"
+          echo "rpm-package-path=${rpm_package_path}" >> "$GITHUB_ENV"
+          echo "debian-package-name=${debian_package_name}" >> "$GITHUB_ENV"
+          echo "rpm-package-name=${rpm_package_name}" >> "$GITHUB_ENV"
+          echo "package-version=${package_version" >> "$GITHUB_ENV"
+      - name: Upload Debian Package
+        uses: actions/upload-release-asset@v5
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ${{ env.debian-package-path }}
+          asset_name: ${{ env.debian-package-name }}
+          asset_content_type: application/deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload RPM Package
+        uses: actions/upload-release-asset@v5
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ${{ env.rpm-package-path }}
+          asset_name: ${{ env.rpm-package-name }}
+          asset_content_type: application/x-rpm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
