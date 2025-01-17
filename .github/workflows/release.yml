@@ -44,7 +44,7 @@ jobs:
           echo "rpm-package-name=${rpm_package_name}" >> "$GITHUB_ENV"
           echo "package-version=${package_version" >> "$GITHUB_ENV"
       - name: Upload Debian Package
-        uses: actions/upload-release-asset@v5
+        uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create-release.outputs.upload_url }}
           asset_path: ${{ env.debian-package-path }}
