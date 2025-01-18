@@ -12,7 +12,6 @@ ApplicationWindow {
     minimumWidth: 600
     font.family: "Noto Sans"
     font.pixelSize: 42
-    flags: Qt.FramelessWindowHint
 
     property int font_big: 42
     property int font_medium: 32
@@ -28,128 +27,83 @@ ApplicationWindow {
         return value * percentage / 100;
     }
 
+    function lock_window()
+    {
+        workspace.enabled = false;
+        shadow.visible = true;
+    }
+
+    function unlock_window()
+    {
+        workspace.enabled = true;
+        shadow.visible = false;
+    }
+
     Rectangle {
-        id: titlebar
-        color: Qt.lighter(window.color)
+        id: shadow
+        visible: false
+        anchors.fill: parent
+        color: window.color
+        z: 99
+
+        Item {
+            anchors.centerIn: parent
+            z: 100
+
+            Text {
+                id: loading_text
+                font.pixelSize: window.font_big
+                color: window.font_color
+                text: "LOADING"
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+
+                onImplicitHeightChanged: {
+                    parent.width = width
+                    parent.height = height
+                }
+
+                SequentialAnimation on opacity {
+                    running: shadow.visible
+                    loops: Animation.Infinite
+                    NumberAnimation { to: 0.0; duration: 1000 }
+                    PauseAnimation { duration: 500 }
+                    NumberAnimation { to: 1.0; duration: 1000 }
+                    PauseAnimation { duration: 500 }
+                }
+            }
+        }
+    }
+
+    WorkSpace {
+        id: workspace
+        foreground: Qt.lighter(window.color)
+        background: window.color
+        font: window.font
+        text_color: window.font_color
+        enabled: false
+
         anchors.top: parent.top
+        anchors.topMargin: window.orientation == "vertical" ? window.percent(window.long_side, 8) : window.percent(window.short_side, 10)
+        anchors.bottom: parent.bottom
         anchors.left: parent.left
+        anchors.leftMargin: window.orientation == "vertical" ? window.percent(window.short_side, 10) : window.percent(window.long_side, 20)
         anchors.right: parent.right
-        height: window.percent(parent.height, 4)
+        anchors.rightMargin: window.orientation == "vertical" ? window.percent(window.short_side, 10) : window.percent(window.long_side, 20)
 
-        Text {
-            id: window_name
-            text: "Milestone"
-            color: window.font_color
-            width: Math.max(100, parent.width * 10 / 100)
-            elide: Text.ElideRight
-            font.pixelSize: window.font_small
-            anchors.left: parent.left
-            anchors.leftMargin: 20
-            anchors.verticalCenter: parent.verticalCenter
-            verticalAlignment: Text.AlignVCenter
-            horizontalAlignment: Text.AlignLeft
+        onShowBack: {
+            back.visible = true
+        }
+        onHideBack: {
+            back.visible = false
         }
 
-        Row {
-            id: window_buttons
-            spacing: 5
-            anchors.right: parent.right
-            anchors.rightMargin: 20
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-
-            Rectangle {
-                id: minimize_button
-                height: parent.height
-                width: parent.height
-                color: titlebar.color
-
-                Text {
-                    text: "-"
-                    color: window.font_color
-                    font.family: window.font.family
-                    font.pixelSize: window.font_small
-                    font.bold: true
-                    anchors.fill: parent
-                    verticalAlignment: Text.AlignVCenter
-                    horizontalAlignment: Text.AlignHCenter
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: {
-                        window.showMinimized();
-                    }
-                }
-            }
-
-            Rectangle {
-                id: maximize_button
-                height: parent.height
-                width: parent.height
-                color: titlebar.color
-
-                Text {
-                    text: window.visibility === Window.Maximized ? "o" : "O"
-                    color: window.font_color
-                    font.family: window.font.family
-                    font.pixelSize: window.font_small
-                    font.bold: true
-                    anchors.fill: parent
-                    verticalAlignment: Text.AlignVCenter
-                    horizontalAlignment: Text.AlignHCenter
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: {
-                        window.visibility = window.visibility === Window.Maximized ? Window.Windowed : Window.Maximized;
-                    }
-                }
-            }
-
-            Rectangle {
-                id: quit_button
-                height: parent.height
-                width: parent.height
-                color: titlebar.color
-
-                Text {
-                    text: "X"
-                    color: window.font_color
-                    font.family: window.font.family
-                    font.pixelSize: window.font_small
-                    font.bold: true
-                    anchors.fill: parent
-                    verticalAlignment: Text.AlignVCenter
-                    horizontalAlignment: Text.AlignHCenter
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: {
-                        Qt.quit()
-                    }
-                }
-            }
+        onLock: {
+            window.lock_window();
         }
 
-        MouseArea {
-            id: drag_area
-            anchors.left: parent.left
-            anchors.right: window_buttons.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            drag.target: window.window
-            onPressed: {
-                drag_area.cursorShape = Qt.SizeAllCursor;
-            }
-            onReleased: {
-                drag_area.cursorShape = Qt.ArrowCursor;
-            }
-            onPositionChanged: {
-                // console.log("position changes from", window.x, window.y, "to", drag_area.pressedX, drag_area.pressedY);
-            }
+        onUnlock: {
+            window.unlock_window();
         }
     }
 
@@ -207,29 +161,6 @@ ApplicationWindow {
                     back.color = Qt.lighter(window.color);
                 }
             }
-        }
-    }
-
-    WorkSpace {
-        id: workspace
-        foreground: Qt.lighter(window.color)
-        background: window.color
-        font: window.font
-        text_color: window.font_color
-
-        anchors.top: parent.top
-        anchors.topMargin: window.orientation == "vertical" ? window.percent(window.long_side, 8) : window.percent(window.short_side, 10)
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.leftMargin: window.orientation == "vertical" ? window.percent(window.short_side, 10) : window.percent(window.long_side, 20)
-        anchors.right: parent.right
-        anchors.rightMargin: window.orientation == "vertical" ? window.percent(window.short_side, 10) : window.percent(window.long_side, 20)
-
-        onShowBack: {
-            back.visible = true
-        }
-        onHideBack: {
-            back.visible = false
         }
     }
 

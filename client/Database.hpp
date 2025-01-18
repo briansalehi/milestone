@@ -37,13 +37,11 @@ public:
     Q_INVOKABLE BoxModel* practice_blocks(std::uint64_t const practice_id);
 
 protected:
-    void connect_database();
+    std::unique_ptr<flashback::database> connect_database();
 
 signals:
-    void connection_state_changed(flashback::database::connection_state const);
+    void connectionStateChanged(bool const is_connected);
 
 private:
-    std::unique_ptr<flashback::database> m_database;
     std::unique_ptr<QTimer> m_connection_timer;
-    flashback::database::connection_state m_last_connection_state;
 };

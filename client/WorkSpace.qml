@@ -21,6 +21,8 @@ Item {
     signal hideBack
     signal showNext
     signal hideNext
+    signal lock
+    signal unlock
 
     function next_page()
     {
@@ -31,6 +33,45 @@ Item {
     {
         stack.pop(StackView.Immediate);
         page_indicator.clear();
+    }
+
+    property var last_request
+    property var last_caller
+    property var last_arg
+
+    function dispatch_request(command, caller, arg)
+    {
+        if (caller)
+        {
+            workspace.last_request = command;
+            workspace.last_caller = caller;
+            workspace.last_arg = arg;
+        }
+
+        if (command == "subjects")
+        {
+            return database.subjects();
+        }
+        else if (command == "resources")
+        {
+            return database.resources()
+        }
+        else if (command == "topics")
+        {
+            return database.topics(arg);
+        }
+        else if (command == "practices")
+        {
+            return database.practices(arg);
+        }
+        else if (command == "sections")
+        {
+            return database.sections(arg);
+        }
+        else if (command == "notes")
+        {
+            return database.notes(arg);
+        }
     }
 
     StackView {
@@ -55,6 +96,26 @@ Item {
 
     Database {
         id: database
+
+        onConnectionStateChanged: function(is_connected) {
+            if (is_connected)
+            {
+                var last_request = workspace.last_request
+                var last_caller = workspace.last_caller
+                var last_arg = workspace.last_arg
+
+                if (last_request && last_caller)
+                {
+                    last_caller.model = workspace.dispatch_request(last_request, null, last_arg);
+                }
+
+                workspace.unlock();
+            }
+            else
+            {
+                workspace.lock();
+            }
+        }
     }
 
     Component {
@@ -85,7 +146,7 @@ Item {
         ListView {
             id: subjects_list_view
             spacing: 10
-            model: database.subjects()
+            model: workspace.dispatch_request("subjects", this)
 
             delegate: EntryView {
                 color: workspace.foreground
@@ -118,7 +179,7 @@ Item {
         ListView {
             id: resources_list_view
             spacing: 10
-            model: database.resources()
+            model: workspace.dispatch_request("resources", this)
             delegate: EntryView {
                 color: workspace.foreground
                 font {
@@ -150,7 +211,7 @@ Item {
         ListView {
             id: topics_list_view
             spacing: 10
-            model: database.topics(selected_subject_id)
+            model: workspace.dispatch_request("topics", this, selected_subject_id)
 
             delegate: EntryView {
                 color: workspace.foreground
@@ -183,7 +244,7 @@ Item {
         ListView {
             id: section_list_view
             spacing: 10
-            model: database.sections(selected_resource_id)
+            model: workspace.dispatch_request("sections", this, selected_resource_id)
 
             delegate: EntryView {
                 color: workspace.foreground
@@ -219,7 +280,7 @@ Item {
 
             Repeater {
                 id: repeater
-                model: database.practices(selected_topic_id)
+                model: workspace.dispatch_request("practices", this, selected_topic_id)
 
                 Loader {
                     // active: SwipeView.isCurrentItem || SwipeView.isNextItem || SwipeView.isPreviousItem
@@ -252,7 +313,7 @@ Item {
 
             Repeater {
                 id: repeater
-                model: database.notes(selected_section_id)
+                model: workspace.dispatch_request("notes", this, selected_section_id)
 
                 Loader {
                     // active: SwipeView.isCurrentItem || SwipeView.isNextItem || SwipeView.isPreviousItem

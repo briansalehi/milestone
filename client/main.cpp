@@ -11,6 +11,7 @@ int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
 
+    qmlRegisterType<flashback::database::connection_state>("Flashback.Database", 1, 0, "ConnectionState");
     qmlRegisterType<Database>("Flashback.Database", 1, 0, "Database");
     qmlRegisterType<EntryList>("Flashback.EntryList", 1, 0, "EntryList");
     qmlRegisterType<NoteModel>("Flashback.NoteModel", 1, 0, "NoteModel");
