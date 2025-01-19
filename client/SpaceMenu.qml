@@ -13,26 +13,28 @@ Item {
         spacing: parent.width * 3 / 100
         anchors.fill: parent
 
-        Space {
+        EntryView {
             id: practice
-            text: "Practice"
             font: menu.font
-            text_color: menu.text_color
             color: menu.color
-            preferred_size: menu.space_size
-            onClicked: {
+            headline_text: "Practice"
+            heading_color: menu.text_color
+            width: menu.space_size
+            height: menu.space_size
+            onSelected: {
                 menu.spaceSelected("practice");
             }
         }
 
-        Space {
+        EntryView {
             id: study
-            text: "Study"
             font: menu.font
-            text_color: menu.text_color
             color: menu.color
-            preferred_size: menu.space_size
-            onClicked: {
+            headline_text: "Study"
+            heading_color: menu.text_color
+            width: menu.space_size
+            height: menu.space_size
+            onSelected: {
                 menu.spaceSelected("study");
             }
         }

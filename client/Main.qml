@@ -54,7 +54,7 @@ ApplicationWindow {
                 id: loading_text
                 font.pixelSize: window.font_big
                 color: window.font_color
-                text: "LOADING"
+                text: "CONNECTING"
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
 
@@ -67,9 +67,9 @@ ApplicationWindow {
                     running: shadow.visible
                     loops: Animation.Infinite
                     NumberAnimation { to: 0.0; duration: 1000 }
-                    PauseAnimation { duration: 500 }
+                    PauseAnimation { duration: 200 }
                     NumberAnimation { to: 1.0; duration: 1000 }
-                    PauseAnimation { duration: 500 }
+                    PauseAnimation { duration: 200 }
                 }
             }
         }

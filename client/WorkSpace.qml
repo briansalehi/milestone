@@ -419,11 +419,11 @@ Item {
                                 delegate: Box {
                                     anchors.left: parent.left
                                     anchors.right: parent.right
-                                    font.family: workspace.font.family
-                                    font.pixelSize: workspace.font.pixelSize * 55 / 100
+                                    font.family: page.font.family
+                                    font.pixelSize: page.font.pixelSize * 80 / 100
                                     radius: body_frame.radius * 80 / 100
-                                    text_color: workspace.text_color
-                                    background: workspace.foreground
+                                    text_color: page.text_color
+                                    background: page.foreground
                                     vertical_alignment: Text.AlignTop
                                     horizontal_alignment: Text.AlignLeft
 

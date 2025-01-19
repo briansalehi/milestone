@@ -10,12 +10,12 @@ Item {
     property color heading_color
     property string designator_text
     property color designator_color
-    property bool doubleClicked: false
+    property bool alreadyClickedOnce: false
     property int id_number
     signal selected
 
-
     Rectangle {
+        id: space
         anchors.fill: parent
         radius: 13
         color: entry.color
@@ -28,11 +28,11 @@ Item {
             verticalAlignment: Text.AlignVCenter
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight
-            anchors.left: parent.left
+            anchors.left: space.left
             anchors.leftMargin: 15
             anchors.right: update_id.left
             anchors.rightMargin: 10
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenter: space.verticalCenter
         }
 
         Text {
@@ -41,34 +41,36 @@ Item {
             color: entry.designator_color
             font: entry.font
             elide: Text.ElideRight
-            anchors.right: parent.right
+            anchors.right: space.right
             anchors.rightMargin: text == "" ? 5 : 15
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenter: space.verticalCenter
         }
 
         MouseArea {
             anchors.fill: parent
             hoverEnabled: true
             onClicked: {
-                if (entry.doubleClicked) {
+                if (entry.alreadyClickedOnce) {
+                    entry.alreadyClickedOnce = false;
+                    space.color = entry.color;
                     entry.selected();
-                    entry.doubleClicked = false
                 }
                 else {
-                    entry.doubleClicked = true
+                    entry.alreadyClickedOnce = true;
+                    space.color = Qt.lighter(entry.color, 2);
                 }
-
-                parent.color = Qt.lighter(entry.color, 2);
             }
             onDoubleClicked: {
+                entry.alreadyClickedOnce = false
+                space.color = entry.color;
                 entry.selected();
             }
             onEntered: {
-                parent.color = Qt.lighter(entry.color, 1.5);
+                space.color = Qt.lighter(entry.color, 1.5);
             }
             onExited: {
-                parent.color = entry.color;
-                entry.doubleClicked = false
+                space.color = entry.color;
+                entry.alreadyClickedOnce = false
             }
         }
     }
