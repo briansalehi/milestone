@@ -84,3 +84,4 @@ _CPack_Packages/
 *.deb
 *.rpm
 *.tar
+.idea/
