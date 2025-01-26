@@ -11,7 +11,7 @@ class NoteModel : public QAbstractListModel
 public:
     enum Role
     {
-        Id = Qt::UserRole + 1,
+        Index = Qt::UserRole + 1,
         Heading,
         State,
         Creation,

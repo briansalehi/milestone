@@ -17,11 +17,13 @@ Item {
             id: practice
             font: menu.font
             color: menu.color
-            headline_text: "Practice"
+            index: 0
+            designator: qsTr("")
+            headline: "Practice"
             heading_color: menu.text_color
             width: menu.space_size
             height: menu.space_size
-            onSelected: {
+            onSelected: function(index) {
                 menu.spaceSelected("practice");
             }
         }
@@ -30,11 +32,13 @@ Item {
             id: study
             font: menu.font
             color: menu.color
-            headline_text: "Study"
+            index: 0
+            designator: qsTr("")
+            headline: "Study"
             heading_color: menu.text_color
             width: menu.space_size
             height: menu.space_size
-            onSelected: {
+            onSelected: function(index) {
                 menu.spaceSelected("study");
             }
         }

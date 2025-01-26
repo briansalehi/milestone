@@ -18,7 +18,7 @@ public:
     {
         Headline = Qt::UserRole + 1,
         Designator,
-        Id
+        Index
     };
 
     explicit EntryList(QObject *parent = nullptr);

@@ -74,24 +74,12 @@ Item {
         }
     }
 
-    StackView {
-        id: stack
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: page_indicator.top
-        anchors.bottomMargin: Math.min(20, parent.height * 2 / 100)
-        initialItem: menu
-        onCurrentItemChanged: {
-            if (depth > 1)
-            {
-                workspace.showBack();
-            }
-            else
-            {
-                workspace.hideBack();
-            }
-        }
+    function expandResource(index){
+        stack.push(section_list, { index: index, database: database }, StackView.Immediate);
+    }
+
+    function expandSection(index) {
+        stack.push(note_list, {section_index: index, database: database}, StackView.Immediate);
     }
 
     Database {
@@ -118,57 +106,40 @@ Item {
         }
     }
 
-    Component {
-        id: menu
-
-        SpaceMenu {
-            id: space
-            color: workspace.foreground
-            font: workspace.font
-            text_color: workspace.text_color
-            onSpaceSelected: function(space) {
-                switch (space)
-                {
-                case "practice":
-                    stack.push(subject_list, {}, StackView.Immediate);
-                    break;
-                case "study":
-                    stack.push(resource_list, {}, StackView.Immediate);
-                    break;
-                }
+    StackView {
+        id: stack
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: page_indicator.top
+        anchors.bottomMargin: Math.min(20, parent.height * 2 / 100)
+        initialItem: space
+        onCurrentItemChanged: {
+            if (depth > 1)
+            {
+                workspace.showBack();
+            }
+            else
+            {
+                workspace.hideBack();
             }
         }
     }
 
-    Component {
-        id: subject_list
-
-        ListView {
-            id: subjects_list_view
-            spacing: 10
-            model: workspace.dispatch_request("subjects", this)
-
-            delegate: EntryView {
-                color: workspace.foreground
-                font {
-                    family: workspace.font.family
-                    pixelSize: workspace.font.pixelSize * 70 / 100
-                }
-                headline_text: headline
-                heading_color: workspace.text_color
-                // designator_text: designator
-                // designator_color: workspace.text_color
-                id_number: id
-                width: ListView.view.width
-                onSelected: {
-                    var selected_entry = subjects_list_view.itemAtIndex(index);
-
-                    if (selected_entry)
-                    {
-                        selected_subject_id = selected_entry.id_number;
-                        stack.push(topic_list, {}, StackView.Immediate);
-                    }
-                }
+    SpaceMenu {
+        id: space
+        color: workspace.foreground
+        font: workspace.font
+        text_color: workspace.text_color
+        onSpaceSelected: function(space) {
+            switch (space)
+            {
+            // case "practice":
+            //     stack.push(subject_list, {}, StackView.Immediate);
+            //     break;
+            case "study":
+                stack.push(resource_list, { database: database }, StackView.Immediate);
+                break;
             }
         }
     }
@@ -176,64 +147,13 @@ Item {
     Component {
         id: resource_list
 
-        ListView {
-            id: resources_list_view
-            spacing: 10
-            model: workspace.dispatch_request("resources", this)
-            delegate: EntryView {
-                color: workspace.foreground
-                font {
-                    family: workspace.font.family
-                    pixelSize: workspace.font.pixelSize * 70 / 100
-                }
-                headline_text: headline
-                heading_color: workspace.text_color
-                designator_text: designator
-                designator_color: workspace.text_color
-                id_number: id
-                width: ListView.view.width
-                onSelected: {
-                    var selected_entry = resources_list_view.itemAtIndex(index);
-
-                    if (selected_entry)
-                    {
-                        selected_resource_id = selected_entry.id_number;
-                        stack.push(section_list, {}, StackView.Immediate);
-                    }
-                }
-            }
-        }
-    }
-
-    Component {
-        id: topic_list
-
-        ListView {
-            id: topics_list_view
-            spacing: 10
-            model: workspace.dispatch_request("topics", this, selected_subject_id)
-
-            delegate: EntryView {
-                color: workspace.foreground
-                font {
-                    family: workspace.font.family
-                    pixelSize: workspace.font.pixelSize * 70 / 100
-                }
-                headline_text: headline
-                heading_color: workspace.text_color
-                designator_text: designator
-                designator_color: workspace.text_color
-                id_number: id
-                width: ListView.view.width
-                onSelected: {
-                    var selected_entry = topics_list_view.itemAtIndex(index);
-
-                    if (selected_entry)
-                    {
-                        selected_topic_id = selected_entry.id_number;
-                        stack.push(practice_list, {}, StackView.Immediate);
-                    }
-                }
+        ResourceList {
+            Component.onCompleted: {
+                font =       Qt.binding(() => { return workspace.font;       });
+                background = Qt.binding(() => { return workspace.background; });
+                foreground = Qt.binding(() => { return workspace.foreground; });
+                text_color = Qt.binding(() => { return workspace.text_color; });
+                selected.connect((index) => { expandResource(index); });
             }
         }
     }
@@ -241,65 +161,13 @@ Item {
     Component {
         id: section_list
 
-        ListView {
-            id: section_list_view
-            spacing: 10
-            model: workspace.dispatch_request("sections", this, selected_resource_id)
-
-            delegate: EntryView {
-                color: workspace.foreground
-                font {
-                    family: workspace.font.family
-                    pixelSize: workspace.font.pixelSize * 70 / 100
-                }
-                headline_text: headline
-                heading_color: workspace.text_color
-                designator_text: designator
-                designator_color: workspace.text_color
-                id_number: id
-                width: ListView.view.width
-                onSelected: {
-                    var selected_entry = section_list_view.itemAtIndex(index);
-
-                    if (selected_entry)
-                    {
-                        selected_section_id = selected_entry.id_number;
-                        stack.push(note_list, {}, StackView.Immediate);
-                    }
-                }
-            }
-        }
-    }
-
-    Component {
-        id: practice_list
-
-        SwipeView {
-            spacing: 10
-            orientation: Qt.Horizontal
-
-            Repeater {
-                id: repeater
-                model: workspace.dispatch_request("practices", this, selected_topic_id)
-
-                Loader {
-                    // active: SwipeView.isCurrentItem || SwipeView.isNextItem || SwipeView.isPreviousItem
-                    sourceComponent: page_model
-                    onLoaded: {
-                        item.block_id = id;
-                        item.model = database.practice_blocks(id);
-                        item.heading = heading;
-                        item.font.family = workspace.font.family
-                        item.font.pixelSize = workspace.font.pixelSize * 70 / 100
-                        item.text_color = workspace.text_color
-                        item.background = workspace.background
-                        item.foreground = workspace.foreground
-                        // note_id
-                        // state
-                        // creation
-                        // last_update
-                    }
-                }
+        SectionList {
+            Component.onCompleted: {
+                font =       Qt.binding(() => { return workspace.font;       });
+                background = Qt.binding(() => { return workspace.background; });
+                foreground = Qt.binding(() => { return workspace.foreground; });
+                text_color = Qt.binding(() => { return workspace.text_color; });
+                selected.connect((index) => { expandSection(index); });
             }
         }
     }
@@ -307,140 +175,114 @@ Item {
     Component {
         id: note_list
 
-        SwipeView {
-            spacing: 10
-            orientation: Qt.Horizontal
-
-            Repeater {
-                id: repeater
-                model: workspace.dispatch_request("notes", this, selected_section_id)
-
-                Loader {
-                    // active: SwipeView.isCurrentItem || SwipeView.isNextItem || SwipeView.isPreviousItem
-                    sourceComponent: page_model
-                    onLoaded: {
-                        item.block_id = id;
-                        item.model = database.note_blocks(id);
-                        item.heading = heading;
-                        item.font.family = workspace.font.family
-                        item.font.pixelSize = workspace.font.pixelSize * 70 / 100
-                        item.text_color = workspace.text_color
-                        item.background = workspace.background
-                        item.foreground = workspace.foreground
-
-                        page_indicator.page_count = repeater.count
-                        page_indicator.set_page(0);
-                        // note_id
-                        // state
-                        // creation
-                        // last_update
-                    }
-                }
-            }
-
-            onCurrentIndexChanged: {
-                var total = count - 1;
-                page_indicator.set_page(currentIndex);
-
-                // log study completion when reached last section
-                if (total !== 0 && currentIndex === total)
-                {
-                    database.section_study_completed(selected_section_id);
-                }
+        NoteList {
+            Component.onCompleted: {
+                text_font = Qt.binding(() => { return workspace.font; });
+                background_color = Qt.binding(() => { return workspace.background; });
+                foreground_color = Qt.binding(() => { return workspace.foreground; });
+                text_color = Qt.binding(() => { return workspace.text_color; });
             }
         }
     }
 
-    Component {
-        id: page_model
+    // Component {
+    //     id: subject_list
 
-        Item {
-            id: page
-            height: parent.height
-            width: parent.width
+    //     ListView {
+    //         id: subjects_list_view
+    //         spacing: 10
+    //         model: workspace.dispatch_request("subjects", this)
 
-            property int block_id
-            property string heading
-            property font font
-            property var model
-            property color text_color
-            property color background
-            property color foreground
+    //         delegate: EntryView {
+    //             color: workspace.foreground
+    //             font {
+    //                 family: workspace.font.family
+    //                 pixelSize: workspace.font.pixelSize * 70 / 100
+    //             }
+    //             headline_text: headline
+    //             heading_color: workspace.text_color
+    //             // designator_text: designator
+    //             // designator_color: workspace.text_color
+    //             id_number: id
+    //             width: ListView.view.width
+    //             onSelected: {
+    //                 var selected_entry = subjects_list_view.itemAtIndex(index);
 
-            Box {
-                id: head
-                text_color: page.text_color
-                background: page.foreground
-                font: page.font
-                radius: 20
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                vertical_alignment: Text.AlignVCenter
-                horizontal_alignment: Text.AlignLeft
+    //                 if (selected_entry)
+    //                 {
+    //                     selected_subject_id = selected_entry.id_number;
+    //                     stack.push(topic_list, {}, StackView.Immediate);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-                block_id: page.block_id
-                content: page.heading
-                type: 'Text'
-                format: TextEdit.RichText
-            }
+    // Component {
+    //     id: topic_list
 
-            Rectangle {
-                color: page.foreground
-                radius: 20
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: head.bottom
-                anchors.topMargin: 20
-                anchors.bottom: parent.bottom
+    //     ListView {
+    //         id: topics_list_view
+    //         spacing: 10
+    //         model: workspace.dispatch_request("topics", this, selected_subject_id)
 
-                Rectangle {
-                    id: body_frame
-                    color: page.background
-                    radius: parent.radius * 80 / 100
-                    anchors.fill: parent
-                    anchors.margins: parent.radius * 80 / 100
+    //         delegate: EntryView {
+    //             color: workspace.foreground
+    //             font {
+    //                 family: workspace.font.family
+    //                 pixelSize: workspace.font.pixelSize * 70 / 100
+    //             }
+    //             headline_text: headline
+    //             heading_color: workspace.text_color
+    //             designator_text: designator
+    //             designator_color: workspace.text_color
+    //             id_number: id
+    //             width: ListView.view.width
+    //             onSelected: {
+    //                 var selected_entry = topics_list_view.itemAtIndex(index);
 
-                    Flickable {
-                        anchors.fill: parent
-                        anchors.margins: 20
-                        flickableDirection: Flickable.VerticalFlick
-                        contentWidth: width
-                        contentHeight: page_container.height
-                        clip: true
+    //                 if (selected_entry)
+    //                 {
+    //                     selected_topic_id = selected_entry.id_number;
+    //                     stack.push(practice_list, {}, StackView.Immediate);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-                        Column {
-                            id: page_container
-                            width: parent.width
-                            spacing: 10
+    // Component {
+    //     id: practice_list
 
-                            Repeater {
-                                model: page.model
-                                delegate: Box {
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    font.family: page.font.family
-                                    font.pixelSize: page.font.pixelSize * 80 / 100
-                                    radius: body_frame.radius * 80 / 100
-                                    text_color: page.text_color
-                                    background: page.foreground
-                                    vertical_alignment: Text.AlignTop
-                                    horizontal_alignment: Text.AlignLeft
+    //     SwipeView {
+    //         spacing: 10
+    //         orientation: Qt.Horizontal
 
-                                    block_id: model.block_id
-                                    position: model.position
-                                    content: model.content
-                                    type: model.type
-                                    language: model.language
-                                    last_update: model.last_update
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    //         Repeater {
+    //             id: repeater
+    //             model: workspace.dispatch_request("practices", this, selected_topic_id)
+
+    //             Loader {
+    //                 // active: SwipeView.isCurrentItem || SwipeView.isNextItem || SwipeView.isPreviousItem
+    //                 sourceComponent: page_model
+    //                 onLoaded: {
+    //                     item.block_id = id;
+    //                     item.model = database.practice_blocks(id);
+    //                     item.heading = heading;
+    //                     item.font.family = workspace.font.family
+    //                     item.font.pixelSize = workspace.font.pixelSize * 70 / 100
+    //                     item.text_color = workspace.text_color
+    //                     item.background = workspace.background
+    //                     item.foreground = workspace.foreground
+    //                     // note_id
+    //                     // state
+    //                     // creation
+    //                     // last_update
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     Item {
         id: page_indicator

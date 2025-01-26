@@ -4,15 +4,17 @@ Item {
     id: entry
     height: 70
 
+    required property int index
+    required property string headline
+    required property string designator
+
     property color color
     property font font
-    property string headline_text
     property color heading_color
-    property string designator_text
     property color designator_color
     property bool alreadyClickedOnce: false
-    property int id_number
-    signal selected
+
+    signal selected(int index)
 
     Rectangle {
         id: space
@@ -22,7 +24,7 @@ Item {
 
         Text {
             id: headline_id
-            text: entry.headline_text
+            text: entry.headline
             color: entry.heading_color
             font: entry.font
             verticalAlignment: Text.AlignVCenter
@@ -37,7 +39,7 @@ Item {
 
         Text {
             id: update_id
-            text: entry.designator_text
+            text: entry.designator
             color: entry.designator_color
             font: entry.font
             elide: Text.ElideRight
@@ -53,7 +55,7 @@ Item {
                 if (entry.alreadyClickedOnce) {
                     entry.alreadyClickedOnce = false;
                     space.color = entry.color;
-                    entry.selected();
+                    entry.selected(entry.index);
                 }
                 else {
                     entry.alreadyClickedOnce = true;
@@ -63,7 +65,7 @@ Item {
             onDoubleClicked: {
                 entry.alreadyClickedOnce = false
                 space.color = entry.color;
-                entry.selected();
+                entry.selected(entry.index);
             }
             onEntered: {
                 space.color = Qt.lighter(entry.color, 1.5);

@@ -41,7 +41,7 @@ ApplicationWindow {
 
     Rectangle {
         id: shadow
-        visible: false
+        visible: true
         anchors.fill: parent
         color: window.color
         z: 99

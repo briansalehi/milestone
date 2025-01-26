@@ -8,23 +8,21 @@ Item {
     property int index: model.index
     property string heading: model.heading
 
+    property int width
+    property int height
     property font font
     property color text_color
     property color background
     property color foreground
-    property int max_width
-    property int max_height
 
     Component.onCompleted: {
         console.log("note.index:", index);
         console.log("note.heading:", heading);
         console.log("note.font:", font.family);
-        console.log("note.width:", max_width);
-        console.log("note.height:", max_height);
+        console.log("note.width:", width);
+        console.log("note.height:", height);
         console.log("note.background:", background);
         console.log("note.foreground:", foreground);
-        console.log("note.text.color:", text_color);
-        console.log();
     }
 
     Box {
@@ -99,6 +97,8 @@ Item {
 
             anchors.left: parent.left
             anchors.right: parent.right
+            font.pixelSize: font.pixelSize * 80 / 100
+            // radius: body_frame.radius * 80 / 100
             vertical_alignment: Text.AlignTop
             horizontal_alignment: Text.AlignLeft
         }

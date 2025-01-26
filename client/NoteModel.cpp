@@ -43,7 +43,7 @@ QVariant NoteModel::data(const QModelIndex &index, int role) const
 
         switch (role)
         {
-        case Role::Id: role_data = note.id(); break;
+        case Role::Index: role_data = note.id(); break;
         case Role::Heading: role_data = note.heading(); break;
         case Role::State: role_data = note.state(); break;
         case Role::Creation: role_data = note.creation(); break;
@@ -58,7 +58,7 @@ QVariant NoteModel::data(const QModelIndex &index, int role) const
 QHash<int, QByteArray> NoteModel::roleNames() const
 {
     QHash<int, QByteArray> roles{};
-    roles[Id] = "id";
+    roles[Index] = "index";
     roles[Heading] = "heading";
     roles[State] = "state";
     roles[Creation] = "creation";
