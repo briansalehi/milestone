@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.30.5)
+cmake_minimum_required(VERSION 4.0.0)
 project(Milestone VERSION 0.12.0 LANGUAGES CXX DESCRIPTION "Technical References Training Program")
 
 include(GNUInstallDirs)
