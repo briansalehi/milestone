@@ -11,11 +11,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 set(CMAKE_INSTALL_RPATH $<INSTALL_INTERFACE:${CMAKE_INSTALL_LIBDIR}>)
 
-set(client_source src/main.cpp src/options.cpp src/screen.cpp)
-
 find_package(Curses REQUIRED)
 find_package(Boost CONFIG COMPONENTS system program_options REQUIRED)
 
+file(GLOB client_source RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} src/*.cpp)
 add_executable(milestone-cli ${client_source})
 target_link_libraries(milestone-cli PRIVATE curses Boost::system Boost::program_options)
 target_include_directories(milestone-cli PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_compile_definitions(milestone-cli PRIVATE PROGRAM_VERSION="${PROJECT_VERSION}")

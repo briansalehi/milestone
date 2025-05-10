@@ -1,16 +1,20 @@
-#include <ncurses.h>
-#include <vector>
 #include <iostream>
 #include <print>
-#include <milestone/options.hpp>
-#include <milestone/screen.hpp>
 #include <boost/system.hpp>
+#include <milestone/options.hpp>
+#include <milestone/client.hpp>
 
-int main(int argc, char** argv)
+int main(int const argc, char** argv)
 {
     try
     {
-        milestone::options options{argc, argv};
+        milestone::options const options{argc, argv};
+        milestone::client client{options};
+    }
+    catch(milestone::terminating_argument const& arg)
+    {
+        // execution halts when some arguments are given
+        std::println(std::cout, "{}", arg.what());
     }
     catch(boost::system::system_error const& exp)
     {
