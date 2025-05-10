@@ -1,9 +1,19 @@
 #include <ncurses.h>
 #include <vector>
-#include <options.hpp>
-#include <screen.hpp>
+#include <iostream>
+#include <print>
+#include <milestone/options.hpp>
+#include <milestone/screen.hpp>
+#include <boost/system.hpp>
 
 int main(int argc, char** argv)
 {
-    std::vector args(argv + 1, argv + argc);
+    try
+    {
+        milestone::options options{argc, argv};
+    }
+    catch(boost::system::system_error const& exp)
+    {
+        std::println(std::cerr, "{}", exp.what());
+    }
 }

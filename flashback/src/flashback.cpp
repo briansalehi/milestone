@@ -48,7 +48,7 @@ std::string database::section_pattern(std::uint64_t const resource_id)
     {
         pqxx::work work(*m_connection);
         std::string query{std::format(R"(select pattern from get_section_pattern({});)", resource_id)};
-        pattern = work.exec1(query).at("pattern").as<std::string>();
+        pattern = work.exec(query).one_row().at("pattern").as<std::string>();
     }
 
     return pattern;
@@ -226,8 +226,15 @@ std::vector<block> database::practice_blocks(uint64_t practice_id)
             block.language = row.at("language").as<std::string>();
 
             std::string type{row.at("type").as<std::string>()};
-            if (type == "code") block.type = block_type::code;
-            else if (type == "text") block.type = block_type::text;
+
+            if (type == "code")
+            {
+                block.type = block_type::code;
+            }
+            else if (type == "text")
+            {
+                block.type = block_type::text;
+            }
 
             std::tm datetime{};
             std::istringstream last_update_stream{row.at("last_update").as<std::string>()};
@@ -260,14 +267,14 @@ std::vector<section> database::sections(uint64_t const resource_id)
             section.id = row.at("section_id").as<std::uint64_t>();
             section.number = row.at("section_number").as<std::uint32_t>();
             std::string state{row.at("section_state").as<std::string>()};
-            if (state == "open") section.state = publication_state::open;
-            else if (state == "writing") section.state = publication_state::writing;
-            else if (state == "completed") section.state = publication_state::completed;
-            else if (state == "revised") section.state = publication_state::revised;
-            else if (state == "validated") section.state = publication_state::validated;
-            else if (state == "approved") section.state = publication_state::approved;
-            else if (state == "released") section.state = publication_state::released;
-            else if (state == "ignored") section.state = publication_state::ignored;
+            if (state == "open") { section.state = publication_state::open; }
+            else if (state == "writing") { section.state = publication_state::writing; }
+            else if (state == "completed") { section.state = publication_state::completed; }
+            else if (state == "revised") { section.state = publication_state::revised; }
+            else if (state == "validated") { section.state = publication_state::validated; }
+            else if (state == "approved") { section.state = publication_state::approved; }
+            else if (state == "released") { section.state = publication_state::released; }
+            else if (state == "ignored") { section.state = publication_state::ignored; }
             sections.push_back(section);
         }
     }
@@ -294,14 +301,14 @@ std::vector<note> database::notes(const uint64_t section_id)
             note.id = row.at("note_id").as<std::uint64_t>();
 
             std::string state{row.at("note_state").as<std::string>()};
-            if (state == "open") note.state = publication_state::open;
-            else if (state == "writing") note.state = publication_state::writing;
-            else if (state == "completed") note.state = publication_state::completed;
-            else if (state == "revised") note.state = publication_state::revised;
-            else if (state == "validated") note.state = publication_state::validated;
-            else if (state == "approved") note.state = publication_state::approved;
-            else if (state == "released") note.state = publication_state::released;
-            else if (state == "ignored") note.state = publication_state::ignored;
+            if (state == "open") { note.state = publication_state::open; }
+            else if (state == "writing") { note.state = publication_state::writing; }
+            else if (state == "completed") { note.state = publication_state::completed; }
+            else if (state == "revised") { note.state = publication_state::revised; }
+            else if (state == "validated") { note.state = publication_state::validated; }
+            else if (state == "approved") { note.state = publication_state::approved; }
+            else if (state == "released") { note.state = publication_state::released; }
+            else if (state == "ignored") { note.state = publication_state::ignored; }
 
             note.heading = row.at("heading").as<std::string>();
             block block{};
@@ -346,9 +353,9 @@ std::vector<block> database::note_blocks(const uint64_t note_id)
             block.language = row.at("language").as<std::string>();
 
             std::string type{row.at("type").as<std::string>()};
-            if (type == "code") block.type = block_type::code;
-            else if (type == "text") block.type = block_type::text;
-            else throw std::runtime_error("block type not retrieved");
+            if (type == "code") { block.type = block_type::code; }
+            else if (type == "text") { block.type = block_type::text; }
+            else { throw std::runtime_error("block type not retrieved"); }
 
             std::tm datetime{};
             std::istringstream last_update_stream{row.at("last_update").as<std::string>()};

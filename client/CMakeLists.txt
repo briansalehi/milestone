@@ -1,4 +1,8 @@
+cmake_minimum_required(VERSION 4.0.0)
+project("Milestone Client" VERSION 0.1 LANGUAGES CXX DESCRIPTION "Milestone Graphical Client")
+
 include(GNUInstallDirs)
+enable_testing()
 
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)

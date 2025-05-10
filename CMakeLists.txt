@@ -12,6 +12,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_INSTALL_RPATH $<INSTALL_INTERFACE:${CMAKE_INSTALL_LIBDIR}>)
 set(CMAKE_CXX_CLANG_TIDY clang-tidy -checks=-*,readability-*)
 
+add_subdirectory(flashback)
 add_subdirectory(server)
 add_subdirectory(client)
 add_subdirectory(client-cli)
