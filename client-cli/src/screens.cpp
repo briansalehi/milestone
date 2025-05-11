@@ -19,7 +19,7 @@ void screens::print(int const row, int const column, std::string const& text)
 {
     clear();
     mvprintw(row, column, "%s\n", text.c_str());
-    printw("Print q to quit");
+    mvprintw(LINES - 1, 0, "Press q to quit");
     refresh();
     getchar();
 }

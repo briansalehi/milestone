@@ -36,17 +36,17 @@ void options::parse(int argc, char const** argv)
     boost::program_options::store(parsed_options, arguments);
     arguments.notify();
 
-    if (arguments.count("help") > 0)
+    if (arguments.contains("help"))
     {
         throw std::invalid_argument{std::string{}};
     }
 
-    if (arguments.count("version") > 0)
+    if (arguments.contains("version"))
     {
         throw std::runtime_error{std::format("v{}", PROGRAM_VERSION)};
     }
 
-    if (arguments.count("log") > 0)
+    if (arguments.contains("log"))
     {
         logfile = arguments["log"].as<std::string>();
     }
@@ -58,12 +58,12 @@ void options::parse(int argc, char const** argv)
     address = arguments["address"].as<std::string>();
     port = std::stoi(arguments["port"].as<std::string>());
 
-    if (arguments.count("v4") > 0)
+    if (arguments.contains("v4"))
     {
         ipv4_only = true;
     }
 
-    if (arguments.count("v6") > 0)
+    if (arguments.contains("v6"))
     {
         ipv6_only = true;
     }

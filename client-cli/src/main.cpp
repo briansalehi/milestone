@@ -10,6 +10,7 @@ int main(int const argc, char** argv)
     {
         milestone::options const options{argc, argv};
         milestone::client client{options};
+        client.make_request("/resources");
     }
     catch(milestone::terminating_argument const& arg)
     {
