@@ -2,10 +2,8 @@
 
 #include <vector>
 #include <string>
-#include <cstdint>
 #include <boost/program_options.hpp>
 #include <boost/asio.hpp>
-#include <milestone/exceptions.hpp>
 
 namespace milestone
 {

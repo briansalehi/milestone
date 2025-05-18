@@ -1061,7 +1061,7 @@ EXAMPLE_RECURSIVE      = NO
 # that contain images that are to be included in the documentation (see the
 # \image command).
 
-IMAGE_PATH             = docs/images
+IMAGE_PATH             =
 
 # The INPUT_FILTER tag can be used to specify a program that doxygen should
 # invoke to filter for each input file. Doxygen will invoke the filter program
@@ -2705,7 +2705,7 @@ DIAFILE_DIRS           =
 # a preprocessing step. Doxygen will generate a warning when it encounters a
 # \startuml command in this case and will not generate output for the diagram.
 
-PLANTUML_JAR_PATH      = /usr/share/java/plantuml/plantuml.jar
+PLANTUML_JAR_PATH      = /usr/share/java/plantuml.jar
 
 # When using plantuml, the PLANTUML_CFG_FILE tag can be used to specify a
 # configuration file for plantuml.

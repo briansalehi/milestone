@@ -1,8 +1,8 @@
 #include <milestone/client.hpp>
-#include <print>
 #include <iostream>
 #include <string>
 #include <format>
+#include <print>
 
 using namespace milestone;
 
@@ -12,8 +12,8 @@ static constexpr char const* request_format{
     "Accept: application/json{1}{1}"
 };
 
-client::client(options const& opts)
-    : m_options{opts}
+client::client(options opts)
+    : m_options{std::move(opts)}
     , m_screen{}
     , m_context{}
     , m_socket{m_context}

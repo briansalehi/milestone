@@ -12,7 +12,7 @@ namespace milestone
 class client
 {
 public:
-    explicit client(options const& opts);
+    explicit client(options opts);
     virtual ~client();
     void make_request(std::string const& path) &;
 private:
