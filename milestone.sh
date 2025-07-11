@@ -4,9 +4,11 @@ read -n 1 -p "Do you want to [P]ractice or [S]tudy? " mode
 echo
 echo
 
-last_line=$((LINES - 2))
+last_line=$(($(tput lines) - 2))
 declare -A subjects
 declare -A topics
+declare -A resources
+declare -A sections
 
 dense_column()
 {
@@ -73,7 +75,7 @@ start_practice()
 
     while IFS="|" read -r id name
     do
-        topics[$id]="$parent"
+        topics[$id]="$name"
     done < <(psql -U milestone -d milestone -c "select id, name from topics where subject_id = $subject order by position, creation" -At)
 
     while IFS="|" read -r id name
@@ -130,6 +132,72 @@ start_practice()
 
 start_study()
 {
+    while IFS='|' read -r id name
+    do
+        resources[$id]="$name"
+    done < <(psql -U milestone -d milestone -c "select id, name from resources order by name" -At)
+
+    while IFS='|' read -r id name
+    do
+        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m"
+    done < <(psql -U milestone -d milestone -c "select id, name from resources order by name" -At) | dense_column
+    echo
+
+    while true
+    do
+        read -p "Select a resource: " resource
+        [[ -n "${resources[$resource]}" ]] && break
+    done
+
+    while IFS="|" read -r id name
+    do
+        sections[$id]="$name"
+    done < <(psql -U milestone -d milestone -c "select id, number from sections where resource_id = $resource order by number, created" -At)
+
+    while IFS="|" read -r id name
+    do
+        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m"
+    done < <(psql -U milestone -d milestone -c "select id, number from sections where resource_id = $resource order by number, created" -At) | dense_column
+    echo
+
+    while true
+    do
+        read -p "Select a section: " section
+        echo "Topic ${sections[$section]} selected"
+        [[ -n "${sections[$section]}" ]] && break
+    done
+    echo
+
+    note_count="$(psql -U milestone -d milestone -c "select count(id) from notes where section_id = $section" -At)"
+    note_number=0
+
+    while IFS="|" read -r note heading
+    do
+        note_number=$((note_number + 1))
+        notes[$note]="$parent"
+
+        clear
+        echo -e "\e[1;35m$note_number/$note_count \e[1;33m$heading\e[0m\n"
+
+        while IFS="|" read -r block type language
+        do
+            content="$(psql -U milestone -d milestone -c "select content from note_blocks where id = $block" -At)"
+
+            case "$type" in
+                text) echo "$content" | bat --paging never --squeeze-blank --language "md" --style "plain" ;;
+                code) echo "$content" | bat --paging never --squeeze-blank --language "$language" --style "grid,numbers" ;;
+                *) echo -e "\e[1;31mInvalid block type and language $type / $language" ;;
+            esac
+            echo
+        done < <(psql -U milestone -d milestone -c "select id, type, language from note_blocks where note_id = $note order by position" -At)
+
+        while true
+        do
+            tput cup $last_line 0
+            read -n 1 -p "Press [N]ext to move forward: " response </dev/tty
+            [[ "${response,,}" == "n" ]] && break
+        done
+    done < <(psql -U milestone -d milestone -c "select id, heading from notes where section_id = $section" -At)
     echo
 }
 
