@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+
+read -n 1 -p "Do you want to [P]ractice or [S]tudy? " mode
+echo
+echo
+
+last_line=$((LINES - 2))
+declare -A subjects
+declare -A topics
+
+dense_column()
+{
+    local line=0
+    local max_line_width=0
+    local max_width=$(tput cols)
+    local total_lines=0
+    local max_columns=0
+    local column_number=0
+    local line_number=0
+    local remaining_line=0
+    local min_axes=0
+    local line_length=0
+    local line_bytes=0
+    local buffer=""
+
+    buffer="$(mktemp)"
+
+    while read -r line
+    do
+        echo "$line" >> "$buffer"
+        total_lines=$((total_lines + 1))
+        line_length="$(sed -E 's/\x1B\[[0-9;]*[mK]//g' <<< "$line" | wc -c)"
+        [[ "${line_length}" -gt "$max_line_width" ]] && max_line_width="${line_length}" && line_bytes=${#line}
+    done
+
+    max_line_width=$((max_line_width + 4))
+    line_bytes=$((line_bytes + 4))
+    max_columns=$((max_width / max_line_width))
+    [[ $((total_lines % max_columns)) -gt 0 ]] && remaining_line=1
+    max_lines=$((total_lines / max_columns + remaining_line))
+
+    for line_number in $(seq 1 $max_lines)
+    do
+        for column_number in $(seq $line_number $max_lines $total_lines)
+        do
+            line="$(sed -n "$((column_number))p" "$buffer")"
+            printf "%-$((line_bytes))s" "$line"
+        done
+        echo
+    done
+
+    rm "$buffer"
+}
+
+start_practice()
+{
+    while IFS='|' read -r id name
+    do
+        subjects[$id]="$name"
+    done < <(psql -U milestone -d milestone -c "select id, name from subjects order by id" -At)
+
+    while IFS='|' read -r id name
+    do
+        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m"
+    done < <(psql -U milestone -d milestone -c "select id, name from subjects order by id" -At) | dense_column
+    echo
+
+    while true
+    do
+        read -p "Select a subject: " subject
+        [[ -n "${subjects[$subject]}" ]] && break
+    done
+
+    while IFS="|" read -r id name
+    do
+        topics[$id]="$parent"
+    done < <(psql -U milestone -d milestone -c "select id, name from topics where subject_id = $subject order by position, creation" -At)
+
+    while IFS="|" read -r id name
+    do
+        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m"
+    done < <(psql -U milestone -d milestone -c "select id, name from topics where subject_id = $subject order by position, creation" -At) | dense_column
+    echo
+
+    while true
+    do
+        read -p "Select a topic: " topic
+        echo "Topic ${topics[$topic]} selected"
+        [[ -n "${topics[$topic]}" ]] && break
+    done
+    echo
+
+    practice_count="$(psql -U milestone -d milestone -c "select count(id) from practices where topic_id = $topic" -At)"
+    practice_number=0
+
+    while read -r record
+    do
+        practice_number=$((practice_number + 1))
+        practice="$(awk 'BEGIN{FS="|"} {print $1}' <<< "$record")"
+        heading="$(awk 'BEGIN{FS="|"} {print $2}' <<< "$record")"
+        practices[$practice]="$parent"
+
+        clear
+        echo -e "\e[1;35m$practice_number/$practice_count \e[1;33m$heading\e[0m\n"
+
+        while read -r record
+        do
+            block="$(cut -d"|" -f1 <<< "$record")"
+            type="$(cut -d"|" -f2 <<< "$record")"
+            language="$(cut -d"|" -f3 <<< "$record")"
+            content="$(psql -U milestone -d milestone -c "select content from practice_blocks where id = $block" -At)"
+
+            case "$type" in
+                text) echo "$content" | bat --paging never --squeeze-blank --language "md" --style "plain" ;;
+                code) echo "$content" | bat --paging never --squeeze-blank --language "$language" --style "grid,numbers" ;;
+                *) echo -e "\e[1;31mInvalid block type and language $type / $language" ;;
+            esac
+            echo
+        done <<< "$(psql -U milestone -d milestone -c "select id, type, language from practice_blocks where practice_id = $practice order by position" -At)"
+
+        while true
+        do
+            tput cup $last_line 0
+            read -n 1 -p "Press [N]ext to move forward: " response </dev/tty
+            [[ "${response,,}" == "n" ]] && break
+        done
+    done <<< "$(psql -U milestone -d milestone -c "select id, heading from practices where topic_id = $topic" -At)"
+    echo
+}
+
+start_study()
+{
+    echo
+}
+
+case "${mode,,}" in
+    s|study) start_study ;;
+    p|practice) start_practice ;;
+    *) echo -e "\e[1;31mIncorrect mode selected\e[0m" ;;
+esac
