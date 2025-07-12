@@ -15,6 +15,7 @@ dense_column()
     local line=0
     local max_line_width=0
     local max_width=$(tput cols)
+    local screen_lines=$(tput lines)
     local total_lines=0
     local max_columns=0
     local column_number=0
@@ -41,15 +42,28 @@ dense_column()
     [[ $((total_lines % max_columns)) -gt 0 ]] && remaining_line=1
     max_lines=$((total_lines / max_columns + remaining_line))
 
-    for line_number in $(seq 1 $max_lines)
-    do
-        for column_number in $(seq $line_number $max_lines $total_lines)
+    if [[ $max_lines -gt $screen_lines ]]
+    then
+        for line_number in $(seq 1 $max_lines)
         do
-            line="$(sed -n "$((column_number))p" "$buffer")"
-            printf "%-$((line_bytes))s" "$line"
+            for column_number in $(seq $line_number $max_lines $total_lines)
+            do
+                line="$(sed -n "$((column_number))p" "$buffer")"
+                printf "%-$((line_bytes))s" "$line"
+            done
+            echo
+        done | less -RF
+    else
+        for line_number in $(seq 1 $max_lines)
+        do
+            for column_number in $(seq $line_number $max_lines $total_lines)
+            do
+                line="$(sed -n "$((column_number))p" "$buffer")"
+                printf "%-$((line_bytes))s" "$line"
+            done
+            echo
         done
-        echo
-    done
+    fi
 
     rm "$buffer"
 }
