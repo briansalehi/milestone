@@ -129,13 +129,13 @@ start_practice()
         practices[$practice]="$parent"
 
         clear
-        echo -e "\e[2;37m$practice\e[0m \e[1;35m$practice_number/$practice_count \e[1;33m$heading\e[0m\n"
+        printf "\e[1;35m%d/%d\e[0m \e[2;37m%*s\e[0m\n\e[1;33m%-s\e[0m\n" $practice_number $practice_count $(($(tput cols) - ${#practice_number} - ${#practice_count} - 2)) $practice "$heading"
 
         while IFS="|" read -r block type language
         do
             content="$(psql -U milestone -d milestone -c "select content from practice_blocks where id = $block" -At)"
 
-            echo -e "\e[2;37m${block}\e[0m"
+            printf "\e[2;37m%*s\e[0m" $(tput cols) ${block}
             case "$type" in
                 text) echo "$content" | bat --paging never --squeeze-blank --language "md" --style "plain" ;;
                 code) echo "$content" | bat --paging never --squeeze-blank --language "$language" --style "grid,numbers" ;;
@@ -201,13 +201,13 @@ start_study()
         notes[$note]="$parent"
 
         clear
-        echo -e "\e[2;37m$note\e[0m \e[1;35m$note_number/$note_count \e[1;33m$heading\e[0m\n"
+        printf "\e[1;35m%d/%d\e[0m \e[2;37m%*s\e[0m\n\e[1;33m%-s\e[0m\n" $note_number $note_count $(($(tput cols) - ${#note_number} - ${#note_count} - 2)) $note "$heading"
 
         while IFS="|" read -r block type language
         do
             content="$(psql -U milestone -d milestone -c "select content from note_blocks where id = $block" -At)"
 
-            echo -e "\e[2;37m${block}\e[0m"
+            printf "\e[2;37m%*s\e[0m" $(tput cols) ${block}
             case "$type" in
                 text) echo "$content" | bat --paging never --squeeze-blank --language "md" --style "plain" ;;
                 code) echo "$content" | bat --paging never --squeeze-blank --language "$language" --style "grid,numbers" ;;
