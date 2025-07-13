@@ -62,7 +62,7 @@ dense_column()
                 fi
             done
             echo
-        done | less -RF
+        done | less -RFX
     else
         for line_number in $(seq 1 $max_lines)
         do
@@ -96,7 +96,6 @@ start_practice()
     do
         echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m"
     done < <(psql -U milestone -d milestone -c "select id, name from subjects order by id" -At) | dense_column
-    echo
 
     while true
     do
@@ -113,7 +112,6 @@ start_practice()
     do
         echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m"
     done < <(psql -U milestone -d milestone -c "select id, name from topics where subject_id = $subject order by position, creation" -At) | dense_column
-    echo
 
     while true
     do
@@ -121,35 +119,30 @@ start_practice()
         echo "Topic ${topics[$topic]} selected"
         [[ -n "${topics[$topic]}" ]] && break
     done
-    echo
 
     practice_count="$(psql -U milestone -d milestone -c "select count(id) from practices where topic_id = $topic" -At)"
     practice_number=0
 
-    while read -r record
+    while IFS="|" read -r practice heading
     do
         practice_number=$((practice_number + 1))
-        practice="$(awk 'BEGIN{FS="|"} {print $1}' <<< "$record")"
-        heading="$(awk 'BEGIN{FS="|"} {print $2}' <<< "$record")"
         practices[$practice]="$parent"
 
         clear
         echo -e "\e[1;35m$practice_number/$practice_count \e[1;33m$heading\e[0m\n"
 
-        while read -r record
+        while IFS="|" read -r block type language
         do
-            block="$(cut -d"|" -f1 <<< "$record")"
-            type="$(cut -d"|" -f2 <<< "$record")"
-            language="$(cut -d"|" -f3 <<< "$record")"
             content="$(psql -U milestone -d milestone -c "select content from practice_blocks where id = $block" -At)"
 
+            echo -e "\e[2;37m${block}\e[0m"
             case "$type" in
                 text) echo "$content" | bat --paging never --squeeze-blank --language "md" --style "plain" ;;
                 code) echo "$content" | bat --paging never --squeeze-blank --language "$language" --style "grid,numbers" ;;
                 *) echo -e "\e[1;31mInvalid block type and language $type / $language" ;;
             esac
             echo
-        done <<< "$(psql -U milestone -d milestone -c "select id, type, language from practice_blocks where practice_id = $practice order by position" -At)"
+        done < <(psql -U milestone -d milestone -c "select id, type, language from practice_blocks where practice_id = $practice order by position" -At)
 
         while true
         do
@@ -157,7 +150,7 @@ start_practice()
             read -n 1 -p "Press [N]ext to move forward: " response </dev/tty
             [[ "${response,,}" == "n" ]] && break
         done
-    done <<< "$(psql -U milestone -d milestone -c "select id, heading from practices where topic_id = $topic" -At)"
+    done < <(psql -U milestone -d milestone -c "select id, heading from practices where topic_id = $topic" -At)
     echo
 }
 
@@ -214,6 +207,7 @@ start_study()
         do
             content="$(psql -U milestone -d milestone -c "select content from note_blocks where id = $block" -At)"
 
+            echo -e "\e[2;37m${block}\e[0m"
             case "$type" in
                 text) echo "$content" | bat --paging never --squeeze-blank --language "md" --style "plain" ;;
                 code) echo "$content" | bat --paging never --squeeze-blank --language "$language" --style "grid,numbers" ;;
