@@ -129,7 +129,7 @@ start_practice()
         practices[$practice]="$parent"
 
         clear
-        echo -e "\e[1;35m$practice_number/$practice_count \e[1;33m$heading\e[0m\n"
+        echo -e "\e[2;37m$practice\e[0m \e[1;35m$practice_number/$practice_count \e[1;33m$heading\e[0m\n"
 
         while IFS="|" read -r block type language
         do
@@ -201,7 +201,7 @@ start_study()
         notes[$note]="$parent"
 
         clear
-        echo -e "\e[1;35m$note_number/$note_count \e[1;33m$heading\e[0m\n"
+        echo -e "\e[2;37m$note\e[0m \e[1;35m$note_number/$note_count \e[1;33m$heading\e[0m\n"
 
         while IFS="|" read -r block type language
         do
