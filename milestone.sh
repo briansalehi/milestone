@@ -9,6 +9,7 @@ declare -A subjects
 declare -A topics
 declare -A resources
 declare -A sections
+margin=4
 
 dense_column()
 {
@@ -24,6 +25,7 @@ dense_column()
     local min_axes=0
     local line_length=0
     local line_bytes=0
+    local last_column=0
     local buffer=""
 
     buffer="$(mktemp)"
@@ -36,9 +38,10 @@ dense_column()
         [[ "${line_length}" -gt "$max_line_width" ]] && max_line_width="${line_length}" && line_bytes=${#line}
     done
 
-    max_line_width=$((max_line_width + 4))
-    line_bytes=$((line_bytes + 4))
+    max_line_width=$((max_line_width + $margin))
+    line_bytes=$((line_bytes + $margin))
     max_columns=$((max_width / max_line_width))
+    [[ $((max_width % max_line_width)) -le $margin ]] && max_columns=$((max_columns + 1))
     [[ $((total_lines % max_columns)) -gt 0 ]] && remaining_line=1
     max_lines=$((total_lines / max_columns + remaining_line))
 
@@ -48,8 +51,15 @@ dense_column()
         do
             for column_number in $(seq $line_number $max_lines $total_lines)
             do
+                last_column=$(seq $line_number $max_lines $total_lines | tail -n1)
                 line="$(sed -n "$((column_number))p" "$buffer")"
-                printf "%-$((line_bytes))s" "$line"
+
+                if [[ $column_number -eq $last_column ]]
+                then
+                    printf "%-$((line_bytes - margin))s" "$line"
+                else
+                    printf "%-${line_bytes}s" "$line"
+                fi
             done
             echo
         done | less -RF
@@ -58,8 +68,15 @@ dense_column()
         do
             for column_number in $(seq $line_number $max_lines $total_lines)
             do
+                last_column=$(seq $line_number $max_lines $total_lines | tail -n1)
                 line="$(sed -n "$((column_number))p" "$buffer")"
-                printf "%-$((line_bytes))s" "$line"
+
+                if [[ $column_number -eq $last_column ]]
+                then
+                    printf "%-$((line_bytes - margin))s" "$line"
+                else
+                    printf "%-${line_bytes}s" "$line"
+                fi
             done
             echo
         done
