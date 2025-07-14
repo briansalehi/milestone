@@ -668,6 +668,78 @@ end; $$;
 ALTER FUNCTION milestone.get_user_topics(user_index integer, subject_index integer) OWNER TO milestone;
 
 --
+-- Name: merge_note_blocks(integer, integer); Type: FUNCTION; Schema: milestone; Owner: milestone
+--
+
+CREATE FUNCTION milestone.merge_note_blocks(upper integer, lower integer) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+declare
+    upper_note integer;
+    lower_note integer;
+    upper_position integer;
+    lower_position integer;
+    swap_position integer;
+    lower_type block_type;
+    lower_language varchar(10);
+    block integer;
+begin
+    if upper_position = lower_position then
+        return 0;
+    end if;
+
+    if upper_position > lower_position then
+        swap_position = upper_position;
+        upper_position = lower_position;
+        lower_position = swap_position;
+    end if;
+
+    -- collect first block info
+    select note_id, position
+    into upper_note, upper_position
+    from note_blocks where id = upper;
+
+    -- collect second block info
+    select note_id, position, type, language
+    into lower_note, lower_position, lower_type, lower_language
+    from note_blocks where id = lower;
+
+    if upper_note <> lower_note then
+        raise exception 'Uncommon card between blocks % and %', upper, lower;
+    end if;
+
+    -- find the top free position of this note for swapping
+    select max(position) + 1 into swap_position
+    from note_blocks where note_id = upper_note;
+
+    -- create a new record on the top most position
+    insert into note_blocks (note_id, content, type, language, position)
+    select upper_note, string_agg(coalesce(content, ''), E'\n\n' order by position), lower_type, lower_language, swap_position
+    from note_blocks where id in (upper, lower)
+    returning id into block;
+
+    -- remove the two merged blocks
+    delete from note_blocks where id in (upper, lower);
+
+    -- move the newly created block into the top most position
+    update note_blocks set position = lower_position where id = block;
+
+    -- reorder positions from top to bottom for a note
+    update note_blocks pb set position = sub.position
+    from (
+        select id, row_number() over (order by position) as position
+        from note_blocks where note_id = upper_note
+    ) sub
+    where pb.id = sub.id;
+
+    return block;
+end;
+$$;
+
+
+ALTER FUNCTION milestone.merge_note_blocks(upper integer, lower integer) OWNER TO milestone;
+
+--
 -- Name: merge_practice_blocks(integer, integer); Type: FUNCTION; Schema: milestone; Owner: milestone
 --
 
@@ -680,15 +752,23 @@ declare
     upper_position integer;
     lower_position integer;
     swap_position integer;
-    upper_type block_type;
     lower_type block_type;
-    upper_language varchar(10);
     lower_language varchar(10);
     block integer;
 begin
+    if upper_position = lower_position then
+        return 0;
+    end if;
+
+    if upper_position > lower_position then
+        swap_position := upper_position;
+        upper_position := lower_position;
+        lower_position := swap_position;
+    end if;
+
     -- collect first block info
-    select practice_id, position, type, language
-    into upper_practice, upper_position, upper_type, upper_language
+    select practice_id, position
+    into upper_practice, upper_position
     from practice_blocks where id = upper;
 
     -- collect second block info
@@ -700,35 +780,13 @@ begin
         raise exception 'Uncommon card between blocks % and %', upper, lower;
     end if;
 
-    if upper_type <> lower_type then
-        raise exception 'Uncommon types for block % as % and block % as %', upper, upper_type, lower, lower_type;
-    end if;
-
-    if upper_language <> lower_language then
-        raise exception 'Uncommon languages for block % as % and block % as %', upper, upper_language, lower, lower_language;
-    end if;
-
-    if upper_position = lower_position then
-        raise exception 'The two blocks % cannot be the same', upper;
-    end if;
-
-    if upper_position < lower_position then
-        swap_position = upper_position;
-        upper_position = lower_position;
-        lower_position = swap_position;
-    end if;
-
-    if upper_position - lower_position > 1 then
-        raise exception 'The two blocks % and % are not adjacent', upper, lower;
-    end if;
-
     -- find the top free position of this practice for swapping
     select max(position) + 1 into swap_position
     from practice_blocks where practice_id = upper_practice;
 
     -- create a new record on the top most position
     insert into practice_blocks (practice_id, content, type, language, position)
-    select upper_practice, string_agg(coalesce(content, ''), E'\n\n' order by position), upper_type, upper_language, swap_position
+    select upper_practice, string_agg(coalesce(content, ''), E'\n\n' order by position), lower_type, lower_language, swap_position
     from practice_blocks where id in (upper, lower)
     returning id into block;
 
@@ -16596,7 +16654,6 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 504	265	C++20 introduced designated initializers for aggregate initialization. This\nallows for better control over which elements of the aggregate will be\nexplicitly initialized.	text	txt	2024-07-28 09:46:45.307708	1
 505	265	#include <string>	text	txt	2024-07-28 09:46:45.328004	2
 506	265	struct Data {\n    int a;\n    double b;\n    std::string c;\n};	text	txt	2024-07-28 09:46:45.349071	3
-474	258	#include <string>	text	txt	2024-07-28 09:46:40.222284	3
 511	265	// A clunky but functional option for named agruments in C++\nstruct Arg { const std::string& label; int64_t id; };\nvoid some_func(Arg arg) {}	text	txt	2024-07-28 09:46:45.452174	8
 512	265	some_func({.label = config.label, .id = 42});	code	txt	2024-07-28 09:46:45.473004	9
 513	266	void do_something();	text	txt	2024-07-28 09:46:45.903451	1
@@ -19900,11 +19957,7 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 3822	1192	For **AVX**, data should be aligned on a 32 bytes border and for **AVX-512**,\ndata needs to be aligned on a 64 bytes border.	text	txt	2024-07-28 09:55:46.780365	2
 472	258	Unlike some other languages, the fundamental types (`bool`, `char`, `int`,\n`float`,...) in C++ do not receive special treatment with the following\nexceptions:	text	txt	2024-07-28 09:46:40.18121	1
 473	258	- Fundamental types have their semantics defined in the C++ standard.\n- Default initializing a variable of a fundamental type does not perform any\n  initialization.\n- Arguments to operators for fundamental types are prvalues.	text	txt	2024-07-28 09:46:40.201882	2
-475	258	int v; // left uninitialized	text	txt	2024-07-28 09:46:40.243502	4
-476	258	// Only well-defined since C++17\nint x = 1;\n(x = 2) = x; // x == 1	text	txt	2024-07-28 09:46:40.263242	5
-477	258	// right side evalutes: 1 (prvalue)\n// left side evaluates: ref to x (x==2)\n// assignment evaluates: ref to x (x==1)	text	txt	2024-07-28 09:46:40.28468	6
-478	258	std::string y = "a";\n(y = "b") = y; // y == "b"	text	txt	2024-07-28 09:46:40.303948	7
-479	258	// right side evaluates: ref to y\n// left side evalutes: ref y (y=="b")\n// assignment evaluates: ref to y (y=="b")	code	txt	2024-07-28 09:46:40.323457	8
+3827	258	#include <string>\n\nint v; // left uninitialized\n\n// Only well-defined since C++17\nint x = 1;\n(x = 2) = x; // x == 1\n\n// right side evalutes: 1 (prvalue)\n// left side evaluates: ref to x (x==2)\n// assignment evaluates: ref to x (x==1)\n\nstd::string y = "a";\n(y = "b") = y; // y == "b"\n\n// right side evaluates: ref to y\n// left side evalutes: ref y (y=="b")\n// assignment evaluates: ref to y (y=="b")	code	cpp	2025-07-13 14:51:59.008113	3
 \.
 
 
@@ -26464,7 +26517,7 @@ SELECT pg_catalog.setval('milestone.notes_id_seq', 3956, true);
 -- Name: practice_blocks_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
 --
 
-SELECT pg_catalog.setval('milestone.practice_blocks_id_seq', 3822, true);
+SELECT pg_catalog.setval('milestone.practice_blocks_id_seq', 3827, true);
 
 
 --
