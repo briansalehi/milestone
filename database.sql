@@ -16625,25 +16625,8 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 467	254	You can also enable it for all directories with `set auto-load-safe-path /`.	text	txt	2024-07-28 09:46:38.465778	5
 468	255	perf record -o /tmp/perf.data --call-graph dwarf --event instructions,cpu-cycles,cache-misses,branches,branch-misses --aio --sample-cpu <exec>	code	txt	2024-07-28 09:46:38.736678	1
 469	256	sudo hotspot	code	txt	2024-07-28 09:46:39.001065	1
-470	257	g++ -o program source.cpp -std=c++20	code	txt	2024-07-28 09:46:39.360787	1
-471	257	clang++ -o program source.cpp -std=c++20	code	txt	2024-07-28 09:46:39.381534	2
-480	259	#include <iostream>	text	txt	2024-07-28 09:46:40.868101	1
-481	259	int global_number = 42;	text	txt	2024-07-28 09:46:40.887556	2
-482	259	int function()\n{\n    int local_number = 77;\n    return local_number;\n}	text	txt	2024-07-28 09:46:40.908775	3
-483	259	int main()\n{\n    std::cout << function() << '\\\\n';\n    std::cout << global_number << '\\\\n';\n    return 0;\n}	code	txt	2024-07-28 09:46:40.931053	4
 484	260	- Literal constants\n- Constants defined by `const`\n- Constant expressions defined by `constexpr`\n- Immediate functions marked by `consteval`\n- Enumerations\n- Scoped Enumerations\n- Preprocessor macro `#define`	text	txt	2024-07-28 09:46:41.305457	1
-485	261	const double pi = 22.0 / 7;	code	txt	2024-07-28 09:46:41.547064	1
-486	262	* direct initialization initializes an object from an explicit set of\n  constructor arguments.\n* copy initialization initializes an object from another object.\n* brace initialization prevents narrowing conversion of data types.\n* all elements of list initialization should be of the same type.	text	txt	2024-07-28 09:46:42.687443	1
-487	262	#include <iostream>\n#include <initializer_list>\n#include <string>\n#include <vector>\n#include <map>	text	txt	2024-07-28 09:46:42.709203	2
-488	262	void func(int const a, int const b, int const c)\n{\n    std::cout << a << b << c << '\\\\n';\n}	text	txt	2024-07-28 09:46:42.731217	3
-489	262	void func(std::initializer_list<int> const list)\n{\n    for (auto const& e: list)\n        std::cout << e;\n    std::cout << '\\\\n';\n}	text	txt	2024-07-28 09:46:42.752051	4
-490	262	int main()\n{\n    std::string s1("text"); // direct initialization\n    std::string s2 = "text"; // copy initialization\n    std::string s3{"text"}; // direct list-initialization\n    std::string s4 = {"text"}; // copy list-initialization	text	txt	2024-07-28 09:46:42.772898	5
-491	262	    std::vector<int> v{1, 2, 3};\n    std::map<int, std::string> m{{1, "one"}, {2, "two"}};	text	txt	2024-07-28 09:46:42.794464	6
-492	262	    func({1, 2, 3}); // call std::initializer_list<int> overload	text	txt	2024-07-28 09:46:42.815327	7
-493	262	    std::vector v1{4}; // size = 1\n    std::vector v2(4); // size = 4	text	txt	2024-07-28 09:46:42.836057	8
-494	262	    auto a = {42}; // std::initializer_list<int>\n    auto b{42}; // int\n    auto c = {4, 2}; //std::initializer_list<int>\n    auto d{4, 2}; // error, too many elements	code	txt	2024-07-28 09:46:42.856724	9
 495	263	Before C++ direct list initialization deduced as `std::initializer_list<int>`\nbut since C++17 it is as `int`.	text	txt	2024-07-28 09:46:43.287337	1
-496	263	auto x { 42 };\n// before C++17: std::initializer_list<int>\n// since C++17: int	code	txt	2024-07-28 09:46:43.308841	2
 497	264	Aggregate types can be initialized using special aggregate initialization.\nThis initializes members in their declaration order. Members that are not\nexplicitly initialized and do not have a default member initializer are\ninitialized using empty copy-list-initialization (i.e. `T x={}`).	text	txt	2024-07-28 09:46:44.264905	1
 498	264	#include <string>\n#include <vector>	text	txt	2024-07-28 09:46:44.286577	2
 499	264	struct Data\n{\n    int x;\n    double y;\n    std::string label = "Hello World!"; // only permitted since C++14\n    std::vector<int> arr;\n};	text	txt	2024-07-28 09:46:44.307937	3
@@ -16654,6 +16637,11 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 504	265	C++20 introduced designated initializers for aggregate initialization. This\nallows for better control over which elements of the aggregate will be\nexplicitly initialized.	text	txt	2024-07-28 09:46:45.307708	1
 505	265	#include <string>	text	txt	2024-07-28 09:46:45.328004	2
 506	265	struct Data {\n    int a;\n    double b;\n    std::string c;\n};	text	txt	2024-07-28 09:46:45.349071	3
+470	257	g++ -o program source.cpp -std=c++20	code	sh	2024-07-28 09:46:39.360787	1
+471	257	clang++ -o program source.cpp -std=c++20	code	sh	2024-07-28 09:46:39.381534	2
+485	261	const double pi = 22.0 / 7;	code	cpp	2024-07-28 09:46:41.547064	1
+486	262	* direct initialization initializes an object from an explicit set of\n  constructor arguments.\n* copy initialization initializes an object from another object.\n* brace initialization prevents narrowing conversion of data types.\n* all elements of list initialization should be of the same type.	text	txt	2024-07-28 09:46:42.687443	1
+496	263	auto x { 42 };\n// before C++17: std::initializer_list<int>\n// since C++17: int	code	cpp	2024-07-28 09:46:43.308841	2
 511	265	// A clunky but functional option for named agruments in C++\nstruct Arg { const std::string& label; int64_t id; };\nvoid some_func(Arg arg) {}	text	txt	2024-07-28 09:46:45.452174	8
 512	265	some_func({.label = config.label, .id = 42});	code	txt	2024-07-28 09:46:45.473004	9
 513	266	void do_something();	text	txt	2024-07-28 09:46:45.903451	1
@@ -19958,6 +19946,8 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 472	258	Unlike some other languages, the fundamental types (`bool`, `char`, `int`,\n`float`,...) in C++ do not receive special treatment with the following\nexceptions:	text	txt	2024-07-28 09:46:40.18121	1
 473	258	- Fundamental types have their semantics defined in the C++ standard.\n- Default initializing a variable of a fundamental type does not perform any\n  initialization.\n- Arguments to operators for fundamental types are prvalues.	text	txt	2024-07-28 09:46:40.201882	2
 3827	258	#include <string>\n\nint v; // left uninitialized\n\n// Only well-defined since C++17\nint x = 1;\n(x = 2) = x; // x == 1\n\n// right side evalutes: 1 (prvalue)\n// left side evaluates: ref to x (x==2)\n// assignment evaluates: ref to x (x==1)\n\nstd::string y = "a";\n(y = "b") = y; // y == "b"\n\n// right side evaluates: ref to y\n// left side evalutes: ref y (y=="b")\n// assignment evaluates: ref to y (y=="b")	code	cpp	2025-07-13 14:51:59.008113	3
+3830	259	#include <iostream>\n\nint global_number = 42;\n\nint function()\n{\n    int local_number = 77;\n    return local_number;\n}\n\nint main()\n{\n    std::cout << function() << '\\\\n';\n    std::cout << global_number << '\\\\n';\n    return 0;\n}	code	cpp	2025-07-14 12:45:07.366694	1
+3837	262	#include <iostream>\n#include <initializer_list>\n#include <string>\n#include <vector>\n#include <map>\n\nvoid func(int const a, int const b, int const c)\n{\n    std::cout << a << b << c << '\\\\n';\n}\n\nvoid func(std::initializer_list<int> const list)\n{\n    for (auto const& e: list)\n        std::cout << e;\n    std::cout << '\\\\n';\n}\n\nint main()\n{\n    std::string s1("text"); // direct initialization\n    std::string s2 = "text"; // copy initialization\n    std::string s3{"text"}; // direct list-initialization\n    std::string s4 = {"text"}; // copy list-initialization\n\n    std::vector<int> v{1, 2, 3};\n    std::map<int, std::string> m{{1, "one"}, {2, "two"}};\n\n    func({1, 2, 3}); // call std::initializer_list<int> overload\n\n    std::vector v1{4}; // size = 1\n    std::vector v2(4); // size = 4\n\n    auto a = {42}; // std::initializer_list<int>\n    auto b{42}; // int\n    auto c = {4, 2}; //std::initializer_list<int>\n    auto d{4, 2}; // error, too many elements	code	cpp	2025-07-14 13:09:53.17377	2
 \.
 
 
@@ -26517,7 +26507,7 @@ SELECT pg_catalog.setval('milestone.notes_id_seq', 3956, true);
 -- Name: practice_blocks_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
 --
 
-SELECT pg_catalog.setval('milestone.practice_blocks_id_seq', 3827, true);
+SELECT pg_catalog.setval('milestone.practice_blocks_id_seq', 3837, true);
 
 
 --
