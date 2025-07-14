@@ -99,6 +99,7 @@ start_practice()
 
     while true
     do
+        echo
         read -p "Select a subject: " subject
         [[ -n "${subjects[$subject]}" ]] && break
     done
@@ -116,8 +117,8 @@ start_practice()
     while true
     do
         read -p "Select a topic: " topic
-        echo "Topic ${topics[$topic]} selected"
         [[ -n "${topics[$topic]}" ]] && break
+        echo
     done
 
     practice_count="$(psql -U milestone -d milestone -c "select count(id) from practices where topic_id = $topic" -At)"
@@ -129,7 +130,8 @@ start_practice()
         practices[$practice]="$parent"
 
         clear
-        printf "\e[1;35m%d/%d\e[0m \e[2;37m%*s\e[0m\n\e[1;33m%-s\e[0m\n" $practice_number $practice_count $(($(tput cols) - ${#practice_number} - ${#practice_count} - 2)) $practice "$heading"
+        printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m \e[1;33m>>\e[0m \e[1;36m%s\e[0m \e[2;37m%d\e[0m\n\n" "${subjects[$subject]}" ${subject} "${topics[$topic]}" ${topic}
+        printf "\e[1;35m%d/%d\e[0m \e[1;33m%s\e[0m \e[2;37m%s\e[0m\n" $practice_number $practice_count "$heading" $practice
 
         while IFS="|" read -r block type language
         do
@@ -146,8 +148,11 @@ start_practice()
 
         while true
         do
-            tput cup $last_line 0
-            read -n 1 -p "Press [N]ext to move forward: " response </dev/tty
+            tput cup $last_line $(($(tput cols) - 28))
+            tput civis
+            echo -ne "\e[1;31mPress [N]ext to move forward\e[0m"
+            read -n 1 -s response </dev/tty
+            tput cnorm
             [[ "${response,,}" == "n" ]] && break
         done
     done < <(psql -U milestone -d milestone -c "select id, heading from practices where topic_id = $topic" -At)
@@ -165,7 +170,6 @@ start_study()
     do
         echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m"
     done < <(psql -U milestone -d milestone -c "select id, name from resources order by name" -At) | dense_column
-    echo
 
     while true
     do
@@ -182,12 +186,10 @@ start_study()
     do
         echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m"
     done < <(psql -U milestone -d milestone -c "select id, number from sections where resource_id = $resource order by number, created" -At) | dense_column
-    echo
 
     while true
     do
         read -p "Select a section: " section
-        echo "Topic ${sections[$section]} selected"
         [[ -n "${sections[$section]}" ]] && break
     done
     echo
@@ -199,9 +201,12 @@ start_study()
     do
         note_number=$((note_number + 1))
         notes[$note]="$parent"
+        section_name="${sections[$section]}"
 
         clear
-        printf "\e[1;35m%d/%d\e[0m \e[2;37m%*s\e[0m\n\e[1;33m%-s\e[0m\n" $note_number $note_count $(($(tput cols) - ${#note_number} - ${#note_count} - 2)) $note "$heading"
+        #printf "\e[1;36m%s\e[0m \e[1;35m%d/%d\e[0m \e[2;37m%*s\e[0m\n\e[1;33m%-s\e[0m\n" "${section_name}" $note_number $note_count $(($(tput cols) - ${#note_number} - ${#note_count} - ${#section_name} - 3)) $note "$heading"
+        printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m \e[1;33m>>\e[0m \e[1;36m%s\e[0m \e[2;37m%d\e[0m\n\n" "${resources[$resource]}" ${resource} "${sections[$section]}" ${section}
+        printf "\e[1;35m%d/%d\e[0m \e[1;33m%s\e[0m \e[2;37m%s\e[0m\n" $note_number $note_count "$heading" $note
 
         while IFS="|" read -r block type language
         do
@@ -218,8 +223,11 @@ start_study()
 
         while true
         do
-            tput cup $last_line 0
-            read -n 1 -p "Press [N]ext to move forward: " response </dev/tty
+            tput cup $last_line $(($(tput cols) - 28))
+            tput civis
+            echo -ne "\e[1;31mPress [N]ext to move forward\e[0m"
+            read -n 1 -s response </dev/tty
+            tput cnorm
             [[ "${response,,}" == "n" ]] && break
         done
     done < <(psql -U milestone -d milestone -c "select id, heading from notes where section_id = $section" -At)
