@@ -135,7 +135,7 @@ start_practice()
         do
             content="$(psql -U milestone -d milestone -c "select content from practice_blocks where id = $block" -At)"
 
-            printf "\e[2;37m%*s\e[0m" $(tput cols) $type $language $block
+            printf "\e[2;37m%*s\e[0m" $(tput cols) "$type $language $block"
             case "$type" in
                 text) echo "$content" | bat --paging never --squeeze-blank --language "md" --style "plain" ;;
                 code) echo "$content" | bat --paging never --squeeze-blank --language "$language" --style "grid,numbers" ;;
