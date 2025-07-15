@@ -128,6 +128,7 @@ start_practice()
     do
         practice_number=$((practice_number + 1))
         practices[$practice]="$parent"
+        heading="$(pandoc -f markdown -t plain <<< "$heading" | xargs)"
 
         clear
         printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m \e[1;33m>>\e[0m \e[1;36m%s\e[0m \e[2;37m%d\e[0m\n\n" "${subjects[$subject]}" ${subject} "${topics[$topic]}" ${topic}
@@ -202,9 +203,9 @@ start_study()
         note_number=$((note_number + 1))
         notes[$note]="$parent"
         section_name="${sections[$section]}"
+        heading="$(pandoc -f markdown -t plain <<< "$heading" | xargs)"
 
         clear
-        #printf "\e[1;36m%s\e[0m \e[1;35m%d/%d\e[0m \e[2;37m%*s\e[0m\n\e[1;33m%-s\e[0m\n" "${section_name}" $note_number $note_count $(($(tput cols) - ${#note_number} - ${#note_count} - ${#section_name} - 3)) $note "$heading"
         printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m \e[1;33m>>\e[0m \e[1;36m%s\e[0m \e[2;37m%d\e[0m\n\n" "${resources[$resource]}" ${resource} "${sections[$section]}" ${section}
         printf "\e[1;35m%d/%d\e[0m \e[1;33m%s\e[0m \e[2;37m%s\e[0m\n" $note_number $note_count "$heading" $note
 
