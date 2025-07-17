@@ -183,10 +183,10 @@ start_study()
         sections[$id]="$name"
     done < <(psql -U milestone -d milestone -c "select id, number from sections where resource_id = $resource order by number, created" -At)
 
-    while IFS="|" read -r id name
+    while IFS="|" read -r id name state
     do
-        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m"
-    done < <(psql -U milestone -d milestone -c "select id, number from sections where resource_id = $resource order by number, created" -At) | dense_column
+        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m \e[2;37m($state)\e[0m"
+    done < <(psql -U milestone -d milestone -c "select id, number, state from sections where resource_id = $resource order by number, created" -At) | dense_column
 
     while true
     do
@@ -196,9 +196,10 @@ start_study()
     echo
 
     note_count="$(psql -U milestone -d milestone -c "select count(id) from notes where section_id = $section" -At)"
+    section_state="$(psql -U milestone -d milestone -c "select state from sections where id = $section" -At)"
     note_number=0
 
-    while IFS="|" read -r note heading
+    while IFS="|" read -r note state heading
     do
         note_number=$((note_number + 1))
         notes[$note]="$parent"
@@ -206,8 +207,8 @@ start_study()
         heading="$(pandoc -f markdown -t plain <<< "$heading" | xargs)"
 
         clear
-        printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m \e[1;33m>>\e[0m \e[1;36m%s\e[0m \e[2;37m%d\e[0m\n\n" "${resources[$resource]}" ${resource} "${sections[$section]}" ${section}
-        printf "\e[1;35m%d/%d\e[0m \e[1;33m%s\e[0m \e[2;37m%s\e[0m\n" $note_number $note_count "$heading" $note
+        printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m \e[1;33m>>\e[0m \e[1;36m%s\e[0m \e[2;37m%d (%s)\e[0m\n\n" "${resources[$resource]}" ${resource} "${sections[$section]}" ${section} "$section_state"
+        printf "\e[1;35m%d/%d\e[0m \e[1;33m%s\e[0m \e[2;37m%s (%s)\e[0m\n" $note_number $note_count "$heading" $note "$state"
 
         while IFS="|" read -r block type language
         do
@@ -231,7 +232,7 @@ start_study()
             tput cnorm
             [[ "${response,,}" == "n" ]] && break
         done
-    done < <(psql -U milestone -d milestone -c "select id, heading from notes where section_id = $section" -At)
+    done < <(psql -U milestone -d milestone -c "select id, state, heading from notes where section_id = $section" -At)
     echo
 }
 
