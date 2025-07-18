@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+trap 'printf "\r\e[1;31m%-*s\e[0m" $(tput cols) "User Interrupted"; tput cnorm; exit 1' SIGINT
+
 read -n 1 -p "Do you want to [P]ractice or [S]tudy? " mode
 echo
 echo
@@ -92,10 +94,10 @@ start_practice()
         subjects[$id]="$name"
     done < <(psql -U milestone -d milestone -c "select id, name from subjects order by id" -At)
 
-    while IFS='|' read -r id name
+    while IFS='|' read -r id name topic_count
     do
-        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m"
-    done < <(psql -U milestone -d milestone -c "select id, name from subjects order by id" -At) | dense_column
+        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m \e[2;37m($topic_count)\e[0m"
+    done < <(psql -U milestone -d milestone -c "select s.id, s.name, count(t.id) from subjects s left join topics t on t.subject_id = s.id group by s.id, s.name order by id" -At) | dense_column
 
     while true
     do
@@ -116,47 +118,61 @@ start_practice()
 
     while true
     do
-        read -p "Select a topic: " topic
-        [[ -n "${topics[$topic]}" ]] && break
+        read -p "Select a topic or type all: " topic
+        ( [ -n "${topics[$topic]}" ] || [ "$topic" == "all" ] ) && break
         echo
     done
 
-    practice_count="$(psql -U milestone -d milestone -c "select count(id) from practices where topic_id = $topic" -At)"
+    local -a selected_topics=()
+
+    if [ "$topic" == "all" ]
+    then
+        selected_topics=( "${!topics[@]}" )
+    else
+        selected_topics=( $topic )
+    fi
+
+    [ ${#selected_topics[*]} -eq 0 ] && return
+
+    practice_count="$(psql -U milestone -d milestone -c "select count(id) from practices where topic_id in ( $(tr ' ' ',' <<< "${selected_topics[*]}") )" -At)"
     practice_number=0
 
-    while IFS="|" read -r practice heading
+    while IFS="|" read -r topic topic_name
     do
-        practice_number=$((practice_number + 1))
-        practices[$practice]="$parent"
-        heading="$(pandoc -f markdown -t plain <<< "$heading" | xargs)"
-
-        clear
-        printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m \e[1;33m>>\e[0m \e[1;36m%s\e[0m \e[2;37m%d\e[0m\n\n" "${subjects[$subject]}" ${subject} "${topics[$topic]}" ${topic}
-        printf "\e[1;35m%d/%d\e[0m \e[1;33m%s\e[0m \e[2;37m%s\e[0m\n" $practice_number $practice_count "$heading" $practice
-
-        while IFS="|" read -r block type language
+        while IFS="|" read -r practice heading
         do
-            content="$(psql -U milestone -d milestone -c "select content from practice_blocks where id = $block" -At)"
+            practice_number=$((practice_number + 1))
+            practices[$practice]="$parent"
+            heading="$(pandoc -f markdown -t plain <<< "$heading" | xargs)"
 
-            printf "\e[2;37m%*s\e[0m" $(tput cols) "$type $language $block"
-            case "$type" in
-                text) echo "$content" | bat --paging never --squeeze-blank --language "md" --style "plain" ;;
-                code) echo "$content" | bat --paging never --squeeze-blank --language "$language" --style "grid,numbers" ;;
-                *) echo -e "\e[1;31mInvalid block type and language $type / $language" ;;
-            esac
-            echo
-        done < <(psql -U milestone -d milestone -c "select id, type, language from practice_blocks where practice_id = $practice order by position" -At)
+            clear
+            printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m \e[1;33m>>\e[0m \e[1;36m%s\e[0m \e[2;37m%d\e[0m\n\n" "${subjects[$subject]}" ${subject} "$topic_name" ${topic}
+            printf "\e[1;35m%d/%d\e[0m \e[1;33m%s\e[0m \e[2;37m%s\e[0m\n" $practice_number $practice_count "$heading" $practice
 
-        while true
-        do
-            tput cup $last_line $(($(tput cols) - 28))
-            tput civis
-            echo -ne "\e[1;31mPress [N]ext to move forward\e[0m"
-            read -n 1 -s response </dev/tty
-            tput cnorm
-            [[ "${response,,}" == "n" ]] && break
-        done
-    done < <(psql -U milestone -d milestone -c "select id, heading from practices where topic_id = $topic" -At)
+            while IFS="|" read -r block type language
+            do
+                content="$(psql -U milestone -d milestone -c "select content from practice_blocks where id = $block" -At)"
+
+                printf "\e[2;37m%*s\e[0m" $(tput cols) "$type $language $block"
+                case "$type" in
+                    text) echo "$content" | bat --paging never --squeeze-blank --language "md" --style "plain" ;;
+                    code) echo "$content" | bat --paging never --squeeze-blank --language "$language" --style "grid,numbers" ;;
+                    *) echo -e "\e[1;31mInvalid block type and language $type / $language" ;;
+                esac
+                echo
+            done < <(psql -U milestone -d milestone -c "select id, type, language from practice_blocks where practice_id = $practice order by position" -At)
+
+            while true
+            do
+                tput cup $last_line $(($(tput cols) - 28))
+                tput civis
+                echo -ne "\e[1;31mPress [N]ext to move forward\e[0m"
+                read -n 1 -s response </dev/tty
+                tput cnorm
+                [[ "${response,,}" == "n" ]] && break
+            done
+        done < <(psql -U milestone -d milestone -c "select id, heading from practices where topic_id = $topic" -At)
+    done < <(psql -U milestone -d milestone -c "select id, name from topics where id in ( $(tr ' ' ',' <<< "${selected_topics[*]}") ) order by position, creation" -At)
     echo
 }
 
@@ -167,10 +183,10 @@ start_study()
         resources[$id]="$name"
     done < <(psql -U milestone -d milestone -c "select id, name from resources order by name" -At)
 
-    while IFS='|' read -r id name
+    while IFS='|' read -r id name section_count
     do
-        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m"
-    done < <(psql -U milestone -d milestone -c "select id, name from resources order by name" -At) | dense_column
+        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m \e[2;37m($section_count)\e[0m"
+    done < <(psql -U milestone -d milestone -c "select r.id, r.name, count(s.id) from resources r left join sections s on s.resource_id = r.id group by r.id, r.name order by name" -At) | dense_column
 
     while true
     do
@@ -188,51 +204,64 @@ start_study()
         echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m \e[2;37m($state)\e[0m"
     done < <(psql -U milestone -d milestone -c "select id, number, state from sections where resource_id = $resource order by number, created" -At) | dense_column
 
+    local selected_sections=()
+
     while true
     do
-        read -p "Select a section: " section
-        [[ -n "${sections[$section]}" ]] && break
+        read -p "Select a section or type all: " section
+        ( [ -n "${sections[$section]}" ] || [ "$section" == "all" ] ) && break
     done
     echo
 
-    note_count="$(psql -U milestone -d milestone -c "select count(id) from notes where section_id = $section" -At)"
-    section_state="$(psql -U milestone -d milestone -c "select state from sections where id = $section" -At)"
+    if [ "$section" == "all" ]
+    then
+        selected_sections=( "${!sections[@]}" )
+    else
+        selected_sections=( $section )
+    fi
+
+    [ ${#selected_sections[*]} -eq 0 ] && return
+
+    note_count="$(psql -U milestone -d milestone -c "select count(id) from notes where section_id in ( $(tr ' ' ',' <<< "${selected_sections[*]}") )" -At)"
     note_number=0
 
-    while IFS="|" read -r note state heading
+    while IFS="|" read -r section section_name section_state
     do
-        note_number=$((note_number + 1))
-        notes[$note]="$parent"
-        section_name="${sections[$section]}"
-        heading="$(pandoc -f markdown -t plain <<< "$heading" | xargs)"
-
-        clear
-        printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m \e[1;33m>>\e[0m \e[1;36m%s\e[0m \e[2;37m%d (%s)\e[0m\n\n" "${resources[$resource]}" ${resource} "${sections[$section]}" ${section} "$section_state"
-        printf "\e[1;35m%d/%d\e[0m \e[1;33m%s\e[0m \e[2;37m%s (%s)\e[0m\n" $note_number $note_count "$heading" $note "$state"
-
-        while IFS="|" read -r block type language
+        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m \e[2;37m($state)\e[0m"
+        while IFS="|" read -r note state heading
         do
-            content="$(psql -U milestone -d milestone -c "select content from note_blocks where id = $block" -At)"
+            note_number=$((note_number + 1))
+            notes[$note]="$parent"
+            heading="$(pandoc -f markdown -t plain <<< "$heading" | xargs)"
 
-            printf "\e[2;37m%*s\e[0m" $(tput cols) "$type $language $block"
-            case "$type" in
-                text) echo "$content" | bat --paging never --squeeze-blank --language "md" --style "plain" ;;
-                code) echo "$content" | bat --paging never --squeeze-blank --language "$language" --style "grid,numbers" ;;
-                *) echo -e "\e[1;31mInvalid block type and language $type / $language" ;;
-            esac
-            echo
-        done < <(psql -U milestone -d milestone -c "select id, type, language from note_blocks where note_id = $note order by position" -At)
+            clear
+            printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m \e[1;33m>>\e[0m \e[1;36m%s\e[0m \e[2;37m%d (%s)\e[0m\n\n" "${resources[$resource]}" ${resource} "$section_name" ${section} "$section_state"
+            printf "\e[1;35m%d/%d\e[0m \e[1;33m%s\e[0m \e[2;37m%s (%s)\e[0m\n" $note_number $note_count "$heading" $note "$state"
 
-        while true
-        do
-            tput cup $last_line $(($(tput cols) - 28))
-            tput civis
-            echo -ne "\e[1;31mPress [N]ext to move forward\e[0m"
-            read -n 1 -s response </dev/tty
-            tput cnorm
-            [[ "${response,,}" == "n" ]] && break
-        done
-    done < <(psql -U milestone -d milestone -c "select id, state, heading from notes where section_id = $section" -At)
+            while IFS="|" read -r block type language
+            do
+                content="$(psql -U milestone -d milestone -c "select content from note_blocks where id = $block" -At)"
+
+                printf "\e[2;37m%*s\e[0m" $(tput cols) "$type $language $block"
+                case "$type" in
+                    text) echo "$content" | bat --paging never --squeeze-blank --language "md" --style "plain" ;;
+                    code) echo "$content" | bat --paging never --squeeze-blank --language "$language" --style "grid,numbers" ;;
+                    *) echo -e "\e[1;31mInvalid block type and language $type / $language" ;;
+                esac
+                echo
+            done < <(psql -U milestone -d milestone -c "select id, type, language from note_blocks where note_id = $note order by position" -At)
+
+            while true
+            do
+                tput cup $last_line $(($(tput cols) - 28))
+                tput civis
+                echo -ne "\e[1;31mPress [N]ext to move forward\e[0m"
+                read -n 1 -s response </dev/tty
+                tput cnorm
+                [[ "${response,,}" == "n" ]] && break
+            done
+        done < <(psql -U milestone -d milestone -c "select id, state, heading from notes where section_id = $section" -At)
+    done < <(psql -U milestone -d milestone -c "select id, number, state from sections where id in ( $(tr ' ' ',' <<< "${selected_sections[*]}") ) order by number, created" -At)
     echo
 }
 
