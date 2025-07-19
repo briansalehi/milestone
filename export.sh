@@ -1,5 +1,31 @@
 #!/usr/bin/env bash
 
+global_resources_count=0
+global_sections_count=0
+global_subjects_count=0
+global_topics_count=0
+global_cards_count=0
+global_blocks_count=0
+
+show_progress()
+{
+    local increment_resources="${1:-0}"
+    local increment_sections="${2:-0}"
+    local increment_subjects="${3:-0}"
+    local increment_topics="${4:-0}"
+    local increment_cards="${5:-0}"
+    local increment_blocks="${6:-0}"
+
+    [ $increment_resources -eq 1 ] && global_resources_count=$((global_resources_count + 1))
+    [ $increment_sections -eq 1 ]  && global_sections_count=$((global_sections_count + 1))
+    [ $increment_subjects -eq 1 ]  && global_subjects_count=$((global_subjects_count + 1))
+    [ $increment_topics -eq 1 ]    && global_topics_count=$((global_topics_count + 1))
+    [ $increment_cards -eq 1 ]     && global_cards_count=$((global_cards_count + 1))
+    [ $increment_blocks -eq 1 ]    && global_blocks_count=$((global_blocks_count + 1))
+
+    printf "\rresources: %-5d sections: %-5d subjects: %-5d topics: %-5d cards: %-5d blocks: %-5d" $global_resources_count $global_sections_count $global_subjects_count $global_topics_count $global_cards_count $global_blocks_count
+}
+
 while IFS="|" read -r m_resource resource_name m_resource_type m_resource_pattern m_author
 do
     case "$m_resource_type" in
@@ -11,106 +37,57 @@ do
 
     #f_resource=$(psql -U flashback -d flashback -c "select create_resource('$resource_name', '$f_resource_type'::resource_type, '$f_resource_pattern'::section_pattern, '$author', '')" -At)
 
-    printf "\e[1;36mresource\e[0m: \e[1;36mtype\e[0m %-12s / \e[1;36mpattern\e[0m %-6s / \e[1;36mauthor\e[0m %s / \e[1;36mname\e[0m %s\n" "$f_resource_type" "$f_resource_pattern" "$author" "$resource_name"
+    show_progress 1 0 0 0 0 0
+    #printf "resource: \e[1;36mtype\e[0m %-12s / \e[1;36mpattern\e[0m %-6s / \e[1;36mauthor\e[0m %s / \e[1;36mname\e[0m %s\n" "$f_resource_type" "$f_resource_pattern" "$author" "$resource_name"
 
     while IFS="|" read -r m_section m_section_position
     do
         f_section_position=$m_section_position
 
-        psql -U flashback -d flashback -c "select create_section($f_resource, $f_section_position, '')" -At
+        #psql -U flashback -d flashback -c "select create_section($f_resource, $f_section_position, '')" -At
 
-        printf "  \e[1;33msection\e[0m %-4s / \e[1;33mposition\e[0m %-2s\n" "$m_section" "$m_section_position"
+        show_progress 0 1 0 0 0 0
+        #printf "  section: \e[1;33mposition\e[0m %-2s\n" "$m_section_position"
+
+        backup_position=0
+
+        while IFS="|" read -r note note_state note_position heading
+        do
+            case "$note_state" in
+                open|writing) card_state="draft" ;;
+                completed|revised) card_state="review" ;;
+                approved|validated) card_state="approved" ;;
+                released) card_state="completed" ;;
+                ignored) card_state="rejected" ;;
+                *) card_state="draft" ;;
+            esac
+
+            backup_position=$((backup_position + 1))
+
+            card_position=$note_position
+
+            if [ $card_position -eq 0 ]
+            then
+                card_position=$backup_position
+            fi
+
+            #card=$(psql -U flashback -d flashback -c "select create_card($f_resource, $f_section_position, $card_state, $card_position)" -At)
+
+            show_progress 0 0 0 0 1 0
+            #printf "    card: \e[1;31mposition\e[0m %-10s / \e[1;31mstate\e[0m %-10s / \e[1;31mheading\e[0m %s\n" "$card_position" "$card_state" "$heading"
+
+            while IFS="|" read -r m_block block_position content_type extension
+            do
+                content="$(psql -U milestone -d milestone -c "select content from note_blocks where id = $m_block" -At)"
+
+                #psql -U flashback -d flashback -c "select create_block($card, $block_position, '$content_type'::content_type, '$extension', '$content')" -At
+
+                show_progress 0 0 0 0 0 1
+                #printf "      block: \e[1;32mposition\e[0m %s / \e[1;32mtype\e[0m %s / \e[1;32mextension\e[0m %s\n" "$block_position" "$content_type" "$extension"
+            done < <(psql -U milestone -d milestone -c "select id, position, type, language from note_blocks where note_id = $note order by position, id" -At)
+        done < <(psql -U milestone -d milestone -c "select id, state, number, heading from notes where section_id = $m_section order by number, id" -At)
     done < <(psql -U milestone -d milestone -c "select id, number from sections where resource_id = $m_resource order by number" -At)
+    #read pause </dev/tty
 done < <(psql -U milestone -d milestone -c "select id, name, type, section_pattern_id, leading_author from resources order by id" -At)
-
-#resources:
-#  id (internal)
-#  name
-#  type:
-#    resource_type:
-#      - unknown
-#        book
-#        website
-#        course
-#        video
-#        mailing list
-#        manual
-#        slides
-#    resource_type:
-#      - book
-#        website
-#        course
-#        video
-#        mailing list
-#        manual
-#        slides
-#  pattern:
-#    section_pattern_id:
-#      - Chapter
-#        Page
-#        Course
-#        Video
-#        Post
-#    section_pattern:
-#      - chapter
-#        page
-#        course
-#        video
-#        post
-#  condition:
-#    - draft
-#      relevant (default)
-#      outdated
-#      canonical
-#      abandoned
-#  leading_author
-#  sections:
-#    id (internal):
-#      integer
-#      resource
-#    number:
-#      integer
-#      position
-#    name:
-#      string:
-#        - null
-#cards:
-#  notes:
-#    id (internal)
-#    heading
-#    state:
-#      publication_state:
-#        - open
-#          writing
-#          completed
-#          revised
-#          validated
-#          approved
-#          released
-#          ignored
-#      card_state:
-#        - draft
-#          review
-#          approved
-#          completed
-#          rejected
-#sections_cards:
-#  notes:
-#    number
-#    position
-#blocks:
-#  note_blocks:
-#    id (internal)
-#  position
-#  content
-#  type:
-#    block_type:
-#      - text
-#        code
-#    content_type:
-#      - text
-#        code
-#    extension:
-#      language
-#      extension
+echo
 
