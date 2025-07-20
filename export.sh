@@ -80,7 +80,7 @@ do
             do
                 content="$(psql -U milestone -d milestone -c "select content from note_blocks where id = $m_block" -At)"
 
-                psql -U flashback -d flashback -c "select create_block($card, $block_position, '$content_type'::content_type, '$extension', '$content')" -At
+                block=$(psql -U flashback -d flashback -c "select create_block($card, $block_position, '$content_type'::content_type, '$extension', '$content')" -At)
 
                 show_progress 0 0 0 0 0 1
                 #printf "      block: \e[1;32mposition\e[0m %s / \e[1;32mtype\e[0m %s / \e[1;32mextension\e[0m %s\n" "$block_position" "$content_type" "$extension"
