@@ -42,7 +42,7 @@ do
         *) f_resource_pattern="chapter";;
     esac
 
-    f_resource=$(psql -U flashback -d flashback -c "select create_resource('$resource_name', '$f_resource_type'::resource_type, '$f_resource_pattern'::section_pattern, '$author', '')" -At) || break
+    f_resource=$(psql -U flashback -d flashback -c "select create_resource('${resource_name//\'/\'\'}', '${f_resource_type//\'/\'\'}'::resource_type, '${f_resource_pattern//\'/\'\'}'::section_pattern, '${author//\'/\'\'}', '')" -At) || break
 
     show_progress 1 0 0 0 0 0
     #printf "resource: \e[1;36mtype\e[0m %-12s / \e[1;36mpattern\e[0m %-6s / \e[1;36mauthor\e[0m %s / \e[1;36mname\e[0m %s\n" "$f_resource_type" "$f_resource_pattern" "$author" "$resource_name"
@@ -51,7 +51,7 @@ do
     do
         f_section_position=$m_section_position
 
-        psql -U flashback -d flashback -c "select create_section($f_resource, $f_section_position, '')" -At || break
+        section=$(psql -U flashback -d flashback -c "select create_section(${f_resource//\'/\'\'}, ${f_section_position//\'/\'\'}, '')" -At) || break
 
         show_progress 0 1 0 0 0 0
         #printf "  section: \e[1;33mposition\e[0m %-2s\n" "$m_section_position"
@@ -78,16 +78,16 @@ do
                 card_position=$backup_position
             fi
 
-            card=$(psql -U flashback -d flashback -c "select create_card($f_resource, $f_section_position, $card_position, '$card_state', '$heading')" -At) || break
+            card=$(psql -U flashback -d flashback -c "select create_card(${f_resource//\'/\'\'}, ${f_section_position//\'/\'\'}, ${card_position//\'/\'\'}, '${card_state//\'/\'\'}', '${heading//\'/\'\'}')" -At) || break
 
             show_progress 0 0 0 0 1 0
             #printf "    card: \e[1;31mposition\e[0m %-10s / \e[1;31mstate\e[0m %-10s / \e[1;31mheading\e[0m %s\n" "$card_position" "$card_state" "$heading"
 
             while IFS="|" read -r m_block block_position content_type extension
             do
-                content="$(psql -U milestone -d milestone -c "select content from note_blocks where id = $m_block" -At)"
+                content="$(psql -U milestone -d milestone -c "select content from note_blocks where id = ${m_block}" -At)"
 
-                psql -U flashback -d flashback -c "select create_block($card, $block_position, '$content_type'::content_type, '$extension', '$content')" -At || break
+                block=$(psql -U flashback -d flashback -c "select create_block(${card//\'/\'\'}, ${block_position//\'/\'\'}, '${content_type//\'/\'\'}'::content_type, '${extension//\'/\'\'}', '${content//\'/\'\'}')" -At) || break
 
                 show_progress 0 0 0 0 0 1
                 #printf "      block: \e[1;32mposition\e[0m %s / \e[1;32mtype\e[0m %s / \e[1;32mextension\e[0m %s\n" "$block_position" "$content_type" "$extension"
