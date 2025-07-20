@@ -94,7 +94,6 @@ export_resources()
             done < <(psql -U milestone -d milestone -c "select id, state, number, heading from notes where section_id = $m_section order by number, id" -At)
         done < <(psql -U milestone -d milestone -c "select id, number from sections where resource_id = $m_resource order by number" -At)
     done < <(psql -U milestone -d milestone -c "select id, name, type, section_pattern_id, leading_author from resources order by id" -At)
-    echo
 }
 
 export_subjects()
@@ -140,10 +139,9 @@ export_subjects()
                 done < <(psql -U milestone -d milestone -c "select id, position, type, language from practice_blocks where practice_id = $practice order by position, id" -At)
             done < <(psql -U milestone -d milestone -c "select id, position, heading from practices where topic_id = $m_topic order by position, id" -At)
         done < <(psql -U milestone -d milestone -c "select id, position, name from topics where subject_id = $m_subject order by position" -At)
-        read pause </dev/tty
     done < <(psql -U milestone -d milestone -c "select id, name from subjects order by id" -At)
-    echo
 }
 
-#export_resources
+export_resources
 export_subjects
+echo
