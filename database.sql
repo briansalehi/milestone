@@ -123,6 +123,36 @@ end; $$;
 ALTER PROCEDURE milestone.add_section(IN resource_index integer, IN reference_string character varying) OWNER TO milestone;
 
 --
+-- Name: change_note_block_language(integer, character varying); Type: PROCEDURE; Schema: milestone; Owner: milestone
+--
+
+CREATE PROCEDURE milestone.change_note_block_language(IN block integer, IN new_language character varying)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    update note_blocks set language = new_language where id = block;
+end;
+$$;
+
+
+ALTER PROCEDURE milestone.change_note_block_language(IN block integer, IN new_language character varying) OWNER TO milestone;
+
+--
+-- Name: change_practice_block_language(integer, character varying); Type: PROCEDURE; Schema: milestone; Owner: milestone
+--
+
+CREATE PROCEDURE milestone.change_practice_block_language(IN block integer, IN new_language character varying)
+    LANGUAGE plpgsql
+    AS $$
+begin
+    update practice_blocks set language = new_language where id = block;
+end;
+$$;
+
+
+ALTER PROCEDURE milestone.change_practice_block_language(IN block integer, IN new_language character varying) OWNER TO milestone;
+
+--
 -- Name: create_note(integer, integer, character varying); Type: PROCEDURE; Schema: milestone; Owner: milestone
 --
 
@@ -668,6 +698,135 @@ end; $$;
 ALTER FUNCTION milestone.get_user_topics(user_index integer, subject_index integer) OWNER TO milestone;
 
 --
+-- Name: merge_note_block_series(integer[]); Type: FUNCTION; Schema: milestone; Owner: milestone
+--
+
+CREATE FUNCTION milestone.merge_note_block_series(VARIADIC block_list integer[]) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+declare
+    block_index integer default 1;
+    lower_block integer;
+    upper_block integer;
+    upper_note integer;
+    lower_note integer;
+    upper_position integer;
+    lower_position integer;
+    swap_position integer;
+    lower_type block_type;
+    lower_language varchar(10);
+    block integer;
+begin
+    upper_block := block_list[block_index];
+    block := upper_block;
+    block_index := block_index + 1;
+
+    while block_index <= array_length(block_list, 1) loop
+        lower_block := block_list[block_index];
+
+        select note_id, position
+        into upper_note, upper_position
+        from note_blocks where id = upper_block;
+
+        select note_id, position, type, language
+        into lower_note, lower_position, lower_type, lower_language
+        from note_blocks where id = lower_block;
+
+        if upper_position = lower_position then
+            return 0;
+        end if;
+
+        if upper_position > lower_position then
+            swap_position := upper_position;
+            upper_position := lower_position;
+            lower_position := swap_position;
+        end if;
+
+        if upper_note <> lower_note then
+            raise exception 'Uncommon card between blocks % and %', upper_block, lower_block;
+        end if;
+
+        -- find the top free position of this note for swapping
+        select max(position) + 1 into swap_position
+        from note_blocks where note_id = upper_note;
+
+        -- create a new record on the top most position
+        insert into note_blocks (note_id, content, type, language, position)
+        select upper_note, string_agg(coalesce(content, ''), E'\n\n' order by position), lower_type, lower_language, swap_position
+        from note_blocks where id in (upper_block, lower_block)
+        returning id into block;
+
+        -- remove the two merged blocks
+        delete from note_blocks where id in (upper_block, lower_block);
+
+        update note_blocks set position = lower_position where id = block;
+
+        upper_block := block;
+        block_index := block_index + 1;
+    end loop;
+
+    -- reorder positions from top to bottom for a note
+    update note_blocks pb set position = sub.position
+    from (
+        select id, row_number() over (order by position) as position
+        from note_blocks where note_id = upper_note
+    ) sub
+    where pb.id = sub.id;
+
+    return block;
+end;
+$$;
+
+
+ALTER FUNCTION milestone.merge_note_block_series(VARIADIC block_list integer[]) OWNER TO milestone;
+
+--
+-- Name: merge_note_blocks(integer); Type: FUNCTION; Schema: milestone; Owner: milestone
+--
+
+CREATE FUNCTION milestone.merge_note_blocks(note integer) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+declare
+    upper_block integer;
+    swap_position integer;
+    block integer;
+    block_record record;
+begin
+    select id into upper_block from note_blocks where note_id = note and position = 1;
+
+    select max(position) + 1 into swap_position from note_blocks where note_id = note;
+
+    block := upper_block;
+
+    for block_record in select id, position, type, language from note_blocks where note_id = note and position > 1 loop
+        insert into note_blocks (note_id, content, type, language, position)
+        select note, string_agg(coalesce(content, ''), E'\n\n' order by position), block_record.type, block_record.language, swap_position
+        from note_blocks where id in (upper_block, block_record.id)
+        returning id into block;
+
+        delete from note_blocks where id in (upper_block, block_record.id);
+
+        update note_blocks set position = block_record.position where id = block;
+
+        upper_block := block;
+    end loop;
+
+    update note_blocks pb set position = sub.position
+    from (
+        select id, row_number() over (order by position) as position
+        from note_blocks where note_id = note
+    ) sub
+    where pb.id = sub.id;
+
+    return block;
+end;
+$$;
+
+
+ALTER FUNCTION milestone.merge_note_blocks(note integer) OWNER TO milestone;
+
+--
 -- Name: merge_note_blocks(integer, integer); Type: FUNCTION; Schema: milestone; Owner: milestone
 --
 
@@ -689,9 +848,9 @@ begin
     end if;
 
     if upper_position > lower_position then
-        swap_position = upper_position;
-        upper_position = lower_position;
-        lower_position = swap_position;
+        swap_position := upper_position;
+        upper_position := lower_position;
+        lower_position := swap_position;
     end if;
 
     -- collect first block info
@@ -738,6 +897,135 @@ $$;
 
 
 ALTER FUNCTION milestone.merge_note_blocks(upper integer, lower integer) OWNER TO milestone;
+
+--
+-- Name: merge_practice_block_series(integer[]); Type: FUNCTION; Schema: milestone; Owner: milestone
+--
+
+CREATE FUNCTION milestone.merge_practice_block_series(VARIADIC block_list integer[]) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+declare
+    block_index integer default 1;
+    lower_block integer;
+    upper_block integer;
+    upper_practice integer;
+    lower_practice integer;
+    upper_position integer;
+    lower_position integer;
+    swap_position integer;
+    lower_type block_type;
+    lower_language varchar(10);
+    block integer;
+begin
+    upper_block := block_list[block_index];
+    block := upper_block;
+    block_index := block_index + 1;
+
+    while block_index <= array_length(block_list, 1) loop
+        lower_block := block_list[block_index];
+
+        select practice_id, position
+        into upper_practice, upper_position
+        from practice_blocks where id = upper_block;
+
+        select practice_id, position, type, language
+        into lower_practice, lower_position, lower_type, lower_language
+        from practice_blocks where id = lower_block;
+
+        if upper_position = lower_position then
+            return 0;
+        end if;
+
+        if upper_position > lower_position then
+            swap_position := upper_position;
+            upper_position := lower_position;
+            lower_position := swap_position;
+        end if;
+
+        if upper_practice <> lower_practice then
+            raise exception 'Uncommon card between blocks % and %', upper_block, lower_block;
+        end if;
+
+        -- find the top free position of this practice for swapping
+        select max(position) + 1 into swap_position
+        from practice_blocks where practice_id = upper_practice;
+
+        -- create a new record on the top most position
+        insert into practice_blocks (practice_id, content, type, language, position)
+        select upper_practice, string_agg(coalesce(content, ''), E'\n\n' order by position), lower_type, lower_language, swap_position
+        from practice_blocks where id in (upper_block, lower_block)
+        returning id into block;
+
+        -- remove the two merged blocks
+        delete from practice_blocks where id in (upper_block, lower_block);
+
+        update practice_blocks set position = lower_position where id = block;
+
+        upper_block := block;
+        block_index := block_index + 1;
+    end loop;
+
+    -- reorder positions from top to bottom for a practice
+    update practice_blocks pb set position = sub.position
+    from (
+        select id, row_number() over (order by position) as position
+        from practice_blocks where practice_id = upper_practice
+    ) sub
+    where pb.id = sub.id;
+
+    return block;
+end;
+$$;
+
+
+ALTER FUNCTION milestone.merge_practice_block_series(VARIADIC block_list integer[]) OWNER TO milestone;
+
+--
+-- Name: merge_practice_blocks(integer); Type: FUNCTION; Schema: milestone; Owner: milestone
+--
+
+CREATE FUNCTION milestone.merge_practice_blocks(practice integer) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+declare
+    upper_block integer;
+    swap_position integer;
+    block integer;
+    block_record record;
+begin
+    select id into upper_block from practice_blocks where practice_id = practice and position = 1;
+
+    select max(position) + 1 into swap_position from practice_blocks where practice_id = practice;
+
+    block := upper_block;
+
+    for block_record in select id, position, type, language from practice_blocks where practice_id = practice and position > 1 loop
+        insert into practice_blocks (practice_id, content, type, language, position)
+        select practice, string_agg(coalesce(content, ''), E'\n\n' order by position), block_record.type, block_record.language, swap_position
+        from practice_blocks where id in (upper_block, block_record.id)
+        returning id into block;
+
+        delete from practice_blocks where id in (upper_block, block_record.id);
+
+        update practice_blocks set position = block_record.position where id = block;
+
+        upper_block := block;
+    end loop;
+
+    update practice_blocks pb set position = sub.position
+    from (
+        select id, row_number() over (order by position) as position
+        from practice_blocks where practice_id = practice
+    ) sub
+    where pb.id = sub.id;
+
+    return block;
+end;
+$$;
+
+
+ALTER FUNCTION milestone.merge_practice_blocks(practice integer) OWNER TO milestone;
 
 --
 -- Name: merge_practice_blocks(integer, integer); Type: FUNCTION; Schema: milestone; Owner: milestone
@@ -860,8 +1148,8 @@ CREATE PROCEDURE milestone.set_section_as_complete_id(IN resource_index integer,
     AS $$
 declare section_index integer;
 begin
-    select id into section_index from flashback.sections where resource_id = resource_index and number = section_number;
-    update flashback.sections set state = 'completed', updated = now() where id = section_index;
+    select id into section_index from milestone.sections where resource_id = resource_index and number = section_number;
+    update milestone.sections set state = 'completed', updated = now() where id = section_index;
 end; $$;
 
 
@@ -877,9 +1165,9 @@ CREATE PROCEDURE milestone.set_section_as_ignored(IN resource_name character var
 declare resource_index integer;
 declare section_index integer;
 begin
-    select id into resource_index from flashback.resources where name = resource_name;
-    select id into section_index from flashback.sections where resource_id = resource_index and number = section_number;
-    update flashback.sections set state = 'ignored', updated = now() where id = section_index;
+    select id into resource_index from milestone.resources where name = resource_name;
+    select id into section_index from milestone.sections where resource_id = resource_index and number = section_number;
+    update milestone.sections set state = 'ignored', updated = now() where id = section_index;
 end; $$;
 
 
@@ -944,123 +1232,6 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: container_templates; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.container_templates (
-    id integer NOT NULL,
-    name character varying(40) NOT NULL,
-    content text,
-    creation timestamp without time zone DEFAULT now() NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.container_templates OWNER TO milestone;
-
---
--- Name: container_templates_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.container_templates ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.container_templates_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
--- Name: containers; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.containers (
-    id integer NOT NULL,
-    template_id integer,
-    name character varying(40) NOT NULL,
-    content text,
-    description character varying(500),
-    creation timestamp without time zone DEFAULT now() NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.containers OWNER TO milestone;
-
---
--- Name: containers_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.containers ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.containers_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
--- Name: credentials; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.credentials (
-    id integer NOT NULL,
-    user_id integer,
-    hash character varying(4096) NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.credentials OWNER TO milestone;
-
---
--- Name: credentials_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.credentials ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.credentials_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
--- Name: logins; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.logins (
-    id integer NOT NULL,
-    user_id integer,
-    session character varying(1000) NOT NULL,
-    updated timestamp with time zone DEFAULT now() NOT NULL,
-    valid boolean DEFAULT false
-);
-
-
-ALTER TABLE milestone.logins OWNER TO milestone;
-
---
--- Name: logins_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.logins ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.logins_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
 -- Name: note_blocks; Type: TABLE; Schema: milestone; Owner: milestone
 --
 
@@ -1092,35 +1263,6 @@ ALTER TABLE milestone.note_blocks ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTI
 
 
 --
--- Name: note_editing; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.note_editing (
-    id integer NOT NULL,
-    user_id integer,
-    note_id integer,
-    action milestone.editing_action NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.note_editing OWNER TO milestone;
-
---
--- Name: note_editing_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.note_editing ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.note_editing_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
 -- Name: note_references; Type: TABLE; Schema: milestone; Owner: milestone
 --
 
@@ -1141,35 +1283,6 @@ ALTER TABLE milestone.note_references OWNER TO milestone;
 
 ALTER TABLE milestone.note_references ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME milestone.note_references_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
--- Name: note_usage; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.note_usage (
-    id integer NOT NULL,
-    user_id integer,
-    note_id integer,
-    duration integer NOT NULL,
-    updated timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.note_usage OWNER TO milestone;
-
---
--- Name: note_usage_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.note_usage ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.note_usage_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -1241,35 +1354,6 @@ ALTER TABLE milestone.practice_blocks ALTER COLUMN id ADD GENERATED ALWAYS AS ID
 
 
 --
--- Name: practice_editing; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.practice_editing (
-    id integer NOT NULL,
-    user_id integer,
-    practice_id integer,
-    action milestone.editing_action NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.practice_editing OWNER TO milestone;
-
---
--- Name: practice_editing_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.practice_editing ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.practice_editing_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
 -- Name: practice_resources; Type: TABLE; Schema: milestone; Owner: milestone
 --
 
@@ -1288,35 +1372,6 @@ ALTER TABLE milestone.practice_resources OWNER TO milestone;
 
 ALTER TABLE milestone.practice_resources ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME milestone.practice_resources_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
--- Name: practice_usage; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.practice_usage (
-    id integer NOT NULL,
-    user_id integer,
-    practice_id integer,
-    duration integer NOT NULL,
-    updated timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.practice_usage OWNER TO milestone;
-
---
--- Name: practice_usage_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.practice_usage ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.practice_usage_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -1356,19 +1411,6 @@ ALTER TABLE milestone.practices ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY
 
 
 --
--- Name: progress; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.progress (
-    user_id integer NOT NULL,
-    topic_id integer NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.progress OWNER TO milestone;
-
---
 -- Name: references; Type: TABLE; Schema: milestone; Owner: milestone
 --
 
@@ -1398,48 +1440,6 @@ ALTER TABLE milestone."references" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENT
 
 
 --
--- Name: resource_editing; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.resource_editing (
-    id integer NOT NULL,
-    user_id integer,
-    resource_id integer,
-    action milestone.editing_action NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.resource_editing OWNER TO milestone;
-
---
--- Name: resource_editing_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.resource_editing ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.resource_editing_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
--- Name: resource_watching; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.resource_watching (
-    user_id integer NOT NULL,
-    resource_id integer NOT NULL,
-    update timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.resource_watching OWNER TO milestone;
-
---
 -- Name: resources; Type: TABLE; Schema: milestone; Owner: milestone
 --
 
@@ -1463,35 +1463,6 @@ ALTER TABLE milestone.resources OWNER TO milestone;
 
 ALTER TABLE milestone.resources ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME milestone.resources_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
--- Name: section_editing; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.section_editing (
-    id integer NOT NULL,
-    user_id integer,
-    section_id integer,
-    action milestone.editing_action NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.section_editing OWNER TO milestone;
-
---
--- Name: section_editing_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.section_editing ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.section_editing_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -1558,48 +1529,6 @@ ALTER TABLE milestone.sections ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY 
 
 
 --
--- Name: studies; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.studies (
-    user_id integer NOT NULL,
-    section_id integer NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.studies OWNER TO milestone;
-
---
--- Name: subject_editing; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.subject_editing (
-    id integer NOT NULL,
-    user_id integer,
-    subject_id integer,
-    action milestone.editing_action NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.subject_editing OWNER TO milestone;
-
---
--- Name: subject_editing_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.subject_editing ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.subject_editing_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
 -- Name: subject_resources; Type: TABLE; Schema: milestone; Owner: milestone
 --
 
@@ -1610,19 +1539,6 @@ CREATE TABLE milestone.subject_resources (
 
 
 ALTER TABLE milestone.subject_resources OWNER TO milestone;
-
---
--- Name: subject_watching; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.subject_watching (
-    user_id integer NOT NULL,
-    subject_id integer NOT NULL,
-    update timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.subject_watching OWNER TO milestone;
 
 --
 -- Name: subjects; Type: TABLE; Schema: milestone; Owner: milestone
@@ -1644,95 +1560,6 @@ ALTER TABLE milestone.subjects OWNER TO milestone;
 
 ALTER TABLE milestone.subjects ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME milestone.subjects_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
--- Name: task_blocks; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.task_blocks (
-    id integer NOT NULL,
-    task_id integer,
-    solution text,
-    type milestone.block_type DEFAULT 'text'::milestone.block_type NOT NULL,
-    language character varying(10) NOT NULL,
-    creation timestamp without time zone DEFAULT now() NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.task_blocks OWNER TO milestone;
-
---
--- Name: task_blocks_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.task_blocks ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.task_blocks_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
--- Name: tasks; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.tasks (
-    id integer NOT NULL,
-    topic_id integer,
-    heading character varying(400) NOT NULL,
-    creation timestamp without time zone DEFAULT now() NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.tasks OWNER TO milestone;
-
---
--- Name: tasks_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.tasks ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.tasks_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
--- Name: topic_editing; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.topic_editing (
-    id integer NOT NULL,
-    user_id integer,
-    topic_id integer,
-    action milestone.editing_action NOT NULL,
-    updated timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE milestone.topic_editing OWNER TO milestone;
-
---
--- Name: topic_editing_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.topic_editing ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.topic_editing_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -1769,74 +1596,6 @@ ALTER TABLE milestone.topics ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     NO MAXVALUE
     CACHE 1
 );
-
-
---
--- Name: users; Type: TABLE; Schema: milestone; Owner: milestone
---
-
-CREATE TABLE milestone.users (
-    id integer NOT NULL,
-    username character varying(20) NOT NULL,
-    first_name character varying(30),
-    last_name character varying(30),
-    state milestone.user_state DEFAULT 'active'::milestone.user_state NOT NULL,
-    email character varying(100) DEFAULT NULL::character varying,
-    is_author boolean DEFAULT false NOT NULL
-);
-
-
-ALTER TABLE milestone.users OWNER TO milestone;
-
---
--- Name: users_id_seq; Type: SEQUENCE; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE milestone.users ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME milestone.users_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
--- Data for Name: container_templates; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.container_templates (id, name, content, creation, updated) FROM stdin;
-1	flashback	FROM ubuntu:24.04\n\n RUN apt update && apt upgrade --yes && apt install bash build-essential bzip2 ca-certificates chrpath cmake curl file gawk git locales lz4 make patch python3 vim wget zstd \n\n ENV LANG="en_US.UTF-8 UTF-8"\n RUN echo "$LANG" > /etc/locale.gen\n RUN echo "LANG=$LANG" > /etc/default/locale\n RUN echo "LC_ALL=$LANG" >> /etc/default/locale\n RUN locale-gen\n\n WORKDIR /src\n\n CMD /usr/bin/bash	2024-08-31 18:58:52.176345	2024-08-31 18:58:52.176345
-\.
-
-
---
--- Data for Name: containers; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.containers (id, template_id, name, content, description, creation, updated) FROM stdin;
-\.
-
-
---
--- Data for Name: credentials; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.credentials (id, user_id, hash, updated) FROM stdin;
-1	1	1cfea2a4b1e9d0ad61aaa97d23f0338233538ecbb858d196c3be1142f22c4b21e4419ae1706ab34ab42013a499a67edb85b1d75aa80eb23bc31b57e53c5e1c32	2024-08-11 03:13:54.980249
-\.
-
-
---
--- Data for Name: logins; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.logins (id, user_id, session, updated, valid) FROM stdin;
-1	1	b6e90657b0390c2f17170140de87c9f19c4eaf882a4f9fb3b65292c093e3fef7f9d807eeec0cf8ee773723ccc6c7790b8a4df6f82e7efdcc681e3e57415daf58	2024-08-11 03:12:43.341393+02	f
-2	1	067c7d68caf127743291f56d1791d1944ed9c16c414b934913e88ad52e3e474b8d654e20ab1858e2c73e7aef17c1c696fcd1b5da313a6e0842efc96ce47765aa	2024-08-11 11:18:14.335912+02	f
-3	1	9cfac9f64b7aff5e0c80fdaa4c231a8f25af48adbb0dde266bdf149a00a1f2c130ff05f46dae68ea7278b278090a353ce53b8c4fc2d10b4bac06fef5ed0f8e24	2024-08-11 11:18:40.857472+02	t
-\.
 
 
 --
@@ -3510,6 +3269,7 @@ COPY milestone.note_blocks (id, note_id, content, type, language, updated, "posi
 1639	368	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    auto last = std::remove(range.begin(), range.end(), 3);\n    range.erase(last, range.end());\n}	code	txt	2024-07-28 10:00:10.040533	3
 1640	369	| `std::remove_if` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:10.589465	1
 1641	369	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 10:00:10.610141	2
+10436	3994	fromJSON(object)	code	yml	2025-07-18 23:37:25.752058	7
 1642	369	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    auto last = std::remove_if(range.begin(), range.end(), [limit=4](long v) { return v > limit; });\n    range.erase(last, range.end());\n}	code	txt	2024-07-28 10:00:10.630715	3
 1643	370	| `std::replace` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:11.176005	1
 1644	370	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 10:00:11.197611	2
@@ -3601,6 +3361,7 @@ COPY milestone.note_blocks (id, note_id, content, type, language, updated, "posi
 1730	392	#include <algorithm>\n#include <vector>\n#include <ranges>	text	txt	2024-07-28 10:00:25.818701	2
 1731	392	int main()\n{\n    std::vector<long> range(5,0);\n    std::ranges::generate_n(range, 3, []() { return 1; });\n    // range == {1,1,1,0,0}\n}	code	txt	2024-07-28 10:00:25.838181	3
 1732	393	| `std::iota` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++23 |	text	txt	2024-07-28 10:00:26.40426	1
+10437	3994	hashFiles(path)	code	yml	2025-07-18 23:37:25.752058	8
 1733	393	#include <algorithm>\n#include <vector>\n#include <ranges>	text	txt	2024-07-28 10:00:26.424838	2
 1734	393	int main()\n{\n    std::vector<long> range(5,0);\n    std::ranges::iota(range, 1);\n    std::ranges::copy(range, std::ostream_iterator<long>(std::cout, " "));\n}	code	txt	2024-07-28 10:00:26.445923	3
 1735	394	| `std::copy` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 10:00:27.093163	1
@@ -4549,6 +4310,7 @@ COPY milestone.note_blocks (id, note_id, content, type, language, updated, "posi
 2671	639	std::filesystem::is_character_file(fs);\nstd::filesystem::is_block_file(fs);\nstd::filesystem::is_fifo(fs);\nstd::filesystem::is_socket(fs);	code	txt	2024-07-28 10:02:55.477638	3
 2672	640	std::filesystem::path p{};\nstd::filesystem::file_status fs = std::filesystem::status(p);\nstd::filesystem::file_type ft = fs.type();	text	txt	2024-07-28 10:02:56.0795	1
 3523	838	Apart from *module interface partition*, there could also be internal\npartitions that do not export anything. Such partition unit is called a\n**module implementation partition**.	text	txt	2024-07-28 10:05:03.987289	1
+10459	4009	select 1.23456789::int4;	code	sql	2025-07-18 23:38:35.226499	1
 2673	640	switch (fs.type())\n{\n    using std::filesystem::file_type;\n    case (file_type::regular):      std::cout << "regular"; break;\n    case (file_type::directory):    std::cout << "directory"; break;\n    case (file_type::block):        std::cout << "block"; break;\n    case (file_type::character):    std::cout << "char"; break;\n    case (file_type::symlink):      std::cout << "symlink"; break;\n    case (file_type::socket):       std::cout << "socket"; break;\n    case (file_type::fifo):         std::cout << "fifo"; break;\n    case (file_type::not_found):    std::cout << "not found"; break;\n    case (file_type::unknown):      std::cout << "unknown"; break;\n    case (file_type::none):         std::cout << "none"; break;\n}	code	txt	2024-07-28 10:02:56.102891	2
 2674	641	std::filesystem::path p{};\nstd::filesysetm::file_status fs = std::filesystem::status(p);\nstd::filesystem::perms file_permissions = fs.permissions();	code	txt	2024-07-28 10:02:56.38347	1
 2675	642	#include <iostream>\n#include <filesystem>	text	txt	2024-07-28 10:02:56.775368	1
@@ -4770,6 +4532,7 @@ COPY milestone.note_blocks (id, note_id, content, type, language, updated, "posi
 2934	706	1. Specify what data the problem operates on: **bag**	text	txt	2024-07-28 10:03:38.604967	1
 2935	706	2. Specify what operations does the problem requires:	text	txt	2024-07-28 10:03:38.625708	2
 2936	706	* Get the number of items currently in the bag.\n* See whether the bag is empty.\n* Add a given object to the bag.\n* Remove an occurence of a specific object from the bag, if possible.\n* Remove all objects from the bag.\n* Count the number of times a certain object occurs in the bag.\n* Test whether the bag contains a particular object.\n* Look at all objects that are in the bag.	text	txt	2024-07-28 10:03:38.647513	3
+10460	4009	select 1.23456789::int8;	code	sql	2025-07-18 23:38:35.226499	2
 2937	706	3. Specify ADT operations using the **Unified Modeling Language**:	text	txt	2024-07-28 10:03:38.667708	4
 2938	706	class bag {\n    // return the current number of entries in the bag\n    + size(): integer	text	txt	2024-07-28 10:03:38.689476	5
 2939	706	    // return true if the bag is empty; false otherwise\n    + empty(): boolean	text	txt	2024-07-28 10:03:38.711769	6
@@ -4818,6 +4581,7 @@ COPY milestone.note_blocks (id, note_id, content, type, language, updated, "posi
 2983	710	#include <iostream>\n#include <initializer_list>\n#include <string>\n#include <vector>\n#include <map>	text	txt	2024-07-28 10:03:43.174276	2
 2984	710	void func(int const a, int const b, int const c)\n{\n    std::cout << a << b << c << '\\\\n';\n}	text	txt	2024-07-28 10:03:43.19523	3
 2985	710	void func(std::initializer_list<int> const list)\n{\n    for (auto const& e: list)\n        std::cout << e;\n    std::cout << '\\\\n';\n}	text	txt	2024-07-28 10:03:43.215445	4
+10461	4009	* `integer`, `int4`\n* `bigint`, `int8`	text	txt	2025-07-18 23:38:35.226499	3
 2986	710	int main()\n{\n    std::string s1("text"); // direct initialization\n    std::string s2 = "text"; // copy initialization\n    std::string s3{"text"}; // direct list-initialization\n    std::string s4 = {"text"}; // copy list-initialization	text	txt	2024-07-28 10:03:43.235714	5
 2987	710	    std::vector<int> v{1, 2, 3};\n    std::map<int, std::string> m{{1, "one"}, {2, "two"}};	text	txt	2024-07-28 10:03:43.256768	6
 2988	710	    func({1, 2, 3}); // call std::initializer_list<int> overload	text	txt	2024-07-28 10:03:43.277137	7
@@ -5158,6 +4922,7 @@ COPY milestone.note_blocks (id, note_id, content, type, language, updated, "posi
 3324	791	void sample()\n{\n    std::function<int(int const)> lfib = [&lfib](int const n)\n    {\n        return n <= 2 ? 1 : lfib(n - 1) + lfib(n - 2);\n    };	text	txt	2024-07-28 10:04:33.340135	5
 3325	791	    auto f10 = lfib(10);\n}	code	txt	2024-07-28 10:04:33.360106	6
 3326	792	In order to write variadic function templates, you must perform the following steps:	text	txt	2024-07-28 10:04:34.072169	1
+10462	4010	select 1.23456789::real;	code	sql	2025-07-18 23:38:35.228058	1
 3327	792	1. Define an overload with a fixed number of arguments to end compile-time recursion if the semantics of the variadic function template require it.\n2. Define a template parameter pack that is a template parameter that can hold any number of arguments, including zero; these arguments can be either types, non-types, or templates.\n3. Define a function parameter pack to hold any number of function arguments, including zero; the size of the template parameter pack and the corresponding function parameter pack is the same. This size can be determined with the sizeof... operator.\n4. Expand the parameter pack in order to replace it with the actual arguments being supplied.	text	txt	2024-07-28 10:04:34.095273	2
 3328	792	With GCC and Clang, you can use the `__PRETTY_FUNCTION__` macro to print the name and the signature of the function.	text	txt	2024-07-28 10:04:34.114399	3
 3329	792	Make return type `auto` to ensure all of the function template initializations have the same return type, for example, in case of having `std::string` and `char` types in parameter pack.	text	txt	2024-07-28 10:04:34.135056	4
@@ -5247,6 +5012,7 @@ COPY milestone.note_blocks (id, note_id, content, type, language, updated, "posi
 3414	811	// using SFINAE\ntemplate<typename T, typename = typename std::enable_if_t<std::is_pointer_v<T>, T>>\nauto value_of(T value) { return *value; }	text	txt	2024-07-28 10:04:47.783428	1
 3415	811	template<typename T, typename = typename std::enable_if_t<!std::is_pointer_v<T>, T>>\nT value_of(T value) { return value; }	text	txt	2024-07-28 10:04:47.804333	2
 3416	811	// simplified by if constexpr\ntemplate<typename T>\nauto value_of(T value)\n{\n    if constexpr (std::is_pointer_v<T>)\n        return *value;\n    else\n        return value;\n}	code	txt	2024-07-28 10:04:47.825422	3
+10463	4010	select 1.23456789::double precision;	code	sql	2025-07-18 23:38:35.228058	2
 3417	811	template<typename CharT, char d, char... bits>\nconstexpr CharT binary_eval()\n{\n    if constexpr(sizeof...(bits) == 0)\n        return static_cast<CharT>(d-'0');\n    else if constexpr(d == '0')\n        return binary_eval<CharT, bits...>();\n    else if constexpr(d == '1')\n        return static_cast<CharT>((1 << sizeof...(bits)) | binary_eval<CharT, bits...>());\n}	text	txt	2024-07-28 10:04:47.846905	4
 3418	811	template<char... bits>\nconstexpr byte8 operator""_b8()\n{\n    static_assert(sizeof...(bits) <= 8, "binary literal b8 must be up to 8 digits long");\n    return binary_eval<byte8, bits...>();\n}	code	txt	2024-07-28 10:04:47.867047	5
 3419	812	[[nodiscard]] int get_value() { return 42; }	text	txt	2024-07-28 10:04:48.120397	1
@@ -5349,6 +5115,7 @@ COPY milestone.note_blocks (id, note_id, content, type, language, updated, "posi
 3516	837	In the primary module interface unit, import and then export the partitions\nwith statements of the form `export import :partitionname`.	text	txt	2024-07-28 10:05:02.853873	9
 3517	837	*geometry.cppm*\nexport module geometry;	text	txt	2024-07-28 10:05:02.875296	10
 3518	837	export import :core;\nexport import :literals;	code	txt	2024-07-28 10:05:02.894678	11
+10527	4050	./scripts/kconfig/streamline_config.pl	code	sh	2025-07-18 23:40:48.372459	1
 3528	838	std::pair<int, int> split(char const* ptr, std::size_t const size)\n{\n    int x{}, y{};\n    ...\n    return {x, y};\n}	code	txt	2024-07-28 10:05:04.091518	6
 3529	838	*geometry-literals.cppm*\nexport module geometry:literals;	text	txt	2024-07-28 10:05:04.111753	7
 3530	838	import :core;\nimport :details;	text	txt	2024-07-28 10:05:04.132399	8
@@ -5489,6 +5256,7 @@ COPY milestone.note_blocks (id, note_id, content, type, language, updated, "posi
 3665	876	#include <iostream>	text	txt	2024-07-28 10:05:24.723072	1
 3666	876	int main()\n{\n    std::cout << "default compiler standard: " << __cplusplus << std::endl;\n}	code	txt	2024-07-28 10:05:24.744285	2
 3667	877	void f(int);\nvoid f(void*);	text	txt	2024-07-28 10:05:25.191527	1
+10528	4050	make localdefconfig	code	sh	2025-07-18 23:40:48.372459	2
 3668	877	int main()\n{\n    f(0); // calls f(int)\n    f(NULL); // calls f(int)\n    f(nullptr); // calls f(void*)\n}	code	txt	2024-07-28 10:05:25.212795	2
 3669	878	int main()\n{\n    auto i = 42;\n    auto u = 42U;\n    auto l = 42L;\n    auto ul = 42UL;\n    auto ll = 42LL;\n    auto ull = 42ULL;\n    auto d = 42.0;\n    auto ld = 42.0L;\n}	code	txt	2024-07-28 10:05:25.775062	1
 3670	879	int main()\n{\n    int i; // indeterminate value\n    int j{}; // initialized to 0\n    int* p; // indeterminate value\n    int* q{}; // initialized to nullptr	text	txt	2024-07-28 10:05:26.430485	1
@@ -7937,12 +7705,6 @@ COPY milestone.note_blocks (id, note_id, content, type, language, updated, "posi
 6103	1833	* Anti-Aliased line with Guassian Smoothing	text	txt	2024-07-28 10:11:42.341209	6
 6104	1833	```\n|O|O| | | | | | | | |\n| |O|X|O| | | | | | |\n| | | |O|X|O| | | | |\n| | | | | |O|X|O| | |\n| | | | | | | |O|X|O|\n| | | | | | | | | |O|\n``````	text	txt	2024-07-28 10:11:42.362869	7
 6105	1834	The `thickness` of the lines measured in pixles. For all closed shapes, it\ncan be set to `cv::FILLED` which is an alias for `-1`.	text	txt	2024-07-28 10:11:42.550676	1
-6106	1835	The signature of this function is as follows:	text	txt	2024-07-28 10:11:43.35882	1
-6107	1835	void cv::circle(\n    cv::Mat&            image,      // image to be drawn on\n    cv::Point           center,     // location of circle center\n    int                 radius,     // radius of circle\n    const cv::Scalar&   color,      // color RGB form\n    int                 thickness=1,// thickness of line\n    int                 lineType=8, // connectedness, 4 or 8\n    int                 shift=0     // bits of radius to treat as fraction\n)	code	txt	2024-07-28 10:11:43.380029	2
-6108	1835	A sample usage of this drawing function is:	text	txt	2024-07-28 10:11:43.400078	3
-6109	1835	#include <opencv2/imgproc.hpp>	text	txt	2024-07-28 10:11:43.420899	4
-6110	1835	int main()\n{\n    cv::Mat image = cv::imread("/tmp/image.jpg");\n    cv::Point2i center{image.cols / 2, image.rows / 2};\n    int radius{100};\n    cv::Scalar color{};\n    int thickness{4};\n    int linetype{4};\n    int shift{0};	text	txt	2024-07-28 10:11:43.441207	5
-6111	1835	    cv::circle(image, center, radius, color, thickness, linetype, shift);\n}	code	txt	2024-07-28 10:11:43.463046	6
 6112	1836	git clone https://github.com - https://github.com/opencv/opencv.git\ncmake -S opencv -B opencv-build -D CMAKE_BUILD_TYPE=Release -D CMAKE_PREFIX_PATH=/usr/local\ncmake --build opencv-build --release Release --target all -j $(nproc)\ncmake --install opencv-build -j $(nproc)	code	txt	2024-07-28 10:11:44.271593	1
 6113	1837	#include <opencv2/core.hpp>	code	txt	2024-07-28 10:11:44.51335	1
 6114	1838	cv::Mat image;\nstd::cout << image.rows << " x " << image.cols << '\\\\n';;	code	txt	2024-07-28 10:11:44.773739	1
@@ -7976,6 +7738,8 @@ COPY milestone.note_blocks (id, note_id, content, type, language, updated, "posi
 6143	1847	    cv::rectangle(image, topleft, bottomright, color, thickness);\n    cv::putText(image, name, position, cv::FONT_HERSHEY_PLAIN, scale, color, thickness);\n    cv::imshow(window, image);\n    cv::waitKey(0);\n    cv::destroyWindow(window);\n}	code	txt	2024-07-28 10:11:49.842696	4
 6455	2036	    Rectangle {\n        anchors.fill: parent\n        color: 'lightsteelblue'\n        border.color: 'gray'\n    }	text	txt	2024-07-28 10:12:59.414114	3
 6456	2036	    property alias text: input.text\n    property alias input: input	text	txt	2024-07-28 10:12:59.434325	4
+6106	1835	The signature of this function is as follows:	text	txt	2024-07-28 10:11:43.35882	1
+6108	1835	A sample usage of this drawing function is:	text	txt	2024-07-28 10:11:43.400078	3
 6144	1848	You need to specify the type of each matrix element. The letter `U` means it\nis unsigned. You can also declare signed numbers by using the letter `S`. For\na color image, you would specify three channels. You can also declare\nintegers (signed or unsigned) of size 16 and 32. You also have access to\n32-bit and 64-bit floating-point numbers	text	txt	2024-07-28 10:11:50.36288	1
 6145	1848	`CV_8U`: 1-byte pixel image with a single channel.\n`CV_8UC3`: 1-byte pixel image with 3 channels.\n`CV_16SC3`: 2-byte pixel image with 3 channels.\n`CV_32F`: 4-byte floating point pixel image.	text	txt	2024-07-28 10:11:50.383908	2
 6146	1848	#include <opencv2/core.hpp>	text	txt	2024-07-28 10:11:50.403893	3
@@ -11868,6 +11632,7 @@ COPY milestone.note_blocks (id, note_id, content, type, language, updated, "posi
 10178	3882	cmake --build build --config Release	code	sh	2025-02-23 23:06:51.388193	4
 10213	3900	We’re not technically linking against the library, but we must add the target as a dependency so that the include search paths for our target get populated.	text	txt	2025-02-23 23:06:51.419662	1
 10214	3900	target_include_directories(<lib> INTERFACE $<BUILD_LOCAL_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)	code	cmake	2025-02-23 23:06:51.419662	2
+10457	4007	* `true`: `yes`, `on`, 1\n* `false`: `no`, `off`, 0	text	txt	2025-07-18 23:38:35.221613	1
 10179	3883	1. Copy the third-party library into source directory.\n2.  If third-party project is using CMake, it’s possible to use a feature called `add_subdirectory` to add that library relatively cleanly. Any modifications will make future upgrades incredibly painful. A `LICENSE` file exists in that library’s root folder.\n3. Git submodules have the advantage of keeping the source files of third-party dependencies out of project but submodules can make cloning and updating the project more complex.\n4. `FetchContent` solves all of these problems, keeping good hygiene between code and dependencies and avoiding unwanted complexity or maintenance headaches.	text	txt	2025-02-23 23:06:51.391595	1
 10180	3884	FetchContent allows us to keep the source of any third-party dependency out of codebase. A target can depend on the targets provided by the dependency at configure time. The dependency will be built at the same time as the project.	text	txt	2025-02-23 23:06:51.393767	1
 10181	3885	The build artifacts will added to a folder called `_deps` inside the build directory.	text	txt	2025-02-23 23:06:51.39501	1
@@ -12029,18 +11794,235 @@ COPY milestone.note_blocks (id, note_id, content, type, language, updated, "posi
 10339	3958	We count operations instead of measuring the variable time when those operations run.	text	txt	2025-07-14 20:33:03.507465	1
 10340	3958	template<Container, Element>\nrequires requires(Element e) { e + e; }\nint aggregate(Container<Element> const& container)\n{\n    int sum{0}; // 1\n\n    for (Element const& element: container)\n    {\n        sum += element; // 3N\n    }\n\n    return sum; // 1\n}	code	cpp	2025-07-14 20:33:03.507465	2
 10341	3959	We only consider the highest growth term using asymptotic notation.	text	txt	2025-07-14 20:33:03.508943	1
+10382	3975	CRTP is most useful when you want compile-time polymorphism, meaning you want a base class to call functions from the derived class without using virtual functions (no runtime overhead).	text	txt	2025-07-16 20:32:27.129894	1
 10342	3959	template<Container, Element>\nrequires requires(Element e) { e + e; }\nint aggregate(Container<Element> const& container)\n{\n    int sum{0}; // 1\n\n    for (Element const& element: container)\n    {\n        sum += element; // 3N\n    }\n\n    return sum; // 1\n}	code	cpp	2025-07-14 20:33:03.508943	2
 10343	3959	f(N) = 3N + 2\nO(N) = N	text	txt	2025-07-14 20:33:03.508943	3
 10344	3959	template<Container, Element>\nrequires requires(Element e) { e + e; }\nlong long aggregate(Container<Element> const& container)\n{\n    int index{0}; // 1\n    long long sum{0}; // 1\n\n    while (index < container.size())\n    {\n        sum += container.at(index); // 3N\n        index++; // N\n    }\n\n    return sum; // 1\n}	code	cpp	2025-07-14 20:33:03.508943	4
 10345	3959	f(N) = 4N + 3\nO(N) = N	text	txt	2025-07-14 20:33:03.508943	5
-\.
-
-
---
--- Data for Name: note_editing; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.note_editing (id, user_id, note_id, action, updated) FROM stdin;
+10370	3969	For each algorithm, there are three cases to analyze; the best case, the worst case, and the average case. For each, there are use cases, but most of the time, we only care about the worst case scenario. The big O notation is the definition of the worst case scenario of an algorithm. If the algorithm can be written as `f(n) = 5n + 3`, then `g(n) = n` is always greater than `f(n)`. Therefore, by taking only the highest order of a function, we estimate the worst case scenario. For the best case scenario, if we have a function `f(n)`, and the best case is `g(n)`, then the comparison `f(n) > g(n)` is always true. For the average case, if we have `f(n)` and the best case scenario is `g(n)`, and the worst case of `h(n)`, then the average function `w(n)` is always sandwiched between `f(n)` and `g(n)`, thus `f(n) >= w(n) >= g(n)`.	text	txt	2025-07-16 14:02:30.622829	1
+10371	3970	The worst case scenario is written by `O(n)` notation. Best case scenario is written by `Omega(n)`. Average case scenario is written by `Delta(n)` notation.	text	txt	2025-07-16 14:02:30.628117	1
+10372	3971	When we have a function `1 + 2 + 3 + ... + n`, then we can rewrite the function as `f(n) = (n + 1) / 2`. Then say the worst case is `O(n) = n`, and the best case scenario is `Omega(n) = 1`. For average case, we have `Delta(n) = n/2 + 1/2 = n`.	text	txt	2025-07-16 14:02:30.630504	1
+10373	3971		code	cpp	2025-07-16 14:02:30.630504	2
+10374	3972	Array is a set of adjacent elements on memory.	text	txt	2025-07-16 14:02:30.634981	1
+10375	3972	|**Operation**|**Time Complexity**|\n|Read|`O(1)`|\n|Write|`O(n)`|\n|Search|`O(n)`|\n|Delete|`O(n)`|	text	txt	2025-07-16 14:02:30.634981	2
+10376	3973	The maximum number can be the first element in best case scenario, or it can be the last element in the worst case scenario. So the algorithm is to search for all the elements of an array from beginning to the end, and for best and worst case scenario we read the entire list. Therefore, the algorithm is linear, and the worst case is `O(n)`, and the best case is `Omega(n)`.	text	txt	2025-07-16 14:02:30.639054	1
+10377	3973	template<typename T>\nT max(std::array<T> const& container)\n{\n    auto iter{container.cbegin()};\n    auto last{container.cend()};\n    auto value{*iter};\n\n    for (; iter != last; ++iter)\n    {\n        if (*iter > value)\n        {\n            value = *iter;\n        }\n    }\n\n    return value;\n}	code	cpp	2025-07-16 14:02:30.639054	2
+10378	3974	The first and naive approach could be to take the reverse of a string and linearly step through both strings and check until the end. In this case, we have `O(n)` and `Omega(n)`.	text	txt	2025-07-16 14:02:30.642871	1
+10379	3974	bool is_palindrome(std::string const& s)\n{\n    std::string r{s};\n    std::reverse(r.begin(), r.end());\n    bool result{true};\n    int i{0};\n\n    while (result && i < s.length())\n    {\n        if (s[i] != r[i])\n        {\n            result = false;\n        }\n\n        ++i;\n    }\n\n    return result;\n}	code	cpp	2025-07-16 14:02:30.642871	2
+10380	3974	But this can also be done by approaching from the beginning and the end of the string at the same time. The time complexity of this approach is `O(n)` and `Omega(n)`.	text	txt	2025-07-16 14:02:30.642871	3
+10381	3974	bool is_palindrome(std::string const& s)\n{\n    auto forward{s.cbegin()};\n    auto backward{s.cend() - 1};\n    bool result{true};\n\n    while (result && std::distance(forward, backward) > 0)\n    {\n        if (*forward != *backwards)\n        {\n            result = false;\n        }\n\n        ++forward;\n        --backward;\n    }\n\n    return result;\n}	code	cpp	2025-07-16 14:02:30.642871	4
+10383	3976	template<typename Iterative>\nstruct non_iterative\n{\n    non_iterative()\n    {\n        for (auto const& item: *static_cast<Iterative*>(this))\n        {\n            (void*) item;\n        }\n    }\n};\n\nstruct iterative: public non_iterative<iterative>\n{\n    class iterator\n    {\n        friend bool operator ==(iterator const&, iterator const&) { return true; }\n        friend iterator& operator ++(iterator& iter) { return iter; }\n        friend bool operator *(iterator const&) { return true; }\n    };\n\n    iterator begin() { return {}; }\n    iterator end() { return {}; }\n};\n\nint main()\n{\n    non_iterative<iterative> range{};\n}	code	cpp	2025-07-16 20:32:27.134015	1
+10384	3976	In this case, the base type does not provide begin and end methods, but the derived type does.	text	txt	2025-07-16 20:32:27.134015	2
+10385	3976	This pattern can be used in Composite pattern.	text	txt	2025-07-16 20:32:27.134015	3
+10386	3977	A class can inherit from its own template argument.	text	txt	2025-07-16 20:32:27.136287	1
+10387	3977	template<typename T>\nclass mixin: T\n{\n};	code	cpp	2025-07-16 20:32:27.136287	2
+10388	3977	This pattern allows hierarchical composition of types:	text	txt	2025-07-16 20:32:27.136287	3
+10389	3977	Top<Middle<Bottom>> hierarchy;	code	cpp	2025-07-16 20:32:27.136287	4
+10390	3977	This implements the traits of all three classes, without the need to construct a new `TopMiddleBottom` class.	text	txt	2025-07-16 20:32:27.136287	5
+10391	3977	This pattern can be used in Decorator pattern.	text	txt	2025-07-16 20:32:27.136287	6
+10392	3978	When a class might have multiple behaviors within its methods, to make sure all variations follow the same API, we can make an interface with the functionalities shared between implementations, then we can use curiously recurring template pattern to implement multiple variations. This can be a substitution for C++ concepts prior to C++20.	text	txt	2025-07-16 20:32:27.138319	1
+10393	3978	template<typename Impl>\nclass basic_notifier\n{\npublic:\n    basic_notifier(): impl{static_cast<Impl&>(*this)}\n    {\n    }\n\n    void send_sms(std::string_view message)\n    {\n        impl.sms(message);\n    }\n\n    void send_email(std::string_view message)\n    {\n        impl.email(message);\n    }\n\nprivate:\n    Impl& impl;\n    friend Impl;\n};\n\nclass empty_notifier: public basic_notifier<empty_notifier>\n{\npublic:\n    void sms(std::string_view message) { }\n    void email(std::string_view message) { }\n};\n\ntemplate<typename Impl>\nvoid notify_all_channels(basic_notifier<Impl>& notifier, std::string_view message)\n{\n    notifier.send_sms(message);\n    notifier.send_email(message);\n}\n\nint main()\n{\n    empty_notifier notifier{};\n    notify_all_channels(notifier, "");\n}	code	cpp	2025-07-16 20:32:27.138319	2
+10394	3978	Disadvantages of this pattern is:\n\n- Parallel APIs between interface and implementations due to implementation methods hiding interface methods when they share the same name\n- Pimpl pattern seems unnecessary and normal polymorphism would look better\n- Availability of interface methods in implementations are not checked in compile time	text	txt	2025-07-16 20:32:27.138319	3
+10395	3978	The third objective can be fixed with concepts:	text	txt	2025-07-16 20:32:27.138319	4
+10396	3978	template<typename Impl>\nconcept is_notifier = requires(Impl impl) {\n    impl.send_sms(std::string_view{});\n    impl.send_email(std::string_view{});\n};\n\ntemplate<is_notifier Notifier>\nvoid notify_all_channels(Notifier& notifier, std::string message)\n{\n    notifier.send_sms(message);\n    notifier.send_email(message);\n}	code	cpp	2025-07-16 20:32:27.138319	5
+10397	3978	With concepts, there is no need for the interface.	text	txt	2025-07-16 20:32:27.138319	6
+10398	3979	qemu-system-arm -machine vexpress-a9 -m 256M -drive file=rootfs.ext4,sd -net nic -net use -kernel zImage -dtb vexpress-v2p-ca9.dtb -append "console=ttyAMA0,115200 root=/dev/mmcblk0" -serial stdio -net nic,model=lan9118 -net tap,ifname=tap0	code	sh	2025-07-16 20:36:30.837888	1
+10399	3979	`-machine`: creates a machine with specified processor\n`-m`: specifies the amount of memory available on the emulated machine\n`-drive`: locates the filesystem image\n`-kernel`: locates the kernel image\n`-dtb`: locates the device driver files\n`-serial`: connects the serial port to the terminal that launched the machine\n`-net nic,model=lan9118`: creates a network interface\n`-net tap,ifname=tap0`: connects the network interface to the virtual network interface `tap0`	text	txt	2025-07-16 20:36:30.837888	2
+10400	3979	To configure the host side of the network, use `tunctl` from the **User Mode Linux (UML)** project.	text	txt	2025-07-16 20:36:30.837888	3
+10401	3979	sudo tunctl -u $USER -t tap0	code	sh	2025-07-16 20:36:30.837888	4
+10420	3987	Since C++17 the need to specify template arguments explicitly to class templates is relaxed.	text	txt	2025-07-18 23:34:38.274381	1
+10421	3987	std::complex<double> c{4.2, 5.1}; // prior to C++17	code	cpp	2025-07-18 23:34:38.274381	2
+10422	3987	std::complex c{4.2, 5.1}; // since C++17	code	cpp	2025-07-18 23:34:38.274381	3
+10423	3988	Template parameters have to be unambiguously deducible.	text	txt	2025-07-18 23:34:38.278197	1
+10424	3988	std::complex c{3, 4.2}; // ERROR: attempts int and double as T	code	cpp	2025-07-18 23:34:38.278197	2
+6107	1835	void cv::circle(\n    cv::Mat&            image,      // image to be drawn on\n    cv::Point           center,     // location of circle center\n    int                 radius,     // radius of circle\n    const cv::Scalar&   color,      // color RGB form\n    int                 thickness=1,// thickness of line\n    int                 lineType=8, // connectedness, 4 or 8\n    int                 shift=0     // bits of radius to treat as fraction\n)	code	cpp	2024-07-28 10:11:43.380029	2
+10438	3995	steps:\n  release:\n    runs-on: ubuntu-latest\n    steps:\n      - name: "Runs the step if the previous step has failed"\n        if: ${{ failure() }}\n      - name: "Runs the step only if the workflow has cancelled"\n        if: ${{ cancelled() }}\n      - name: "Runs the step if none of the previous steps have failed or been cancelled"\n        if: ${{ success() }}\n      - name: "Runs the step even if previous steps failed or cancelled"\n        if: ${{ always }}	code	yml	2025-07-18 23:37:25.755172	1
+10403	1835	#include <opencv2/imgproc.hpp>\n\nint main()\n{\n    cv::Mat image = cv::imread("/tmp/image.jpg");\n    cv::Point2i center{image.cols / 2, image.rows / 2};\n    int radius{100};\n    cv::Scalar color{};\n    int thickness{4};\n    int linetype{4};\n    int shift{0};\n\n    cv::circle(image, center, radius, color, thickness, linetype, shift);\n}	code	cpp	2025-07-17 18:50:21.243988	4
+10404	3980	When there are multiple variations in the behavior of a member function, we can either implement each variation in a naive way and separate them by conditions, but then we will have to add more conditional statements over time, thus modifying the existing code which leads to the violation of Open-Closed principle.	text	txt	2025-07-18 23:22:41.330377	1
+10405	3980	class context\n{\nprivate:\n    state current_state;\n\npublic:\n    enum class state { active, passive };\n\n    void run()\n    {\n        switch (current_state)\n        {\n        case state::active:\n            // strategy 1\n            break;\n        case state::passive:\n            // strategy 2\n            break;\n        default:\n            // possible future strategies\n        }\n    }\n};	code	cpp	2025-07-18 23:22:41.330377	2
+10406	3980	With strategy pattern, each conditional behavior, also known as algorithms, are taken out of the member functions and are put inside their own classes. The class that might behave differently based on conditions, is also known as a context. Since all of the algorithm classes have the same behavior, but with different implementations, they can be inherited from a common base class. These classes are called strategies or policies.	text	txt	2025-07-18 23:22:41.330377	3
+10439	3996	jobs:\n  release:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo "::warning some warning"\n      - run: echo "::error some error"	code	yml	2025-07-18 23:37:25.758193	1
+10440	3997	jobs:\n  release:\n    runs-on: ubuntu-latest\n    steps:\n      - name: "Set file path"\n        id: paths\n        run: echo "file_path=/src/project/main.cpp" >> "$GITHUB_OUTPUT"\n      - name: "Get file path"\n        run: echo "${{ steps.paths.outputs.file_path }}"	code	yml	2025-07-18 23:37:25.761095	1
+10441	3998	jobs:\n  release:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo "::add-mask::$(( RANDOM ))"	code	yml	2025-07-18 23:37:25.762967	1
+10442	3999	jobs:\n  release:\n    runs-on: ubuntu-latest\n    steps:\n      - id: produce\n        run: echo "action_state=yellow" >> "$GITHUB_ENV"\n      - run: echo "state: ${{ env.action_state }}"	code	yml	2025-07-18 23:37:25.764245	1
+10443	4000	jobs:\n  release:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo "### First Step" >> "$GITHUB_STEP_SUMMARY"\n      - run: echo "### Second Step" >> "$GITHUB_STEP_SUMMARY"\n      - run: echo "### Third Step" >> "$GITHUB_STEP_SUMMARY"	code	yml	2025-07-18 23:37:25.765478	1
+10444	4001	- Organization\n  - User\n    - Repository (default)\n      - Environment	text	txt	2025-07-18 23:37:25.766731	1
+10445	4002	Secrets and variables can be created in either of three context levels to have different access levels.	text	txt	2025-07-18 23:37:25.768146	1
+10446	4002	jobs:\n  release:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/create-release@v1\n        with:\n          GITHUB_TOKEN: ${{ secrets.github_token }}	code	yml	2025-07-18 23:37:25.768146	2
+10447	4003	Secrets and variables can be set using `gh` command:	text	txt	2025-07-18 23:37:25.769546	1
+10448	4003	gh secret set KEY --body "$((RANDOM))"	code	sh	2025-07-18 23:37:25.769546	2
+10449	4003	gh secret set KEY --body "$((RANDOM))" --env <environment>	code	sh	2025-07-18 23:37:25.769546	3
+10450	4003	gh secret set KEY --body "$((RANDOM))" --org <organization> --visibility public	code	sh	2025-07-18 23:37:25.769546	4
+10451	4003	gh secret set KEY --body "$((RANDOM))" --org <organization> --repos <repo>...	code	sh	2025-07-18 23:37:25.769546	5
+10452	4003	gh secret set KEY --body "$((RANDOM))" --user	code	sh	2025-07-18 23:37:25.769546	6
+10453	4004	GitHub automatically creates a secret and it can be accessed by `github.token` or `secrets.github_token`.	text	txt	2025-07-18 23:37:25.77078	1
+10454	4004	jobs:\n  release:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          GITHUB_TOKEN: ${{ github.token }}	code	yml	2025-07-18 23:37:25.77078	2
+10455	4005	Permissions can be applied on the entire workflow, or on a single job.	text	txt	2025-07-18 23:37:25.771914	1
+10458	4008	alter table users add is_active boolean default true;	code	sql	2025-07-18 23:38:35.22487	1
+10407	3980	#include <memory>\n\nclass context\n{\nprivate:\n    std::unique_ptr<basic_strategy> m_strategy;\npublic:\n    context(): m_strategy{nullptr}\n    { }\n\n    explicit context(std::unique_ptr<basic_strategy> strategy): m_strategy{std::move(strategy)}\n    { }\n\n    void set_strategy(std::unique_ptr<basic_strategy> strategy)\n    {\n        m_strategy.reset(std::move(strategy));\n    }\n\n    void run()\n    {\n        strategy->run();\n    }\n};\n\nclass basic_strategy\n{\nprotected:\n    virtual void run() = 0;\n};\n\nstruct strategy1: public basic_strategy\n{\n    void run() override;\n};\n\nstruct strategy2: public basic_strategy\n{\n    void run() override;\n};\n\nint main()\n{\n    context c{};\n    std::unique_ptr<strategy1> s1{std::make_unique<strategy1>()};\n    std::unique_ptr<strategy2> s2{std::make_unique<strategy2>()};\n\n    c.set_strategy(s1);\n    c.run();\n\n    c.set_strategy(s2);\n    c.run();\n}	code	cpp	2025-07-18 23:22:41.330377	4
+10408	3981	Instead of creating strategies dynamically on runtime, strategy pattern can be applied using templates in compile-time.	text	txt	2025-07-18 23:22:41.333005	1
+10409	3981	template<typename Strategy>\nclass context\n{\nprivate:\n    Strategy m_strategy;\npublic:\n    void run()\n    {\n        strategy->run();\n    }\n};\n\nclass strategy1\n{\n};\n\nclass strategy2\n{\n};\n\nint main()\n{\n    context<strategy1> c1{};\n    c1.run();\n    context<strategy2> c2{};\n    c2.run();\n}	code	cpp	2025-07-18 23:22:41.333005	2
+10410	3982	When the strategy is not used across the class, there is no need to store it as a member. Therefore, we can only pass the strategy to the member function where it uses the strategy.	text	txt	2025-07-18 23:22:41.334417	1
+10411	3982	class context\n{\npublic:\n    template<typename Strategy>\n    void run(Strategy strategy)\n    {\n        strategy->run();\n    }\n};\n\nclass strategy1\n{\n};\n\nclass strategy2\n{\n};\n\nint main()\n{\n    context c{};\n    c.run<strategy1>();\n    c.run<strategy2>();\n}	code	cpp	2025-07-18 23:22:41.334417	2
+10412	3983	Similar to strategy pattern which applies to classes that have multiple variations of behaviors between instances, template method pattern applies to algorithms that some of the steps have variations of behaviors.	text	txt	2025-07-18 23:22:41.338346	1
+10413	3983	With template method pattern, we define the skeleton of an algorithm in an operation, deferring some steps to the subclasses. Then, redefine certain steps of an algorithm without changing the algorithms structure.	text	txt	2025-07-18 23:22:41.338346	2
+10414	3983	class basic_context\n{\nprotected:\n    virtual void step1() = 0; // varying step\n    virtual void step2() = 0; // varying step\n    virtual void step3() { } // optional step, hook\n    void step4() { } // fixed step\n\npublic:\n    virtual void run()\n    {\n        step1(); // varying\n        step2(); // varying\n        step3(); // hook\n        step4(); // fixed\n    }\n};\n\nclass context: public basic_context\n{\nprotected:\n    void step1() override { }\n    void step2() override { }\n\npublic:\n    void run() override;\n};\n\nint main()\n{\n    context c{};\n    c.run();\n}	code	cpp	2025-07-18 23:22:41.338346	3
+10415	3984	Where there are requests from one part of an application called *invoker*, to another component called receiver, by first design we might directly connect these two to directly call on each other. But if later we need to know the state of these requests in order to implement features like undo and redo, we need to make these requests into instances of command class. The difference is that requests were functions but now they are classes with the advantage of having states.	text	txt	2025-07-18 23:22:41.341768	1
+10416	3985	class invoker as "User" <<Invoker>> {\n    - receiver\n}\n\nclass receiver as "Bank Account" <<Receiver>> {\n    + withdraw(amount: int): void\n    + deposit(amount: int): void\n}\n\nreceiver -o invoker: < aggregates	code	plantuml	2025-07-18 23:22:41.344604	1
+10417	3985	The invoker and receiver classes can be decoupled like this:	text	txt	2025-07-18 23:22:41.344604	2
+10418	3985	abstract command {\n    - receiver\n    {abstract} + execute(): void\n}\n\nclass withdraw_command {\n    + execute(): void\n}\n\nclass deposit_command {\n    + execute(): void\n}\n\nclass invoker as "User" <<Invoker>> {\n    - command\n}\n\nclass receiver as "Bank Account" <<Receiver>> {\n    + withdraw(amount: int): void\n    + deposit(amount: int): void\n}\n\ncommand <|.. withdraw_command: > implements\ncommand <|.. deposit_command: > implements\ncommand -o invoker: < aggregates\nreceiver -o command: < aggregates	code	plantuml	2025-07-18 23:22:41.344604	3
+10419	3986	#include <iostream>\n\nclass bank_account\n{\nprivate:\n    int m_balance;\n    int m_overdraft_limit;\n\npublic:\n    explicit bank_account(): m_overdraft_limit{-500} { }\n    explicit bank_account(int balance, int overdraft_limit = -500): m_balance{balance}, m_overdraft_limit{overdraft_limit} { }\n\n    void withdraw(int amount) { m_balance-= amount; }\n    void deposit(int amount) { m_balance+= amount; }\n    int balance() const { return m_balance; }\n};\n\nclass command\n{\n    virtual void execute() const = 0;\n};\n\nclass withdraw_command: public command\n{\nprivate:\n    int amount;\n    bank_account& account;\n\npublic:\n    explicit withdraw_command(bank_account& account, int const amount): amount{amount}, account{account} { }\n\n    void execute() const override { account.withdraw(amount); }\n};\n\nclass deposit_command: public command\n{\nprivate:\n    int amount;\n    bank_account& account;\n\npublic:\n    explicit deposit_command(bank_account& account, int const amount): amount{amount}, account{account} { }\n\n    void execute() const override { account.deposit(amount); }\n};\n\nint main()\n{\n    bank_account account{1000};\n    withdraw_command action{account, 10};\n    std::cout << account.balance() << std::endl; // 1000\n    action.execute();\n    std::cout << account.balance() << std::endl; // 990\n}	code	cpp	2025-07-18 23:22:41.347225	1
+10425	3989	on:\n  workflow_dispatch:\n    inputs:\n      log-level:\n        description: "verbosity of logs"\n        required: true\n        default: "warning"\n        type: choice\n        options:\n          - info\n          - warning\n          - debug\n      environment:\n        description: "selected environments"\n        type: environment\n        required: true	code	yml	2025-07-18 23:37:25.737122	1
+10426	3990	gh workflow run <workflow> -f log-level=debug -f environment=Debug	code	sh	2025-07-18 23:37:25.739394	1
+10427	3991	jobs:\n  release:\n    strategy:\n      fail-fast: false\n      max-parallel: 3\n      matrix:\n        os_version: [macos-latest, ubuntu-latest]\n        node_version: [12, 14, 16]\n    name: Release\n    runs-on: ${{ matrix.os_version }}\n    steps:\n      - uses: actions/setup-node@v3.6.0\n        with:\n          node-version: ${{ matrix.node_version }}	code	yml	2025-07-18 23:37:25.741787	1
+10428	3992	jobs:\n  release:\n    if: ${{ github.ref_name == "main" }}\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo "Deploy branch ${{ github.ref_name }}"	code	yml	2025-07-18 23:37:25.745186	1
+10429	3993	|Operator|Description|\n|---|---|\n|`()`|Logical grouping|\n|`[]`|Index|\n|`.`|Property dereference|\n|`!`|Logical inverse|\n|`<`, `<=`, `>`, `>=`|Comparison|\n|`==`, `!=`|Equality and inequality|\n|`&&`, `||`|Logical combinations|	text	txt	2025-07-18 23:37:25.748419	1
+10430	3994	contains(list, item)	code	yml	2025-07-18 23:37:25.752058	1
+10431	3994	startsWith(list, item)	code	yml	2025-07-18 23:37:25.752058	2
+10432	3994	endsWith(list, item)	code	yml	2025-07-18 23:37:25.752058	3
+10433	3994	format(string, v0, v1,...)	code	yml	2025-07-18 23:37:25.752058	4
+10434	3994	join(list, separator)	code	yml	2025-07-18 23:37:25.752058	5
+10435	3994	toJSON(string)	code	yml	2025-07-18 23:37:25.752058	6
+10456	4006	jobs:\n  release:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      pull-requests: write\n    steps:\n      - uses: actions/labeler@v4	code	yml	2025-07-18 23:37:25.773264	1
+10464	4010	* `real` (4 byte precision, almost 6 digits)\n* `double precision` (8 byte variable precision, almost 15 digits)	text	txt	2025-07-18 23:38:35.228058	3
+10465	4011	select 1.99::numeric(3,2) as wallet;	code	sql	2025-07-18 23:38:35.231245	1
+10466	4011	The type `numeric` takes two arguments `(precision, scale)`, by which precision is the total count of significant digits in the whole number, and the scale of a numeric is the count of decimal digits.	text	txt	2025-07-18 23:38:35.231245	2
+10467	4012	create table tags (id integer not null primary key, fixed_tag char(10), varying_tag varchar(10), long_tag text);	code	sql	2025-07-18 23:38:35.234243	1
+10468	4012	* `char(n)`, `character(n)`\n* `varchar(n)`, `character varying(n)`\n* `text`, `varchar`	text	txt	2025-07-18 23:38:35.234243	2
+10469	4013	select length(name) from users where id = 1;	code	sql	2025-07-18 23:38:35.236741	1
+10470	4014	select octet_length(name) from users where id = 1;	code	sql	2025-07-18 23:38:35.238147	1
+10471	4015		code	sql	2025-07-18 23:38:35.239665	1
+10472	4015	Using the `pg_settings` view, we can view the parameters set in the `postgresql.conf` configuration file.	text	txt	2025-07-18 23:38:35.239665	2
+10473	4016	select * from pg_settings where name = 'DateStyle';	code	sql	2025-07-18 23:38:35.242222	1
+10474	4016	*postgresql.conf*\n\ndatestyle = 'iso, mdy'	text	txt	2025-07-18 23:38:35.242222	2
+10475	4017	select to_date('2025-06-10', 'yyyy-mm-dd');	code	sql	2025-07-18 23:38:35.245024	1
+10476	4018	select to_char(to_date('2025-06-10', 'yyyy-mm-dd'), 'dd.mm.yyyy');	code	sql	2025-07-18 23:38:35.247441	1
+10477	4019	create table posts (creation timestamp with timezone);	code	sql	2025-07-18 23:38:35.249064	1
+10478	4019	select creation::timestamp with time zone as creation_tz, creation::timestamp without time zone as creation_nz from posts;	code	sql	2025-07-18 23:38:35.249064	2
+10479	4020	show timezone;	code	sql	2025-07-18 23:38:35.250401	1
+10480	4021	set timezone='UTC';	code	sql	2025-07-18 23:38:35.251593	1
+10481	4022	select id, username, hstore(array['first', first_name, 'last', last_name]) as name from users;	code	sql	2025-07-18 23:38:35.252905	1
+10482	4023	select username from users where name->'first' = 'Brian';	code	sql	2025-07-18 23:38:35.254148	1
+10483	4024	select row_to_json(q) as data from (select * from users) Q;	code	sql	2025-07-18 23:38:35.255625	1
+10484	4024	create table posts (data jsonb);	code	sql	2025-07-18 23:38:35.255625	2
+10485	4024	insert into posts (data) select row_to_json(q) from users;	code	sql	2025-07-18 23:38:35.255625	3
+10486	4025	create table posts (data jsonb);	code	sql	2025-07-18 23:38:35.256933	1
+10487	4025	select jsonb_pretty(data) from posts;	code	sql	2025-07-18 23:38:35.256933	2
+10488	4026	select jsonb_pretty(data) from posts where data @> '{"tag": "design"}';	code	sql	2025-07-18 23:38:35.25812	1
+10489	4027	* SQL\n* PL/pgSQL\n* C	text	txt	2025-07-18 23:38:35.259281	1
+10490	4028	create or replace function show_timezone() returns varchar as begin return now(); end; language plpgsql;	code	sql	2025-07-18 23:38:35.260566	1
+10491	4029	* parsing\n* rewriting\n* optimization\n* execution	text	txt	2025-07-18 23:38:35.261861	1
+10492	4030	Handles the textual form of a statement and verifies whether it is syntactically correct or not.	text	txt	2025-07-18 23:38:35.264692	1
+10493	4031	Applies any syntactic rules to rewrite the original statement into what will be effectively executed.	text	txt	2025-07-18 23:38:35.267764	1
+10494	4032	Finds the fastest path to the data.	text	txt	2025-07-18 23:38:35.269627	1
+10495	4033	Goes to the storage and retrieves the data using the access method decided by the executor.	text	txt	2025-07-18 23:38:35.271447	1
+10496	4034	When retrieving a very large set of data that can be performed by dividing the amount of work between different parallel workers, each one assigned to a smaller subset of the data.	text	txt	2025-07-18 23:38:35.272758	1
+10497	4035	The optimizer divides the set of actions to pass to the executor in nodes. A node is an action to execute in order to provide the final or an intermediate result. For example, when executing a generic query asking for data in a specific order:	text	txt	2025-07-18 23:38:35.274292	1
+10498	4035	select * from posts order by release_date;	code	sql	2025-07-18 23:38:35.274292	2
+10499	4035	The optimizer will pass two actions to the executor, and thus the nodes include one to retrieve all the data and one to sort the data.	text	txt	2025-07-18 23:38:35.274292	3
+10500	4036	- Sequential nodes\n- Parallel nodes	text	txt	2025-07-18 23:38:35.275518	1
+10501	4037	Sequential nodes are those nodes that will be executed sequentially, one afer the other, in order to achieve the final result.	text	txt	2025-07-18 23:38:35.276871	1
+10502	4037	- Sequential scan\n- Index scan, index-only scan, and bitmap index scan\n- Nested loop, hash join, and merge join\n- The gather and merge parallel nodes	text	txt	2025-07-18 23:38:35.276871	2
+10503	4037		code	sql	2025-07-18 23:38:35.276871	3
+10504	4038	The sequential scan is the only node that is always available to the optimizer and the executor, when there is no other valuable alternative. In sequential scan, the executor will iterate through all the data from the beginning of the dataset in sequential order.	text	txt	2025-07-18 23:38:35.278236	1
+10505	4038	This node is used when the filtering clause is not very limiting in the query so that the end result will be to get almost the whole table contents.	text	txt	2025-07-18 23:38:35.278236	2
+10506	4038	select * from categories;	code	sql	2025-07-18 23:38:35.278236	3
+10507	4039	An index scan has access to the data that involves an index in order to quickly find the requested dataset. Indexes live alongside the table. Therefore, there will be a data file for the table and one for every index built on the table. Postgres avoids using indexes when double storage access accounts for more disadvantages than advantages. But when used, Postgres will produce an index node that can specialize in three different types:	text	txt	2025-07-18 23:38:35.280361	1
+10508	4039	- Index scan\n- Index-only scan\n- Bitmap index scan	text	txt	2025-07-18 23:38:35.280361	2
+10509	4040	Using this classical index access method, Postgres reads the chosen index, and from that, it goes seeking the tuples, reading again from the storage.	text	txt	2025-07-18 23:38:35.283282	1
+10510	4041	If the requested data only involves columns that belong to the index, Postgres is smart enough to avoid the second trip to storage.	text	txt	2025-07-18 23:38:35.285607	1
+10511	4042	PostgreSQL builds a memory bitmap containing the location of tuples that satisfy the statement clauses, then it will use that bitmap to locate the tuples.	text	txt	2025-07-18 23:38:35.28718	1
+10512	4042	Bitmap index scan is usually associated with bitmap heap scan.	text	txt	2025-07-18 23:38:35.28718	2
+10513	4043	When PostgreSQL performs a join between two or more tables, it uses of the following nodes:	text	txt	2025-07-18 23:38:35.288496	1
+10514	4043	- Nested loop\n- hash join\n- merge join	text	txt	2025-07-18 23:38:35.288496	2
+10515	4044	When bot both tables are scanned in a sequential or indexed based method and every tuple is checked to see whether there is a match.	text	txt	2025-07-18 23:38:35.289791	1
+10516	4044	for (tuple o: outer)\n    for (tuple i: inner)\n        if (o.matches(i))\n            result_set.append(o, i);	code	c	2025-07-18 23:38:35.289791	2
+10517	4044	Nested loop nodes are not forced to perform a sequential scan on both tables. However, the core concept does not change that there will always be a nested doule loop to search for matches among the tuples.	text	txt	2025-07-18 23:38:35.289791	3
+10518	4044	PostgreSQL chooses nested loop scans only if the inner table is small enough so that looping every time over it does not introduce any penalties.	text	txt	2025-07-18 23:38:35.289791	4
+10519	4045	When the inner table is mapped into a hash, which is aset of buckets containing the tuples of the table, the outer table is then walked and for every tuple extraced from the outer table, the hash is searched to see whether there is a match.	text	txt	2025-07-18 23:38:35.291291	1
+10520	4045	hash inner_hash = build_hash(inner_table);\n\nfor (tuple o: outer_table)\n    if (inner_hash.contains(build_hash(o));\n        result_set.append(o, i);	code	c	2025-07-18 23:38:35.291291	2
+10521	4046	When the program needs to do multiple checking before running something, the chain of responsibility pattern can be applied. An obvious pattern is where we need multiple if conditions which breaks reusability. For example, checks for authentication, validation and connection before a user can do something. Another example is to check for length, strength, and validity of an input password.	text	txt	2025-07-18 23:39:44.427016	1
+10522	4047	Represent sequential checks as a chain of handlers. Each handler handles the situation or passes on the responsibility to the next handler.	text	txt	2025-07-18 23:39:44.430053	1
+10523	4047	\ntemplate<typename T>\nclass basic_validator\n{\npublic:\n    virtual ~basic_validator();\n    virtual std::shared_ptr<basic_validator> next(std::shared_ptr<basic_validator> validator) = 0;\n    virtual bool is_valid(T const&) = 0;\n};\n\ntemplate<typename T>\nclass password_length_validator: public basic_validator\n{\nprotected:\n    std::shared_ptr<basic_validator> m_next;\n\npublic:\n    virtual ~password_length_validator() override { }\n\n    std::shared_ptr<basic_validator> next(std::shared_ptr<basic_validator> validator) override\n    {\n        m_next.reset(validator);\n        return validator;\n    }\n\n    bool is_valid(T const& value) override\n    {\n        return m_next ? m_next->is_valid(value) : true;\n    }\n};\n\ntemplate<typename T>\nclass incorrect_character_validator: public basic_validator\n{\n    virtual ~incorrect_character_validator() override { };\n\n    std::shared_ptr<basic_validator> next(std::shared_ptr<basic_validator> validator) override\n    {\n        m_next.reset(validator);\n        return validator;\n    }\n\n    bool is_valid(T const& value) override\n    {\n        return m_next ? m_next->is_valid() : true;\n    }\n};\n\nint main()\n{\n    std::shared_ptr<basic_validator> validator{std::make_shared<password_length_validator>()};\n    validator->next(std::make_shared<incorrect_character_validator>());\n    std::cout << validator->is_valid("123456") << std::endl;\n}	code	cpp	2025-07-18 23:39:44.430053	2
+10524	4048	Use this pattern to reduce coupling between classes that call one another and make functionality more reusable between similar classes.	text	txt	2025-07-18 23:39:44.433487	1
+10525	4048	This pattern represents events or changes that can occur in a program as their own classes, which implement a common command interface.	text	txt	2025-07-18 23:39:44.433487	2
+10526	4049	#include <vector>\n#include <ranges>\n#include <string>\n#include <memory>\n#include <iostream>\n#include <iterator>\n\nclass console\n{\nprivate:\n    std::vector<std::string> m_logs;\npublic:\n    void clear() noexcept { m_logs.clear(); }\n    void print() const { std::ranges::copy(m_logs, std::ostream_iterator{std::cout, "\\n"}); }\n    void add(std::string const& log) { m_logs.push_back(log); }\n};\n\nclass basic_console_command\n{\npublic:\n    virtual ~basic_console_command() = default;\n    virtual void execute() = 0;\n};\n\nclass clear_console_command: public basic_console_command\n{\nprivate:\n    console& m_console;\npublic:\n    explicit clear_console_command(console& tty): m_console{tty} { }\n    void execute() override { m_console.clear(); }\n};\n\nclass print_console_command: public basic_console_command\n{\nprivate:\n    console& m_console;\npublic:\n    explicit print_console_command(console& tty): m_console{tty} { }\n    void execute() override { m_console.print(); }\n};\n\nclass add_console_command: public basic_console_command\n{\nprivate:\n    console& m_console;\n    std::string m_value;\npublic:\n    explicit print_console_command(console& tty, std::string const& value): m_console{tty}, m_value{value} { }\n    void execute() override { m_console.add(m_value); }\n};\n\nclass button\n{\nprivate:\n    std::shared_ptr<basic_console_command> m_command;\npublic:\n    explicit button(std::shared_ptr<basic_console_command> command): m_command{command} { }\n    void click() { m_command.execute(); }\n};\n\nint main()\n{\n    console tty{};\n\n    std::shared_ptr<clear_console_command> clear_command{std::make_shared<clear_console_command>(tty)};\n    std::shared_ptr<print_console_command> print_command{std::make_shared<print_console_command>(tty)};\n    std::shared_ptr<add_console_command> add_command{std::make_shared<add_console_command>(tty, "Command Pattern")};\n\n    button clear{clear_command};\n    button print{print_command};\n    button add{add_command};\n}	code	cpp	2025-07-18 23:39:44.436944	1
+10529	4050	This is suitable when your distro kernel has too many modules but you just want the ones that you are using right now.	text	txt	2025-07-18 23:40:48.372459	3
+10530	4051	lsmod > /tmp/modules.lst	code	sh	2025-07-18 23:40:48.375969	1
+10531	4051	make LSMOD=/tmp/modules.lst LCM_KEEP="drivers/usb:drivers/gpu:fs" localmodconfig	code	sh	2025-07-18 23:40:48.375969	2
+10532	4052	./scripts/extract-ikconfig	code	sh	2025-07-18 23:40:48.377417	1
+10533	4053	./scripts/diffconfig <config> <config>	code	sh	2025-07-18 23:40:48.378758	1
+10534	4054	cmake -B build -D CMAKE_INSTALL_PREFIX=install	code	cmake	2025-07-18 23:42:15.132698	1
+10535	4055	cmake --build build --config Release --target install	code	cmake	2025-07-18 23:42:15.136532	1
+10536	4055	cmake --install build --config Release	code	cmake	2025-07-18 23:42:15.136532	2
+10537	4056	When building, the default configuration is `Debug`.	text	txt	2025-07-18 23:42:15.138702	1
+10538	4056	cmake --build build	code	cmake	2025-07-18 23:42:15.138702	2
+10539	4056	But CMake will look for `Release` configuration on installing.	text	txt	2025-07-18 23:42:15.138702	3
+10540	4056	cmake --install build	code	cmake	2025-07-18 23:42:15.138702	4
+10541	4057	cmake --install build --prefix install	code	cmake	2025-07-18 23:42:15.142676	1
+10542	4058	Config mode, Module mode.	text	txt	2025-07-18 23:42:15.1472	1
+10543	4058	find_package(<lib> CONFIG REQUIRED)	code	cmake	2025-07-18 23:42:15.1472	2
+10544	4058	find_package(<lib> REQUIRED)	code	cmake	2025-07-18 23:42:15.1472	3
+10545	4059	Config mode is the mode to use when the dependency has itself been built and installed using CMake. As part of the install process, either `<package>-config.cmake` or `<Package>Config.cmake` will be created by CMake. This file includes the location of built artifacts, include paths and etc. to import and use the library.	text	txt	2025-07-18 23:42:15.150449	1
+10546	4060	CMake looks for a file called `Find<Package>.cmake` in several locations. Manual locations can be added to `CMAKE_MODULE_PATH` to make them visible to CMake.	text	txt	2025-07-18 23:42:15.154619	1
+10547	4061	`Find<Package>.cmake` files are hand crafted and hard to write. But modules are helpful when we want to import a project that is not built by CMake.	text	txt	2025-07-18 23:42:15.158694	1
+10548	4061		code	cmake	2025-07-18 23:42:15.158694	2
+10549	4062	List of emails in the currently opened mailbox. By default it opens the system mailbox.	text	txt	2025-07-18 23:42:51.026286	1
+10550	4063	The pager contains the email content. How much information can be seen depends on configuration.	text	txt	2025-07-18 23:42:51.028862	1
+10551	4064	The file browser is the interface to the local or remote file system, presenting mailboxes listed in a custom sorting of items.	text	txt	2025-07-18 23:42:51.031382	1
+10552	4065	The sidebar shows a list of all mailboxes.	text	txt	2025-07-18 23:42:51.034885	1
+10553	4066	set sidebar_visible\nset sidebar_format = "%B%<F? [%F]>%* %<N?%N/>%S"\nset mail_check_stats	code	neomutt.rc	2025-07-18 23:42:51.037976	1
+10554	4067	`<sidebar_next>` and `<sidebar-prev>` named keys move the highlight, and `<sidebar-open>` named key opens the highlighted folder.	text	txt	2025-07-18 23:42:51.040713	1
+10555	4067	bind index,pager \\CP sidebar-prev	code	neomutt.rc	2025-07-18 23:42:51.040713	2
+10556	4067	bind index,pager \\CN sidebar-next	code	neomutt.rc	2025-07-18 23:42:51.040713	3
+10557	4067	bind index,pager \\CO sidebar-open	code	neomutt.rc	2025-07-18 23:42:51.040713	4
+10558	4068		text	txt	2025-07-18 23:42:51.042397	1
+10559	4068		code	neomutt.rc	2025-07-18 23:42:51.042397	2
+10560	4069	A class should have only one reason to change and only one responsibility.	text	txt	2025-07-18 23:43:56.283835	1
+10561	4069	class Note\n{\npublic:\n    void add();\n    void remove();\n    void display(); // beyond the responsibility of this class\n};	code	cpp	2025-07-18 23:43:56.283835	2
+10562	4070	Classes should be open for extension but closed for modification. We should add more code instead of changing current code.	text	txt	2025-07-18 23:43:56.286872	1
+10563	4070	class Note\n{\npublic:\n    void add()\n    {\n        // directly modifying code breaks this principle\n        if (contains("!"))\n        {\n        }\n    }\n\n    void remove();\n};	code	cpp	2025-07-18 23:43:56.286872	2
+10564	4070	class INote\n{\npublic:\n    virtual void add() = 0;\n    virtual void remove() = 0;\n};\n\nclass TaggedNote\n{\npublic:\n    void add() override\n    {\n        if (contains("!"))\n        {\n        }\n    }\n\n    void remove() override;\n};	code	cpp	2025-07-18 23:43:56.286872	3
+10565	4071	Subtypes must be substitutable for their base types. Inheritance relationship should be based on behavior. A subclass must not remove or change its parent behavior. This allows subclass to replace its base type. New classes can be added without modifying existing code. By following this principle, we automatically follow open-closed principle as well.	text	txt	2025-07-18 23:43:56.290291	1
+10566	4071	using OperationResult = std::variant<int, bool>;	code	cpp	2025-07-18 23:43:56.290291	2
+10567	4071	class IOperation\n{\npublic:\n    virtual OperationResult perform() = 0;\n};\n\nclass IntegerOperation: public IOperation\n{\npublic:\n    OperationResult perform() override\n    {\n        return int{};\n    }\n};\n\nclass BooleanOperation: public IOperation\n{\npublic:\n    OperationResult perform() override\n    {\n        return bool{};\n    }\n};	code	cpp	2025-07-18 23:43:56.290291	3
+10568	4072	Interface users should not be forced to depend on methods they do not use. Interfaces with too many irrelevant methods will be complex to use. Some users may not use all the methods. Separate the interface and put methods based on client use.	text	txt	2025-07-18 23:43:56.293498	1
+10569	4072	struct IFile\n{\n    virtual ~IFile() = default;\n    virtual void write() = 0;\n    virtual void read() = 0; // not all users may use write()\n};	code	cpp	2025-07-18 23:43:56.293498	2
+10570	4072	struct IWrite\n{\n    virtual ~IWrite() = default;\n    virtual void write() = 0;\n};\n\nstruct IRead\n{\n    virtual ~IRead() = default;\n    virtual void read() = 0;\n};	code	cpp	2025-07-18 23:43:56.293498	3
+10571	4073	Interfaces should not depend on classes, classes should depend on interfaces. Using a concrete class directly creates dependency. Software becomes difficult to modify. Invert the dependency by using an interface rather than a concrete class.	text	txt	2025-07-18 23:43:56.297161	1
+10572	4073	class ImageReader\n{\npublic:\n    virtual ~ImageReader() = default;\n    virtual void decode() = 0;\n};\n\nclass BitmapReader: public ImageReader\n{\npublic:\n    void decode() override;\n};	code	cpp	2025-07-18 23:43:56.297161	2
+10573	4073	class ImageViewer\n{\nprivate:\n    // depends on implementation not abstraction\n    std::shared_ptr<BitmapReader> m_reader;\npublic:\n    ImageViewer(std::shared_ptr<BitmapReader> reader): m_reader{reader} { }\n    void display();\n};	code	cpp	2025-07-18 23:43:56.297161	3
+10574	4073	class ImageViewer\n{\nprivate:\n    std::shared_ptr<ImageReader> m_reader;\npublic:\n    ImageViewer(std::shared_ptr<ImageReader> reader): m_reader{reader} { }\n    void display();\n};	code	cpp	2025-07-18 23:43:56.297161	4
+10575	4074	|Pattern|Description|\n|---|---|\n|Singleton|Ensure only one instance exists|\n|Factory Method|Create instance without depending on its concrete type|\n|Object Pool|Reuse existing instances|\n|Abstract Factory|Create instances from a specific family|\n|Prototype|Clone existing objects from a prototype|\n|Builder|Construct a complex object step by step|	text	txt	2025-07-18 23:43:56.299385	1
+10576	4075	Ensure a class only has one instance, and provide a global point of access to it.	text	txt	2025-07-18 23:43:56.305103	1
+10577	4075	The class is responsible for its own instance. Direct construction of the object is prohibited. It contains a method to construct and return a single instance.	text	txt	2025-07-18 23:43:56.305103	2
+10578	4075	Singleton {\n    + static createInstance(): unique_instance\n    + SingletonOperation()\n    + GetSingletonData()\n    - static unique_instance\n    - singleton_data\n}	code	uml	2025-07-18 23:43:56.305103	3
+10579	4076	class Singleton\n{\nprivate:\n    Singleton() = default;\n    static Singleton m_instance;\n\npublic:\n    static Singleton& createInstance();\n    void doSomething();\n    void doSomethingElse();\n};	code	cpp	2025-07-18 23:43:56.308045	1
+10580	4076	#include "singleton.hpp"\n\nSingleton Singleton::m_instance;\n\nSingleton& Singleton::createInstance()\n{\n    return m_instance;\n}\n\nvoid Singleton::doSomething()\n{\n}\n\nvoid Singleton::doSomethingElse()\n{\n}	code	cpp	2025-07-18 23:43:56.308045	2
+10581	4076	#include "singleton.hpp"\n\nint main()\n{\n    Singleton& singleton = Singleton::createInstance();\n    singleton.doSomething();\n}	code	cpp	2025-07-18 23:43:56.308045	3
+10582	4077	A program that is not a system program is designed as if it has exclusive access to all of the resources it uses. It does not deal with complexity of talking directly to the kernel. In contrast, a system program makes direct requests from the operating system for services.	text	txt	2025-07-18 23:44:32.481364	1
+10583	4078	#include <algorithm>\n#include <utility>\n\nint min_year{std::min({2003, 2011, 2014, 2017, 2020, 2023, 2026, 2029, 2032, 2035, 2038})};\nint max_year{std::max({2003, 2011, 2014, 2017, 2020, 2023, 2026, 2029, 2032, 2035, 2038})};\nstd::pair<int, int> minmax_result{std::minmax({2003, 2011, 2014, 2017, 2020, 2023, 2026, 2029, 2032, 2035, 2038})};	code	cpp	2025-07-18 23:45:13.801103	1
+10584	4079	All overloads are also available for `std::min()` and `std::max()` functions.	text	txt	2025-07-18 23:45:13.804623	1
+10585	4079	std::minmax(a, b);	code	cpp	2025-07-18 23:45:13.804623	2
+10586	4079	std::minmax(a, b, predicate);	code	cpp	2025-07-18 23:45:13.804623	3
+10587	4079	std::minmax({initializer list});	code	cpp	2025-07-18 23:45:13.804623	4
+10588	4079	std::minmax({initializer list}, predicate);	code	cpp	2025-07-18 23:45:13.804623	5
+10589	4080	Arguments can be integers, floating points, and points. When arguments are pointers, they both should point to the same array object.	text	txt	2025-07-18 23:45:13.806312	1
+10590	4080	#include <numeric>\n\nauto result{std::midpoint(a, b)};	code	cpp	2025-07-18 23:45:13.806312	2
+10591	4081	#include <cmath>\n\nauto result{std::lerp(a, b, t)}; // result = a + t(b - a)	code	cpp	2025-07-18 23:45:13.808377	1
+10592	4082		text	txt	2025-07-18 23:45:13.812305	1
+10593	4082	#include <utility>\n\nstd::cmp_equal(a, b);\nstd::cmp_not_equal(a, b);\nstd::cmp_less(a, b);\nstd::cmp_greater(a, b);\nstd::cmp_less_equal(a, b);\nstd::cmp_greater_equal(a, b);	code	cpp	2025-07-18 23:45:13.812305	2
+10594	4083	#include <utility>\n#include <string>\n\nvoid get_message(std::string&& m);\nstd::string message{"something to say"};\nget_message(message);	code	cpp	2025-07-18 23:45:13.81527	1
+10595	4084	Typical use cases are factory functions which create an object and should pass to their arguments unmodified.	text	txt	2025-07-18 23:45:13.818629	1
+10596	4084	 Another use case is constructors which often use their arguments to initialize their base class with identical arguments.	text	txt	2025-07-18 23:45:13.818629	2
+10597	4084	#include <utility>\n#include <string>\n\nvoid f(std::string& ref);\nvoid f(std::string const& cref);\nvoid f(std::string&& rref);\nvoid f(std::string const&& rref);\n\nstd::string sv;\nstd::string const sc;\n\ntemplate<typename T>\nvoid call_f(T&& arg)\n{\n    f(std::forward(arg));\n}\n\ncall_f(sv); // ref\ncall_f(std::move(sv)); // rref\ncall_f(sc); // cref\ncall_f(std::move(sc)); // rcref	code	cpp	2025-07-18 23:45:13.818629	3
+10598	4085	#include <type_traits>\n#include <cstdint>\n\nenum class some_type : std::uint16_t { first, second, etc };\nauto underlying_type{std::to_underlying(some_type)};	code	cpp	2025-07-18 23:45:13.821365	1
+10599	4086	Swap internally uses move semantics for efficiency.	text	txt	2025-07-18 23:45:13.825151	1
+10600	4086	#include <utility>\n\nstd::swap(a, b);	code	cpp	2025-07-18 23:45:13.825151	2
+10601	4087	#include <functional>\n\nusing std::placeholder;\n\ndouble div(double a, double b) { return a / b; }\n\nstd::function<double(double, double)> div1{std::bind(div, _1, _2)};\nstd::function<double(double, double)> div2{std::bind(div, 2000, _1)};\nstd::function<double(double, double)> div3{std::bind_front(div, 2000)}; // C++20\nstd::function<double(double, double)> div4{std::bind_back(div, 10)}; // C++23	code	cpp	2025-07-18 23:45:13.828221	1
+10602	4088	While `std::bind()` and counterparts `std::bind_back()` and `std::bind_front()` create a function object, `std::function()` takes these objects and binds them to a variable.	text	txt	2025-07-18 23:45:13.829883	1
+10603	4089	#include <utility>\n\nstd::pair<T1, T2> p1{a, b};\nauto p2{std::make_pair(a, b)};	code	cpp	2025-07-18 23:45:13.831198	1
+10604	4090	std::get<0>(p);\np.first;\nstd::get<1>(p);\np.second;	code	cpp	2025-07-18 23:45:13.832514	1
 \.
 
 
@@ -12253,14 +12235,6 @@ COPY milestone.note_references (id, note_id, origin, type, updated) FROM stdin;
 202	2019	https://doc.qt.io - https://doc.qt.io/qt-6/qml-qtquick-image.html#fillMode-prop	unknown	2024-07-28 10:12:46.537218
 203	2050	[Easing Table](http://doc.qt.io/qt-6/qml-qtquick-propertyanimation.html#easing-prop)	unknown	2024-07-28 10:13:06.805474
 204	2080	https://linux-mm.org	unknown	2024-07-28 10:13:23.330277
-\.
-
-
---
--- Data for Name: note_usage; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.note_usage (id, user_id, note_id, duration, updated) FROM stdin;
 \.
 
 
@@ -13517,6 +13491,7 @@ COPY milestone.notes (id, section_id, heading, state, creation, updated, number)
 1288	1398	Compile a program with debugging information?	open	2024-07-28 10:08:03.754196	2024-07-28 10:08:03.754196	0
 1289	419	How does <code>eBPF</code> help us to learn application behavior?	open	2024-07-28 10:08:13.272943	2024-07-28 10:08:13.272943	0
 1290	419	What does the <code>eBPF</code> verifier?	open	2024-07-28 10:08:13.439554	2024-07-28 10:08:13.439554	0
+4063	1972	What is the content of pager?	open	2025-07-18 23:42:51.028862	2025-07-18 23:42:51.028862	0
 1291	419	What is the advantage of dynamic loading functionality in <code>eBPF</code>?	open	2024-07-28 10:08:13.66934	2024-07-28 10:08:13.66934	0
 1292	419	How efficient is loading <code>eBPF</code> programs?	open	2024-07-28 10:08:13.884486	2024-07-28 10:08:13.884486	0
 1293	420	How to load a simple <code>eBPF</code> code in python's BCC library as a simplified example?	open	2024-07-28 10:08:14.98458	2024-07-28 10:08:14.98458	0
@@ -14000,8 +13975,6 @@ COPY milestone.notes (id, section_id, heading, state, creation, updated, number)
 1761	626	What is the normalization of a vector?	open	2024-07-28 10:11:21.375298	2024-07-28 10:11:21.375298	0
 1762	626	Evaluate the unit vector of any non-zero vector?	open	2024-07-28 10:11:21.646497	2024-07-28 10:11:21.646497	0
 1763	626	Practice: Normalize the vector $(3,4) \\in \\mathbb{R}^2$?	open	2024-07-28 10:11:21.911575	2024-07-28 10:11:21.911575	0
-1764	627	What is the Cauchy Schwarz inequality theorem?	open	2024-07-28 10:11:22.151212	2024-07-28 10:11:22.151212	0
-1765	627	What is the Triangle Inequality theorem?	open	2024-07-28 10:11:22.381916	2024-07-28 10:11:22.381916	0
 1766	629	What are the two properties of linear transformation functions?	open	2024-07-28 10:11:22.828845	2024-07-28 10:11:22.828845	0
 1767	629	Determine whether or not function $T(v_1, v_2) = (1+v_1, 2+v_2)$ when $T: R^2 → R^2$ is a linear transformation?	open	2024-07-28 10:11:23.082645	2024-07-28 10:11:23.082645	0
 1768	629	Determine whether or not function $T(v_1, v_2) = (v_1-v_2, v_1v_2)$ when $T: R^2 → R^2$ is a linear transformation?	open	2024-07-28 10:11:23.2896	2024-07-28 10:11:23.2896	0
@@ -16144,6 +16117,129 @@ COPY milestone.notes (id, section_id, heading, state, creation, updated, number)
 3957	\N	What measurement do we use to evaluate how efficient an algorithm is?	open	2025-07-14 20:33:03.503422	2025-07-14 20:33:03.503422	0
 3958	\N	How to avoid different measurements between different runs of an algorithm?	open	2025-07-14 20:33:03.507465	2025-07-14 20:33:03.507465	0
 3959	\N	How to avoid different measurements between different implementations?	open	2025-07-14 20:33:03.508943	2025-07-14 20:33:03.508943	0
+3969	1698	What are the use cases of the worst, best, and average functions in algorithm analysis?	open	2025-07-16 14:02:30.622829	2025-07-16 14:02:30.622829	0
+3970	1699	What notation do we use for best, worst, and average case scenarios of an algorithm?	open	2025-07-16 14:02:30.628117	2025-07-16 14:02:30.628117	0
+3971	1700	What is the general procedure to find the average function of an algorithm?	open	2025-07-16 14:02:30.630504	2025-07-16 14:02:30.630504	0
+3972	1701	What are the characteristics of an array data structure?	open	2025-07-16 14:02:30.634981	2025-07-16 14:02:30.634981	0
+3973	1702	What algorithm can be used to find the maximum value in an array?	open	2025-07-16 14:02:30.639054	2025-07-16 14:02:30.639054	0
+3974	1703	What algorithms can be used to check if a string is palindrome or not?	open	2025-07-16 14:02:30.642871	2025-07-16 14:02:30.642871	0
+3975	702	What are the use cases of Curiously Recurring Template Pattern?	open	2025-07-16 20:32:27.129894	2025-07-16 20:32:27.129894	0
+3976	702	Use curiously recurring template pattern to use derived type functionalities inside the base type?	open	2025-07-16 20:32:27.134015	2025-07-16 20:32:27.134015	0
+3977	702	Use mixin inheritance pattern to implement a composition type?	open	2025-07-16 20:32:27.136287	2025-07-16 20:32:27.136287	0
+3978	702	Use static polymorphism pattern to implement multiple variations of a class ensuring all having the same interface?	open	2025-07-16 20:32:27.138319	2025-07-16 20:32:27.138319	0
+3979	46	Build a fundamental ARM machine with QEMU?	open	2025-07-16 20:36:30.837888	2025-07-16 20:36:30.837888	0
+3980	1855	What are the use cases of strategy pattern?	open	2025-07-18 23:22:41.330377	2025-07-18 23:22:41.330377	0
+3981	1855	What are the advantages of static strategy pattern over dynamic strategy pattern?	open	2025-07-18 23:22:41.333005	2025-07-18 23:22:41.333005	0
+3982	1855	What are the advantages of using strategies as non-member functions?	open	2025-07-18 23:22:41.334417	2025-07-18 23:22:41.334417	0
+3983	1856	What are the use cases of template method pattern?	open	2025-07-18 23:22:41.338346	2025-07-18 23:22:41.338346	0
+3984	1857	Where are the common use cases of the command pattern?	open	2025-07-18 23:22:41.341768	2025-07-18 23:22:41.341768	0
+3985	1857	What is the structure of the command pattern?	open	2025-07-18 23:22:41.344604	2025-07-18 23:22:41.344604	0
+3986	1857	Use command pattern to decouple invoker and receiver classes?	open	2025-07-18 23:22:41.347225	2025-07-18 23:22:41.347225	0
+3987	852	What are the benefits of Class Template Argument Deduction feature?	open	2025-07-18 23:34:38.274381	2025-07-18 23:34:38.274381	0
+3988	852	What is the consequence of not having type conversions for deducing template parameters?	open	2025-07-18 23:34:38.278197	2025-07-18 23:34:38.278197	0
+3989	1911	Introduce inputs to manual triggers?	open	2025-07-18 23:37:25.737122	2025-07-18 23:37:25.737122	0
+3990	1911	Give input parameters to manual workflows?	open	2025-07-18 23:37:25.739394	2025-07-18 23:37:25.739394	0
+3991	1911	Define matrix strategy for a job?	open	2025-07-18 23:37:25.741787	2025-07-18 23:37:25.741787	0
+3992	1911	Apply conditions on a job?	open	2025-07-18 23:37:25.745186	2025-07-18 23:37:25.745186	0
+3993	1911	What expressions are available in GitHub expressions?	open	2025-07-18 23:37:25.748419	2025-07-18 23:37:25.748419	0
+3994	1911	What are the built-in expression functions?	open	2025-07-18 23:37:25.752058	2025-07-18 23:37:25.752058	0
+3995	1911	What functions return the status of the current job?	open	2025-07-18 23:37:25.755172	2025-07-18 23:37:25.755172	0
+3996	1911	Print logs with specific contexts?	open	2025-07-18 23:37:25.758193	2025-07-18 23:37:25.758193	0
+3997	1911	Pass outputs to subsequent steps?	open	2025-07-18 23:37:25.761095	2025-07-18 23:37:25.761095	0
+3998	1911	Mask the output of a step?	open	2025-07-18 23:37:25.762967	2025-07-18 23:37:25.762967	0
+3999	1911	Use environment variables to pass values to subsequent steps?	open	2025-07-18 23:37:25.764245	2025-07-18 23:37:25.764245	0
+4000	1911	Create job summaries?	open	2025-07-18 23:37:25.765478	2025-07-18 23:37:25.765478	0
+4001	1911	How many context levels exist?	open	2025-07-18 23:37:25.766731	2025-07-18 23:37:25.766731	0
+4002	1911	In what context level secrets and variables exist?	open	2025-07-18 23:37:25.768146	2025-07-18 23:37:25.768146	0
+4003	1911	Set secrets and variables?	open	2025-07-18 23:37:25.769546	2025-07-18 23:37:25.769546	0
+4004	1911	Get access to GitHub token?	open	2025-07-18 23:37:25.77078	2025-07-18 23:37:25.77078	0
+4005	1911	Where permissions can be applied?	open	2025-07-18 23:37:25.771914	2025-07-18 23:37:25.771914	0
+4006	1911	What permissions are available?	open	2025-07-18 23:37:25.773264	2025-07-18 23:37:25.773264	0
+4007	211	What forms of boolean types exist in postgres?	open	2025-07-18 23:38:35.221613	2025-07-18 23:38:35.221613	0
+4008	211	Add a boolean type column to a table?	open	2025-07-18 23:38:35.22487	2025-07-18 23:38:35.22487	0
+4009	211	What are the two integral types in postgres?	open	2025-07-18 23:38:35.226499	2025-07-18 23:38:35.226499	0
+4010	211	What floating types are supported by postgres?	open	2025-07-18 23:38:35.228058	2025-07-18 23:38:35.228058	0
+4011	211	Write a numeric type to hold money amount?	open	2025-07-18 23:38:35.231245	2025-07-18 23:38:35.231245	0
+4012	211	What character types exist in postgres?	open	2025-07-18 23:38:35.234243	2025-07-18 23:38:35.234243	0
+4013	211	Count the number of characters in a string?	open	2025-07-18 23:38:35.236741	2025-07-18 23:38:35.236741	0
+4014	211	Count the number of bytes in a string?	open	2025-07-18 23:38:35.238147	2025-07-18 23:38:35.238147	0
+4015	211	Where in the database can we see the parameters in postgres configurations?	open	2025-07-18 23:38:35.239665	2025-07-18 23:38:35.239665	0
+4016	211	Check the current date type of the server?	open	2025-07-18 23:38:35.242222	2025-07-18 23:38:35.242222	0
+4017	211	Convert a string to date type?	open	2025-07-18 23:38:35.245024	2025-07-18 23:38:35.245024	0
+4018	211	Convert a date type to string?	open	2025-07-18 23:38:35.247441	2025-07-18 23:38:35.247441	0
+4019	211	What are the two types of timestamps in postgres?	open	2025-07-18 23:38:35.249064	2025-07-18 23:38:35.249064	0
+4020	211	Check the timezone set in current session?	open	2025-07-18 23:38:35.250401	2025-07-18 23:38:35.250401	0
+4021	211	Change timezone in current session?	open	2025-07-18 23:38:35.251593	2025-07-18 23:38:35.251593	0
+4022	211	Create hstore rows in a query?	open	2025-07-18 23:38:35.252905	2025-07-18 23:38:35.252905	0
+4023	211	Access to hstore data in a query?	open	2025-07-18 23:38:35.254148	2025-07-18 23:38:35.254148	0
+4024	211	Create JSON rows in a query?	open	2025-07-18 23:38:35.255625	2025-07-18 23:38:35.255625	0
+4025	211	Beautify the JSON output in a query?	open	2025-07-18 23:38:35.256933	2025-07-18 23:38:35.256933	0
+4026	211	Search in a JSON data by matching to an object?	open	2025-07-18 23:38:35.25812	2025-07-18 23:38:35.25812	0
+4027	211	What builtin languages are supported by postgres?	open	2025-07-18 23:38:35.259281	2025-07-18 23:38:35.259281	0
+4028	211	Define a function?	open	2025-07-18 23:38:35.260566	2025-07-18 23:38:35.260566	0
+4029	217	What are the four stages of query execution?	open	2025-07-18 23:38:35.261861	2025-07-18 23:38:35.261861	0
+4030	217	What is the responsibility of the parser?	open	2025-07-18 23:38:35.264692	2025-07-18 23:38:35.264692	0
+4031	217	What is the responsibility of the rewriter?	open	2025-07-18 23:38:35.267764	2025-07-18 23:38:35.267764	0
+4032	217	What is the responsibility of the optimizer?	open	2025-07-18 23:38:35.269627	2025-07-18 23:38:35.269627	0
+4033	217	What is the responsibility of the executor?	open	2025-07-18 23:38:35.271447	2025-07-18 23:38:35.271447	0
+4034	217	When does executor perform data access using parallel jobs?	open	2025-07-18 23:38:35.272758	2025-07-18 23:38:35.272758	0
+4035	217	What is a node?	open	2025-07-18 23:38:35.274292	2025-07-18 23:38:35.274292	0
+4036	217	What nodes does the optimizer use?	open	2025-07-18 23:38:35.275518	2025-07-18 23:38:35.275518	0
+4037	217	What are the sequential nodes?	open	2025-07-18 23:38:35.276871	2025-07-18 23:38:35.276871	0
+4038	217	When does the optimizer apply sequential scan?	open	2025-07-18 23:38:35.278236	2025-07-18 23:38:35.278236	0
+4039	217	What are the characteristics of index nodes?	open	2025-07-18 23:38:35.280361	2025-07-18 23:38:35.280361	0
+4040	217	How does index scan optimize queries?	open	2025-07-18 23:38:35.283282	2025-07-18 23:38:35.283282	0
+4041	217	How does index-only scan optimize queries?	open	2025-07-18 23:38:35.285607	2025-07-18 23:38:35.285607	0
+4042	217	How does bitmap index scan optimize queries?	open	2025-07-18 23:38:35.28718	2025-07-18 23:38:35.28718	0
+4043	217	What are the characteristics of join nodes?	open	2025-07-18 23:38:35.288496	2025-07-18 23:38:35.288496	0
+4044	217	When does the nested loop node applies by the optimizer?	open	2025-07-18 23:38:35.289791	2025-07-18 23:38:35.289791	0
+4045	217	When does the hash join node applies by the optimizer?	open	2025-07-18 23:38:35.291291	2025-07-18 23:38:35.291291	0
+4046	1921	What are the use cases of chain of responsibility pattern?	open	2025-07-18 23:39:44.427016	2025-07-18 23:39:44.427016	0
+4047	1921	What are the steps into implementing the chain of responsibilities pattern?	open	2025-07-18 23:39:44.430053	2025-07-18 23:39:44.430053	0
+4048	1922	What are the use cases of command pattern?	open	2025-07-18 23:39:44.433487	2025-07-18 23:39:44.433487	0
+4049	1922	Apply command pattern to refine multiple implementations of class button when each execute a different task to a single implementation of class button with multiple definitions of a command?	open	2025-07-18 23:39:44.436944	2025-07-18 23:39:44.436944	0
+4062	1972	What is the content of index?	open	2025-07-18 23:42:51.026286	2025-07-18 23:42:51.026286	0
+4050	459	Create a config file containing only the modules that are enabled on your system?	open	2025-07-18 23:40:48.372459	2025-07-18 23:40:48.372459	0
+4051	459	Configure the kernel with your existing modules but exceptionally leave a few modules unchanged?	open	2025-07-18 23:40:48.375969	2025-07-18 23:40:48.375969	0
+4052	459	Extract the kernel configurations from a kernel image that has embedded configurations?	open	2025-07-18 23:40:48.377417	2025-07-18 23:40:48.377417	0
+4053	459	Locate the differences between two kernel config files?	open	2025-07-18 23:40:48.378758	2025-07-18 23:40:48.378758	0
+4054	1611	Specify a separate directory for installation?	open	2025-07-18 23:42:15.132698	2025-07-18 23:42:15.132698	0
+4055	1611	How many ways exist to install a project?	open	2025-07-18 23:42:15.136532	2025-07-18 23:42:15.136532	0
+4056	1611	What are the default configurations of cmake commands when build type is not specified?	open	2025-07-18 23:42:15.138702	2025-07-18 23:42:15.138702	0
+4057	1611	Override the install directory when installing?	open	2025-07-18 23:42:15.142676	2025-07-18 23:42:15.142676	0
+4058	1611	How many search modes exist to find an external library?	open	2025-07-18 23:42:15.1472	2025-07-18 23:42:15.1472	0
+4059	1611	What files will be searched for in the config mode?	open	2025-07-18 23:42:15.150449	2025-07-18 23:42:15.150449	0
+4060	1611	What files will be searched for in the module mode?	open	2025-07-18 23:42:15.154619	2025-07-18 23:42:15.154619	0
+4061	1611	What are the advantages of both search modes?	open	2025-07-18 23:42:15.158694	2025-07-18 23:42:15.158694	0
+4064	1972	What is the content of file browser??	open	2025-07-18 23:42:51.031382	2025-07-18 23:42:51.031382	0
+4065	1972	What is the content of sidebar?	open	2025-07-18 23:42:51.034885	2025-07-18 23:42:51.034885	0
+4066	1972	Enable sidebar?	open	2025-07-18 23:42:51.037976	2025-07-18 23:42:51.037976	0
+4067	1972	What named keys are available to move the sidebar highlight?	open	2025-07-18 23:42:51.040713	2025-07-18 23:42:51.040713	0
+4068	1972		open	2025-07-18 23:42:51.042397	2025-07-18 23:42:51.042397	0
+4069	2019	What is the definition of single responsibility principle?	open	2025-07-18 23:43:56.283835	2025-07-18 23:43:56.283835	0
+4070	2019	What is the definition of open-closed principle?	open	2025-07-18 23:43:56.286872	2025-07-18 23:43:56.286872	0
+4071	2019	What is the definition of Liskov substitution principle?	open	2025-07-18 23:43:56.290291	2025-07-18 23:43:56.290291	0
+4072	2019	What is the definition of interface segregation principle?	open	2025-07-18 23:43:56.293498	2025-07-18 23:43:56.293498	0
+4073	2019	What is the definition of dependency inversion principle?	open	2025-07-18 23:43:56.297161	2025-07-18 23:43:56.297161	0
+4074	2019	What are the structural design patterns?	open	2025-07-18 23:43:56.299385	2025-07-18 23:43:56.299385	0
+4075	2020	What are the essential steps of creating a singleton?	open	2025-07-18 23:43:56.305103	2025-07-18 23:43:56.305103	0
+4076	2020	Implement a singleton class?	open	2025-07-18 23:43:56.308045	2025-07-18 23:43:56.308045	0
+4077	2027	What is the difference between ordinary programs and system programs?	open	2025-07-18 23:44:32.481364	2025-07-18 23:44:32.481364	0
+4078	2046	Find the minimum and maximum value in a series of values?	open	2025-07-18 23:45:13.801103	2025-07-18 23:45:13.801103	0
+4079	2046	What overloads of min and max functions are available?	open	2025-07-18 23:45:13.804623	2025-07-18 23:45:13.804623	0
+4080	2046	Calculate the midpoint between two values?	open	2025-07-18 23:45:13.806312	2025-07-18 23:45:13.806312	0
+4081	2046	Calculate the interpolation of two numbers?	open	2025-07-18 23:45:13.808377	2025-07-18 23:45:13.808377	0
+4082	2046	Safely compare two integral values?	open	2025-07-18 23:45:13.812305	2025-07-18 23:45:13.812305	0
+4083	2046	Mark an object as no longer needed while passed as an argument?	open	2025-07-18 23:45:13.81527	2025-07-18 23:45:13.81527	0
+4084	2046	Pass input arguments without changes in constness and value category to another call?	open	2025-07-18 23:45:13.818629	2025-07-18 23:45:13.818629	0
+4085	2046	Cast a scoped enumeration into its underlying type?	open	2025-07-18 23:45:13.821365	2025-07-18 23:45:13.821365	0
+4086	2046	Swap the value of two objects?	open	2025-07-18 23:45:13.825151	2025-07-18 23:45:13.825151	0
+4087	2046	Bind arguments to an arbitrary position?	open	2025-07-18 23:45:13.828221	2025-07-18 23:45:13.828221	0
+4088	2046	What is the difference between <code>std::function()</code> and <code>std::bind()</code>	open	2025-07-18 23:45:13.829883	2025-07-18 23:45:13.829883	0
+4089	2046	Construct a pair of two objects?	open	2025-07-18 23:45:13.831198	2025-07-18 23:45:13.831198	0
+4090	2046	Get either of the two elements of a pair?	open	2025-07-18 23:45:13.832514	2025-07-18 23:45:13.832514	0
+1764	625	What is the Cauchy Schwarz inequality theorem?	open	2024-07-28 10:11:22.151212	2024-07-28 10:11:22.151212	0
+1765	625	What is the Triangle Inequality theorem?	open	2024-07-28 10:11:22.381916	2024-07-28 10:11:22.381916	0
 \.
 
 
@@ -16154,15 +16250,12 @@ COPY milestone.notes (id, section_id, heading, state, creation, updated, number)
 COPY milestone.practice_blocks (id, practice_id, content, type, language, updated, "position") FROM stdin;
 108	59	mmc	code	txt	2024-07-28 09:45:31.345142	1
 245	137	import QtQuick	text	txt	2024-07-28 09:45:58.690062	5
-531	272	struct Data{};	text	txt	2024-07-28 09:46:49.418214	3
-713	301	class Value\n{\n    long id;	text	txt	2024-07-28 09:47:15.566017	6
-880	340	#include <type_traits>	text	txt	2024-07-28 09:47:41.231796	2
+1855	545	Using C++23:	text	txt	2024-07-28 09:50:16.455795	1
 181	105	\\\\sout{Strikethrough text}	code	txt	2024-07-28 09:45:45.292618	2
 182	106	usepackage(ulem)	text	txt	2024-07-28 09:45:45.582554	1
 183	106	\\\\xout{Slashed out text}	code	txt	2024-07-28 09:45:45.603052	2
 184	107	usepackage(ulem)	text	txt	2024-07-28 09:45:45.882289	1
 14	12	* minicom\n* picocom\n* gtkterm\n* putty\n* screen\n* tio	text	txt	2024-07-28 09:45:14.298634	3
-1855	545	Using C++23:	text	txt	2024-07-28 09:50:16.455795	1
 15	13	picocom --baud 115200 /dev/ttyUSB0	code	txt	2024-07-28 09:45:14.659026	1
 185	107	\\\\dashuline{Dash underline text}	code	txt	2024-07-28 09:45:45.90191	2
 186	108	usepackage(ulem)	text	txt	2024-07-28 09:45:46.184551	1
@@ -16363,6 +16456,8 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 197	116	|Operation|Example|\n|---|---|\n|Default constructor|`cv::Scalar{}`|\n|Copy constructor|`cv::Scalar{s}`|\n|Value constructor|`cv::Scalar{x0}` `cv::Scalar{x0, x1, x2, x3}`|\n|Element-wise multiplication|`s1.mul(s2)`|\n|Conjugation|`s.conj()`|\n|Real test|`s.isReal()`|\nThe size classes are similar to point classes, and can be cast to and from\nthem. The primary difference is that the point data members are named `x` and\n`y`, while the size data members are named `width` and `height`.	text	txt	2024-07-28 09:45:49.06236	1
 198	116	|Operation|Example|\n|---|---|\n|Default constructor|`cv::Size{}` `cv::Size2i{}` `cv::Size2f{}`|\n|Copy constructor|`cv::Size{s}`|\n|Value constructor|`cv::Size2f{w, h}`|\n|Member access|`sz.width` `sz.height`|\n|Compute area|`sz.area()`|	text	txt	2024-07-28 09:45:49.082336	2
 199	117	Similar to `cv::Point` class there are `x` and `y` data members in `cv::Rect`\nclass. Additionally, there are `width` and `height` data members.	text	txt	2024-07-28 09:45:49.677004	1
+583	283	Export a module by creating a **Module Interface Unit (MIU)** that can\ncontain functions, types, constants, and even macros.	text	txt	2024-07-28 09:46:57.900993	1
+1055	368	Because handling raw pointers in containers is a source of trouble, we should\ndisable automatically deducing raw character pointers for container classes.	text	txt	2024-07-28 09:48:06.30882	1
 200	117	|Operation|Example|\n|---|---|\n|Default constructor|`cv::Rect{}`|\n|Copy constructor|`cv::Rect{r}`|\n|Value constructor|`cv::Rect{x, y, w, h}`|\n|Construct from origin and size|`cv::Rect{p, sz}`|\n|Construct from two corners|`cv::Rect{tl, br}`|\n|Member access|`r.x` `r.y` `r.width` `r.height`|\n|Compute area|`r.area()`|\n|Extract upper-left corner|`r.tl()`|\n|Extract bottom-right corner|`r.br()`|\n|Determine if a point is inside|`r.contains(p)`|\n|Intersection of rectangles|`r1 &= r2`|\n|Minimum area rectangle|`r1 |= r2`|\n|Translate rectangle by an amount|`r += x`|\n|Enlarge rectangle by size|`r += s`|\n|Compare rectangles for exact quality|`r1 == r2`|\n|Compare rectangles for inequality|`r1 != r2`|	text	txt	2024-07-28 09:45:49.699798	2
 201	118	A non-template class holding a `cv::Point2f` member called `center`, a\n`cv::Size2f` called `size`, and one additional `float` called `angle`, with\nthe latter representing the rotation of the rectangle around `center`.	text	txt	2024-07-28 09:45:50.142573	1
 202	118	|Operation|Example|\n|---|---|\n|Default constructor|`cv::RotatedRect{}`|\n|Copy constructor|`cv::RotatedRect{rr}`|\n|Value constructor|`cv::RotatedRect{p, sz, theta}`|\n|Construct from two corners|`cv::RotatedRect{p1, p2}`|\n|Member access|`rr.center` `rr.size` `rr.angle`|\n|Return a list of corners|`rr.points{pts[4]}`|	text	txt	2024-07-28 09:45:50.164594	2
@@ -16558,7 +16653,6 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 388	208	cmake -E <command> [<options>]	code	txt	2024-07-28 09:46:23.6259	2
 389	209	cmake -E	code	txt	2024-07-28 09:46:23.874976	1
 390	210	cmake ––help[-<topic>]\ncmake --help-commands file	code	txt	2024-07-28 09:46:24.170911	1
-391	211	The simplest way to run tests for a built project is to call ctest in the\ngenerated build tree:	text	txt	2024-07-28 09:46:24.523912	1
 392	211	ctest	code	txt	2024-07-28 09:46:24.544688	2
 393	212	Files that contain the CMake language are called listfiles and can be\nincluded one in another, by calling `include()` and `find_package()`, or\nindirectly with `add_subdirectory()`	text	txt	2024-07-28 09:46:25.040491	1
 394	212	CMake projects are configured with `CMakeLists.txt` listfiles.	text	txt	2024-07-28 09:46:25.060414	2
@@ -16566,6 +16660,7 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 396	212	cmake_minimum_required(VERSION <x.xx>)\nproject(<name> <OPTIONS>)	code	txt	2024-07-28 09:46:25.101148	4
 397	212	We also have an `add_subdirectory(api)` command to include another\n`CMakeListst.txt` file from the api directory to perform steps that are\nspecific to the API part of our application.	text	txt	2024-07-28 09:46:25.122426	5
 3664	1169	#include <stdio.h>	text	txt	2024-07-28 09:55:26.401303	6
+1052	367	With this, the following initialization works fine:	text	txt	2024-07-28 09:48:05.649849	5
 398	213	Not that many: a script can be as complex as you like or an empty file.\nHowever, it is recommended that you call the `cmake_minimum_required()`\ncommand at the beginning of the script. This command tells CMake which\npolicies should be applied to subsequent commands in this project	text	txt	2024-07-28 09:46:25.455896	1
 399	213	When running scripts, CMake won't execute any of the usual stages (such as\nconfiguration or generation), and it won't use the cache.	text	txt	2024-07-28 09:46:25.476425	2
 400	214	To use a utility module, we need to call an `include(<MODULE>)` command.	text	txt	2024-07-28 09:46:25.674686	1
@@ -16648,381 +16743,156 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 517	268	consteval double divide(double a, double b)\n{\n    return a / b;\n}	text	txt	2024-07-28 09:46:46.76329	1
 518	268	consteval double get_pi()\n{\n    return divide(22.0, 7); // OK\n}	text	txt	2024-07-28 09:46:46.783456	2
 519	268	double dividen{22.0}, divisor{7.0};\ndivide(dividen, divisor); // ERROR: non-const arguments to consteval	code	txt	2024-07-28 09:46:46.805479	3
-520	269	C++23 brings `if consteval` conditional statement.	text	txt	2024-07-28 09:46:47.522905	1
-521	269	This `if` statement takes no condition but would only evaluate during\nconstant evaluation. Otherwise, the `else` statement is evaluated.	text	txt	2024-07-28 09:46:47.543252	2
-522	269	consteval int f(int i) { return i; }	text	txt	2024-07-28 09:46:47.562905	3
-523	269	constexpr int g(int i)\n{\n    if consteval\n    {\n        return f(i) + 1; // immediate function context\n    }\n    else\n    {\n        return 42;\n    }\n}	text	txt	2024-07-28 09:46:47.584569	4
-524	269	consteval int h(int i)\n{\n    return f(i) + 1; // immediate function context\n}	code	txt	2024-07-28 09:46:47.605265	5
-525	270	if (std::is_constant_evaluated())\n{\n    /* A */\n}\nelse\n{\n    /* B */\n}	code	txt	2024-07-28 09:46:48.001507	1
 526	271	- `if consteval` is part of the core language, so no header needed\n- `if consteval` cannot be used wrong, but `is_constant_evaluated()` can:	text	txt	2024-07-28 09:46:48.369782	1
-527	271	if constexpr (std::is_constant_evaluated()) { /*A*/ } else { /*B*/ };	code	txt	2024-07-28 09:46:48.389926	2
 528	271	- Within `if consteval` block you can call immediate `consteval` functions.	text	txt	2024-07-28 09:46:48.409219	3
+525	270	if (std::is_constant_evaluated())\n{\n    /* A */\n}\nelse\n{\n    /* B */\n}	code	cpp	2024-07-28 09:46:48.001507	1
+527	271	if constexpr (std::is_constant_evaluated()) { /*A*/ } else { /*B*/ };	code	cpp	2024-07-28 09:46:48.389926	2
 529	272	Besides being a simple smart pointer, `std::unique_ptr` is also an important\nsemantic tool, marking an ownership handoff.	text	txt	2024-07-28 09:46:49.377355	1
-530	272	#include <memory>	text	txt	2024-07-28 09:46:49.397182	2
-532	272	// Function returning a unique_ptr handing off ownership to caller.\nstd::unique_ptr<Data> producer() { return std::make_unique<Data>(); }	text	txt	2024-07-28 09:46:49.437619	4
-533	272	// Function accepting a unique_ptr taking over ownership.\nvoid consumer(std::unique_ptr<Data> data) {}	text	txt	2024-07-28 09:46:49.45777	5
-534	272	// Helps with Single Reponsibility Principle\n// by separating resource management from logic\nstruct Holder {\n    Holder() : data_{std::make_unique<Data>()} {}\n    // implicitly defaulted move constructor && move assignment\n    // implicitly deleted copy constructor && copy assignment\nprivate:\n    std::unique_ptr<Data> data_;\n};	text	txt	2024-07-28 09:46:49.47884	6
-535	272	// shared_ptr has a fast constructor from unique_ptr\nstd::shared_ptr<Data> sptr = producer();	text	txt	2024-07-28 09:46:49.500137	7
-536	272	// Even in cases when manual resource management is required,\n// a unique_ptr on the interface might be preferable:\nvoid manual_handler(std::unique_ptr<Data> ptr) {\n    Data* raw = ptr.release();\n    // manual resource management\n}	code	txt	2024-07-28 09:46:49.520118	8
-537	273	#include <iostream>	text	txt	2024-07-28 09:46:49.982779	1
-538	273	int main()\n{\n    using std::cout;\n    using std::endl;	text	txt	2024-07-28 09:46:50.002303	2
-539	273	    cout << 42 << endl;\n}	code	txt	2024-07-28 09:46:50.022742	3
-586	283	export module geometry;   // module declaration	text	txt	2024-07-28 09:46:57.962919	4
-587	283	import std;      // module preamble	text	txt	2024-07-28 09:46:57.984943	5
-540	274	Unnamed namespaces as well as all namespaces declared directly or indirectly\nwithin an unnamed namespace have internal linkage, which means that any name\nthat is declared within an unnamed namespace has internal linkage.	text	txt	2024-07-28 09:46:50.680303	1
-541	274	namespace\n{\n    void f() { } // ::(unique)::f\n}	text	txt	2024-07-28 09:46:50.701498	2
-542	274	f(); // OK	text	txt	2024-07-28 09:46:50.723662	3
-543	274	namespace A\n{\n    void f() { } // A::f\n}	text	txt	2024-07-28 09:46:50.743666	4
-544	274	using namespace A;	text	txt	2024-07-28 09:46:50.76438	5
-545	274	f(); // Error: ::(unique)::f and A::f both in scope	code	txt	2024-07-28 09:46:50.785509	6
-546	275	Prior to C++11, non-type template arguments could not be named with internal\nlinkage, so `static` variables were not allowed.\nVC++ compiler still doesn't support it.	text	txt	2024-07-28 09:46:51.380161	1
-547	275	template <int const& Size>\nclass test {};	text	txt	2024-07-28 09:46:51.401093	2
-548	275	static int Size1 = 10; // internal linkage due static	text	txt	2024-07-28 09:46:51.422182	3
-549	275	namespace\n{\n    int Size2 = 10; // internal linkage due unnamed namespace\n}	text	txt	2024-07-28 09:46:51.442891	4
-550	275	test<Size1> t1; // error only on VC++\ntest<Size2> t2; // okay	code	txt	2024-07-28 09:46:51.462877	5
-551	276	Members of an inline namespace are treated as if they are members of the\nenclosing namespace. This property is transitive: if a namespace N contains\nan inline namespace M, which in turn contains an inline namespace O, then the\nmembers of O can be used as though they were members of M or N.	text	txt	2024-07-28 09:46:53.862341	1
-552	276	Common use cases of inline namespaces are:	text	txt	2024-07-28 09:46:53.882664	2
-553	276	* Specialization of a template is required to be done in the same namespace\n  where the template was declared.\n* Define the content of the library inside a namespace\n* Define each version of the library or parts of it inside an inner inline\n  namespace\n* Use preprocessor macros to enable a particular version of the library	text	txt	2024-07-28 09:46:53.903544	3
-554	276	namespace incorrect_implementation\n{\n    namespace v1\n    {\n        template<typename T>\n        int test(T value) { return 1; }\n    }	text	txt	2024-07-28 09:46:53.924456	4
-555	276	    namespace v2\n    {\n        template<typename T>\n        int test(T value) { return 2; }\n    }	text	txt	2024-07-28 09:46:53.944904	5
-556	276	    #ifndef _lib_version_1\n        using namespace v1;\n    #endif	text	txt	2024-07-28 09:46:53.965669	6
-557	276	    #ifndef _lib_version_2\n        using namespace v2;\n    #endif\n}	text	txt	2024-07-28 09:46:53.987312	7
-558	276	namespace broken_client_code\n{\n    // okay\n    auto x = incorrect_implementation::test(42);	text	txt	2024-07-28 09:46:54.007879	8
-559	276	    struct foo { int a; };	text	txt	2024-07-28 09:46:54.028755	9
-560	276	    // breaks\n    namespace incorrect_implementation\n    {\n        template <>\n        int test(foo value) { return value.a; }\n    }	text	txt	2024-07-28 09:46:54.04859	10
-561	276	    // won't compile\n    auto y = incorrect_implementation::test(foor{42});	text	txt	2024-07-28 09:46:54.06944	11
-562	276	    // library leaks implementation details\n    namespace incorrect_implementation\n    {\n        namespace version_2\n        {\n            template<>\n            int test(foo value) { return value.a; }\n        }\n    }	text	txt	2024-07-28 09:46:54.091579	12
-563	276	    // okay, but client needs to be aware of implementation details\n    auto y = incorrect_implementation::test(foor{42});\n}	text	txt	2024-07-28 09:46:54.114198	13
-564	276	namespace correct_implementation\n{\n    #ifndef _lib_version_1\n    inline namespace v1\n    {\n        template<typename T>\n        int test(T value) { return 1; }\n    }\n    #endif	text	txt	2024-07-28 09:46:54.135231	14
-565	276	    #ifndef _lib_version_2\n    inline namespace v2\n    {\n        template<typename T>\n        int test(T value) { return 2; }\n    }\n    #endif\n}	text	txt	2024-07-28 09:46:54.15647	15
-566	276	namespace working_client_code\n{\n    // okay\n    auto x = correct_implementation::test(42);	text	txt	2024-07-28 09:46:54.177698	16
-567	276	    struct foo { int a; };	text	txt	2024-07-28 09:46:54.198585	17
-568	276	    namespace correct_implementation\n    {\n        template <>\n        int test(foo value) { return value.a; }\n    }	text	txt	2024-07-28 09:46:54.219469	18
-569	276	    // okay\n    auto y = correct_implementation::test(foor{42});\n}	code	txt	2024-07-28 09:46:54.239404	19
-570	277	// before C++17\nnamespace A\n{\n    namespace B\n    {\n        namespace C\n        {\n            /* ... */\n        }\n    }\n}	text	txt	2024-07-28 09:46:54.85892	1
-571	277	// since C++16\nnamespace A::B::C\n{\n    /* ... */\n};	code	txt	2024-07-28 09:46:54.87948	2
 572	278	- Modules are only imported once and the order they're imported in does not matter.\n- Modules do not require splitting interfaces and implementation in different source files, although this is still possible.\n- Modules reduce compilation time. The entities exported from a module are described in a binary file that the compiler can process faster than traditional precompiled headers.\n- Exported files can potentially be used to build integrations with C++ code from other languages.	text	txt	2024-07-28 09:46:55.138744	1
-573	279	import std;	text	txt	2024-07-28 09:46:55.632971	1
-574	279	int main()\n{\n    std::cout << std::format("{}\\\\n", "modules are working");\n}	code	txt	2024-07-28 09:46:55.653325	2
-575	279	Headers can also be imported:	text	txt	2024-07-28 09:46:55.673671	3
-576	279	import std;\nimport "geometry.hpp"	code	txt	2024-07-28 09:46:55.693903	4
 577	280	- The **global module fragment**, introduced with a `module;` statement. This\n  part is optional and, if present, may only contain preprocessor directives.\n  Everything that is added here is said to belong to the *global module*,\n  which is the collection of all the global module fragments and all\n  translation units that are not modules.	text	txt	2024-07-28 09:46:56.092092	1
 578	280	- The **module declaration**, which is a required statement of the form\n  `export module name;`.\n- The **module preamble**, which is optional, and may only contain import\n  declarations.\n- The **module purview**, which is the content of the unit, starting with the\n  module declaration and extending to the end of the module unit.	text	txt	2024-07-28 09:46:56.112746	2
 579	281	Entities can be exported only when:	text	txt	2024-07-28 09:46:56.422239	1
 580	281	- have a name\n- have external linkage	text	txt	2024-07-28 09:46:56.443531	2
 581	281	Names of namespaces containing export declarations are implicitly exported as\nwell.	text	txt	2024-07-28 09:46:56.464812	3
 582	282	- Names with internal linkage or no linkage cannot be exported.\n- An export group must not contain declarations that cannot be exported, e.g.\n  `static_assert` or anonymous names.\n- The module declaration must not be the result of macro expansion.	text	txt	2024-07-28 09:46:56.740033	1
-583	283	Export a module by creating a **Module Interface Unit (MIU)** that can\ncontain functions, types, constants, and even macros.	text	txt	2024-07-28 09:46:57.900993	1
-584	283	module;               // global module fragment	text	txt	2024-07-28 09:46:57.921254	2
-585	283	#define X\n#include "code.h"	text	txt	2024-07-28 09:46:57.941471	3
-588	283	// module purview	text	txt	2024-07-28 09:46:58.006327	6
-589	283	export template<typename T, typename = typename std::enable_if_t<std::is_arithmetic_v<T>, T>>\nstruct point\n{\n    T x;\n    T y;\n};	text	txt	2024-07-28 09:46:58.027761	7
-590	283	export using int_point = point<int>;	text	txt	2024-07-28 09:46:58.047364	8
-591	283	export constexpr int_point int_point_zero{0, 0};	text	txt	2024-07-28 09:46:58.067856	9
-592	283	export template<typename T>\ndouble distance(point<T> const& p1, point<T> const& p2)\n{\n    return std::sqrt((p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y));\n}	code	txt	2024-07-28 09:46:58.089466	10
-593	283	import std;\nimport geometry;	text	txt	2024-07-28 09:46:58.111906	11
-594	283	int main()\n{\n    int_point p{3, 4};\n    std::cout << distance(int_point_zero, p) << std::endl;\n}	code	txt	2024-07-28 09:46:58.134035	12
+551	276	Members of an inline namespace are treated as if they are members of the\nenclosing namespace. This property is transitive: if a namespace N contains\nan inline namespace M, which in turn contains an inline namespace O, then the\nmembers of O can be used as though they were members of M or N.	text	txt	2024-07-28 09:46:53.862341	1
+552	276	Common use cases of inline namespaces are:	text	txt	2024-07-28 09:46:53.882664	2
+575	279	Headers can also be imported:	text	txt	2024-07-28 09:46:55.673671	2
+576	279	import std;\nimport "geometry.hpp"	code	cpp	2024-07-28 09:46:55.693903	3
 595	284	The source code of a module may become large and difficult to maintain.\nMoreover, a module may be composed of logically separate parts. To help with\nscenarios like that, modules support composition from parts called\n**partitions**.	text	txt	2024-07-28 09:46:58.630847	1
 596	284	Although module partitions are distinct files, they are not available as\nseparate modules or submodules to translation units using a module. They are\nexported together as a single, aggregated module.	text	txt	2024-07-28 09:46:58.653004	2
-597	285	A module unit that is a partition that exports entities is called a **module\ninterface partition**.	text	txt	2024-07-28 09:47:00.35894	1
-598	285	Here the `geometry-core.cppm` and `geometry-literals.cppm` are internal partitions.	text	txt	2024-07-28 09:47:00.380515	2
-599	285	*geometry-core.cppm*\nexport module geometry:core;	text	txt	2024-07-28 09:47:00.402003	3
-600	285	import std.core;	text	txt	2024-07-28 09:47:00.421713	4
-601	285	export template<typename T, typename = typename std::enable_if_t<std::is_arithmetic_v<T>, T>>\nstruct point\n{\n    T x;\n    T y;\n};	code	txt	2024-07-28 09:47:00.444865	5
-602	285	*geometry-literals.cppm*\nexport module geometry.literals;	text	txt	2024-07-28 09:47:00.465732	6
-603	285	import std.core;	text	txt	2024-07-28 09:47:00.48503	7
-604	285	namespace geometry_literals\n{\n    export point<int> operator ""_p(const char* ptr, std::size_t const size)\n    {\n        int x{}, y{};\n        ...\n        return {x , y};\n    }\n}	code	txt	2024-07-28 09:47:00.504712	8
-605	285	In the primary module interface unit, import and then export the partitions\nwith statements of the form `export import :partitionname`.	text	txt	2024-07-28 09:47:00.524852	9
-606	285	*geometry.cppm*\nexport module geometry;	text	txt	2024-07-28 09:47:00.546334	10
-607	285	export import :core;\nexport import :literals;	code	txt	2024-07-28 09:47:00.566281	11
-608	285	The code importing a module composed from multiple partitions only sees the\nmodule as a whole if it was built from a single module unit:	text	txt	2024-07-28 09:47:00.586687	12
-609	285	import std.core;\nimport geometry;	text	txt	2024-07-28 09:47:00.606601	13
-610	285	int main()\n{\n    point<int> p{4, 2};	text	txt	2024-07-28 09:47:00.627186	14
-611	285	    {\n        using namespace geometry_literals;\n        point<int> origin{"0,0"_p};\n    }\n}	code	txt	2024-07-28 09:47:00.647983	15
+4148	413	class base\n{\n    virtual void foo() = 0;\n    virtual void bar() {}\n    virtual void baz() = 0;\n};\n\nclass derived final: public base\n{\n    virtual void foo() override {}\n    virtual void baz() override {}\n};\n\n// won't compile\nclass prime: public derived\n{\n};	code	cpp	2025-07-16 14:48:04.065869	1
+4146	412	class base\n{\n    virtual void foo() = 0;\n    virtual void bar() {}\n    virtual void baz() = 0;\n};\n\nclass alpha: public base\n{\n    virtual void foo() override {}\n    virtual void baz() override final {}\n};\n\nclass beta: public alpha\n{\n    // won't compile\n    virtual void baz() override {}\n};\n\nint main()\n{\n    beta object;\n}	code	cpp	2025-07-16 14:47:48.613775	1
+4143	411	class base\n{\n    virtual void foo() = 0;\n    virtual void bar() {}\n    virtual void baz() = 0;\n};\n\nclass alpha: public base\n{\n    virtual void bar() override {}\n    virtual void baz() override {}\n};\n\nclass beta: public alpha\n{\n    virtual void foo() override {}\n};\n\nbeta object;	code	cpp	2025-07-16 14:47:35.680752	1
+4423	537	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3};\n\n    std::ranges::any_of(range, [](long e) { return e % 2 == 0; });\n    // at least an even number exists: true\n}	code	cpp	2025-07-17 11:04:28.008158	2
+4138	409	#include <string>\n\nclass box\n{\nprivate:\n    std::string first;\n\npublic:\n    box(std::string f): first{std::move(f)} {}\n    void set_first(std::string f) { first = f; }\n};\n\nbox b{"Sample"};\nb.set_first("Another Sample");\nb.set_first("Another Sample");\nb.set_first("Another Sample");\nb.set_first("Another Sample");	code	cpp	2025-07-16 14:46:39.576048	15
+4140	409	#include <string>\n\nclass box\n{\nprivate:\n    std::string first;\n\npublic:\n    box(std::string f): first{std::move(f)} {}\n    void set_first(std::string const& f) { first = f; }\n};	code	cpp	2025-07-16 14:46:57.225496	17
+1827	538	| `std::all_of` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:11.534362	1
+4425	538	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3};\n\n    std::ranges::none_of(range, [](long e) { return e < 0; });\n    // not any number is negative: true\n}	code	cpp	2025-07-17 11:04:39.48889	2
+4149	414	#include <syncstream>\n#include <iostream>\n\nint main()\n{\n    std::osyncstream output_stream{std::cout};\n    output_stream << "This literal string will be";\n    output_stream << std::endl; // no effect\n    output_stream << "written into output stream";\n    // flushes on destruction\n}	code	cpp	2025-07-16 14:48:45.611898	1
 612	286	Apart from *module interface partition*, there could also be internal\npartitions that do not export anything. Such partition unit is called a\n**module implementation partition**.	text	txt	2024-07-28 09:47:01.687487	1
 613	286	It is possible to create internal partitions that do not export anything, but\ncontain code that can be used in the same module.	text	txt	2024-07-28 09:47:01.707675	2
-614	286	modulename:partitionname;`.	text	txt	2024-07-28 09:47:01.728647	3
-615	286	*geometry-details.cppm*\nmodule geometry:details;	text	txt	2024-07-28 09:47:01.748465	4
-616	286	import std.core;	text	txt	2024-07-28 09:47:01.767777	5
-617	286	std::pair<int, int> split(char const* ptr, std::size_t const size)\n{\n    int x{}, y{};\n    ...\n    return {x, y};\n}	code	txt	2024-07-28 09:47:01.788304	6
-618	286	*geometry-literals.cppm*\nexport module geometry:literals;	text	txt	2024-07-28 09:47:01.808253	7
-619	286	import :core;\nimport :details;	text	txt	2024-07-28 09:47:01.828581	8
-620	286	namespace geometry_literals\n{\n    export point<int> operator ""_p(const char* ptr, std::size_t size)\n    {\n        auto [x, y] = split(ptr, size);\n        return {x, y};\n    }\n}	code	txt	2024-07-28 09:47:01.849217	9
 621	287	Partitions are division of a module. However, they are not submodules. They\ndo not logically exist outside of the module. There is no concept of a\nsubmodule in the C++ language.	text	txt	2024-07-28 09:47:03.815119	1
 622	287	This snippet uses module interface partition and module implementation partition.	text	txt	2024-07-28 09:47:03.834224	2
-623	287	*sample-core.cppm*\nexport module sample:core;	text	txt	2024-07-28 09:47:03.855161	3
-624	287	export constexpr double fraction{7 / 5};	code	txt	2024-07-28 09:47:03.87611	4
-625	287	*sample-details.cppm*\nmodule sample:details;	text	txt	2024-07-28 09:47:03.897368	5
-626	287	import :core;	text	txt	2024-07-28 09:47:03.918088	6
-627	287	constexpr double power{fraction * fraction};	code	txt	2024-07-28 09:47:03.939792	7
-628	287	*sample.cppm*\nexport module sample;	text	txt	2024-07-28 09:47:03.960943	8
-629	287	export import :core;	code	txt	2024-07-28 09:47:03.982216	9
-630	287	*consumer.cpp*\nimport std.core;\nimport sample;	text	txt	2024-07-28 09:47:04.00139	10
-631	287	std::cout << power << "\\\\n";	code	txt	2024-07-28 09:47:04.022652	11
-632	287	Next snippet is the same implementation but with modules instead of partitions:	text	txt	2024-07-28 09:47:04.044701	12
-633	287	*sample-core.cppm*\nexport module sample.core;	text	txt	2024-07-28 09:47:04.067462	13
-634	287	export constexpr double fraction{7 / 5};	code	txt	2024-07-28 09:47:04.088412	14
-635	287	*sample-details.cppm*\nmodule sample.details;	text	txt	2024-07-28 09:47:04.107738	15
-636	287	import sample.core;	text	txt	2024-07-28 09:47:04.127746	16
-637	287	constexpr double power{fraction * fraction};	code	txt	2024-07-28 09:47:04.148403	17
-638	287	*sample.cppm*\nexport module sample;	text	txt	2024-07-28 09:47:04.168728	18
-639	287	export import sample.core;	code	txt	2024-07-28 09:47:04.188548	19
-640	287	*consumer.cpp*\nimport std.core;\nimport sample;	text	txt	2024-07-28 09:47:04.209786	20
-641	287	std::cout << power << "\\\\n";	code	txt	2024-07-28 09:47:04.230242	21
-642	287	So far, we have two modules: `sample.core` and `sample`. Here `sample`\nimports and then re-exports the entire content of `sample.core`. Because of\nthis, the core in the `consumer.cpp` does not need to change. By solely\nimporting the `sample` module, we get access to the content of the\n`sample.core` module.	text	txt	2024-07-28 09:47:04.251552	22
-643	287	However, if we do not define the `sample` module anymore, then we need to explicitly import `sample.core` module:	text	txt	2024-07-28 09:47:04.272721	23
-644	287	*consumer.cpp*\nimport std.core;\nimport sample.core;	text	txt	2024-07-28 09:47:04.294419	24
-645	287	std::cout << power << "\\\\n";	code	txt	2024-07-28 09:47:04.316856	25
-646	287	Choosing between using partitions or multiple modules for componentizing your\nsource code should depend on the particularities of your project. If you use\nmultiple smaller modules, you provide better granularity for imports. This\ncan be important if you're developing a large library because users should\nonly import things they use.	text	txt	2024-07-28 09:47:04.337692	26
+632	287	Next snippet is the same implementation but with modules instead of partitions:	text	txt	2024-07-28 09:47:04.044701	7
 647	288	Benefits of using `auto`:	text	txt	2024-07-28 09:47:05.591579	1
 648	288	* It is not possible to leave a variable uninitialized with `auto`.\n* It prevents narrowing conversion of data types. (?)\n* It makes generic programming easy.\n* It can be used where we don't care about types.	text	txt	2024-07-28 09:47:05.6121	2
-649	288	Preconditions of using `auto`:	text	txt	2024-07-28 09:47:05.633075	3
-650	288	* `auto` does not retain cv-ref qualifiers.\n* `auto` cannot be used for non-movable objects.\n* `auto` cannot be used for multi-word types like long long.	text	txt	2024-07-28 09:47:05.654222	4
-651	288	#include <string>\n#include <vector>\n#include <memory>	text	txt	2024-07-28 09:47:05.676004	5
-652	288	int main()\n{\n    auto i = 42; // int\n    auto d = 42.5; // double\n    auto c = "text"; // char const*\n    auto z = {1, 2, 3}; // std::initializer_list<int>	text	txt	2024-07-28 09:47:05.697171	6
-653	288	    auto b = new char[10]{0}; // char*\n    auto s = std::string{"text"}; // std::string\n    auto v = std::vector<int>{1, 2, 3}; // std::vector<int>\n    auto p = std::make_shared<int>(42); // std::shared_ptr<int>	text	txt	2024-07-28 09:47:05.717819	7
-654	288	    auto upper = [](char const c) { return toupper(c); };\n    auto add = [](auto const a, auto const b) { return a + b; };	text	txt	2024-07-28 09:47:05.73943	8
-655	288	    template<typename F, typename F>\n    auto apply(F&& f, T value)\n    {\n        return f(value);\n    }\n}	text	txt	2024-07-28 09:47:05.760336	9
-656	288	class foo\n{\n    int _x;\npublic:\n    foo(int const x = 0): _x{x} {}\n    int& get() { return _x; }\n};	text	txt	2024-07-28 09:47:05.781168	10
-657	288	decltype(auto) proxy_gen(foo& f) { return f.get(); }\n// ^__ decltype() preserves cv-ref qualification of return type	code	txt	2024-07-28 09:47:05.801966	11
+1002	362	Alias templates are especially helpful to define shortcuts for types that are\nmembers of class templates.	text	txt	2024-07-28 09:47:59.546801	1
+4153	415	#include <iostream>\n#include <sstream>\n\n// make allocations obvious\nvoid* operator new(std::size_t sz){\n    std::cout << "Allocating " << sz << " bytes\\\\n";\n    return std::malloc(sz);\n}\n\nint main() {\n    std::stringstream str;\n    str << "Using C++20 standard";\n    // allocates\n\n    std::cout << str.str() << '\\\\n';\n    // allocates\n\n    std::cout << str.view() << '\\\\n';\n    // doesn't allocate\n}	code	cpp	2025-07-16 14:49:05.50068	2
+4690	888	#include <thread>\n#include <chrono>\n#include <functional>\n#include <boost/asio.hpp>\n\nvoid some_work(std::size_t s)\n{\n    std::this_thread::sleep_for(std::chrono::seconds(s));\n}\n\nvoid finish_tasks(boost::asio::io_service& service)\n{\n    service.run();\n}\n\nint main()\n{\n    boost::asio::io_context service;\n    boost::asio::io_context::strand strand{service};\n    std::thread worker{finish_tasks, std::ref(service)};\n    strand.post(std::bind(some_work, 2));\n    service.post(strand.wrap(std::bind(some_work, 2)));\n    worker.join();\n    service.stop();\n}	code	cpp	2025-07-17 18:32:42.260618	2
+4160	417	#include <iostream>\n#include <sstream>\n#include <spanstream> // new header\n\n// make allocations obvious\nvoid* operator new(std::size_t sz){\n    std::cout << "Allocating " << sz << " bytes\\\\n";\n    return std::malloc(sz);\n}\n\nint main() {\n    std::stringstream ss;\n    ss << "one string that doesn't fit into SSO";\n    ss << "another string that hopefully won't fit";\n    // allocates memory\n\n    char buffer[128]{};\n    std::span<char> internal_memory(buffer);\n    std::basic_spanstream<char> ss2(internal_memory);\n    ss2 << "one string that doesn't fit into SSO";\n    ss2 << "another string that hopefully won't fit";\n    // doesn't allocate new memory\n}	code	cpp	2025-07-16 14:49:46.214148	2
+4157	416	#include <iostream>\n#include <sstream>\n\n// make allocations obvious\nvoid* operator new(std::size_t sz){\n    std::cout << "Allocating " << sz << " bytes\\\\n";\n    return std::malloc(sz);\n}\n\nint main() {\n    std::stringstream str {std::string("hello C++ programming World")};\n}	code	cpp	2025-07-16 14:49:24.767542	2
 658	289	Initialization of `auto` always decays. This also applies to return\nvalues when the return type is just `auto`.	text	txt	2024-07-28 09:47:06.201144	1
-659	289	int i = 42;\nint coust& ir = i;\nauto a = ir;  // a is declared as new object of type int	code	txt	2024-07-28 09:47:06.221279	2
+855	332		code	txt	2024-07-28 09:47:36.860706	4
+659	289	int i = 42;\nint coust& ir = i;\nauto a = ir;  // a is declared as new object of type int	code	cpp	2024-07-28 09:47:06.221279	2
 660	290	* Only by C++20 structured bindings can include `static` or `thread_local`\n  specifiers in the declaration.\n* Only by C++20 `[[maybe_unused]]` attribute can be used in the declaration.\n* Only by C++20 a lambda can capture structure binding identifiers.	text	txt	2024-07-28 09:47:06.807831	1
-661	290	#include <iostream>\n#include <set>	text	txt	2024-07-28 09:47:06.829573	2
-662	290	int main()\n{\n    std::set<int> numbers;	text	txt	2024-07-28 09:47:06.850677	3
-663	290	    if (auto const [iter, inserted] = numbers.insert(1); inserted)\n        std::cout << std::distance(numbers.cbegin(), iter);\n}	code	txt	2024-07-28 09:47:06.872307	4
-664	291	typedef unsigned long positive_t;	code	txt	2024-07-28 09:47:07.149927	1
-665	292	#include <bitset>	text	txt	2024-07-28 09:47:07.674437	1
-666	292	using byte = std::bitset<8>;\nusing fn = void(byte, double);\nusing fn_ptr = void(*)(byte, double);	text	txt	2024-07-28 09:47:07.694657	2
-667	292	void func(byte b, double d) { /* ... */ }	text	txt	2024-07-28 09:47:07.715147	3
-668	292	int main()\n{\n    byte b{001101001};\n    fn* f = func;\n    fn_ptr fp = func;\n}	code	txt	2024-07-28 09:47:07.737104	4
+664	291	typedef unsigned long positive_t;	code	cpp	2024-07-28 09:47:07.149927	1
 669	293	Scoped enumerations do not export their enumerators to the surrounding scope.	text	txt	2024-07-28 09:47:08.366138	1
 670	293	Scoped enumerations have an underlying type so they can be forward declared.	text	txt	2024-07-28 09:47:08.387321	2
 671	293	Values of scoped enumerations do not convert implicitly to int.	text	txt	2024-07-28 09:47:08.40869	3
-672	293	enum class status: unsigned int; // forward declared	text	txt	2024-07-28 09:47:08.430493	4
-673	293	status do_something(); // function declaration/prototype	text	txt	2024-07-28 09:47:08.451522	5
-674	293	enum class status : unsigned int\n{\n    success = 0,\n    failed = 1,\n    unknown = 0xffff0000U\n};	text	txt	2024-07-28 09:47:08.471884	6
-675	293	status do_something() { return status::success; }	code	txt	2024-07-28 09:47:08.492072	7
-676	294	#include <string>	text	txt	2024-07-28 09:47:09.152323	1
-677	294	enum class status : unsigned int\n{\n    success = 0,\n    failure = 1,\n    unknown = 0xffff0000U\n};	text	txt	2024-07-28 09:47:09.173609	2
-678	294	std::string_view to_string(status const s)\n{\n    switch (s)\n    {\n        using enum status;\n        case success: return "success";\n        case failure: return "failure";\n        case unknown: return "unknown";\n    }\n}	code	txt	2024-07-28 09:47:09.194473	3
 679	295	`std::variant` is the C++17 type-safe alternative to union which supports\nnon-trivial custom types.	text	txt	2024-07-28 09:47:09.749066	1
 680	295	Variant is never empty. Without arguments, it default constructs the first\ntype.	text	txt	2024-07-28 09:47:09.769924	2
-681	295	#include <variant>\n#include <string>	text	txt	2024-07-28 09:47:09.789939	3
-682	295	std::variant<int, double, std::string> v{"some characters"};\nbool x = std::holds_alternative<std::string>(v);\n// x == true	code	txt	2024-07-28 09:47:09.811138	4
 683	296	Assignment sets the variant type:	text	txt	2024-07-28 09:47:10.202264	1
-684	296	#include <variant>\n#include <string>	text	txt	2024-07-28 09:47:10.223004	2
-685	296	std::variant<int, double, std::string> v;\nv = 10;	code	txt	2024-07-28 09:47:10.243609	3
 686	297	Elements can be extracted by type or index; however, only the active type can\nbe accessed.	text	txt	2024-07-28 09:47:10.961927	1
-687	297	#include <variant>\n#include <string>	text	txt	2024-07-28 09:47:10.981034	2
-688	297	std::variant<int, double, std::string> v{10};\nint number;	text	txt	2024-07-28 09:47:11.000702	3
-689	297	number = std::get<int>(v);\nnumber = std::get<0>(v); // same as above but with index	code	txt	2024-07-28 09:47:11.021324	4
-690	297	`std::variant` throws when we attempt to access the wrong type:	text	txt	2024-07-28 09:47:11.041431	5
-691	297	#include <variant>\n#include <string>	text	txt	2024-07-28 09:47:11.061923	6
-692	297	std::variant<int, double, std::string> v{10};	text	txt	2024-07-28 09:47:11.081085	7
-693	297	double value = std::get<double>(v);\n// throws std::bad_variant_access	code	txt	2024-07-28 09:47:11.102102	8
+690	297	`std::variant` throws when we attempt to access the wrong type:	text	txt	2024-07-28 09:47:11.041431	3
 694	298	When working with `std::variant`, querying the current content can become\ncumbersome. As an alternative, especially for cases when type deduction is\ninvolved, we can use the `std::visit`.	text	txt	2024-07-28 09:47:11.672399	1
 695	298	The `std::visit` requires as an argument an invocable that is compatible with\neach of the contained types.	text	txt	2024-07-28 09:47:11.694222	2
-696	298	#include <variant>\n#include <string>\n#include <iostream>	text	txt	2024-07-28 09:47:11.715725	3
-697	298	std::varian<int, double, std::string> v{"sample string"};	text	txt	2024-07-28 09:47:11.736179	4
-855	332		code	txt	2024-07-28 09:47:36.860706	4
-698	298	std::visit([](auto&& x) {\n    std::cout << x << '\\\\n';\n}, v);\n// prints "sample string"	code	txt	2024-07-28 09:47:11.756269	5
-699	299	#include <variant>\n#include <string>\n#include <iostream>	text	txt	2024-07-28 09:47:12.563389	1
-700	299	std::variant<int, double, std::string> v;	text	txt	2024-07-28 09:47:12.584956	2
-701	299	template<typename ...Ts>\nstruct overloaded : Ts...\n{\n    using Ts::operator()...;\n};	text	txt	2024-07-28 09:47:12.606593	3
-702	299	v = 3.14;	text	txt	2024-07-28 09:47:12.627192	4
-703	299	std::visit(overloaded{\n    [](int& x) {\n        std::cout << "int: " << x << '\\\\n';\n    },\n    [](double& x) {\n        std::cout << "double: " << x << '\\\\n';\n    },\n    [](std::string& x) {\n        std::cout << "std::string: " << x << '\\\\n';\n    }\n}, v);\n// prints "double: 3.14"	code	txt	2024-07-28 09:47:12.649606	5
-704	300	The `std::expected` (C++23) comes with a monadic interface. Relying on the\nmonadic interface prevents the typical if-then-else verbose error checking.\nThe `and_then()` and `or_else()` methods expect a callable that accepts a\nvalue/error and returns a `std::expected`. The `transform` and\n`transform_error` methods expect a callable that accepts a value/error and\nreturns a value/error.	text	txt	2024-07-28 09:47:13.477597	1
-705	300	#include <expected>\n#include <system_error>\n#include <string>	text	txt	2024-07-28 09:47:13.49908	2
-706	300	std::expected<std::string, std::error_condition> read_input();\nstd::expected<int, std::error_condition> to_int(const std::string& s);\nint increase(int v);\nstd::expected<int, std::error_condition> log_error(const std::error_condition& err);	text	txt	2024-07-28 09:47:13.521109	3
-707	300	auto result = read_input()\n    .and_then(to_int) // invoked if the expected contains a value\n    // the callable has to return a std::expected, but can change\n    // the type: std::expected<T,Err> -> std::expected<U,Err>\n    .transform(increase) // invoked if the expected contains a value\n    // the callable can return any type\n    // std::expected<T,Err> -> std::expected<U,Err>\n    .or_else(log_error); // invoked if the expected contains an error\n    // the callable has to return a std::expected, but can change\n    // the type: std::expected<V,T> -> std::expected<V,U>	code	txt	2024-07-28 09:47:13.544485	4
+1053	367	Stack StringStack = "surprise!";    // Stack<char const*> deduced since C++17	code	cpp	2024-07-28 09:48:05.67328	6
+4165	418	#include <vector>\n#include <string>\n\nstd::vector<std::string> vec;\n\n{\n    std::string s("Hello World!");\n    vec.push_back(s); // Copy\n    vec.push_back(std::move(s)); // Move\n}\n\n{\n    std::string s("Hello World!");\n    vec.emplace_back(s); // Copy (same as push_back)\n    vec.emplace_back(std::move(s)); // Move (same as push_back)\n\n    // In-place construction, no move or copy:\n    vec.emplace_back("Hello World!");\n\n    // Note the difference, this is still a move:\n    vec.emplace_back(std::string{"Hello World!"});\n}	code	cpp	2025-07-16 14:50:10.646101	2
+4430	539	#include <string>\n\ntemplate<typename CharT>\nusing tstring = std::basic_string<CharT, std::char_traits<CharT>, std::allocator<CharT>>;\n\ntemplate<typename CharT>\ninline tstring<CharT> to_upper(tstring<CharT> text)\n{\n    std::transform(std::begin(text), std::end(text), std::begin(text), toupper);\n    return text;\n}\n\ntemplate<typename CharT>\ninline tstring<CharT> to_upper(tstring<CharT>&& text)\n{\n    std::transform(std::begin(text), std::end(text), std::begin(text), toupper);\n    return text;\n}\n\ntemplate<typename CharT>\ninline tstring<CharT> to_lower(tstring<CharT> text)\n{\n    std::transform(std::begin(text), std::end(text), std::begin(text), tolower);\n    return text;\n}\n\ntemplate<typename CharT>\ninline tstring<CharT> to_lower(tstring<CharT>&& text)\n{\n    std::transform(std::begin(text), std::end(text), std::begin(text), tolower);\n    return text;\n}	code	cpp	2025-07-17 11:05:11.27756	1
+4177	425	try\n{\n    auto i1 = std::stoi("");\n}\ncatch (std::invalid_argument const& exp)\n{\n    std::cerr << exp.what() << '\\\\n';\n}\n\ntry\n{\n    auto i2 = std::stoi("12345678901234");\n    auto i3 = std::stoi("12345678901234");\n}\ncatch (std::out_of_range const& exp)\n{\n    std::cerr << exp.what() << '\\\\n';\n}	code	cpp	2025-07-16 14:52:06.040917	2
+4172	420	#include <string_view>\n\nbool secure_protocol(std::string_view url)\n{\n    if (url.starts_with("https"))\n        return true;\n\n    return false;\n}	code	cpp	2025-07-16 14:51:00.799328	2
+4175	423	auto i1 = std::stoi("42");\nauto i2 = std::stoi("101010", nullptr, 2);\nauto i3 = std::stoi("052", nullptr, 8);\nauto i7 = std::stoi("052", nullptr, 0);\nauto i4 = std::stoi("0x2A", nullptr, 16);\nauto i9 = std::stoi("0x2A", nullptr, 0);\nauto i10 = std::stoi("101010", nullptr, 2);\nauto i11 = std::stoi("22", nullptr, 20);\nauto i12 = std::stoi("-22", nullptr, 20);\n\nauto d1 = std::stod("123.45"); // d1 = 123.45000000000000\nauto d2 = std::stod("1.2345e+2"); // d2 = 123.45000000000000\nauto d3 = std::stod("0xF.6E6666p3"); // d3 = 123.44999980926514	code	cpp	2025-07-16 14:51:39.316808	1
+4167	419	#include <string>\n#include <iostream>\n\nint main() {\n    std::string message{"Using prior C++23 standard."};\n\n    if (message.find("C++") != std::string::npos)\n        std::cout << "You are using C++\\\\n";\n}	code	cpp	2025-07-16 14:50:36.834409	2
+4170	419	Using C++23:\n\n#include <string>\n#include <iostream>\n\nint main() {\n    std::string message{"Using C++23 standard."};\n\n    if (message.contains("C++"))\n        std::cout << "You are using C++\\\\n";\n}	code	cpp	2025-07-16 14:50:48.497149	3
+4176	423	template<typename T, typename = typename T = std::is_integral_v<T>>\nT stoi(std::string const& str, std::size_t* pos = 0, T base = 10);\n\ntemplate<typename F, typename = typename F = std::is_floating_point_v<F>>\nF stof(std::string const& str, std::size_t* pos = 0);	code	cpp	2025-07-16 14:51:45.397612	3
+4174	421	#include <string_view>\n\nbool org_domain(std::string_view url)\n{\n    if (url.ends_with(".org"))\n        return true;\n\n    return false;\n}	code	cpp	2025-07-16 14:51:13.11929	1
+730	302	However, it is usually easier to define the operator by mapping it to results\nof underlying types.	text	txt	2024-07-28 09:47:17.176903	6
 708	301	Before C++20 you had to define six operators for a type to provide full\nsupport for all possible comparisons of its objects. The problem is that even\nthough most of the operators are defined in terms of either `operator ==` or\n`operator <`, the definitions are tedious and they add a lot of visual\nclutter.	text	txt	2024-07-28 09:47:15.457053	1
-709	301	class Value\n{\n    long id;	text	txt	2024-07-28 09:47:15.47816	2
-710	301	public:\n    bool operator==(Value const& rhs) const { return id == rhs.id; }\n    bool operator!=(Value const& rhs) const { return !(*this == rhs); }\n    bool operator< (Value const& rhs) const { return id < rhs.id; }\n    bool operator<=(Value const& rhs) const { return !(*this < rhs); }\n    bool operator> (Value const& rhs) const { return rhs < *this; }\n    bool operator>=(Value const& rhs) const { return !(rhs < *this); }\n};	code	txt	2024-07-28 09:47:15.500633	3
-711	301	In addition, for a well implemented type, you might need:	text	txt	2024-07-28 09:47:15.521732	4
-712	301	- Declare the operators with `noexcept` if they cannot throw.\n- Declare the operators with `constexpr` if they can be used at compile time.\n- Declare the operators as hidden friends (declare them with `friend` inside\n  the class structure so that both operands become parameters and support\n  implicit conversions if the constructors are not `explicit`).\n- Declare the operators with `[[nodiscard]]` to warn if the return value is\n  not used.	text	txt	2024-07-28 09:47:15.545241	5
-714	301	public:\n    [[nodiscard]] friend constexpr bool operator==(Value const& lhs, Value const& rhs) noexcept { return lhs.id == rhs.id; }\n    [[nodiscard]] friend constexpr bool operator!=(Value const& lhs, Value const& rhs) noexcept { return !(lhs == rhs); }\n    [[nodiscard]] friend constexpr bool operator< (Value const& lhs, Value const& rhs) noexcept { return lhs.id < rhs.id; }\n    [[nodiscard]] friend constexpr bool operator<=(Value const& lhs, Value const& rhs) noexcept { return !(lhs < rhs); }\n    [[nodiscard]] friend constexpr bool operator> (Value const& lhs, Value const& rhs) noexcept { return rhs < lhs; }\n    [[nodiscard]] friend constexpr bool operator>=(Value const& lhs, Value const& rhs) noexcept { return !(rhs < lhs); }\n};	code	txt	2024-07-28 09:47:15.587697	7
-715	301	Since C++20 `operator ==` also implies `operator !=`, therefore, for `a` of\ntype `TypeA` and `b` of `TypeB`, the compiler will be able to compile `a !=\nb` if there is:	text	txt	2024-07-28 09:47:15.608539	8
-716	301	- a freestanding `operator !=(TypeA, TypeB)`\n- a freestanding `operator ==(TypeA, TypeB)`\n- a freestanding `operator ==(TypeB, TypeA)`\n- a member function `TypeA::operator!=(TypeB)`\n- a member function `TypeA::operator==(TypeB)`\n- a member function `TypeB::operator==(TypeA)`	text	txt	2024-07-28 09:47:15.629665	9
-717	301	Having both a freestanding and a member function is an ambiguity error.	text	txt	2024-07-28 09:47:15.649983	10
-718	301	Since C++20 it is enough to declare `operator <=>` with `=default` so that\nthe defaulted member `operator <=>` generates a corresponding member\n`operator ==`:	text	txt	2024-07-28 09:47:15.671329	11
-719	301	class Value\n{\n    auto operator<=>(Value const& rhs) const = default;\n    auto operator==(Value const& rhs) const = default; // implicitly generated\n};	code	txt	2024-07-28 09:47:15.69261	12
-720	301	Both operators use their default implementation to compare objects member by\nmember. The order to the members in the class matter.	text	txt	2024-07-28 09:47:15.713293	13
-721	301	In addition, even when declaring the spaceship operator as a member function,\nthe generated operators:	text	txt	2024-07-28 09:47:15.733108	14
-722	301	- are `noexcept` if comparing the members never throws\n- are `constexpr` if comparing the members is possible at compile time\n- implicit type conversions for the first operand are also supported if a\n  corresponding implicit type conversion is defined\n- may warn if the result of a comparison is not used (compiler dependent)	text	txt	2024-07-28 09:47:15.754684	15
+711	301	In addition, for a well implemented type, you might need:	text	txt	2024-07-28 09:47:15.521732	3
+712	301	- Declare the operators with `noexcept` if they cannot throw.\n- Declare the operators with `constexpr` if they can be used at compile time.\n- Declare the operators as hidden friends (declare them with `friend` inside\n  the class structure so that both operands become parameters and support\n  implicit conversions if the constructors are not `explicit`).\n- Declare the operators with `[[nodiscard]]` to warn if the return value is\n  not used.	text	txt	2024-07-28 09:47:15.545241	4
 723	302	If the `operator <=>` for `x <= y` does not find a matching definition of\n`operator <=`, it might be rewritten as `(x <=> y) <= 0` or even `0 <= (y <=>\nx)`. By this rewriting, the `operator <=>` performs a three-way comparison,\nwhich yields a value that can be compared with 0:	text	txt	2024-07-28 09:47:17.027753	1
 724	302	- If the value of `x <=> y` compares equal to 0, `x` and `y` are equal or equivalent.\n- If the value of `x <=> y` compares less than 0, `x` is less than `y`.\n- If the value of `x <=> y` compares greater than 0, `x` is greater than `y`.	text	txt	2024-07-28 09:47:17.048726	2
 725	302	The return type of `operator <=>` is not an integral value. The return type\nis a type that signals the comparison category, which could be the *strong\nordering*, *weak ordering*, or *partial ordering*. These types support the\ncomparison with 0 to deal with the result.	text	txt	2024-07-28 09:47:17.068719	3
 726	302	You have to include a specific header file to deal with the result of\n`operator <=>`.	text	txt	2024-07-28 09:47:17.089688	4
-727	302	#include <compare>	text	txt	2024-07-28 09:47:17.111914	5
-728	302	class Value\n{\n    long id;	text	txt	2024-07-28 09:47:17.132552	6
-729	302	public:\n    std::strong_ordering operator<=>(Value const& rhs) const\n    {\n        return id < rhs.id ? std::strong_ordering::less :\n            id > rhs.id ? std::strong_ordering::greater :\n                std::strong_ordering::equivalent;\n    }\n};	code	txt	2024-07-28 09:47:17.154688	7
-730	302	However, it is usually easier to define the operator by mapping it to results\nof underlying types.	text	txt	2024-07-28 09:47:17.176903	8
-731	302	#include <compare>	text	txt	2024-07-28 09:47:17.197731	9
-732	302	class Value\n{\n    long id;	text	txt	2024-07-28 09:47:17.220672	10
-733	302	public:\n    auto operator<=>(Value const& rhs) const\n    {\n        return id <=> rhs.id;\n    }\n};	code	txt	2024-07-28 09:47:17.241901	11
-734	302	The member function has to take the second parameter as `const` lvalue\nreference with `=default`. A friend function might also take both parameters\nby value.	text	txt	2024-07-28 09:47:17.26293	12
+4181	427	#include <string>\n#include <string_view>\n\nusing namespace std::string_literals;\n\nauto s1{ "text"s }; // std::string\nauto s2{ L"text"s }; // std::wstring\nauto s3{ u8"text"s }; // std::u8string\nauto s3{ u"text"s }; // std::u16string\nauto s4{ U"text"s }; // std::u32string\n\nusing namespace std::string_view_literals;\n\nauto s5{ "text"sv }; // std::string_view	code	cpp	2025-07-16 14:52:33.89923	1
 735	303	- **strong ordering**: any value of a given type is either *less than* or\n  *equal to* or *greater than* any other value of this type. If a value is\n  neither less nor greater is has to be equal.\n  + `std::strong_ordering:less`\n  + `std::strong_ordering:equal` or `std::strong_ordering::equivalent`\n  + `std::strong_ordering:greater`\n- **weak ordering**: any value of a given type is either *less than*,\n  *equivalent to* or *greater than* any other value of this type. However,\n  equivalent values do not have to be equal (have the same value).\n  + `std::weak_ordering::less`\n  + `std::weak_ordering::equivalent`\n  + `std::weak_ordering::greater`\n- **partial ordering**: any value of a given type could either be *less\n  than*, *equivalent to* or *greater than* any other value of this type.\n  However it could also happen that you cannot specify a specific order\n  between two values.\n  + `std::partial_ordering::less`\n  + `std::partial_ordering::equivalent`\n  + `std::partial_ordering::greater`\n  + `std::partial_ordering::unordered`	text	txt	2024-07-28 09:47:18.152098	1
 736	303	As an example, a floating-point type has a special value `NaN`. Any\ncomparison with `NaN` yields `false`. So in this case a comparison might\nyield that two values are unordered and the comparison operator might return\none of four values.	text	txt	2024-07-28 09:47:18.173146	2
 737	303	Stronger comparison types have implicit type conversions to weaker comparison\ntypes.	text	txt	2024-07-28 09:47:18.19262	3
 738	303	Relational comparison with `nullptr` results compiler error.	text	txt	2024-07-28 09:47:18.212835	4
 739	303	Comparison types themselves can be compared against a specific return value.\nDue to implicit type conversions to weaker ordering types `x <=> y ==\nstd::partial_ordering::equivalent` will compile even if the `operator <=>`\nyields a `std::strong_ordering` or `std::weak_ordering` value. However, the\nother way around does not work. Comparison with 0 is always possible and\nusually easier.	text	txt	2024-07-28 09:47:18.233993	5
+4433	540	#include <string>\n\ntemplate<typename CharT>\nusing tstring = std::basic_string<CharT, std::char_traits<CharT>, std::allocator<CharT>>;\n\ntemplate<typename CharT>\ninline tstring<CharT> reverse(tstring<CharT> text)\n{\n    std::reverse(std::begin(text), std::end(text));\n    return text;\n}\n\ntemplate<typename CharT>\ninline tstring<CharT> reverse(tstring<CharT>&& text)\n{\n    std::reverse(std::begin(text), std::end(text));\n    return text;\n}	code	cpp	2025-07-17 11:05:25.759029	1
+4183	428	#include <string>\n\nusing namespace std::string_literals;\n\nauto filename { R"(C:\\\\Users\\\\Brian\\\\Documents\\\\)"s };\nauto pattern { R"((\\\\w[\\\\w\\\\d]*)=(\\\\d+))"s };	code	cpp	2025-07-16 14:52:51.583027	1
+4694	889	#include <thread>\n#include <mutex>\n#include <iostream>\n#include <exception>\n#include <boost/asio.hpp>\n\nstd::mutex ostream_lock;\n\nvoid some_work()\n{\n    throw std::runtime_error("i/o failure");\n}\n\nvoid finish_tasks(boost::asio::io_service& service)\n{\n    try\n    {\n        service.run();\n    }\n    catch (std::runtime_error const& exp)\n    {\n        std::lock_guard<std::mutex> lock{ostream_lock};\n        std::cerr << exp.what() << "\\\\n";\n    }\n}\n\nint main()\n{\n    boost::asio::io_context service;\n    std::thread worker{finish_tasks, std::ref(service)};\n    service.post(some_work);\n    service.post(some_work); // no more io context to dispatch\n    worker.join();\n    service.stop();\n}	code	cpp	2025-07-17 18:33:16.124335	1
+3694	1175	; preconditions:\n; address of string be set to rsi\n; length of string be set to rdx\nwrite:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:55:30.968894	2
+4435	541	#include <string>\n#include <utility>\n\ntemplate<typename CharT>\nusing tstring = std::basic_string<CharT, std::char_traits<CharT>, std::allocator<CharT>>;\n\ntemplate<typename CharT>\ninline tstring<CharT> trim(tstring<CharT> const& text)\n{\n    tstring<CharT>::size first{text.find_first_not_of(' ')};\n    tstring<CharT>::size last{text.find_last_not_of(' ')};\n    return text.substr(first, (last - first + 1));\n}	code	cpp	2025-07-17 11:05:35.682114	1
+759	305	The compiler does not compile because it cannot decide which ordering\ncategory the base class has.	text	txt	2024-07-28 09:47:21.242912	7
 740	304	The return type does not compile if the attributes have different comparison\ncategories. In that case use the weakest comparison type as the return type.	text	txt	2024-07-28 09:47:19.383515	1
-741	304	#include <compare>\n#include <string>	text	txt	2024-07-28 09:47:19.404413	2
-742	304	class Person\n{\n    std::string name;\n    double weight;	text	txt	2024-07-28 09:47:19.426243	3
-743	304	public:\n    std::partial_ordering operator<=>(Person const& rhs) const\n    {\n        auto cmp1 = name <=> rhs.name;\n        if (name != 0) return cmp1; // std::strong_ordering	text	txt	2024-07-28 09:47:19.44602	4
-744	304	        return weight <=> rhs.weight; // std::partial_ordering\n    }\n};	code	txt	2024-07-28 09:47:19.466384	5
-745	304	If you do not know the comparison types, use\n`std::common_comparison_category<>` type trait that computes the strongest\ncomparison category.	text	txt	2024-07-28 09:47:19.485991	6
-746	304	#include <compare>\n#include <string>	text	txt	2024-07-28 09:47:19.506752	7
-747	304	class Person\n{\n    std::string name;\n    double weight;	text	txt	2024-07-28 09:47:19.527659	8
-748	304	public:\n    auto operator<=>(Person const& rhs) const\n        -> std::common_comparison_category_t<decltype(name <=> rhs.name),\n                                             decltype(weight <=> rhs.name)>\n    {\n        auto cmp1 = name <=> rhs.name;\n        if (name != 0) return cmp1; // std::strong_ordering	text	txt	2024-07-28 09:47:19.549814	9
-749	304	        return weight <=> rhs.weight; // std::partial_ordering\n    }\n};	code	txt	2024-07-28 09:47:19.570064	10
-750	305	If `operator <=>` is defaulted and the object has a base class having the\n`operator <=>` defined, that operator is called. Otherwise, `operator ==` and\n`operator <` are called to decide whether the objects are `equivalent`,\n`less`, `greater` or `unordered`. In that case, the return type of the\ndefaulted `operator <=>` calling these operators cannot be `auto`.	text	txt	2024-07-28 09:47:21.056492	1
-751	305	struct Base\n{\n    bool operator==(Base const&) const;\n    bool operator<(Base const&) const;\n};	text	txt	2024-07-28 09:47:21.077294	2
-752	305	struct Derived: public Base\n{\n    std::strong_ordering operator<=>(Derived const&) const = default;\n};	text	txt	2024-07-28 09:47:21.099105	3
-753	305	Derived d1, d2;\nd1 > d2; // calls Base::operator== and Base::operator<	code	txt	2024-07-28 09:47:21.119488	4
-754	305	If `operator ==` yields true, we know that the result of `>` is `false`,\notherwise `operator <` is called to find out the expression is `true` or\n`false`.	text	txt	2024-07-28 09:47:21.140545	5
-755	305	struct Derived: public Base\n{\n    std::partial_ordering operator<=>(Derived const&) const = default;\n};	code	txt	2024-07-28 09:47:21.160939	6
-756	305	The compiler might call `operator <` twice to find out whether there is any\norder at all.	text	txt	2024-07-28 09:47:21.18186	7
-757	305	struct Base\n{\n    bool operator==(Base const&) const;\n    bool operator<(Base const&) const;\n};	text	txt	2024-07-28 09:47:21.201853	8
-758	305	struct Derived: public Base\n{\n    auto operator<=>(Derived const&) const = default;\n};	code	txt	2024-07-28 09:47:21.221789	9
-759	305	The compiler does not compile because it cannot decide which ordering\ncategory the base class has.	text	txt	2024-07-28 09:47:21.242912	10
-760	305	Checks for equality work for Derived because `operator ==` automatically\ndeclared equivalent to `operator <=>`:	text	txt	2024-07-28 09:47:21.26387	11
-761	305	struct Derived: public Base\n{\n    auto operator<=>(Derived const&) const = default;\n    bool operator==(Derived const&) const = default;\n};	text	txt	2024-07-28 09:47:21.284773	12
-762	305	Derived d1, d2;\nd1 > d2; // ERROR: cannot deduce comparison category of operator <=>\nd1 == d2; // OK: only tries operator <=> and Base::operator==	code	txt	2024-07-28 09:47:21.305098	13
 763	306	When we have a trivial class that stores an integral value and has an\nimplicit constructor only enable implicit type conversions for the second\noperand.	text	txt	2024-07-28 09:47:22.703969	1
-764	306	class MyType\n{\n    int i;	text	txt	2024-07-28 09:47:22.724781	2
-765	306	public:\n    // implicit constructor from int\n    MyType(int i);	text	txt	2024-07-28 09:47:22.745414	3
-766	306	    // before C++20 enables implicit conversion for the second operand\n    bool operator==(MyType const&) const;\n};	code	txt	2024-07-28 09:47:22.766443	4
-767	306	A freestanding `operator==` that swaps the order of the arguments might be\ndefined as well.	text	txt	2024-07-28 09:47:22.787989	5
-768	306	bool operator==(int i, MyType const& t)\n{\n    return t == i; // OK with C++17\n}	code	txt	2024-07-28 09:47:22.810856	6
-769	306	Usually, the class should better define the `operator ==` as **hidden\nfriend** which is declared as a `friend` inside the class so that both\noperators become parameters and support implicit type conversions. However,\nthis is a valid approach to have the same effect.	text	txt	2024-07-28 09:47:22.833564	7
-770	306	This code no longer works in C++20 due to endless recursion. The reason is\nthat inside the global function the expression `t == i` can also call the\nglobal `operator ==` itself, because the compiler also tries to rewrite the\ncall as `i == t`:	text	txt	2024-07-28 09:47:22.856012	8
-771	306	bool operator==(int i, MyType const& t)\n{\n    return t == i;\n    // tries operator==(i, t) in addition to t.operator(MyType{i})\n}	code	txt	2024-07-28 09:47:22.877836	9
-772	306	Unfortunately, the rewritten statement is a better match, because it does not\nneed the implicit type conversion.	text	txt	2024-07-28 09:47:22.90029	10
-773	306	To fix this defect, either use an explicit conversion, or a feature test\nmacro to disable the new feature.	text	txt	2024-07-28 09:47:22.920434	11
-774	306	bool operator==(int i, MyType const& t)\n{\n    return t == MyType{i};\n    // doesn't try operator==(i, t) causing infinit recursion\n    // only uses t.operator(MyType{i});\n}	code	txt	2024-07-28 09:47:22.941101	12
-775	307	#include <memory>	text	txt	2024-07-28 09:47:23.793458	1
-776	307	class string_buffer\n{\npublic:\n    explicit string_buffer() {}\n    explicit string_buffer(std::size_t const size) {}\n    explicit string_buffer(char const* const ptr) {}\n    explicit operator bool() const { return false; }\n    explicit operator char* const () const { return nullptr; }\n};	text	txt	2024-07-28 09:47:23.81553	2
-777	307	int main()\n{\n    std::shared_ptr<char> str;\n    string_buffer b1;            // calls string_buffer()\n    string_buffer b2(20);        // calls string_buffer(std::size_t const)\n    string_buffer b3(str.get()); // calls string_buffer(char const*)	text	txt	2024-07-28 09:47:23.837453	3
-778	307	    enum item_size { small, medium, large };	text	txt	2024-07-28 09:47:23.858658	4
-779	307	    // implicit conversion cases when explicit not specified\n    string_buffer b4 = 'a';      // would call string_buffer(std::size_t const)\n    string_buffer b5 = small;    // would call string_buffer(std::size_t const)\n}	code	txt	2024-07-28 09:47:23.878997	5
-780	308	struct base\n{\n    // default member initialization\n    const int height = 14;\n    const int width = 80;	text	txt	2024-07-28 09:47:24.525655	1
-781	308	    v_align valign = v_align::middle;\n    h_align halign = h_align::left;	text	txt	2024-07-28 09:47:24.546731	2
-782	308	    std::string text;	text	txt	2024-07-28 09:47:24.568315	3
-783	308	    // constructor initialization list\n    base(std::string const& t): text{t}\n    {}	text	txt	2024-07-28 09:47:24.589622	4
-784	308	    base(std::string const& t, v_align const va, h_align const ha): text{t}, valign{va}, halign{ha}\n    {}\n};	code	txt	2024-07-28 09:47:24.610277	5
-785	309	[[nodiscard]] bool completed();	code	txt	2024-07-28 09:47:24.905949	1
+767	306	A freestanding `operator==` that swaps the order of the arguments might be\ndefined as well.	text	txt	2024-07-28 09:47:22.787989	3
+769	306	Usually, the class should better define the `operator ==` as **hidden\nfriend** which is declared as a `friend` inside the class so that both\noperators become parameters and support implicit type conversions. However,\nthis is a valid approach to have the same effect.	text	txt	2024-07-28 09:47:22.833564	5
+768	306	bool operator==(int i, MyType const& t)\n{\n    return t == i; // OK with C++17\n}	code	cpp	2024-07-28 09:47:22.810856	4
+1054	367	In this case, don't forget to use move semantics to avoid unnecessary copy of\nthe argument.	text	txt	2024-07-28 09:48:05.694919	7
+750	305	If `operator <=>` is defaulted and the object has a base class having the\n`operator <=>` defined, that operator is called. Otherwise, `operator ==` and\n`operator <` are called to decide whether the objects are `equivalent`,\n`less`, `greater` or `unordered`. In that case, the return type of the\ndefaulted `operator <=>` calling these operators cannot be `auto`.	text	txt	2024-07-28 09:47:21.056492	1
+754	305	If `operator ==` yields true, we know that the result of `>` is `false`,\notherwise `operator <` is called to find out the expression is `true` or\n`false`.	text	txt	2024-07-28 09:47:21.140545	3
+755	305	struct Derived: public Base\n{\n    std::partial_ordering operator<=>(Derived const&) const = default;\n};	code	cpp	2024-07-28 09:47:21.160939	4
+756	305	The compiler might call `operator <` twice to find out whether there is any\norder at all.	text	txt	2024-07-28 09:47:21.18186	5
+4187	429	#include <string>\n\nusing namespace std::string_literals;\n\nauto s1{ R"(text)"s }; // std::string\nauto s2{ LR"(text)"s }; // std::wstring\nauto s3{ u8R"(text)"s }; // std::u8string\nauto s3{ uR"(text)"s }; // std::u16string\nauto s4{ UR"(text)"s }; // std::u32string\n\nusing namespace std::string_view_literals;\n\nauto s5{ R"text"sv }; // std::string_view	code	cpp	2025-07-16 14:53:20.607419	1
+4437	542	#include <string>\n#include <algorithm>\n\ntemplate<typename CharT>\nusing tstring = std::basic_string<CharT, std::char_traits<CharT>, std::allocator<CharT>>;\n\ntemplate<typename CharT>\ninline tstring<CharT> remove(tstring<CharT> text, CharT const character)\n{\n    auto last = std::remove_if(std::begin(text), std::end(text), [character](CharT const c) { return c == character; });\n    text.erase(last, std::end(text));\n    return text;\n}	code	cpp	2025-07-17 11:05:43.897502	1
+4189	430	#include <string_view>\n\nstd::string_view trim_view(std::string_view str)\n{\n    auto const pos1{ str.find_first_not_of(" ") };\n    auto const pos2{ str.find_last_not_of(" ") };\n    str.remove_suffix(str.length() - pos2 - 1);\n    str.remove_prefix(pos1);\n    return str;\n}\n\nauto sv1{ trim_view("sample") };\nauto sv2{ trim_view(" sample") };\nauto sv3{ trim_view("sample ") };\nauto sv4{ trim_view(" sample ") };	code	cpp	2025-07-16 14:53:35.771267	2
+4191	431	#include <string_view>\n\nstd::string_view message{"  something to show  "};\n\nstd::size_t suffix{ str.find_last_not_of(" ") };\nstd::size_t prefix{ str.find_first_not_of(" ") };	code	cpp	2025-07-16 14:53:49.263363	1
+4194	432	#include <string_view>\n\nstd::string_view message{"  something to show  "};\n\nstd::size_t suffix{ str.find_last_not_of(" ") };\nstd::size_t prefix{ str.find_first_not_of(" ") };\n\nstr.remove_suffix(str.length() - pos2 - 1);\nstr.remove_prefix(pos1);	code	cpp	2025-07-16 14:54:00.35797	1
 3665	1169	extern int sum(int, int);	text	txt	2024-07-28 09:55:26.420978	7
-786	310	[[nodiscard("lock objects should never be discarded")]] bool generated();	code	txt	2024-07-28 09:47:25.165387	1
-787	311	auto l = [] [[nodiscard]] () -> int { return 42; };\nl(); // warning here	code	txt	2024-07-28 09:47:25.46244	1
-788	312	struct [[nodiscard]] ErrorType{};\nErrorType get_value();	text	txt	2024-07-28 09:47:25.85528	1
-789	312	int main()\n{\n    get_value(); // warning here\n}	code	txt	2024-07-28 09:47:25.876479	2
-790	313	*C++20*\nstruct Holder\n{\n    [[nodiscard]] Holder(int value);\n    Holder();\n};	text	txt	2024-07-28 09:47:26.38376	1
-791	313	int main()\n{\n    Holder{42}; // warning here\n    Holder h{42}; // constructed object not discarded, no warning\n    Holder{}; // default constructed, no warning\n}	code	txt	2024-07-28 09:47:26.404699	2
 792	314	Using 4 overloads for all possible combinations of ref-quilified methods is\ncode dupliation.	text	txt	2024-07-28 09:47:27.272446	1
-793	314	class box\n{\npublic:\n    box(std::string label): m_label{std::move(label)} {}\n    std::string& label() & { return m_label; }\n    std::string const& label() const& { return m_label; }\n    std::string&& label() && { return std::move(m_label); }\n    std::string const&& label() const&& { return std::move(m_label); }\nprivate:\n    std::string m_label;\n};	code	txt	2024-07-28 09:47:27.292953	2
 794	314	Since C++23 we can replace all 4 overloads with one:	text	txt	2024-07-28 09:47:27.31374	3
-795	314	class box\n{\npublic:\n    box(std::string label): m_label(std::move(label)} {}\n    template<typename S> auto&& label(this S&& self)\n    {\n        return std::forward<S>(self).m_label;\n    }\n};	code	txt	2024-07-28 09:47:27.333542	4
 796	315	C++23 allows you to write ref-qualified members differently:	text	txt	2024-07-28 09:47:27.863673	1
-797	315	void f() &;\nvoid g() const&;\nvoid h() &&;	code	txt	2024-07-28 09:47:27.884399	2
 798	315	Instead:	text	txt	2024-07-28 09:47:27.904514	3
-799	315	void f(this Data&);\nvoid g(this Data const&);\nvoid h(this Data&&);	code	txt	2024-07-28 09:47:27.925798	4
 800	316	C++23 allows for recursive lambda expressions.	text	txt	2024-07-28 09:47:28.357528	1
 801	316	`this` in a lambda accesses the object that contains the lambda, not the\nlambda instance itself.	text	txt	2024-07-28 09:47:28.380478	2
-802	316	auto fibonacci = [](this auto self, int n)\n{\n    if (n < 2) { return n; }\n    return self(n - 1) + self(n - 2);\n};	code	txt	2024-07-28 09:47:28.401164	3
 803	317	1. You implement the same behavior repeatedly for each different types, you\n   make the same mistakes.\n2. You write general code for a common base type such as `void*`, you lose\n   type checking and lose the control of maitaining derived classes.\n3. You use special preprocessors, code is replaced by stupid text replacement\n   mechanism that has no idea of scope and types.	text	txt	2024-07-28 09:47:28.70298	1
 804	319	Historically, `class` keyword can be used instead of `typename`. However,\nbecause this use of `class` can be misleading, you should prefer the use of\n`typename`. The keyword `struct` cannot be used in place of `typename` when\ndeclaring type parameters.	text	txt	2024-07-28 09:47:29.516711	1
 805	319	- Without instantiation at definition time, the template code itself is\n  checked for correctness ignoring the template parameters.\n  + Syntax errors are discovered, such as missing semicolons.\n  + Using unknown names that don't depend on template parameters are\n    discovered.\n  + Static assertions that don't depend on template parameters are checked.\n- At instantiation time, the template code is checked again to ensure that\n  all code is valid. Especially, all parts that depend on template parameters\n  are double-checked.	text	txt	2024-07-28 09:47:29.538909	2
-806	319	template<typename T>\nvoid foo(T t)\n{\n    undeclared(); // first-stage compile-time error\n    undeclared(t); // second-stage compile-time error\n}	code	txt	2024-07-28 09:47:29.559317	3
-856	333	#include <iostream>\n#include <algorithm>\n#include <iterator>\n#include <vector>	text	txt	2024-07-28 09:47:37.478747	1
-1005	362	The `typename` is necessary here because the member is a type.	text	txt	2024-07-28 09:47:59.609593	4
 807	320	When a function template is used in a way that triggers its instantiation, a\ncompiler at some point will need to see that template's definition. This\nbreaks the usual compile and link distinction for ordinary functions, when\nthe declaration of a function is sufficient to compile its use. The simplest\napproach to handle this problem is to implement each template inside a header\nfile.	text	txt	2024-07-28 09:47:29.901985	1
+785	309	[[nodiscard]] bool completed();	code	cpp	2024-07-28 09:47:24.905949	1
+786	310	[[nodiscard("lock objects should never be discarded")]] bool generated();	code	cpp	2024-07-28 09:47:25.165387	1
+787	311	auto l = [] [[nodiscard]] () -> int { return 42; };\nl(); // warning here	code	cpp	2024-07-28 09:47:25.46244	1
+793	314	class box\n{\npublic:\n    box(std::string label): m_label{std::move(label)} {}\n    std::string& label() & { return m_label; }\n    std::string const& label() const& { return m_label; }\n    std::string&& label() && { return std::move(m_label); }\n    std::string const&& label() const&& { return std::move(m_label); }\nprivate:\n    std::string m_label;\n};	code	cpp	2024-07-28 09:47:27.292953	2
+795	314	class box\n{\npublic:\n    box(std::string label): m_label(std::move(label)} {}\n    template<typename S> auto&& label(this S&& self)\n    {\n        return std::forward<S>(self).m_label;\n    }\n};	code	cpp	2024-07-28 09:47:27.333542	4
+797	315	void f() &;\nvoid g() const&;\nvoid h() &&;	code	cpp	2024-07-28 09:47:27.884399	2
+799	315	void f(this Data&);\nvoid g(this Data const&);\nvoid h(this Data&&);	code	cpp	2024-07-28 09:47:27.925798	4
+802	316	auto fibonacci = [](this auto self, int n)\n{\n    if (n < 2) { return n; }\n    return self(n - 1) + self(n - 2);\n};	code	cpp	2024-07-28 09:47:28.401164	3
+806	319	template<typename T>\nvoid foo(T t)\n{\n    undeclared(); // first-stage compile-time error\n    undeclared(t); // second-stage compile-time error\n}	code	cpp	2024-07-28 09:47:29.559317	3
+1005	362	The `typename` is necessary here because the member is a type.	text	txt	2024-07-28 09:47:59.609593	3
 808	321	Function template defintion specifies a family of functions with parameters\nleft undetermined, parameterized as template parameters.	text	txt	2024-07-28 09:47:30.342588	1
-809	321	template<typename T>\nT max(T a, T b)\n{\n    return b < a ? a : b;\n}	code	txt	2024-07-28 09:47:30.364146	2
 810	322	* You can use any type, as long as the it provides the operations that the\n  template uses.\n* Value of type `T` must also be copyable in order to be returned.\n* Before C++17, type `T` also had to be copyable to be able to pass in\n  arguments, but since C++17 you can pass rvalues even if neither a copy nor\n  a move constructor is valid.	text	txt	2024-07-28 09:47:30.691335	1
-811	323	#include <iostream>	text	txt	2024-07-28 09:47:31.164224	1
-812	323	void print_container(auto const& container)\n{\n    for (auto const& element: container)\n    {\n        std::cout << element << '\\\\n';\n    }\n}	code	txt	2024-07-28 09:47:31.185452	2
-813	324	template<typename T>\nT max(T a, T b) { return b < a ? a : b; }	text	txt	2024-07-28 09:47:31.620824	1
-814	324	max(7, 42); // 42\n::max(3.4, -6.7); // 3.4\n::max("mathematics", "math"); // mathematics	code	txt	2024-07-28 09:47:31.641573	2
-815	324	Each call to `max()` template is qualified with `::` to ensure template is\nfound in the global namespace, not possibly the one in `std` namespace.	text	txt	2024-07-28 09:47:31.66199	3
-816	325	When we call a function template, the template parameters are determined by\nthe arguments we pass. However, template parameters might only be part of the\narguments type.	text	txt	2024-07-28 09:47:32.197384	1
-817	325	If we declare a function template to use constant references as function\narguments, and pass `int`, template parameter is deduced as `int`, because\nthe parameters match for `int const&`.	text	txt	2024-07-28 09:47:32.219105	2
-818	325	template<typename T>\nT max(T const& a, T const& b) { return a < b ? b : a; }	text	txt	2024-07-28 09:47:32.241003	3
-819	325	max(7, 42); // T is int	code	txt	2024-07-28 09:47:32.260583	4
-820	326	- When declaring call parameters by reference, even trivial conversion do not\n  apply to type dedution. Two arguments declared with the same template\n  parameter `T` must match exactly.\n- When declaring call parameters by value, only trivial conversion that decay\n  are supported. Qualifications with `const` or `volatile` are ignored,\n  references convert to the referenced type, and raw arrays or functions\n  convert to the corresponding pointer type. For two arguments declared with\n  the same template parameter `T` the decayed types must match.	text	txt	2024-07-28 09:47:33.045139	1
-821	326	template<typename T>\nT max(T a, T b) { return a < b ? b : a; }	text	txt	2024-07-28 09:47:33.065415	2
-822	326	int const c = 42;\nmax(i, c);    // OK: T deduced as int\nmax(c, c);    // OK: T deduced as int	text	txt	2024-07-28 09:47:33.0875	3
-823	326	int& ir = i;\nmax(i, ir);   // OK: T deduced as int	text	txt	2024-07-28 09:47:33.108451	4
-824	326	int arr[4];\nmax(&i, arr); // OK: T deduced as int*	text	txt	2024-07-28 09:47:33.128787	5
-825	326	max(4, 7.2);  // ERROR: T can be dudeced as int or double	text	txt	2024-07-28 09:47:33.148759	6
-826	326	std::string s;\nmax("text", s); // ERROR: T can be deduced as char const[5] or std::string	code	txt	2024-07-28 09:47:33.168817	7
-827	327	1. Cast the arguments so that they both match:	text	txt	2024-07-28 09:47:33.875424	1
-828	327	max(static_cast<double>(4), 7.2);	code	txt	2024-07-28 09:47:33.89607	2
-829	327	2. Specify explicitly the type of function template parameter to prevent the compiler from attempting type deduction:	text	txt	2024-07-28 09:47:33.91743	3
-830	327	max<double>(4, 7.2);	code	txt	2024-07-28 09:47:33.936353	4
-831	327	3. Specify that the parameters may have different types:	text	txt	2024-07-28 09:47:33.956145	5
-832	327	#include <type_traits>	text	txt	2024-07-28 09:47:33.975783	6
-833	327	template<typename T, typename R>\nauto max(T a, R b) -> std::common_type_t<T, R>\n{\n    return a < b ? b : a;\n}	text	txt	2024-07-28 09:47:33.995919	7
-834	327	max<double>(4, 7.2);	code	txt	2024-07-28 09:47:34.016412	8
-835	328	Type deduction does not work for default call arguments.	text	txt	2024-07-28 09:47:34.601937	1
-836	328	template<typename T>\nvoid f(T = "");	text	txt	2024-07-28 09:47:34.622997	2
-837	328	f(1);   // OK: f<int>(1)\nf();    // ERROR: cannot deduce T	code	txt	2024-07-28 09:47:34.644916	3
-838	328	You have to declare a default function template parameter.	text	txt	2024-07-28 09:47:34.665908	4
-839	328	template<typename T = std::string>\nvoid f(T = "");	text	txt	2024-07-28 09:47:34.685755	5
-840	328	f();    // OK: f<std::string>()	code	txt	2024-07-28 09:47:34.706834	6
-841	329	template<typename T1, typename T2>\nT1 max(T1 a, T2 b)\n{\n    return b < a ? a : b;\n}	text	txt	2024-07-28 09:47:35.110975	1
-842	329	auto m = ::max(4, 7.2); // OK:: but max returns int	code	txt	2024-07-28 09:47:35.13075	2
+4197	434	#include <string>\n#include <string_view>\n\nstd::string str("the quick brown fox jumps over the lazy dog");\nbool t1 = str.starts_with("the quick"); // const char* overload\n                                        // t1 == true\nbool t2 = str.ends_with('g'); // char overload\n                              // t2 == true\n\nstd::string_view needle = "lazy dog";\nbool t3 = str.ends_with(needle); // string_view overload\n                                 // t3 == true\n\nstd::string_view haystack = "you are a lazy cat";\n// both starts_with and ends_with also available for string_view\nbool t4 = haystack.ends_with(needle);\n// t4 == false	code	cpp	2025-07-16 14:54:24.087859	2
+4198	436	#include <iostream>\n#include <format>\n\nstd::clog << std::format("{0:02x} {1:02x} {2:02x}\\\\n", v0, v1, v2);	code	cpp	2025-07-16 14:54:41.648801	2
+4199	437	#include <format>\n\nstd::format("{02x}\\\\n", value);	code	cpp	2025-07-16 14:54:52.954848	1
 843	330	- Introduce an additional template parameter for the return type\n- Let the compiler find out the return type.\n- Declare the return type to be the common type of the parameter types.	text	txt	2024-07-28 09:47:35.404916	1
-844	331	In cases when there is no connection between template and call parameters and\nwhen template parameters cannot be determined, you must specify the template\nargument explicitly with the call. For example, the additional template\nargument type to define the return type of a function template. However,\ntemplate argument deduction does not take return types into account, and its\ntemplate parameter does not appear in the types of the function call\nparameters. Therefore, it cannot be deduced.	text	txt	2024-07-28 09:47:36.145632	1
-845	331	As a consequence, you have to specify the template argument list explicitly:	text	txt	2024-07-28 09:47:36.166621	2
-846	331	template<typename T1, typename T2, typename RT>\nRT max(T1 a, T2 b);	text	txt	2024-07-28 09:47:36.186722	3
-847	331	max<int, double, double>(4, 7.2); // OK, but tedious	code	txt	2024-07-28 09:47:36.206464	4
-848	331	Another approach is to specify return type template parameter at first:	text	txt	2024-07-28 09:47:36.22766	5
-849	331	template <typaname RT, typename T1, typename T2>\nRT max(T1 a, T2 b);	text	txt	2024-07-28 09:47:36.247489	6
-850	331	max<double>(4, 7.2); // OK	code	txt	2024-07-28 09:47:36.267593	7
-851	331	These modifications don't lead to significant advantages.	text	txt	2024-07-28 09:47:36.28841	8
 852	332	- Types for constant integral values (int, long, enum, ...)\n- `std::nullptr_t`\n- Pointers to be globally visible objects/function/members\n- Lvalue references to objects or functions\n- Floating point types (C++20)\n- Data structures with public members (C++20)\n- Lambdas (C++20)	text	txt	2024-07-28 09:47:36.799559	1
 853	332	**Not supporting types:**	text	txt	2024-07-28 09:47:36.820307	2
 854	332	- String literals\n- Classes	text	txt	2024-07-28 09:47:36.841611	3
-857	333	template<template<typename> typename V, typename T>\nvoid print(V<T> const& container)\n{\n    for (auto const& item: container)\n        std::cout << item << " ";\n    std::cout << std::endl;\n}	text	txt	2024-07-28 09:47:37.500584	2
-858	333	int main()\n{\n    print(std::vector<int>{1,2,3,4});\n}	code	txt	2024-07-28 09:47:37.522447	3
-859	334	It is a template parameter representing multiple parameters with different types.	text	txt	2024-07-28 09:47:37.983517	1
-860	334	void print() { }	text	txt	2024-07-28 09:47:38.00519	2
-861	334	template<typename T, typename... Types>\nvoid print(T first, Types... rest)\n{\n    std::cout << first << '\\\\n';\n    print(rest...);\n}	code	txt	2024-07-28 09:47:38.026288	3
-862	335	void num_args() { }	text	txt	2024-07-28 09:47:38.419471	1
-863	335	template<typename T, typename... Types>\nvoid num_args(T first, Types... rest)\n{\n    std::cout << sizeof...(rest) + 1 << '\\\\n';\n}	code	txt	2024-07-28 09:47:38.439944	2
-864	336	Parameter pack is available since C++17:	text	txt	2024-07-28 09:47:38.866103	1
-865	336	template<typename... Args>\nauto print(Args... args)\n{\n    (std::cout << ... << args) << std::endl;\n}	text	txt	2024-07-28 09:47:38.886169	2
-866	336	print(42, "42", 42.0);	code	txt	2024-07-28 09:47:38.906543	3
+815	324	Each call to `max()` template is qualified with `::` to ensure template is\nfound in the global namespace, not possibly the one in `std` namespace.	text	txt	2024-07-28 09:47:31.66199	2
+816	325	When we call a function template, the template parameters are determined by\nthe arguments we pass. However, template parameters might only be part of the\narguments type.	text	txt	2024-07-28 09:47:32.197384	1
+817	325	If we declare a function template to use constant references as function\narguments, and pass `int`, template parameter is deduced as `int`, because\nthe parameters match for `int const&`.	text	txt	2024-07-28 09:47:32.219105	2
+820	326	- When declaring call parameters by reference, even trivial conversion do not\n  apply to type dedution. Two arguments declared with the same template\n  parameter `T` must match exactly.\n- When declaring call parameters by value, only trivial conversion that decay\n  are supported. Qualifications with `const` or `volatile` are ignored,\n  references convert to the referenced type, and raw arrays or functions\n  convert to the corresponding pointer type. For two arguments declared with\n  the same template parameter `T` the decayed types must match.	text	txt	2024-07-28 09:47:33.045139	1
+835	328	Type deduction does not work for default call arguments.	text	txt	2024-07-28 09:47:34.601937	1
+838	328	You have to declare a default function template parameter.	text	txt	2024-07-28 09:47:34.665908	3
+827	327	1. Cast the arguments so that they both match:	text	txt	2024-07-28 09:47:33.875424	1
+828	327	max(static_cast<double>(4), 7.2);	code	cpp	2024-07-28 09:47:33.89607	2
+829	327	2. Specify explicitly the type of function template parameter to prevent the compiler from attempting type deduction:	text	txt	2024-07-28 09:47:33.91743	3
+830	327	max<double>(4, 7.2);	code	cpp	2024-07-28 09:47:33.936353	4
+831	327	3. Specify that the parameters may have different types:	text	txt	2024-07-28 09:47:33.956145	5
+844	331	In cases when there is no connection between template and call parameters and\nwhen template parameters cannot be determined, you must specify the template\nargument explicitly with the call. For example, the additional template\nargument type to define the return type of a function template. However,\ntemplate argument deduction does not take return types into account, and its\ntemplate parameter does not appear in the types of the function call\nparameters. Therefore, it cannot be deduced.	text	txt	2024-07-28 09:47:36.145632	1
+845	331	As a consequence, you have to specify the template argument list explicitly:	text	txt	2024-07-28 09:47:36.166621	2
+848	331	Another approach is to specify return type template parameter at first:	text	txt	2024-07-28 09:47:36.22766	4
+851	331	These modifications don't lead to significant advantages.	text	txt	2024-07-28 09:47:36.28841	6
+4203	438	#include <format>\n#include <ostream>\n\nenum class color_code : std::uint_least8_t {};\n\nstd::ostream& operator<<(std::ostream& os, color_code s)\n{\n    return os << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned>(s);\n}\n\ntemplate <>\nstruct std::formatter<color_code> : std::formatter<unsigned>\n{\n    auto format(color_code const& code, format_context& ctx) {\n        return format_to(ctx.out(), "{:02x}", static_cast<unsigned>(code));\n    }\n};\n\nstd::format("{}\\\\n", color_code);	code	cpp	2025-07-16 14:55:08.040814	1
+4205	440	#include <iostream>\n#include <format>\n\nstd::print("{} <{}>", "Brian Salehi", "salehibrian@gmail.com");	code	cpp	2025-07-16 14:55:28.007166	1
+4204	439	#include <format>\n#include <chrono>\n\nstd::format("{:%F %T} UTC", std::chrono::system_clock::now());	code	cpp	2025-07-16 14:55:16.282145	1
 867	337	Since C++14, this is possible by simply not declaring any return type:	text	txt	2024-07-28 09:47:39.282552	1
-868	337	template<typename T1, typename T2>\nauto max(T1 a, T2 b);	code	txt	2024-07-28 09:47:39.303726	2
 869	337	Deducing the return type from the function body has to be possible.\nTherefore, the code must be available and multiple return statements have to\nmatch.	text	txt	2024-07-28 09:47:39.324911	3
-870	338	template<typename T1, typename T2>\nauto max(T1 a, T2 b) -> decltype(b < a ? a : b);	code	txt	2024-07-28 09:47:39.771519	1
 871	338	Using this method the implementation does not necessarily have to match. Even\nusing `true` as the condition for ternary operator in the declaration is\nenough:	text	txt	2024-07-28 09:47:39.792174	2
-872	338	template<typename T1, typename T2>\nauto max(T1 a, T2 b) -> decltype(true ? a : b);	code	txt	2024-07-28 09:47:39.812493	3
-873	339	It might happen that the return type is a reference type, because under some\nconditions the template parameter might be a reference. For this reason you\nshould return the type decayed from the template paramter, which looks as\nfollows:	text	txt	2024-07-28 09:47:40.471027	1
-874	339	#include <type_traits>	text	txt	2024-07-28 09:47:40.490299	2
-875	339	template<typename T1, typename T2>\nauto max(T1 a, T2 b) -> typename std::decay<decltype(true ? a : b)>::type;	code	txt	2024-07-28 09:47:40.511166	3
-876	339	Because the member `type` is a type, you have to qualify the expression with\n`typename` to access it.	text	txt	2024-07-28 09:47:40.532613	4
-877	339	Initialization of `auto` always decays. This also applies to return\nvalues when the return type is just `auto`.	text	txt	2024-07-28 09:47:40.552593	5
-878	339	int i = 42;\nint coust& ir = i;\nauto a = ir;  // a is declared as new object of type int	code	txt	2024-07-28 09:47:40.574171	6
-879	340	`std::common_type` is a type trait, defined in `<type_traits>`, which yields\na structure having a `type` static member for the resulting type. Thus, it\nneeds a `typename` beforehand in order to access its type.	text	txt	2024-07-28 09:47:41.212027	1
-881	340	template<typename T1, typename T2>\ntypename std::common_type<T1, T2>::type max(T1 a, T2 b);	code	txt	2024-07-28 09:47:41.252837	3
-882	340	Since C++14, `std::common_type_t` is equivalent to\n`std::common_type<T>::type`.	text	txt	2024-07-28 09:47:41.273228	4
-883	340	#include <type_traits>	text	txt	2024-07-28 09:47:41.292909	5
-884	340	template<typename T1, typename T2>\nstd::common_type_t<T1, T2> max(T1 a, T2 b);	code	txt	2024-07-28 09:47:41.313142	6
-885	340	Note that `std::common_type<>` decays.	text	txt	2024-07-28 09:47:41.332911	7
-886	341	Default template arguments can be used with any kind of template. They may\neven refer to previous template parameters.	text	txt	2024-07-28 09:47:41.901125	1
-887	341	#include <type_traits>	text	txt	2024-07-28 09:47:41.921344	2
-888	341	template<typename T1, typename T2,\n          typename RT = std::decay_t<decltype(true ? T1() : T2())>>	code	txt	2024-07-28 09:47:41.94232	3
-889	341	Another way is to use `std::common_type<>` which also decays so that return\nvalue doesn't become a reference.	text	txt	2024-07-28 09:47:41.962554	4
-890	341	RT max(T1 a, T2 b);	text	txt	2024-07-28 09:47:41.982942	5
-891	341	template<typename T1, typename T2, typename RT = std::commot_type_t<T1, T2>>\nRT max(T1 a, T2 b);	code	txt	2024-07-28 09:47:42.003106	6
-892	342	In principle, it is possible to have default arguments for leading function\ntemplate parameters even if parameters without default arguments follow:	text	txt	2024-07-28 09:47:42.495603	1
-893	342	template<typename RT = long, typename T1, typename T2>\nRT max(T1 a, T2 b);	text	txt	2024-07-28 09:47:42.516989	2
-894	342	int i;\nlong l;\nmax(i, l);  // returns long due default argument of template parameter for return type\nmax<int>(7, 42);    // returns int as explicitly specified, T1 and T2 deduced by function arguments	code	txt	2024-07-28 09:47:42.539025	3
-895	342	However, this approach only makes sence, if there is a natural default for a\ntemplate parameter.	text	txt	2024-07-28 09:47:42.559336	4
 896	343	int max(int a, int b);	text	txt	2024-07-28 09:47:43.504419	1
 897	343	template<typename T>\nT max(T a, T b);	code	txt	2024-07-28 09:47:43.52564	2
 898	343	The overload resolution process prefers the nontemplate over one generated\nfrom the template.	text	txt	2024-07-28 09:47:43.545514	3
@@ -17038,6 +16908,21 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 908	344	template<typename RT, typename T1, typename T2>\nRT max(T1 a, T2 b);	text	txt	2024-07-28 09:47:44.179574	3
 909	344	max(4, 7.2);  // calls first overload\n::max<long double>(4, 7.2); // calls second overload\n::max<int>(4, 7.2); // ERROR: both function templates match	code	txt	2024-07-28 09:47:44.199873	4
 910	345	A useful example would be to overload the maximum template for pointers and\nordinary C-strings.	text	txt	2024-07-28 09:47:45.026953	1
+864	336	Parameter pack is available since C++17:	text	txt	2024-07-28 09:47:38.866103	1
+868	337	template<typename T1, typename T2>\nauto max(T1 a, T2 b);	code	cpp	2024-07-28 09:47:39.303726	2
+870	338	template<typename T1, typename T2>\nauto max(T1 a, T2 b) -> decltype(b < a ? a : b);	code	cpp	2024-07-28 09:47:39.771519	1
+872	338	template<typename T1, typename T2>\nauto max(T1 a, T2 b) -> decltype(true ? a : b);	code	cpp	2024-07-28 09:47:39.812493	3
+873	339	It might happen that the return type is a reference type, because under some\nconditions the template parameter might be a reference. For this reason you\nshould return the type decayed from the template paramter, which looks as\nfollows:	text	txt	2024-07-28 09:47:40.471027	1
+876	339	Because the member `type` is a type, you have to qualify the expression with\n`typename` to access it.	text	txt	2024-07-28 09:47:40.532613	3
+877	339	Initialization of `auto` always decays. This also applies to return\nvalues when the return type is just `auto`.	text	txt	2024-07-28 09:47:40.552593	4
+878	339	int i = 42;\nint coust& ir = i;\nauto a = ir;  // a is declared as new object of type int	code	cpp	2024-07-28 09:47:40.574171	5
+886	341	Default template arguments can be used with any kind of template. They may\neven refer to previous template parameters.	text	txt	2024-07-28 09:47:41.901125	1
+879	340	`std::common_type` is a type trait, defined in `<type_traits>`, which yields\na structure having a `type` static member for the resulting type. Thus, it\nneeds a `typename` beforehand in order to access its type.	text	txt	2024-07-28 09:47:41.212027	1
+882	340	Since C++14, `std::common_type_t` is equivalent to\n`std::common_type<T>::type`.	text	txt	2024-07-28 09:47:41.273228	3
+885	340	Note that `std::common_type<>` decays.	text	txt	2024-07-28 09:47:41.332911	5
+889	341	Another way is to use `std::common_type<>` which also decays so that return\nvalue doesn't become a reference.	text	txt	2024-07-28 09:47:41.962554	3
+892	342	In principle, it is possible to have default arguments for leading function\ntemplate parameters even if parameters without default arguments follow:	text	txt	2024-07-28 09:47:42.495603	1
+895	342	However, this approach only makes sence, if there is a natural default for a\ntemplate parameter.	text	txt	2024-07-28 09:47:42.559336	3
 911	345	#include <cstring>\n#include <string>	text	txt	2024-07-28 09:47:45.046538	2
 912	345	template<typename T>\nT max(T a, T b)\n{\n    return b < a ? a : b;\n}	text	txt	2024-07-28 09:47:45.067519	3
 913	345	template<typename T>\nT* max(T* a, T* b)\n{\n    return *b < *a ? a : b;\n}	text	txt	2024-07-28 09:47:45.087475	4
@@ -17062,264 +16947,131 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 931	347	template<typename T>\nT max (T a, T b, T c)\n{\n    return max (max(a,b), c);\n    // calls template max<int> not overload\n}	text	txt	2024-07-28 09:47:47.412335	3
 932	347	// declaration comes too late\nint max (int a, int b)\n{\n    std::cout << "max(int,int) \\\\n";\n    return b < a ? a : b;\n}	code	txt	2024-07-28 09:47:47.433569	4
 933	348	For each function or class template, there are preconditions and\nrequirements. These requirements were implicitly handled before C++20, but\nconcepts make it easier to express requirements explicitly.	text	txt	2024-07-28 09:47:47.966121	1
-934	348	template<typename T>\nrequires std::is_copyable<T> && supports_less_than<T>\nT max_value(T a, T b)\n{\n    return b < a ? a : b;\n}	code	txt	2024-07-28 09:47:47.986862	2
-935	349	template<typename T>\nconcept supports_less_than = requires (T x) { x < x; };	code	txt	2024-07-28 09:47:48.302284	1
+4208	441	#include <string>\n#include <regex>\n\nusing namespace std::string_literals;\n\nstd::string pattern{R"(...)"};\n\nstd::regex srx{pattern};\nstd::regex lrx{R"(...)"s};	code	cpp	2025-07-16 14:55:45.769478	1
+951	353	Template parameters can be omited when declaring copy constructor and copy\nassignment operator.	text	txt	2024-07-28 09:47:51.531661	1
+953	353	But it is formally equivalent to specify template parameters:	text	txt	2024-07-28 09:47:51.574715	3
+935	349	template<typename T>\nconcept supports_less_than = requires (T x) { x < x; };	code	cpp	2024-07-28 09:47:48.302284	1
 936	350	Having two different function bodies but with the same signature, would\nresult in ambigous overload and compiler will raise an error.	text	txt	2024-07-28 09:47:48.99598	1
-937	350	To inform compiler about the best match of two overloads with same signature,\nwe can use concepts as a type constraint.	text	txt	2024-07-28 09:47:49.015818	2
-938	350	template<typename T>\nconcept has_push_back = requires (Container c, Container::value_type v) { c.push_back(v); };	text	txt	2024-07-28 09:47:49.036358	3
-939	350	template<typename T>\nconcept has_insert = requires (Container c, Container::value_type v) { c.insert(v); };	text	txt	2024-07-28 09:47:49.056381	4
-940	350	void add(has_push_back auto& container, auto const& value)\n{\n    container.push_back(value);\n}	text	txt	2024-07-28 09:47:49.077988	5
-941	350	void add(has_insert auto& container, auto const& value)\n{\n    container.insert(value);\n}	code	txt	2024-07-28 09:47:49.099271	6
-942	351	template<typename T>\nconcept has_push_back = requies (Container c, Container::value_type v) { c.push_back(v); };	text	txt	2024-07-28 09:47:49.890134	1
-943	351	template<has_push_back C, typename T>\nvoid add(C& container, T const& value)\n{\n    container.push_back(value);\n}	text	txt	2024-07-28 09:47:49.910836	2
-944	351	void add(has_push_back auto& container, auto const& value)\n{\n    container.push_back(value);\n}	text	txt	2024-07-28 09:47:49.930757	3
-945	351	void add(auto& container, auto const& value)\n{\n    if constexpr (requires { container.push_back(value); })\n    {\n        container.push_back(value);\n    }\n    else\n    {\n        container.insert(value);\n    }\n}	code	txt	2024-07-28 09:47:49.952294	4
 946	352	Before the declaration, you have to declare one or multiple identifiers as a\ntype parameters.	text	txt	2024-07-28 09:47:50.640396	1
 947	352	Inside the class template, template parameters can be used just like any\nother type to declare members and member functions.	text	txt	2024-07-28 09:47:50.661321	2
-948	352	template<typename T>\nclass Stack\n{\nprivate:\n    std::vector<T> data;	text	txt	2024-07-28 09:47:50.682354	3
-949	352	public:\n    void push(T const&);\n    void pop() const;\n    T const& top() const;\n    bool empty() const;\n};	code	txt	2024-07-28 09:47:50.703076	4
-950	352	The keyword `class` can be used instead of `typename`.	text	txt	2024-07-28 09:47:50.724486	5
-951	353	Template parameters can be omited when declaring copy constructor and copy\nassignment operator.	text	txt	2024-07-28 09:47:51.531661	1
-952	353	template<typename T>\nclass Stack\n{\npublic:\n    Stack(Stack const&);\n    Stack& operator=(Stack const&);\n};	code	txt	2024-07-28 09:47:51.553726	2
-953	353	But it is formally equivalent to specify template parameters:	text	txt	2024-07-28 09:47:51.574715	3
-954	353	template<typename T>\nclass Stack\n{\npublic:\n    Stack(Stack<T> const&);\n    Stack<T>& operator=(Stack<T> const&);\n};	code	txt	2024-07-28 09:47:51.596094	4
+950	352	The keyword `class` can be used instead of `typename`.	text	txt	2024-07-28 09:47:50.724486	4
+952	353	template<typename T>\nclass Stack\n{\npublic:\n    Stack(Stack const&);\n    Stack& operator=(Stack const&);\n};	code	cpp	2024-07-28 09:47:51.553726	2
+954	353	template<typename T>\nclass Stack\n{\npublic:\n    Stack(Stack<T> const&);\n    Stack<T>& operator=(Stack<T> const&);\n};	code	cpp	2024-07-28 09:47:51.596094	4
 955	353	But usually the `<T>` signals special handling of special template\nparameters, so it’s usually better to use the first form. However, outside\nthe class structure you'd need to specify it.	text	txt	2024-07-28 09:47:51.616517	5
-956	354	To define a member function of a class template, you have to specify that it\nis a template, and you have to use the full type qualification of the class\ntemplate.	text	txt	2024-07-28 09:47:52.233889	1
-957	354	template<typename T>\nclass Stack\n{\n    void push(T const&);\n    void pop();\n};	text	txt	2024-07-28 09:47:52.254135	2
-958	354	template<typename T>\nvoid Stack<T>::push(T const&) { }	text	txt	2024-07-28 09:47:52.274207	3
-959	354	template<typename T>\nvoid Stack<T>::pop() { }	code	txt	2024-07-28 09:47:52.294217	4
+4442	543	#include <string>\n#include <sstream>\n#include <vector>\n\ntemplate<typename CharT>\nusing tstring = std::basic_string<CharT, std::char_traits<CharT>, std::allocator<CharT>>;\n\ntemplate<typename CharT>\nusing tstringstream = std::basic_stringstream<CharT, std::char_traits<CharT>, std::allocator<CharT>>;\n\ntemplate<typename CharT>\ninline std::vector<tstring<CharT>> split(tstring<CharT> text, CharT const delimiter)\n{\n    auto sstream = tstringstream<CharT>{text};\n    auto tokens = std::vector<tstring<CharT>>{};\n    auto token = tstring<CharT>{};\n\n    while (std::getline(sstream, token, delimiter))\n    {\n        if (!token.empty())\n            tokens.push_back(token);\n    }\n\n    return tokens;\n}	code	cpp	2025-07-17 11:05:59.148572	1
 960	355	Class template arguments have to support all operations of member templates\nthat are **used**. They don't have to support all the operations that\n**could** be used.	text	txt	2024-07-28 09:47:53.074275	1
-961	355	template<typename T>\nclass stack\n{\npublic:\n    std::vector<T> container;\nprivate:\n    void print() const\n    {\n        for (T const& element: container)\n        {\n            std::cout << element << ' ';\n            // requires operator<<() support for type T\n        }\n    }\n};	code	txt	2024-07-28 09:47:53.095746	2
+3645	1167	section .text\n    global main	text	txt	2024-07-28 09:55:24.588638	14
+1000	361	Unlike a `typedef`, an alias declaration can be templated to provide a\nconvenient name for a family of types. This is also available since C++11 and\nis called an alias template.	text	txt	2024-07-28 09:47:58.866759	1
+961	355	template<typename T>\nclass stack\n{\npublic:\n    std::vector<T> container;\nprivate:\n    void print() const\n    {\n        for (T const& element: container)\n        {\n            std::cout << element << ' ';\n            // requires operator<<() support for type T\n        }\n    }\n};	code	cpp	2024-07-28 09:47:53.095746	2
+977	358	You can provide special implementation for particular circumstances, but some\ntemplate parameters must still be defined by the user.	text	txt	2024-07-28 09:47:56.05029	1
+982	358	With partial specialization, we define a class template, still parametrized\nfor `T` but specialized for a pointer (`Stack<T*>`).	text	txt	2024-07-28 09:47:56.154059	3
+989	359	Stack<int, float>{};    // Stack<T1, T2>\nStack<float, float>{};  // Stack<T, T>\nStack<float, int>{};    // Stack<T, int>\nStack<int*, float*>{};  // Stack<T1*, T2*>	code	cpp	2024-07-28 09:47:57.309682	5
 962	356	To declare a friend function and define it afterwards, we have two options:	text	txt	2024-07-28 09:47:54.352482	1
 963	356	1. We can implicitly declare a new function template, which must use a\n   different template parameter, such as U:	text	txt	2024-07-28 09:47:54.374724	2
-964	356	template<typename T>\nclass Stack\n{\npublic:\n    Stack(Stack const&);	text	txt	2024-07-28 09:47:54.39645	3
-965	356	    template<typename U>\n    friend std::ostream& operator<<(std::ostream&, Stack<U> const&);\n};	code	txt	2024-07-28 09:47:54.419273	4
-966	356	We forward declare the output operator for a class to be a template, which,\nhowever, means that we first have to forward declare the class too:	text	txt	2024-07-28 09:47:54.440538	5
-967	356	template<typename T>\nclass Stack;	text	txt	2024-07-28 09:47:54.460525	6
-968	356	template<typename T>\nstd::ostream& operator<<(std::ostream&, Stack<T> const&);	text	txt	2024-07-28 09:47:54.481624	7
-969	356	template<typename T>\nclass Stack\n{\npublic:\n    Stack(Stack const&);	text	txt	2024-07-28 09:47:54.502528	8
-970	356	    friend std::ostream& operator<<<T>(std::ostream&, Stack<T> const&);\n};	code	txt	2024-07-28 09:47:54.524669	9
-971	356	Note the `<T>` behind the function name `operator<<`. Thus, we declare a\nspecialization of the nonmember function template as friend. Without `<T>` we\nwould declare a new nontemplate function.	text	txt	2024-07-28 09:47:54.544082	10
-1848	543	template<typename CharT>\nusing tstring = std::basic_string<CharT, std::char_traits<CharT>, std::allocator<CharT>>;	text	txt	2024-07-28 09:50:15.361228	2
-3645	1167	section .text\n    global main	text	txt	2024-07-28 09:55:24.588638	14
+966	356	We forward declare the output operator for a class to be a template, which,\nhowever, means that we first have to forward declare the class too:	text	txt	2024-07-28 09:47:54.440538	4
 972	357	To specialize a class template, you have to declare the class with a leading\n`template<>` and a specialization of the types for which the class template\nis specialized. The types are used as a template argument and must be\nspecified directly forwarding the name of the class:	text	txt	2024-07-28 09:47:55.246144	1
-973	357	template<typename T>\nclass Stack\n{\n    void push(T const&);\n};	text	txt	2024-07-28 09:47:55.266304	2
-974	357	template<typename T>\nvoid Stack<T>::push(T const&) { }	text	txt	2024-07-28 09:47:55.285633	3
-975	357	template<>\nStack<std::string>\n{\n    void push(std::string const&);\n};	text	txt	2024-07-28 09:47:55.30628	4
-976	357	void Stack<std::string>::push(std::string const&) { }	code	txt	2024-07-28 09:47:55.326268	5
-977	358	You can provide special implementation for particular circumstances, but some\ntemplate parameters must still be defined by the user.	text	txt	2024-07-28 09:47:56.05029	1
-978	358	template<typename T>\nclass Stack\n{\n    void push(T const&);\n};	text	txt	2024-07-28 09:47:56.070383	2
-979	358	template<typename T>\nvoid Stack<T> push(T const&) { }	text	txt	2024-07-28 09:47:56.091299	3
-980	358	template<typename T>\nclass Stack<T*>\n{\n    void push(T*);\n};	text	txt	2024-07-28 09:47:56.11261	4
-981	358	template<typename T>\nvoid Stack<T*>::push(T*) { }	code	txt	2024-07-28 09:47:56.133408	5
-982	358	With partial specialization, we define a class template, still parametrized\nfor `T` but specialized for a pointer (`Stack<T*>`).	text	txt	2024-07-28 09:47:56.154059	6
-983	359	template<typename T1, typename T2>\nclass Stack;	code	txt	2024-07-28 09:47:57.184975	1
+983	359	template<typename T1, typename T2>\nclass Stack;	code	cpp	2024-07-28 09:47:57.184975	1
 984	359	The following class template can be specialized in following ways:	text	txt	2024-07-28 09:47:57.205656	2
-985	359	template<typename T>\nclass Stack<T, T>;	text	txt	2024-07-28 09:47:57.226318	3
-986	359	template<typename T>\nclass Stack<T, int>;	text	txt	2024-07-28 09:47:57.246499	4
-987	359	template<typename T1, typename T2>\nclass Stack<T1*, T2*>;	code	txt	2024-07-28 09:47:57.268001	5
-988	359	The following examples show which template is used by which declaration:	text	txt	2024-07-28 09:47:57.288451	6
-989	359	Stack<int, float>{};    // Stack<T1, T2>\nStack<float, float>{};  // Stack<T, T>\nStack<float, int>{};    // Stack<T, int>\nStack<int*, float*>{};  // Stack<T1*, T2*>	code	txt	2024-07-28 09:47:57.309682	7
-990	359	If more than one partial specialization matches equally well, the declaration is ambiguous:	text	txt	2024-07-28 09:47:57.329755	8
-991	359	Stack<int, int>{};  // ERROR: matches Stack<T, T> and Stack<T, int>\nStack<int*, int*>{};    // ERROR: matches Stack<T, T> and Stack<T1*, T2*>	code	txt	2024-07-28 09:47:57.349901	9
-992	359	To resolve the second ambiguity, you could provide an additional partial specialization for pointers of the same type:	text	txt	2024-07-28 09:47:57.369754	10
-993	359	template<typename T>\nclass Stack<T*, T*>;	code	txt	2024-07-28 09:47:57.390157	11
-994	360	template<typename T, typename C = std::vector<T>>\nclass Stack\n{\nprivate:\n    C container;	text	txt	2024-07-28 09:47:58.405271	1
-995	360	public:\n    void push(T const&);\n    void pop();\n    T const& top() const;\n    bool empty() const;\n};	text	txt	2024-07-28 09:47:58.425949	2
-996	360	template<typename T, typename C>\nvoid Stack<T, C>::push(T const& value)\n{\n    container.push_back(value);\n}	text	txt	2024-07-28 09:47:58.447286	3
-997	360	template<typename T, typename C>\nvoid Stack<T, C>::pop()\n{\n    container.pop_back();\n}	text	txt	2024-07-28 09:47:58.468734	4
-998	360	template<typename T, typename C>\nT const& Stack<T, C>::top() const\n{\n    if (container.empty()) throw std::exception{"empty container"};\n    return container.back();\n}	text	txt	2024-07-28 09:47:58.489871	5
-999	360	template<typename T, typename C>\nbool Stack<T, C>::empty() const\n{\n    return container.empty();\n}	code	txt	2024-07-28 09:47:58.510304	6
-1000	361	Unlike a `typedef`, an alias declaration can be templated to provide a\nconvenient name for a family of types. This is also available since C++11 and\nis called an alias template.	text	txt	2024-07-28 09:47:58.866759	1
-1001	361	template<typename T>\nusing matrix = std::vector<std::vector<T>>;	code	txt	2024-07-28 09:47:58.886473	2
-1002	362	Alias templates are especially helpful to define shortcuts for types that are\nmembers of class templates.	text	txt	2024-07-28 09:47:59.546801	1
-1003	362	struct Matrix\n{\n    using iterator = ...;\n};	text	txt	2024-07-28 09:47:59.567489	2
-1004	362	template<typename T>\nusing MatrixIterator = typename Matrix<T>::iterator;	code	txt	2024-07-28 09:47:59.588822	3
-1006	362	Since C++14, the standard library uses this technique to define shortcuts for\nall type traits in the standard library that yield a type:	text	txt	2024-07-28 09:47:59.629697	5
-1007	362	std::add_const_t<T> // C++14 abbreviate equivalent to std::add_const<T>::type available since C++11\nstd::enable_if_v<T> // C++14 abbreviate equivalent to std::enable_if<T>::value available since C++11	code	txt	2024-07-28 09:47:59.650938	6
+988	359	The following examples show which template is used by which declaration:	text	txt	2024-07-28 09:47:57.288451	4
+990	359	If more than one partial specialization matches equally well, the declaration is ambiguous:	text	txt	2024-07-28 09:47:57.329755	6
+992	359	To resolve the second ambiguity, you could provide an additional partial specialization for pointers of the same type:	text	txt	2024-07-28 09:47:57.369754	8
+991	359	Stack<int, int>{};  // ERROR: matches Stack<T, T> and Stack<T, int>\nStack<int*, int*>{};    // ERROR: matches Stack<T, T> and Stack<T1*, T2*>	code	cpp	2024-07-28 09:47:57.349901	7
+993	359	template<typename T>\nclass Stack<T*, T*>;	code	cpp	2024-07-28 09:47:57.390157	9
+1001	361	template<typename T>\nusing matrix = std::vector<std::vector<T>>;	code	cpp	2024-07-28 09:47:58.886473	2
+4213	443	#include <string>\n#include <regex>\n\ntemplate<typename CharT>\nusing tstring = std::baisc_string<CharT, std::char_traits<CharT>, std::allocator<CharT>>;\n\ntemplate<typename CharT>\nusing tregex = std::basic_regex<CharT>;\n\ntemplate<typename CharT>\nbool matches(tstring<CharT> const& text, tstring<CharT> const& pattern)\n{\n    std::basic_regex<CharT> rx{pattern, std::regex_constants::icase};\n    return std::regex_match(text, rx);\n}\n\nint main()\n{\n    std::string text{R"(https://github.com - https://github.com/briansalehi/references)"};\n    std::string pattern{R"((\\\\w+)://([\\\\w.]+)/([\\\\w\\\\d._-]+)/([\\\\w\\\\d._-]+)[.git]?)"};\n\n    if(matches(text, pattern))\n        std::cout << text << '\\\\n';\n    else\n        std::cerr << "invalid repository link!\\\\n";\n}	code	cpp	2025-07-16 14:56:15.950887	1
 1008	363	Since C++17, the constraint that you always have to specify the template\narguments explicitly was relaxed.	text	txt	2024-07-28 09:48:00.093252	1
-1009	363	Stack<int> IntStack;\nStack<int> AnotherStack = IntStack;   // OK in all standard versions\nStack IntegralStack = AnotherStack;    // OK since C++17	code	txt	2024-07-28 09:48:00.114129	2
+4446	545	#include <iostream>\n#include <iterator>\n#include <string>\n\nint main() {\n    auto const missing = {'l', 'i', 'b', '_'};\n    std::string library_name{"__cpp_containers_ranges"};\n\n    auto const pos = library_name.find("container");\n    auto iter = std::next(library_name.begin(), pos);\n\n#ifdef __cpp_lib_containers_ranges\n    library_name.insert_range(iter, missing);\n#else\n    library_name.insert(iter, missing.begin(), missing.end());\n#endif\n\n    std::cout << library_name;\n}	code	cpp	2025-07-17 11:06:20.183718	2
+4449	546	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <string>\n#include <vector>\n#include <map>\n\nint main()\n{\n    std::map<long, std::string> map{ {0, "first"}, {1, "second"}, {2, "third"} };\n\n    std::ranges::copy(std::views::keys(map), std::ostream_iterator<long>(std::cout, " "));\n    // 0 1 2\n\n    std::ranges::copy(std::views::values(map), std::ostream_iterator<long>(std::cout, " "));\n    // first second third\n}	code	cpp	2025-07-17 11:06:56.96098	1
+1009	363	Stack<int> IntStack;\nStack<int> AnotherStack = IntStack;   // OK in all standard versions\nStack IntegralStack = AnotherStack;    // OK since C++17	code	cpp	2024-07-28 09:48:00.114129	2
 1010	364	Compiler tries to deduce class template arguments by first deducing the\nconstructor argument types which is a regular function template argument\ndeduction. If a constructor meets all the following requirements, then its\nargument types will be used for class template arguments.	text	txt	2024-07-28 09:48:02.261672	1
-1011	364	1. Number of arguments must match\n2. Types must fit (including implicit conversions)\n3. Choose best match:\n  - Perfect match over template\n  - Template over conversion\n  - For non-empty brace initialization, `std::initializer_list<>` has highest\n    priority	text	txt	2024-07-28 09:48:02.284768	2
-1012	364	namespace std\n{\n    template<typename ElemT, typename Allocator = allocator<T>>\n    class vector\n    {\n    public:\n        vector() noexcept(noexcept(Allocator()));	text	txt	2024-07-28 09:48:02.305437	3
-1013	364	        explicit vector(Allocator const&) noexcept;	text	txt	2024-07-28 09:48:02.325306	4
-1014	364	        explicit vector(size_t n, Allocator const& = Allocator());	text	txt	2024-07-28 09:48:02.345329	5
-1015	364	        vector(size_t n, ElemT const& value, Allocator const& = Allocator());	text	txt	2024-07-28 09:48:02.364438	6
-1016	364	        template<typename Iter>\n        vector(Iter beg, Iter end, Allocator const& = Allocator());	text	txt	2024-07-28 09:48:02.38507	7
-1017	364	        vector(vector const& x);	text	txt	2024-07-28 09:48:02.405373	8
-1018	364	        vector(vector&&) noexcept;	text	txt	2024-07-28 09:48:02.424474	9
-1019	364	        vector(vector const&, Allocator const&);	text	txt	2024-07-28 09:48:02.444621	10
-1020	364	        vector(vector&&, Allocator const&);	text	txt	2024-07-28 09:48:02.465229	11
-1021	364	        vector(vector&&, Allocator const&);	text	txt	2024-07-28 09:48:02.486178	12
-1022	364	        vector(initializer_list<ElemT>, Allocator const& = Allocator());\n    };\n} // std	text	txt	2024-07-28 09:48:02.506859	13
-1023	364	int main()\n{\n    std::vector v1(42, 73);\n}	code	txt	2024-07-28 09:48:02.529826	14
-1024	364	By following the overload resolution matching rules, the first rule *number\nof arguments* specifies that we have 6 following matches that fit two\nparameters:	text	txt	2024-07-28 09:48:02.551094	15
-1025	364	explicit vector(size_t n, Allocator const& = Allocator());	text	txt	2024-07-28 09:48:02.572276	16
-1026	364	vector(size_t n, ElemT const& value, Allocator const& = Allocator());	text	txt	2024-07-28 09:48:02.593723	17
-1027	364	template<typename Iter>\nvector(Iter beg, Iter end, Allocator const& = Allocator());	text	txt	2024-07-28 09:48:02.615974	18
-1028	364	vector(vector&&, Allocator const&);	text	txt	2024-07-28 09:48:02.637401	19
-1029	364	vector(vector&&, Allocator const&);	text	txt	2024-07-28 09:48:02.657857	20
-1030	364	vector(initializer_list<ElemT>, Allocator const& = Allocator());	code	txt	2024-07-28 09:48:02.677689	21
-1031	364	By applying the second rule *types must fit* we will only have the following\n3 remaining overload resolutions:	text	txt	2024-07-28 09:48:02.698736	22
-1032	364	vector(size_t n, ElemT const& value, Allocator const& = Allocator());	text	txt	2024-07-28 09:48:02.719362	23
-1033	364	template<typename Iter>\nvector(Iter beg, Iter end, Allocator const& = Allocator());	text	txt	2024-07-28 09:48:02.741117	24
-1034	364	vector(initializer_list<ElemT>, Allocator const& = Allocator());	code	txt	2024-07-28 09:48:02.761803	25
-1035	364	The second overload resolution might seem strange that integers fit two\niterators, but compiler only sees two matching arguments having the same type\nwhich can also be `int`.	text	txt	2024-07-28 09:48:02.782795	26
-1036	364	Going further, the third rule of *choose the best match*, we would lose the\nfirst two because if we have an initializer list for constructing an object,\nthe overload resolution having `std::initializer_list<>` is a best match. So\nwe would only have the last overload:	text	txt	2024-07-28 09:48:02.8052	27
-1037	364	vector(initializer_list<ElemT>, Allocator const& = Allocator());	code	txt	2024-07-28 09:48:02.82573	28
 1038	365	By providing constructors that pass some initial arguments, you can support\ndeduction of the type used in a class.	text	txt	2024-07-28 09:48:03.367263	1
-1039	365	template<typename T>\nclass Stack\n{\nprivate:\n    std::vector<T> container;	text	txt	2024-07-28 09:48:03.387934	2
-1040	365	public:\n    Stack() = default;\n    Stack(T const& value): container({value}) { }\n};	code	txt	2024-07-28 09:48:03.408883	3
 1041	366	1. You have to request the default constructor to be available with its\n   default behavior, because the default constructor is available only if no\n   other constructor is defined:	text	txt	2024-07-28 09:48:04.44524	1
-1042	366	template<typename T>\nclass Stack\n{\npublic:\n    Stack() = default;\n};	code	txt	2024-07-28 09:48:04.466157	2
+1042	366	template<typename T>\nclass Stack\n{\npublic:\n    Stack() = default;\n};	code	cpp	2024-07-28 09:48:04.466157	2
 1043	366	2. The initial argument is passed with braces around to initialize the\n   internal container with an initializer list that argument as the only\n   argument:	text	txt	2024-07-28 09:48:04.488528	3
-1044	366	template<typename T>\nclass Stack\n{\nprivate:\n    std::vector<T> container;	text	txt	2024-07-28 09:48:04.5092	4
-1045	366	public:\n    Stack() = default;\n    Stack(T const& value): container({value}) { }\n};	code	txt	2024-07-28 09:48:04.530061	5
-1046	366	This is because there is no constructor for a vector that is able to take a\nsingle parameter as initial element directly. Even worse, there is a vector\nconstructor taking one integral argument as initial size, so that for a stack\nwith the initial value 5, the vector would get an initial size of five\nelements when `container(value)` is used.	text	txt	2024-07-28 09:48:04.550731	6
+1046	366	This is because there is no constructor for a vector that is able to take a\nsingle parameter as initial element directly. Even worse, there is a vector\nconstructor taking one integral argument as initial size, so that for a stack\nwith the initial value 5, the vector would get an initial size of five\nelements when `container(value)` is used.	text	txt	2024-07-28 09:48:04.550731	5
 1047	367	When passing arguments of a template type `T` by reference, the parameter\ndoes not decay, which is the term for the mechanism to convert a raw array\ntype to the corresponding raw pointer typel.	text	txt	2024-07-28 09:48:05.539551	1
-1048	367	Stack StringStack = "surprise!";    // Stack<char const[10]> deduced since C++17	code	txt	2024-07-28 09:48:05.56086	2
+1048	367	Stack StringStack = "surprise!";    // Stack<char const[10]> deduced since C++17	code	cpp	2024-07-28 09:48:05.56086	2
 1049	367	However, when passing arguments of a template type T by value, the parameter\ndecays, which is the term for the mechansim to convert a raw array type to\nthe corresponding raw pointer type.	text	txt	2024-07-28 09:48:05.583125	3
-1050	367	template<typename T>\nclass Stack\n{\nprivate:\n    std::vector<T> container;	text	txt	2024-07-28 09:48:05.60679	4
-1051	367	public:\n    Stack(T value): container({std::move(value)}) { }\n    // initialize stack with one element by value to decay on class template argument deduction\n};	code	txt	2024-07-28 09:48:05.628303	5
-1052	367	With this, the following initialization works fine:	text	txt	2024-07-28 09:48:05.649849	6
-1053	367	Stack StringStack = "surprise!";    // Stack<char const*> deduced since C++17	code	txt	2024-07-28 09:48:05.67328	7
-1054	367	In this case, don't forget to use move semantics to avoid unnecessary copy of\nthe argument.	text	txt	2024-07-28 09:48:05.694919	8
-1055	368	Because handling raw pointers in containers is a source of trouble, we should\ndisable automatically deducing raw character pointers for container classes.	text	txt	2024-07-28 09:48:06.30882	1
 1056	368	You can define specific **deduction guides** to provide additional or fix\nexisting class template argument deductions.	text	txt	2024-07-28 09:48:06.330419	2
-1057	368	Stack(const char*) -> Stack<std::string>;	code	txt	2024-07-28 09:48:06.351616	3
 1058	368	This guide has to appear in the same scope as the class definition.	text	txt	2024-07-28 09:48:06.372458	4
 1059	368	We call the `->` the *guided type* of the deduction guide.	text	txt	2024-07-28 09:48:06.394973	5
-1060	368	Stack StringStack{"no surprises now!"};  // Stack<std::string>	code	txt	2024-07-28 09:48:06.415747	6
-1061	369	The type of objects without template arguments are not types, but act as a\nplaceholder for a type that activates CTAD. When compiler encouters it, it\nbuilds a set of deduction guides which can be complemented by user with user\ndefined deduction rules.	text	txt	2024-07-28 09:48:07.385832	1
-1062	369	**CTAD** does not occur if the template argument list is present.	text	txt	2024-07-28 09:48:07.406005	2
-1063	369	std::pair p{42, "demo"};    // std::pair<int, char const*>\nstd::vector v{1, 2};        // std::vector<int>	code	txt	2024-07-28 09:48:07.426636	3
-1064	369	// declaration of the template\ntemplate<typename T>\nstruct container\n{\n    container(T t) {}	text	txt	2024-07-28 09:48:07.446604	4
-1065	369	    template<typename Iter>\n    container(Iter beg, Iter end);\n};	text	txt	2024-07-28 09:48:07.46886	5
-1066	369	// additional deduction guide\ntemplate<typename Iter>\ncontainer(Iter b, Iter e) -> container<typename std::iterator_traits<Iter>::value_type>;	text	txt	2024-07-28 09:48:07.489777	6
-1067	369	// use cases\ncontainer c(7); // OK: deduces container<int> using an implicitly-generated guide\nstd::vector<double> v = {/* ... */};\nauto d = container(v.begin(), v.end()); // OK: deduces container<double>\ncontainer e{5, 6}; // Error: there is no std::iterator_traits<int>::value_type	code	txt	2024-07-28 09:48:07.510605	7
+4452	547	#include <iostream>\n#include <iterator>p\n#include <algorithm>\n#include <ranges>\n#include <string>\n#include <vector>\n#include <tuple>\n\nint main()\n{\n    std::vector<std::tuple<long, std::string, long>> range{ {0, "John", 4}, {1, "Laura", 5}, {2, "Alice", 5} };\n\n    std::vector<std::string> names;\n    std::ranges::copy(range | std::views::elements<1>, std::ostream_iterator<long>(std::cout, " "));\n    // John Laura Alice\n\n    std::vector<std::size_t> name_length;\n    std::ranges::copy(range | std::views::elements<2>, std::ostream_iterator<long>(std::cout, " "));\n    // 4 5 5\n}	code	cpp	2025-07-17 11:07:25.731679	1
+4602	632	#include <memory>\n\n// when combined with the PIMPL pattern we can mock/fake the global state\nstruct ImplIface {};\n\nstruct Actual : ImplIface\n{\n    static std::unique_ptr<ImplIface> make()\n    {\n        return std::make_unique<Actual>();\n    }\n};\n\nstruct Testing : ImplIface\n{\n    static std::unique_ptr<ImplIface> make()\n    {\n        return std::make_unique<Testing>();\n    }\n};\n\n// Switch active type based on testing/production\nusing ActiveType = Testing;\n\nstruct MonoPIMPL\n{\n    MonoPIMPL()\n    {\n        std::call_once(flag_, [] { impl_ = ActiveType::make(); });\n    }\n\n    /* expose ImplIface as any other PIMPL */\nprivate:\n    static std::once_flag flag_;\n    static std::unique_ptr<ImplIface> impl_;\n};\n\nstd::once_flag MonoPIMPL::flag_;\nstd::unique_ptr<ImplIface> MonoPIMPL::impl_;	code	cpp	2025-07-17 12:17:18.681716	4
+1393	444	The class template `std::sub_match` represents a sequence of characters that\nmatches a capture group; this class is actually derived from std::pair, and\nits first and second members represent iterators to the first and the one-\npast-end characters in the match sequence. If there is no match sequence, the\ntwo iterators are equal:	text	txt	2024-07-28 09:49:04.77727	3
 1068	370	The declaration of a `Stack{"no surprise!"}` deduces as `Stack<char const*>` using the deduction guide:	text	txt	2024-07-28 09:48:08.095611	1
-1069	370	Stack(char const*) -> Stack<std::string>;	code	txt	2024-07-28 09:48:08.117473	2
 1070	370	However, the following still doesn't work:	text	txt	2024-07-28 09:48:08.139329	3
-1071	370	Stack StringStack = "surprise again!"; // ERROR: Stack<std::string> deduced, but still not valid	code	txt	2024-07-28 09:48:08.162531	4
 1072	370	By language rules, you can't copy initialize an object by passing a string\nliteral to a constructor expecting a `std::string`. So you have to initialize\nthe object with brace initialization.	text	txt	2024-07-28 09:48:08.183979	5
+1394	444	* `typedef sub_match<const char *> csub_match;`\n* `typedef sub_match<const wchar_t *> wcsub_match;`\n* `typedef sub_match<string::const_iterator> ssub_match;`\n* `typedef sub_match<wstring::const_iterator> wssub_match;`	text	txt	2024-07-28 09:49:04.797473	4
+1395	444	The class template `std::match_results` is a collection of matches; the first\nelement is always a full match in the target, while the other elements are\nmatches of subexpressions:	text	txt	2024-07-28 09:49:04.819322	5
+1396	444	* `typedef match_results<const char *> cmatch;`\n* `typedef match_results<const wchar_t *> wcmatch;`\n* `typedef match_results<string::const_iterator> smatch;`\n* `typedef match_results<wstring::const_iterator> wsmatch;`	text	txt	2024-07-28 09:49:04.839906	6
+4217	445	#include <regex>\n\nstd::regex pattern{R"(...)", std::regex_constants::egrep};	code	cpp	2025-07-16 14:56:49.801604	3
+4216	444	#include <string>\n#include <regex>\n\nint main()\n{\n    std::string text{R"(https://github.com - https://github.com/briansalehi/references)"};\n    std::string pattern{R"((\\\\w+)://([\\\\w.]+)/([\\\\w\\\\d._-]+)/([\\\\w\\\\d._-]+)[.git]?)"};\n\n    std::regex rx{pattern, std::regex_constants::icase};\n    std::smatch matches;\n    bool matched = std::regex_match(text, matches, rx);\n\n    if (auto [match, protocol, domain, username, project] = matches; matched)\n        std::cout << project << " owned by " << username\n                  << " hosted on " << domain\n                  << " using " << protocol << " protocol\\\\n";	code	cpp	2025-07-16 14:56:36.204828	7
+2165	636	Because of **Argument Dependent Lookup (ADL)** usually we don't have to\nspecify the full namespace `std::filesystem` when calling free-standing\nfilesystem functions.	text	txt	2024-07-28 09:51:12.612145	2
+1060	368	Stack StringStack{"no surprises now!"};  // Stack<std::string>	code	cpp	2024-07-28 09:48:06.415747	6
+1062	369	**CTAD** does not occur if the template argument list is present.	text	txt	2024-07-28 09:48:07.406005	2
+1069	370	Stack(char const*) -> Stack<std::string>;	code	cpp	2024-07-28 09:48:08.117473	2
+1071	370	Stack StringStack = "surprise again!"; // ERROR: Stack<std::string> deduced, but still not valid	code	cpp	2024-07-28 09:48:08.162531	4
 1073	371	Aggregate classes; classes or structs with no user-provided, explicit, or\ninherited constructor, no private or protected nonstatic data members, no\nvirtual functions, and no virtual, private, or protected base classes; can\nalso be templates.	text	txt	2024-07-28 09:48:09.004473	1
-1074	371	template<typename T>\nstruct ValueWithComment\n{\n    T value;\n    std::string comment;\n};	code	txt	2024-07-28 09:48:09.024898	2
+1074	371	template<typename T>\nstruct ValueWithComment\n{\n    T value;\n    std::string comment;\n};	code	cpp	2024-07-28 09:48:09.024898	2
 1075	371	Since C++17, you can even define deduction guides for aggregate class templates:	text	txt	2024-07-28 09:48:09.046265	3
-1076	371	ValueWithComment(char const*, char const*) -> ValueWithComment<std::string>;	text	txt	2024-07-28 09:48:09.06904	4
-1077	371	ValueWithComment vc = {"secret", "my secret message"}; // ValueWithComment<std::string> deduced	code	txt	2024-07-28 09:48:09.089601	5
-1078	371	Without the deduction guide, the initialization would not be possible,\nbecause the aggregate class has no constructor to perform the deduction\nagainst.	text	txt	2024-07-28 09:48:09.11008	6
-1079	371	The standard library class `std::array<>` is also an aggregate, parametrized\nfor both the element type and the size. The C++17 standard library also\ndefines a deduction guide for it.	text	txt	2024-07-28 09:48:09.131001	7
-1080	372	#include <vector>\n#include <map>	text	txt	2024-07-28 09:48:10.243146	1
-1081	372	std::vector<int> get_numbers()\n{\n    return std::vector<int>{1, 2, 3, 4, 5};\n}	text	txt	2024-07-28 09:48:10.263722	2
-1082	372	std::map<int, double> get_doubles()\n{\n    return std::map<int, double>{\n        {0, 0.0},\n        {1, 1.1},\n        {2, 2.2}\n    };\n}	text	txt	2024-07-28 09:48:10.285544	3
-1083	372	int main()\n{\n    auto numbers = std::vector<int>{1, 2, 3, 4, 5};\n    auto copies = std::vector<int>(numbers.size() * 4);	text	txt	2024-07-28 09:48:10.306297	4
-1084	372	    for (int element: numbers)\n        copies.push_back(element);	text	txt	2024-07-28 09:48:10.326395	5
-1085	372	    for (int& element: numbers)\n        copies.push_back(element);	text	txt	2024-07-28 09:48:10.348338	6
-1086	372	    for (auto&& element: get_numbers())\n        copies.push_back(element);	text	txt	2024-07-28 09:48:10.367831	7
-1087	372	    for (auto&& [key, value]: get_doubles())\n        copies.push_back(key);\n}	code	txt	2024-07-28 09:48:10.390078	8
-1088	373	#include <iostream>\n#include <stdexcept>\n#include <iterator>	text	txt	2024-07-28 09:48:13.056002	1
-1089	373	template<typename T, std::size_t const S>\nclass dummy_array\n{\n    T data[S] = {};	text	txt	2024-07-28 09:48:13.078385	2
-1090	373	public:\n    T const& at(std::size_t const index) const\n    {\n        if (index < S) return data[index];\n        throw std::out_of_range("index out of range");\n    }	text	txt	2024-07-28 09:48:13.100525	3
-1091	373	    void insert(std::size_t const index, T const& value)\n    {\n        if (index < S) data[index] = value;\n        else throw std::out_of_range("index out of range");\n    }	text	txt	2024-07-28 09:48:13.122636	4
-1092	373	    std::size_t size() const { return S; }\n};	text	txt	2024-07-28 09:48:13.144295	5
-1093	373	template<typename T, typename C, std::size_t const S>\nclass dummy_array_iterator_type\n{\npublic:\n    dummy_array_iterator_type(C& collection, std::size_t const index): index{index}, collection{collection}\n    {}	text	txt	2024-07-28 09:48:13.164879	6
-1094	373	    bool operator !=(dummy_array_iterator_type const& other) const\n    {\n        return index != other.index;\n    }	text	txt	2024-07-28 09:48:13.185745	7
-1095	373	    T const& operator *() const\n    {\n        return collection.at(index);\n    }	text	txt	2024-07-28 09:48:13.205466	8
-1096	373	    dummy_array_iterator_type& operator ++()\n    {\n        ++index;\n        return *this;\n    }	text	txt	2024-07-28 09:48:13.226931	9
-1097	373	    dummy_array_iterator_type operator ++(int)\n    {\n        auto temp = *this;\n        ++*temp;\n        return temp;\n    }	text	txt	2024-07-28 09:48:13.248873	10
-1098	373	private:\n    std::size_t index;\n    C& collection;\n};	text	txt	2024-07-28 09:48:13.26967	11
-1346	429	auto s5{ R"text"sv }; // std::string_view	code	txt	2024-07-28 09:48:56.828395	5
-1099	373	template<typename T, std::size_t const S>\nusing dummy_array_iterator = dummy_array_iterator_type<T, dummy_array<T, S>, S>;	text	txt	2024-07-28 09:48:13.290794	12
-1100	373	template<typename T, std::size_t const S>\nusing dummy_array_const_iterator = dummy_array_iterator_type<T, dummy_array<T, S> const, S>;	text	txt	2024-07-28 09:48:13.311681	13
-1101	373	template<typename T, std::size_t const S>\ninline dummy_array_iterator<T, S> begin(dummy_array<T, S>& collection)\n{\n    return dummy_array_iterator<T, S>(collection, 0);\n}	text	txt	2024-07-28 09:48:13.3325	14
-1102	373	template<typename T, std::size_t const S>\ninline dummy_array_iterator<T, S> end(dummy_array<T, S>& collection)\n{\n    return dummy_array_iterator<T, S>(collection, collection.size());\n}	text	txt	2024-07-28 09:48:13.354099	15
-1103	373	template<typename T, std::size_t const S>\ninline dummy_array_const_iterator<T, S> begin(dummy_array<T, S> const& collection)\n{\n    return dummy_array_const_iterator<T, S>(collection, 0);\n}	text	txt	2024-07-28 09:48:13.376171	16
-1104	373	template<typename T, std::size_t const S>\ninline dummy_array_const_iterator<T, S> end(dummy_array<T, S> const& collection)\n{\n    return dummy_array_const_iterator<T, S>(collection, collection.size());\n}	text	txt	2024-07-28 09:48:13.396743	17
-1105	373	int main()\n{\n    dummy_array<int, 5> numbers;\n    numbers.insert(0, 1);\n    numbers.insert(1, 2);\n    numbers.insert(2, 3);\n    numbers.insert(3, 4);\n    numbers.insert(4, 5);	text	txt	2024-07-28 09:48:13.418321	18
-1106	373	    for (auto&& element: numbers)\n        std::cout << element << ' ';\n    std::cout << '\\\\n';\n}	code	txt	2024-07-28 09:48:13.440409	19
+1078	371	Without the deduction guide, the initialization would not be possible,\nbecause the aggregate class has no constructor to perform the deduction\nagainst.	text	txt	2024-07-28 09:48:09.11008	5
+1079	371	The standard library class `std::array<>` is also an aggregate, parametrized\nfor both the element type and the size. The C++17 standard library also\ndefines a deduction guide for it.	text	txt	2024-07-28 09:48:09.131001	6
+4221	446	#include <string>\n#include <regex>\n\nstd::string text {\nR"(\n# server address\naddress = 123.40.94.215\nport=22\n\n# time to live\nttl = 5\n)"};\n\nint main()\n{\n    std::string pattern{R"(^(?!#)(\\\\w+)\\\\s*=\\\\s*([\\\\w\\\\d]+[\\\\w\\\\d._,:-]*)$)"};\n    std::regex rx{pattern, std::regex_constants::icase};\n    std::smatch match{};\n\n    if (std::string variable, value; std::regex_search(text, match, rx))\n    {\n        variable = match[1];\n        value = match[2];\n    }\n}	code	cpp	2025-07-16 14:57:04.905332	1
+4463	556	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    auto common = range | std::views::take(3) | std::views::common;\n    std::copy(common.begin(), common.end(), std::ostream_iterator<long>(std::cout, " "));\n    // 1 2 3\n}	code	cpp	2025-07-17 11:56:13.881709	1
+4457	550	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(range | std::views::take_while([](long e) { return e <= 3; }), std::ostream_iterator<long>(std::cout, " "));\n    // 1 2 3\n}	code	cpp	2025-07-17 11:55:19.815336	1
+4455	548	#include <iostream>\n#include <iterator>p\n#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n\n    std::ranges::copy(std::views::transform(range, [](long e) -> long { return e*e; }), std::ostream_iterator<long>(std::cout, " "));\n    // 1 4 9 16 25\n\n    std::ranges::copy(range | std::views::transform([](long e) -> long { return e*e; }), std::ostream_iterator<long>(std::cout, " "));\n    // 1 4 9 16 25\n}	code	cpp	2025-07-17 11:54:43.799576	1
+4462	555	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(std::views::counted(std::next(range.begin()), 3), std::ostream_iterator<long>(std::cout, " "));\n    // 2 3 4\n}	code	cpp	2025-07-17 11:56:10.197439	1
+4460	553	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5,6};\n    std::ranges::copy(range | std::views::filter([](long e) { return e % 2 == 0; }), std::ostream_iterator<long>(std::cout, " "));\n    // 2 4 6\n}	code	cpp	2025-07-17 11:56:02.454212	1
+4456	549	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(range | std::views::take(3), std::ostream_iterator<long>(std::cout, " "));\n    // 1 2 3\n}	code	cpp	2025-07-17 11:55:12.290353	1
+4458	551	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(range | std::views::drop(3), std::ostream_iterator<long>(std::cout, " "));\n    // 4 5\n}	code	cpp	2025-07-17 11:55:25.660039	1
+4459	552	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(range | std::views::drop_while([](long e) { return e <= 3; }), std::ostream_iterator<long>(std::cout, " "));\n    // 4 5\n}	code	cpp	2025-07-17 11:55:56.748682	1
+4461	554	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(range | std::views::reverse, std::ostream_iterator<long>(std::cout, " "));\n    // 5 4 3 2 1\n}	code	cpp	2025-07-17 11:56:07.170217	1
+4464	557	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(std::views::all(range), std::ostream_iterator<long>(std::cout, " "));\n    // 1 2 3 4 5\n}	code	cpp	2025-07-17 11:56:17.599789	1
+4465	558	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <string>\n#include <charconv>\n\nint main()\n{\n    std::string version{"6.4.2"};\n    std::ranges::copy(\n        version |\n        std::views::split('.') |\n        std::views::transform([](auto v) {\n            int token;\n            std::from_chars(v.data(), v.data() + v.size(), token);\n            return token;\n        }),\n        std::ostream_iterator<int>(std::cout, " ")\n    );\n    // 6 4 2\n}	code	cpp	2025-07-17 11:56:21.301884	1
+4466	560	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n\nint main()\n{\n    std::ranges::copy(std::views::empty<long>, std::ostream_iterator<long>(std::cout, " "));\n}	code	cpp	2025-07-17 11:56:35.704249	1
+1921	573	The compiler will compile contracts, checks for their correctness, and when\neverything is checked all the contracts will be wiped from the code.	text	txt	2024-07-28 09:50:29.427889	1
 1107	374	The alignment must match the size of the largest member in order to avoid\nperformance issues.	text	txt	2024-07-28 09:48:14.791652	1
-1108	374	struct foo1         // size = 1, alignment = 1\n{                   // foo1:    +-+\n    char a;         // members: |a|\n};	text	txt	2024-07-28 09:48:14.813986	2
-1109	374	struct foo2         // size = 2, alignment = 1\n{                   // foo1:    +-+-+\n    char a;         // members: |a|b|\n    char b;\n};	text	txt	2024-07-28 09:48:14.836717	3
-1110	374	struct foo3         // size = 8, alignment = 4\n{                   // foo1:    +----+----+\n    char a;         // members: |a...|bbbb|\n    int  b;\n};	text	txt	2024-07-28 09:48:14.857759	4
-1111	374	struct foo3_\n{\n    char a;         // 1 byte\n    char _pad0[3];  // 3 bytes\n    int  b;         // 4 byte\n};	text	txt	2024-07-28 09:48:14.880231	5
-1849	543	template<typename CharT>\nusing tstringstream = std::basic_stringstream<CharT, std::char_traits<CharT>, std::allocator<CharT>>;	text	txt	2024-07-28 09:50:15.382212	3
-1112	374	struct foo4         // size = 24, alignment = 8\n{                   // foo4:    +--------+--------+--------+--------+\n    int a;          // members: |aaaa....|cccc....|dddddddd|e.......|\n    char b;\n    float c;\n    double d;\n    bool e;\n};	text	txt	2024-07-28 09:48:14.902044	6
-1113	374	struct foo4_\n{\n    int a;          // 4 bytes\n    char b;         // 1 byte\n    char _pad0[3];  // 3 bytes\n    float c;        // 4 bytes\n    char _pad1[4];  // 4 bytes\n    double d;       // 8 bytes\n    bool e;         // 1 byte\n    char _pad2[7];  // 7 bytes\n};	code	txt	2024-07-28 09:48:14.922269	7
 1114	375	`alignof` can only be applied to type-ids, and not to variables or class data\nmembers.	text	txt	2024-07-28 09:48:15.569202	1
-1115	375	struct alignas(4) foo     // size: 4, alignment: 4\n{                         // foo:     +----+\n    char a;               // members: |ab..|\n    char b;\n};	text	txt	2024-07-28 09:48:15.592877	2
-1116	375	alignof(foo);   // 4\nsizeof(foo);    // 4\nalignof(foo&);  // 4\nalignof(char);  // 1\nalignof(int);   // 4\nalignof(int*);  // 8 (64-bit)\nalignof(int[4]);// 4 (natural alignment of element is 4)	code	txt	2024-07-28 09:48:15.614479	3
 1117	376	`alignas` takes an expression evaluating 0 or valid value for alignment, a\ntype-id, or a parameter pack.	text	txt	2024-07-28 09:48:17.109646	1
 1118	376	Only valid values of object alignment are the powers of two.	text	txt	2024-07-28 09:48:17.1309	2
 1119	376	Program is ill-formed if largest `alignas` on a declaration is smaller than\nnatural alignment without any `alignas` specifier.	text	txt	2024-07-28 09:48:17.153713	3
-1120	376	// alignas specifier applied to struct\nstruct alignas(4) foo1  // size = 4, aligned as = 4\n{                       // foo1:    +----+\n    char a;             // members: |a.b.|\n    char b;\n};	text	txt	2024-07-28 09:48:17.175591	4
-1121	376	struct foo1_            // size = 4, aligned as = 1\n{\n    char a;             // 1 byte\n    char b;             // 1 byte\n    char _pad0[2];      // 2 bytes\n};	text	txt	2024-07-28 09:48:17.195715	5
-1122	376	// alignas specifier applied to member data declarations\nstruct foo2             // size = 16, aligned as = 8\n{                       // foo2:    +--------+--------+\n    alignas(2) char a;  // members: |aa......|bbbb....|\n    alignas(8) int b;\n};	text	txt	2024-07-28 09:48:17.216577	6
-1123	376	struct foo2_            // size = 16, aligned as = 4\n{\n    char a;             // 2 bytes\n    char _pad0[6];      // 6 bytes\n    int b;              // 4 bytes\n    char _pad1[4];      // 4 bytes\n};	text	txt	2024-07-28 09:48:17.239421	7
-1124	376	// the alignas specifier applied to the struct is less than alignas\n// specifier applied to member data declaration, thus will be ignored.\nstruct alignas(4) foo3  // size = 16, aligned as = 8\n{                       // foo3:    +--------+--------+\n    alignas(2) char a;  // members: |aa......|bbbbbbbb|\n    alignas(8) int b;\n};	text	txt	2024-07-28 09:48:17.260166	8
-1125	376	struct foo3_            // size = 16, aligned as = 4\n{\n    char a;             // 2 byte\n    char _pad0[6];      // 6 bytes\n    int b;              // 4 bytes\n    char _pad1[4];      // 4 bytes\n};	text	txt	2024-07-28 09:48:17.281097	9
-1126	376	alignas(8) int a;       // size = 4, alignment = 8\nalignas(256) long b[4]; // size = 32, alignment = 256	code	txt	2024-07-28 09:48:17.304537	10
-1127	377	#include <iostream>	text	txt	2024-07-28 09:48:17.728911	1
-1128	377	int main()\n{\n    std::cout << sizeof(long double) << '\\\\n';\n}	code	txt	2024-07-28 09:48:17.748606	2
-1129	378	T operator ""_suffix(unsigned long long int); // biggest integral type\nT operator ""_suffix(long double); // biggest floating-point type\nT operator ""_suffix(char);\nT operator ""_suffix(wchar_t);\nT operator ""_suffix(char16_t);\nT operator ""_suffix(char32_t);\nT operator ""_suffix(char const *, std::size_t);\nT operator ""_suffix(wchar_t const *, std::size_t);\nT operator ""_suffix(char16_t const *, std::size_t);\nT operator ""_suffix(char32_t const *, std::size_t);	code	txt	2024-07-28 09:48:18.299711	1
-1130	379	namespace units\n{\n    inline namespace literals\n    {\n        inline namespace units_literals\n        {\n            constexpr size_t operator ""_KB(unsigned long long const size)\n            {\n                return static_cast<size_t>(size * 1024);\n            }\n        }\n    }\n}	text	txt	2024-07-28 09:48:19.036306	1
-1131	379	int main()\n{\n    using namespace units::units_literals;	text	txt	2024-07-28 09:48:19.058862	2
-1132	379	    size_t bytes = "1024"_KB;\n}	code	txt	2024-07-28 09:48:19.079677	3
+1129	378	T operator ""_suffix(unsigned long long int); // biggest integral type\nT operator ""_suffix(long double); // biggest floating-point type\nT operator ""_suffix(char);\nT operator ""_suffix(wchar_t);\nT operator ""_suffix(char16_t);\nT operator ""_suffix(char32_t);\nT operator ""_suffix(char const *, std::size_t);\nT operator ""_suffix(wchar_t const *, std::size_t);\nT operator ""_suffix(char16_t const *, std::size_t);\nT operator ""_suffix(char32_t const *, std::size_t);	code	cpp	2024-07-28 09:48:18.299711	1
 1133	380	Always define literals in a separate namespace to avoid name clashes.	text	txt	2024-07-28 09:48:19.49427	1
-1134	380	T operator ""_suffix(char const*);	text	txt	2024-07-28 09:48:19.515004	2
-1135	380	template <char...>\nT operator ""_suffix();	code	txt	2024-07-28 09:48:19.536471	3
-1136	381	namespace binary\n{\n    using numeric = unsigned int;	text	txt	2024-07-28 09:48:20.711905	1
-1137	381	    inline namespace binary_literals\n    {\n        namespace binary_internals\n        {\n            template<typename T, char... bits>\n            struct bit_seq;	text	txt	2024-07-28 09:48:20.73455	2
-1138	381	            template<typename T, '0', char... bits>\n            struct bit_seq\n            {\n                static constexpr T value { bit_seq<T, bits...>::value };\n            };	text	txt	2024-07-28 09:48:20.755136	3
-1139	381	            template<typename T, '1', char... bits>\n            struct bit_seq\n            {\n                static constexpr T value {\n                    bit_seq<T, bits...>::value | static_cast<T>(1 << sizeof...(bits))\n                };\n            };	text	txt	2024-07-28 09:48:20.776757	4
-1140	381	            template<typename T>\n            struct bit_seq<T>\n            {\n                static constexpr T value{0};\n            };\n        }	text	txt	2024-07-28 09:48:20.797392	5
-1141	381	        template <char... bits>\n        constexpr numeric operator ""_byte()\n        {\n            static_assert(sizeof...(bits) <= 32, "binary literals only hold 32 bits");	text	txt	2024-07-28 09:48:20.819033	6
-1142	381	            return binary_internals::bit_seq<numeric, bits...>::value;\n        }\n    }\n}	code	txt	2024-07-28 09:48:20.839991	7
-1143	382	#include <vector>\n#include <string>	text	txt	2024-07-28 09:48:21.599244	1
-1144	382	std::vector<std::string> f()\n{\n    std::vector<std::string> cells; // default constructed vector without allocations\n    cells.reserve(3);               // allocate 3 elements of std::string\n    std::string s{"data"};          // default constructed std::string\n    cells.push_back(s);             // 1st vector element copy constructed\n    cells.push_back(s+s);           // default construction of temporary object; move construction of 2nd vector element\n    cells.push_back(std::move(s));  // move constructed 3rd vector element; empty out s object\n    return cells;                   // optimize out vector as return value\n}	text	txt	2024-07-28 09:48:21.621475	2
-1145	382	int main()\n{\n    std::vector<std::string> v;\n    v = f();                        // move assigned constructed vector by return value\n}	code	txt	2024-07-28 09:48:21.643701	3
-1146	383	#include <utility>	text	txt	2024-07-28 09:48:22.794489	1
-1147	383	class bag\n{\nprivate:\n    unsigned int _count;\n    int* _storage;	text	txt	2024-07-28 09:48:22.815607	2
+4467	561	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n\nint main()\n{\n    std::ranges::copy(std::views::single(4), std::ostream_iterator<long>(std::cout, " "));\n    // 4\n}	code	cpp	2025-07-17 11:56:38.792988	1
+4227	447	#include <string>\n#include <regex>\n\nstd::string text {\nR"(\n# server address\naddress = 123.40.94.215\nport=22\n\n# time to live\nttl = 5\n)"};\n\nint main()\n{\n    std::string pattern{R"(^(?!#)(\\\\w+)\\\\s*=\\\\s*([\\\\w\\\\d]+[\\\\w\\\\d._,:-]*)$)"};\n    std::regex rx{pattern, std::regex_constants::icase};\n    std::sregex_iterator end{};\n\n    // iterate through regex matches\n    for (auto it = std::sregex_iterator{std::begin(text), std::end(text), rx};\n            it ! end; ++it)\n    {\n        std::string variable = (*it)[1];\n        std::string value = (*it)[2];\n    }\n\n    // iterate through unmatched tokens\n    for (auto it = std::sregex_iterator{std::begin(text), std::end(text), rx, -1};\n            it ! end; ++it)\n    {\n        std::string variable = (*it)[1];\n        std::string value = (*it)[2];\n    }\n\n    // iterate through tokens of regex matches\n    std::sregex_token_iterator tend{};\n    for (auto it = std::sregex_token_iterator{std::begin(text), std::end(text), rx};\n            it ! tend; ++it)\n    {\n        std::string token = *it;\n    }\n}	code	cpp	2025-07-16 14:57:32.817026	4
+4228	448	#include <string>\n#include <regex>\n\nint main()\n{\n    std::string text{"this is a example with a error"};\n    std::regex rx{R"(\\\\ba ((a|e|i|o|u)\\\\w+))"};\n    std::regex_replace(text, rx, "an $1");\n}	code	cpp	2025-07-16 14:57:42.275748	1
+4469	562	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n\nint main()\n{\n    std::ranges::copy(std::views::iota(2,5), std::ostream_iterator<long>(std::cout, " "));\n    // 2 3 4\n\n    std::ranges::copy(std::views::iota(4) | std::views::take(3), std::ostream_iterator<long>(std::cout, " "));\n    // 4 5 6\n}	code	cpp	2025-07-17 11:56:48.234054	1
+4229	449	#include <string>\n#include <regex>\n\nint main()\n{\n    std::string text{"current date: 3 10 2022"};\n    std::regex pattern{R"((\\\\d{1,2})\\\\s*(\\\\d{1,2})\\\\s*(\\\\d{2,4}))"};\n    std::string reformatted = std::regex_replace(text, pattern, R"([$`] $2 $1 $3 [$'])");\n}	code	cpp	2025-07-16 14:57:51.131539	2
 3646	1167	main:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:55:24.608549	15
-1148	383	public:\n    bag(int const& number): _count{0}, _storage{nullptr}\n    {\n        _count++;\n        _storage = new int{number};\n    }	text	txt	2024-07-28 09:48:22.835933	3
-1149	383	    virtual ~bag()\n    {\n        if (_count)\n            delete _storage;\n    }	text	txt	2024-07-28 09:48:22.857129	4
-1150	383	    bag(bag const& other): _count{other._count}\n    {\n        _storage = new int{*other._storage};\n    }	text	txt	2024-07-28 09:48:22.878749	5
-1151	383	    bag(bag&& other): _count{other._count}, _storage{other._storage}\n    {\n        other._count = 0;\n        other._storage = nullptr;\n    }\n};	text	txt	2024-07-28 09:48:22.899818	6
-1152	383	int main()\n{\n    bag a{1};\n    bag b{std::move(a)};\n}	code	txt	2024-07-28 09:48:22.920633	7
+4470	563	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n\nint main()\n{\n    std::ranges::copy(std::views::istream<long>(std::cin), std::ostream_iterator<long>(std::cout, " "));\n    // 1 2 3 4\n}	code	cpp	2025-07-17 11:56:52.057509	1
 1153	384	- When the value of a temporary object is passed that will automatically be\n  destroyed after the statement.\n- When a non-`const` object marked with `std::move()`.	text	txt	2024-07-28 09:48:23.215263	1
 1154	385	`std::move()` is defined a a function in C++ standard library `<utility>`. No\nstandard header is required t include `utility` header file. Therefore, when\nusing `std::move()`, you should explicitly include `<utility>` to make your\nprogram portable.	text	txt	2024-07-28 09:48:23.545057	1
-1155	386	function(static_cast<decltype(object)&&>(object)	code	txt	2024-07-28 09:48:23.890747	1
 1156	387	The rule is that for a temporary object or an object marked with\n`std::move()`, if available, a function declaring parameters as an rvalue\nreference is preferred. However, if no such function exists, the usual copy\nsemantics is used as a fallback.	text	txt	2024-07-28 09:48:24.254937	1
-1157	388	The objects declared with const cannot be moved because any optimizing\nimplementation requires that the passed argument can be modified.	text	txt	2024-07-28 09:48:24.714339	1
-1158	388	std::vector<std::string> coll;\nconst std::string s{"data"};	text	txt	2024-07-28 09:48:24.736101	2
-1159	388	coll.push_back(std::move(s));   // OK, calls push_back(const std::string &)	code	txt	2024-07-28 09:48:24.757869	3
+4231	450	#include <limits>\n\nauto min_int = std::numeric_limits<int>::min();\nauto max_int = std::numeric_limits<int>::max();\n\nauto min_double = std::numeric_limits<double>::min();\nauto low_double = std::numeric_limits<double>::lowest();\nauto max_double = std::numeric_limits<double::lowest();	code	cpp	2025-07-16 14:58:16.480118	2
 1160	389	Declaring the return value as a whole to be `const` disables move semantics\nand it also disables **return value optimization**. `const` should be used to\ndeclare parts of return type instead, such as the object a returned reference\nor poionter refers to.	text	txt	2024-07-28 09:48:25.30484	1
-1161	389	const std::string getValues(); // BAD: disables move semantics for return value\nconst std::string& getRef();   // OK\nconst std::string* getPtr();   // OK	code	txt	2024-07-28 09:48:25.326211	2
 1162	390	The implementer has to ensure that the passed argument is in a valid state\nafter the call.	text	txt	2024-07-28 09:48:25.63987	1
-1163	391	Moved-from objects are still valid objects for which at least the destructor\nwill be called. However, they should also be valid in the sense that they\nhave a consisten state and all operations work as expected. The only thing\nyou do not know is their value.	text	txt	2024-07-28 09:48:26.291633	1
-1164	391	std::string s{"data"};	text	txt	2024-07-28 09:48:26.312982	2
-1165	391	foo(std::move(s));	text	txt	2024-07-28 09:48:26.332146	3
-1166	391	std::cout << s << '\\\\n'; // OK (don't know which value is written)\nstd::cout << s.size() << '\\\\n';  // OK (writes current number of characters)\nstd::cout << s[0] << '\\\\n';  // ERROR (potentially undefined behavior)\nstd::cout << s.front() << '\\\\n'; // ERROR (potentially undefined behavior)\ns = "new value";  // OK	code	txt	2024-07-28 09:48:26.354659	4
-1167	392	The parameter can bind only to a temporary object that does not have a name\nor to an object marked with `std::move()`.	text	txt	2024-07-28 09:48:26.982006	1
-1168	392	According to the semantics of rvalue references, the caller claims that it is\n*no longer interested in the value*. Therefore, you can modify the object the\nparameter refers to. However, the caller might still be interested in using\nthe object. Therefore, any modification should keep the referenced object in\na valid state.	text	txt	2024-07-28 09:48:27.003314	2
-1169	392	void foo(std::string&& rv);\nstd::string s{"data"};	text	txt	2024-07-28 09:48:27.023583	3
-1170	392	foo(s);     // ERROR\nfoo(std::move(s));      // OK\nfoo(returnStringByValue());     // OK	code	txt	2024-07-28 09:48:27.046779	4
+1432	450	    for (autp i = start; i < end; ++i)\n        if (*i < latest_minimum)\n            latest_minimum = *i;	text	txt	2024-07-28 09:49:10.184975	4
 1171	393	**const lvalue reference**	text	txt	2024-07-28 09:48:28.448022	1
 1172	393	The function has only read access to the passed argument.	text	txt	2024-07-28 09:48:28.468645	2
-1173	393	void foo(const std::string& arg);	code	txt	2024-07-28 09:48:28.488389	3
 1174	393	You can pass everything to a function declared that way if the type fits:	text	txt	2024-07-28 09:48:28.510056	4
 1175	393	- A modifiable named object\n- A `const` named object\n- A temporary object that does not have a name\n- A non-`const` object marked with `std::move()`	text	txt	2024-07-28 09:48:28.531378	5
 1176	393	**non-const lvalue reference**	text	txt	2024-07-28 09:48:28.553519	6
 1177	393	The function has write access to the passed argument. You can no longer pass\neverything to a function declared that way even if the type fits.	text	txt	2024-07-28 09:48:28.575523	7
-1178	393	void foo(std::string& arg);	code	txt	2024-07-28 09:48:28.598669	8
+1155	386	function(static_cast<decltype(object)&&>(object)	code	cpp	2024-07-28 09:48:23.890747	1
+1157	388	The objects declared with const cannot be moved because any optimizing\nimplementation requires that the passed argument can be modified.	text	txt	2024-07-28 09:48:24.714339	1
+1161	389	const std::string getValues(); // BAD: disables move semantics for return value\nconst std::string& getRef();   // OK\nconst std::string* getPtr();   // OK	code	cpp	2024-07-28 09:48:25.326211	2
+1163	391	Moved-from objects are still valid objects for which at least the destructor\nwill be called. However, they should also be valid in the sense that they\nhave a consisten state and all operations work as expected. The only thing\nyou do not know is their value.	text	txt	2024-07-28 09:48:26.291633	1
+1167	392	The parameter can bind only to a temporary object that does not have a name\nor to an object marked with `std::move()`.	text	txt	2024-07-28 09:48:26.982006	1
+1168	392	According to the semantics of rvalue references, the caller claims that it is\n*no longer interested in the value*. Therefore, you can modify the object the\nparameter refers to. However, the caller might still be interested in using\nthe object. Therefore, any modification should keep the referenced object in\na valid state.	text	txt	2024-07-28 09:48:27.003314	2
+1173	393	void foo(const std::string& arg);	code	cpp	2024-07-28 09:48:28.488389	3
+4233	450	#include <limits>\n\ntemplate<typename T, typename Iter>\nT minimum(Iter const start, Iter const end)\n{\n    T latest_minimum = std::numeric_limits<T>::max();\n\n    return latest_minimum;\n}	code	cpp	2025-07-16 14:58:28.222163	5
 1179	393	You can pass:	text	txt	2024-07-28 09:48:28.620763	9
 1180	393	- A modifiable object	text	txt	2024-07-28 09:48:28.641685	10
 1181	393	**non-const rvalue reference**	text	txt	2024-07-28 09:48:28.662588	11
-1182	393	void foo(std::string&& arg);	code	txt	2024-07-28 09:48:28.683403	12
 1183	393	The function has write access to the passed argument.\nHowever, you have restrictions on what you can pass:	text	txt	2024-07-28 09:48:28.703213	13
 1184	393	- A temporary object that does not have a name\n- A non-`const` object marked with `std::move()`	text	txt	2024-07-28 09:48:28.724256	14
 1185	393	The semantic meaning is that we give `foo()` write access to the passed\nargument to steal the value.	text	txt	2024-07-28 09:48:28.746123	15
 1186	393	**const rvalue reference**	text	txt	2024-07-28 09:48:28.767736	16
-1187	393	void foo(const std::string&& arg);	code	txt	2024-07-28 09:48:28.78819	17
 1188	393	This also means that you have read access to the passed argument.\nYou can only pass:	text	txt	2024-07-28 09:48:28.809884	18
 1189	393	- A temporary object that does not have name\n- A `const` or non-`const` object marked with `std::move()`	text	txt	2024-07-28 09:48:28.831577	19
 1190	393	However, there is no useful semantic meaning of this case.	text	txt	2024-07-28 09:48:28.853052	20
@@ -17330,840 +17082,310 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 1195	396	* No <b>copy constructor</b> is user-declared\n* No <b>copy assignment operator</b> is user-declared\n* No another <b>move operation</b> is user-declared\n* No <b>destructor</b> is user-declared	text	txt	2024-07-28 09:48:30.009595	2
 1196	397	Declaring destructors in anyway disables the automatic generation of move\noperations.	text	txt	2024-07-28 09:48:30.301132	1
 1197	398	By default, both copying and moving special member functions are generated\nfor class.	text	txt	2024-07-28 09:48:30.897685	1
-1198	398	class Person\n{\n    ...\npublic:\n    ...\n    // NO copy constructor/assignment declared\n    // NO move constructor/assignment declared\n    // NO destructor declared\n};	code	txt	2024-07-28 09:48:30.918305	2
 1199	399	Generated move operations might introduce problems even though the generated\ncopy operations work correctly. In particular, you have to be careful in the\nfollowing situations:	text	txt	2024-07-28 09:48:31.335346	1
 1200	399	- Values of members have restrictions\n- Values of members depend on each other\n- Member with reference semantics are used (pointers, smart pointers, ...)\n- Objects have no default constructed state	text	txt	2024-07-28 09:48:31.355678	2
 1201	400	The guideline is to either declare all five (copy constructor, move\nconstructor, copy assignment operator, move assignment operator, and\ndestructor) or none of them. Declaration means either to implement, set as\ndefault, or set as deleted.	text	txt	2024-07-28 09:48:31.671011	1
 1202	401	Move constructor is called when the caller no longer needs the value. Inside\nthe move constructor, we hdecide where an how long we need it. In particular,\nwe might need the value multiple times and not lose it with its first use.	text	txt	2024-07-28 09:48:32.314338	1
-1203	401	void insertTwice(std::vector<std::string>& coll, std::string&& str)\n{\n    coll.push_back(str);    // copy str into coll\n    coll.push_back(std::move(str));     // move str into coll\n}	code	txt	2024-07-28 09:48:32.336215	2
 1204	401	The important lesson to learn here is that a parameter being declared as an\nrvalue reference restricts what we can pass to this function but behaves just\nlike any other non-`const` object of this type.	text	txt	2024-07-28 09:48:32.356868	3
 1205	402	All types in C++ standard library receive a valid but unspecified state when\nobjects are moved to themselves. This means that by default, you might lose\nthe values of your members and you might even have a more severe problem if\nyour type does not work properly with members that have arbitrary values.	text	txt	2024-07-28 09:48:33.04932	1
 1206	402	The traditional/naive way to protect against self-assignments is to check\nwether both operands are identical. You can also do this when implementing\nthe move assignment operator.	text	txt	2024-07-28 09:48:33.071338	2
-1207	402	Customer& operator=(Customer&& other) noexcept\n{\n    if (this != &other)\n    {\n        name = std::move(other.name);\n        values = std::move(other.values);\n    }\n    return *this;\n}	code	txt	2024-07-28 09:48:33.09303	3
-1208	403	if you declare the move constructor as deleted, you cannot move (you have\ndisabled this operation; any fallback is not used) and cannot copy (because a\ndeclared move constructor disables copy operations).	text	txt	2024-07-28 09:48:34.432418	1
-1209	403	class Person\n{\npublic:\n    ...\n    // NO copy constructor declared	text	txt	2024-07-28 09:48:34.45322	2
-1210	403	    // move constructor/assignment declared as deleted:\n    Person(Person&&) = delete;\n    Person& operator=(Person&&) = delete;\n    ...\n};	text	txt	2024-07-28 09:48:34.475797	3
-1211	403	Person p{"Tina", "Fox"};\ncoll.push_back(p); // ERROR: copying disabled\ncoll.push_back(std::move(p)); // ERROR: moving disabled	code	txt	2024-07-28 09:48:34.496348	4
-1212	403	You get the same effect by declaring copying special member functions as\ndeleted and that is probably less confusing for other programmers.	text	txt	2024-07-28 09:48:34.517545	5
-1213	403	Deleting the move operations and enabling the copy operations really makes no sense:\nclass Person\n{\npublic:\n    ...\n    // copy constructor explicitly declared:\n    Person(const Person& p) = default;\n    Person& operator=(const Person&) = default;	text	txt	2024-07-28 09:48:34.540005	6
-1214	403	    // move constructor/assignment declared as deleted:\n    Person(Person&&) = delete;\n    Person& operator=(Person&&) = delete;\n    ...\n};	text	txt	2024-07-28 09:48:34.562064	7
-1215	403	Person p{"Tina", "Fox"};\ncoll.push_back(p); // OK: copying enabled\ncoll.push_back(std::move(p)); // ERROR: moving disabled	code	txt	2024-07-28 09:48:34.581343	8
-1216	403	In this case, `=delete` disables the fallback mechanism.	text	txt	2024-07-28 09:48:34.602877	9
+4234	451	#include <limits>\n\nauto s = std::numeric_limits<short>::digits;\nauto d = std::numeric_limits<double>::digits;	code	cpp	2025-07-16 14:58:37.147347	2
+4235	452	#include <limits>\n\nauto s = std::numeric_limits<short>::digits10;\nauto d = std::numeric_limits<double>::digits10;	code	cpp	2025-07-16 14:58:48.156271	1
+4236	453	#include <limits>\n\nauto value_is_signed = std::numeric_limist<T>::is_signed;	code	cpp	2025-07-16 14:58:55.505561	1
 1217	404	Returning a local object by value automatically uses move semantics if\nsupported. On the other hand, `std::move` is just a `static_cast` to an\nrvalue reference, therefore disables **return value optimization**, which\nusually allows the returned object to be used as a return value instead.	text	txt	2024-07-28 09:48:35.073806	1
-1218	404	std::string foo()\n{\n    std::string s;\n    return std::move(s); // BAD, returns std::string&&\n}	code	txt	2024-07-28 09:48:35.094681	2
+1922	573		code	txt	2024-07-28 09:50:29.447795	2
+1182	393	void foo(std::string&& arg);	code	cpp	2024-07-28 09:48:28.683403	12
+1187	393	void foo(const std::string&& arg);	code	cpp	2024-07-28 09:48:28.78819	17
+1203	401	void insertTwice(std::vector<std::string>& coll, std::string&& str)\n{\n    coll.push_back(str);    // copy str into coll\n    coll.push_back(std::move(str));     // move str into coll\n}	code	cpp	2024-07-28 09:48:32.336215	2
+1207	402	Customer& operator=(Customer&& other) noexcept\n{\n    if (this != &other)\n    {\n        name = std::move(other.name);\n        values = std::move(other.values);\n    }\n    return *this;\n}	code	cpp	2024-07-28 09:48:33.09303	3
+4237	454	#include <limits>\n\nauto value_is_integer = std::numeric_limist<T>::is_integer;	code	cpp	2025-07-16 14:59:01.21841	1
+1208	403	if you declare the move constructor as deleted, you cannot move (you have\ndisabled this operation; any fallback is not used) and cannot copy (because a\ndeclared move constructor disables copy operations).	text	txt	2024-07-28 09:48:34.432418	1
+1218	404	std::string foo()\n{\n    std::string s;\n    return std::move(s); // BAD, returns std::string&&\n}	code	cpp	2024-07-28 09:48:35.094681	2
+4238	455	#include <limits>\n\nauto value_is_exact = std::numeric_limist<T>::is_exact;	code	cpp	2025-07-16 14:59:07.064751	1
+4239	456	#include <limits>\n\nauto value_has_infinity = std::numeric_limist<T>::has_infinity;	code	cpp	2025-07-16 14:59:40.909708	1
 1219	405	Declaring the special move member functions as deleted is usually not the\nright way to do it because it disables the fallback mechanism. The right way\nto disable move semantics while providing copy semantics is to declare one of\nthe other special member functions (copy constructor, assignment operator, or\ndestructor). I recommend that you default the copy constructor and the\nassignment operator (declaring one of them would be enough but might cause\nunnecessary confusion):	text	txt	2024-07-28 09:48:35.704622	1
-1220	405	class Customer\n{\n    ...\npublic:\n    ...\n    Customer(const Customer&) = default;    // disable move semantics\n    Customer& operator=(const Customer&) = default;     // disable move semantics\n};	code	txt	2024-07-28 09:48:35.72559	2
-1221	406	If move semantics is unavailable or has been deleted for a type, this has no\ninfluence on the generation of move semantics for classes that have members\nof this type.	text	txt	2024-07-28 09:48:36.601007	1
-1222	406	class Customer\n{\n    ...\npublic:\n    ...\n    Customer(const Customer&) = default;\n    // copying calls enabled\n    Customer& operator=(const Customer&) = default; // copying calls enabled\n    Customer(Customer&&) = delete;\n    // moving calls disabled\n    Customer& operator=(Customer&&) = delete;\n    // moving calls disabled\n};	text	txt	2024-07-28 09:48:36.622668	2
-1223	406	class Invoice\n{\n    std::string id;\n    Customer cust;\npublic:\n    ... // no special member functions\n};	text	txt	2024-07-28 09:48:36.643662	3
-1224	406	Invoice i;\nInvoice i1{std::move(i)}; // OK, moves id, copies cust	code	txt	2024-07-28 09:48:36.66584	4
-1225	407	Usually, in polymorphic derived classes there is no need to declare special\nmember functions, especially virtual destructor.	text	txt	2024-07-28 09:48:37.379986	1
-1226	407	class Base\n{\npublic:\n    virtual void do_something() const = 0;\n    virtual ~Base() = default;\n};	text	txt	2024-07-28 09:48:37.401074	2
-1227	407	class Derived: public Base\n{\npublic:\n    virtual void do_something() const override;\n    virtual ~Derived() = default; // BAD, redundant, disables move\n};	code	txt	2024-07-28 09:48:37.422308	3
-3647	1167	    ; use and print the results of sum function\n    mov rdi, 1\n    mov rsi, 3\n    call sum	text	txt	2024-07-28 09:55:24.629689	16
-1228	408	With move semantics call-by-value can become cheap if a temporary object is\npassed or the passed argument is marked with `std::move()`. Retuurning a\nlocal object by value can be optimized away. However, if it is not optimized\naway, the call is guaranteed to be cheap now.	text	txt	2024-07-28 09:48:38.240365	1
-1229	408	void fooByVal(std::string str);\nvoid fooByRRef(std::string&& str);;	text	txt	2024-07-28 09:48:38.260688	2
-1230	408	std::string s1{"data"}, s2{"data"};	text	txt	2024-07-28 09:48:38.281432	3
-1231	408	fooByVal(std::move(s1));    // s1 is moved\nfooByRRef(std::move(s2));   // s2 might be moved	code	txt	2024-07-28 09:48:38.302908	4
-1232	408	The function taking the string by value will use move semantics because a new\nstring is created with the value of passed argument. The function taking the\nstring by rvalue reference might use move semantics. Passing the argument\ndoes not create a new string. Wether the value of the passed argument is\nstolen/modified depends on the implementation of the function.	text	txt	2024-07-28 09:48:38.323813	5
-1233	408	Move semantics does not guarantee that any optimization happens at all or\nwhat the effect of any optimization is. All we know is that the passed object\nis subsequently in a valid but unspecified state.	text	txt	2024-07-28 09:48:38.344799	6
+4244	459	#include <random>\n\nstd::random_device seeder;\nstd::mt19937 generator1{seeder()};\n\nstd::mt19937 generator2;\ngenerator2.seed(seeder());	code	cpp	2025-07-16 15:01:05.478273	2
+4248	462	#include <random>\n#include <functional>\n\nint main()\n{\n    std::random_device seeder;\n\n    std::array<int, std::mt19937::state_size> seed_data{};\n    std::generate(std::begin(seed_data), std::end(seed_data), std::ref(seeder));\n    std::seed_seq seeds(std::begin(seed_data), std::end(seed_data));\n    std::mt19937 generator{seeds};\n    std::uniform_int_distribution<> dist{0, 10}; // [0, 10)\n    int random_number = dist(generator);\n}	code	cpp	2025-07-16 15:01:34.502272	2
+4245	460	#include <random>\n\nstd::random_device seeder;\nstd::mt19937 generator{seeder()};\nauto number = generator();	code	cpp	2025-07-16 15:01:16.178677	2
 1234	409	Constructing an object only by const lvalue references will allocate four\nmemory spaces which two of them are unnecessary. Also move operation does not\nwork here because parameters are const.	text	txt	2024-07-28 09:48:42.040525	1
+3647	1167	    ; use and print the results of sum function\n    mov rdi, 1\n    mov rsi, 3\n    call sum	text	txt	2024-07-28 09:55:24.629689	16
 1235	409	When passing string literals to const lvalue references, compiler creates two\ntemporary objects of `std::string`, which then will be used to initialize\nmembers while this also makes two copies.	text	txt	2024-07-28 09:48:42.061547	2
-1236	409	#include <string>	text	txt	2024-07-28 09:48:42.083074	3
-1237	409	class box\n{\nprivate:\n    std::string first;\n    std::string last;	text	txt	2024-07-28 09:48:42.103643	4
-1238	409	public:\n    box(std::string const& f, std::string const& l): first{f}, last{l} {}\n    // f, l allocated\n    // first, last also allocated\n};	text	txt	2024-07-28 09:48:42.125897	5
-1239	409	box b{"First", "Last"};	code	txt	2024-07-28 09:48:42.146717	6
-1240	409	With constructors that take each argument by value and moving them into\nmembers, we avoid redundant memory allocations. This is especially true when\nwe are taking values in constructor initialization list.	text	txt	2024-07-28 09:48:42.168895	7
-1241	409	#include <string>	text	txt	2024-07-28 09:48:42.191237	8
-1242	409	class box\n{\nprivate:\n    std::string first;\n    std::string last;	text	txt	2024-07-28 09:48:42.213049	9
-1243	409	public:\n    box(std::string f, std::string l): first{std::move(f)}, last{std::move(l)} {}\n};	code	txt	2024-07-28 09:48:42.234552	10
-1244	409	Another good example to pass by value and move is methods taking objects to\nadd to a data structure:	text	txt	2024-07-28 09:48:42.2536	11
-1245	409	#include <string>\n#include <vector>	text	txt	2024-07-28 09:48:42.274321	12
-1246	409	class box\n{\nprivate:\n    std::string first;\n    std::vector<std::string> values;	text	txt	2024-07-28 09:48:42.296132	13
-1247	409	public:\n    box(std::string f, std::vector<std::string> v): first{std::move(f)}, values{std::move(v)} {}\n    insert(std::string n) { values.push_back(std::move(n)); }\n};	code	txt	2024-07-28 09:48:42.317224	14
-1248	409	It is also possible to use rvalue parameters and move options:	text	txt	2024-07-28 09:48:42.336273	15
-1249	409	#include <string>	text	txt	2024-07-28 09:48:42.357269	16
-1250	409	class box\n{\nprivate:\n    std::string first;\n    std::string last;	text	txt	2024-07-28 09:48:42.37994	17
-1251	409	public:\n    box(std::string&& f, std::string&& l): first{std::move(f)}, last{std::move(l)} {}\n};	code	txt	2024-07-28 09:48:42.40117	18
-1252	409	But this solely prevents objects with names. So we should implement two\noverloads that pass by values and move:	text	txt	2024-07-28 09:48:42.421675	19
-1253	409	Overloading both for rvalue and lvalue references lead to many different\ncombinations of parameters.	text	txt	2024-07-28 09:48:42.442683	20
-1254	409	In some cases, move operations take significant time. For example, if we have\na class with a string and a vector of values, taking by value and move is\nusually the right approach. However, if we have a `std::array` member, moving\nit will take significant time even if the members are moved.	text	txt	2024-07-28 09:48:42.463009	21
-1255	409	#include <string>\n#include <array>	text	txt	2024-07-28 09:48:42.484018	22
-1256	409	class box\n{\nprivate:\n    std::string first;\n    std::array<std::string, 1000> values;	text	txt	2024-07-28 09:48:42.50653	23
-1257	409	public:\n    box(std::string f, std::array<std::string, 1000>& v): first{std::move(f)}, values{v} {}\n    box(std::string f, std::array<std::string, 1000>&& v): first{std::move(f)}, values{std::move(v)} {}\n};	code	txt	2024-07-28 09:48:42.529563	24
-1302	418	{\n    std::string s("Hello World!");\n    vec.push_back(s); // Copy\n    vec.push_back(std::move(s)); // Move\n}	text	txt	2024-07-28 09:48:49.590405	4
-1258	409	Often, pass by value is useful when we *create and initialize* a new value.\nBut if we already have a value, which we update or modify, using this\napproach would be counterproductive. A simple example would be setters:	text	txt	2024-07-28 09:48:42.551019	25
-1259	409	#include <string>	text	txt	2024-07-28 09:48:42.571775	26
-1260	409	class box\n{\nprivate:\n    std::string first;	text	txt	2024-07-28 09:48:42.591571	27
-1261	409	public:\n    box(std::string f): first{std::move(f)} {}\n    void set_first(std::string f) { first = f; }\n};	text	txt	2024-07-28 09:48:42.614385	28
-1262	409	box b{"Sample"};\nb.set_first("Another Sample");\nb.set_first("Another Sample");\nb.set_first("Another Sample");\nb.set_first("Another Sample");	code	txt	2024-07-28 09:48:42.635711	29
-1263	409	Each time we set a new firstname we create a new temporary parameter `s`\nwhich allocates its own memory. But by implementing in the traditional way\ntaking a const lvalue reference we avoid allocations:	text	txt	2024-07-28 09:48:42.657736	30
-1264	409	#include <string>	text	txt	2024-07-28 09:48:42.680363	31
-1265	409	class box\n{\nprivate:\n    std::string first;	text	txt	2024-07-28 09:48:42.701515	32
-1266	409	public:\n    box(std::string f): first{std::move(f)} {}\n    void set_first(std::string const& f) { first = f; }\n};	code	txt	2024-07-28 09:48:42.722642	33
-1267	409	Even with move semantics, the best approach for setting existing values is to\ntake the new values by const lvalue reference and assign without using move\noperation.	text	txt	2024-07-28 09:48:42.745615	34
-1268	409	Taking a parameter by value and moving it to where the new value is needed is\nonly useful when we store the passed value somewhere as a new value where we\nneed new memory allocation anyway. When modifying an existing value, this\npolicy might be counterproductive.	text	txt	2024-07-28 09:48:42.767129	35
-1846	542	template<typename CharT>\ninline tstring<CharT> remove(tstring<CharT> text, CharT const character)\n{\n    auto last = std::remove_if(std::begin(text), std::end(text), [character](CharT const c) { return c == character; });\n    text.erase(last, std::end(text));\n    return text;\n}	code	txt	2024-07-28 09:50:14.559843	3
-1847	543	#include <string>\n#include <sstream>\n#include <vector>	text	txt	2024-07-28 09:50:15.341052	1
-1269	410	- Constructors that initialize members from parameters, for which move\n  operations are cheap, should take the argument by value and move it to the\n  member.\n- Constructors that initialize members from parameters, for which move\n  operations take a significant amount of time, should be overloaded for move\n  semantics for best performance.\n- In general, creating and initializing new values from parameters, for which\n  move operations are cheap, should take the arguments by value and move.\n  However, do not take by value and move to update/modify existing values.	text	txt	2024-07-28 09:48:43.149396	1
-1270	411	class base\n{\n    virtual void foo() = 0;\n    virtual void bar() {}\n    virtual void baz() = 0;\n};	text	txt	2024-07-28 09:48:43.910586	1
-1271	411	class alpha: public base\n{\n    virtual void bar() override {}\n    virtual void baz() override {}\n};	text	txt	2024-07-28 09:48:43.93154	2
-1272	411	class beta: public alpha\n{\n    virtual void foo() override {}\n};	text	txt	2024-07-28 09:48:43.951912	3
-1273	411	beta object;	code	txt	2024-07-28 09:48:43.974055	4
-1274	412	class base\n{\n    virtual void foo() = 0;\n    virtual void bar() {}\n    virtual void baz() = 0;\n};	text	txt	2024-07-28 09:48:44.853245	1
-1275	412	class alpha: public base\n{\n    virtual void foo() override {}\n    virtual void baz() override final {}\n};	text	txt	2024-07-28 09:48:44.873577	2
-1276	412	class beta: public alpha\n{\n    // won't compile\n    virtual void baz() override {}\n};	text	txt	2024-07-28 09:48:44.893414	3
-1277	412	int main()\n{\n    beta object;\n}	code	txt	2024-07-28 09:48:44.915026	4
-1278	413	class base\n{\n    virtual void foo() = 0;\n    virtual void bar() {}\n    virtual void baz() = 0;\n};	text	txt	2024-07-28 09:48:45.61151	1
-1279	413	class derived final: public base\n{\n    virtual void foo() override {}\n    virtual void baz() override {}\n};	text	txt	2024-07-28 09:48:45.631865	2
-1280	413	// won't compile\nclass prime: public derived\n{\n};	code	txt	2024-07-28 09:48:45.65422	3
-1281	414	#include <syncstream>\n#include <iostream>	text	txt	2024-07-28 09:48:46.252922	1
-1282	414	int main()\n{\n    std::osyncstream output_stream{std::cout};\n    output_stream << "This literal string will be";\n    output_stream << std::endl; // no effect\n    output_stream << "written into output stream";\n    // flushes on destruction\n}	code	txt	2024-07-28 09:48:46.274301	2
+1240	409	With constructors that take each argument by value and moving them into\nmembers, we avoid redundant memory allocations. This is especially true when\nwe are taking values in constructor initialization list.	text	txt	2024-07-28 09:48:42.168895	4
+1244	409	Another good example to pass by value and move is methods taking objects to\nadd to a data structure:	text	txt	2024-07-28 09:48:42.2536	6
+1248	409	It is also possible to use rvalue parameters and move options:	text	txt	2024-07-28 09:48:42.336273	8
+4241	457	#include <complex>\n\nusing namespace std::complex_literals;\n\nauto c{ 12.0 + 4.2i }; // std::complex<double>	code	cpp	2025-07-16 14:59:59.030373	1
+4242	458	#include <random>\n\nauto min = std::mt19937::min();\nauto max = std::mt19937::max();	code	cpp	2025-07-16 15:00:54.320617	2
+4473	568	namespace std\n{\n    template <typename T, typename Allocator = allocator<T>>\n    class vector\n    {\n    public:\n        T& operator[](size_type pos);\n        // narrow: pos < size()\n\n        T& at(size_type pos);\n        // wide: throws if out of bound\n\n        T& front();\n        // narrow: 0 != empty()\n\n        vector(vector&&);\n        // wide\n    };\n} // std	code	cpp	2025-07-17 11:58:32.08921	3
+4246	461	#include <random>\n\nstd::mt19937 generator{};\ngenerator.discard(4); // discard 4 numbers	code	cpp	2025-07-16 15:01:23.468663	1
+4474	574	class base\n{\npublic:\n    virtual void do_something(int x)\n        pre(x < 100)\n    {\n    }\n};\n\nclass derived : public base\n{\npublic:\n    virtual void do_something(int x)\n        pre(x < 120)\n    {\n    }\n};	code	cpp	2025-07-17 11:59:24.379017	2
+4251	463	#include <chrono>\n#include <thread>\n\nusing namespace std::chrono_literals;\n\nauto tp1 = std::chrono::steady_clock::now();\nstd::this_thread::sleep_for(1ms);\nauto tp2 = std::chrono::steady_clock::now();\n\nauto duration = tp2 - tp1;\nstd::cout << duration << "\\\\n";\n// example output: 1115389ns	code	cpp	2025-07-16 16:13:23.716575	2
+1221	406	If move semantics is unavailable or has been deleted for a type, this has no\ninfluence on the generation of move semantics for classes that have members\nof this type.	text	txt	2024-07-28 09:48:36.601007	1
+1225	407	Usually, in polymorphic derived classes there is no need to declare special\nmember functions, especially virtual destructor.	text	txt	2024-07-28 09:48:37.379986	1
+1228	408	With move semantics call-by-value can become cheap if a temporary object is\npassed or the passed argument is marked with `std::move()`. Retuurning a\nlocal object by value can be optimized away. However, if it is not optimized\naway, the call is guaranteed to be cheap now.	text	txt	2024-07-28 09:48:38.240365	1
+1232	408	The function taking the string by value will use move semantics because a new\nstring is created with the value of passed argument. The function taking the\nstring by rvalue reference might use move semantics. Passing the argument\ndoes not create a new string. Wether the value of the passed argument is\nstolen/modified depends on the implementation of the function.	text	txt	2024-07-28 09:48:38.323813	3
+1233	408	Move semantics does not guarantee that any optimization happens at all or\nwhat the effect of any optimization is. All we know is that the passed object\nis subsequently in a valid but unspecified state.	text	txt	2024-07-28 09:48:38.344799	4
+4254	464	#include <chrono>\n#include <thread>\n\nusing namespace std::chrono_literals;\n\nauto tp1 = std::chrono::steady_clock::now();\nstd::this_thread::sleep_for(1ms);\nauto tp2 = std::chrono::steady_clock::now();\n\n// explicit type of duration, base type double, with micro precision\nstd::chrono::duration<double, std::micro> sleep_duration = tp2 - tp1;\nstd::cout << sleep_duration << "\\\\n";\n// example output: 1115.39µs	code	cpp	2025-07-16 16:13:38.372491	1
+4258	466	#include <chrono>\n\nbool system_is_steady = std::chrono::system_clock::is_steady;	code	cpp	2025-07-16 16:14:23.375021	1
+4257	465	#include <chrono>\n#include <thread>\n\nusing namespace std::chrono_literals;\n\nauto tp1 = std::chrono::steady_clock::now();\nstd::this_thread::sleep_for(1ms);\nauto tp2 = std::chrono::steady_clock::now();\n\nauto micro = std::chrono::duration_cast<std::chrono::microseconds>(tp2 - tp1);\nstd::cout << micro << "\\\\n";\n// example output: 1115µs	code	cpp	2025-07-16 16:13:50.561888	2
+4259	467	#include <chrono>\n\nauto resolution = std::chrono::system_clock::duration{1};	code	cpp	2025-07-16 16:14:33.104615	1
+4476	575	#include <thread>\n#include <chrono>\n\nvoid do_something()\n{\n    using namespace std::chrono_literals;\n    std::this_thread::sleep_for(1s);\n}\n\nint main()\n{\n    std::thread worker{do_something};\n    worker.join();\n}	code	cpp	2025-07-17 11:59:50.305831	1
 1283	415	String stream operations are slow. To enhance the performance of operations,\nyou have the `view()` member function coming in C++20. This can be used as an\nalternative to `str()`. In short, rather than creating a copy of the internal\nstring, you will get a view instead, so there is no need to dynamically\nallocate memory.	text	txt	2024-07-28 09:48:47.054657	1
-1284	415	#include <iostream>\n#include <sstream>	text	txt	2024-07-28 09:48:47.075105	2
-1285	415	// make allocations obvious\nvoid* operator new(std::size_t sz){\n    std::cout << "Allocating " << sz << " bytes\\\\n";\n    return std::malloc(sz);\n}	text	txt	2024-07-28 09:48:47.09673	3
-1286	415	int main() {\n    std::stringstream str;\n    str << "Using C++20 standard";\n    // allocates	text	txt	2024-07-28 09:48:47.117577	4
-1287	415	    std::cout << str.str() << '\\\\n';\n    // allocates	text	txt	2024-07-28 09:48:47.13789	5
-1288	415	    std::cout << str.view() << '\\\\n';\n    // doesn't allocate\n}	code	txt	2024-07-28 09:48:47.159596	6
 1289	416	Using C++20 there is an extra constructor that can take an rvalue reference\nto the string object, and thus it might not require an additional copy:	text	txt	2024-07-28 09:48:47.787053	1
-1290	416	#include <iostream>\n#include <sstream>	text	txt	2024-07-28 09:48:47.807647	2
-1291	416	// make allocations obvious\nvoid* operator new(std::size_t sz){\n    std::cout << "Allocating " << sz << " bytes\\\\n";\n    return std::malloc(sz);\n}	text	txt	2024-07-28 09:48:47.831143	3
-1292	416	int main() {\n    std::stringstream str {std::string("hello C++ programming World")};\n}	code	txt	2024-07-28 09:48:47.850601	4
-1293	416	Compiled with C++17, two allocations can be witnessed. But compiled with\nC++20, duplicate copy no longer takes place.	text	txt	2024-07-28 09:48:47.871537	5
+1293	416	Compiled with C++17, two allocations can be witnessed. But compiled with\nC++20, duplicate copy no longer takes place.	text	txt	2024-07-28 09:48:47.871537	3
 1294	417	Staring with C++23, you can take complete control over the internal memory of\na stream.	text	txt	2024-07-28 09:48:48.684565	1
-1295	417	#include <iostream>\n#include <sstream>\n#include <spanstream> // new header	text	txt	2024-07-28 09:48:48.706131	2
-1296	417	// make allocations obvious\nvoid* operator new(std::size_t sz){\n    std::cout << "Allocating " << sz << " bytes\\\\n";\n    return std::malloc(sz);\n}	text	txt	2024-07-28 09:48:48.728587	3
-1297	417	int main() {\n    std::stringstream ss;\n    ss << "one string that doesn't fit into SSO";\n    ss << "another string that hopefully won't fit";\n    // allocates memory	text	txt	2024-07-28 09:48:48.752175	4
-1298	417	    char buffer[128]{};\n    std::span<char> internal_memory(buffer);\n    std::basic_spanstream<char> ss2(internal_memory);\n    ss2 << "one string that doesn't fit into SSO";\n    ss2 << "another string that hopefully won't fit";\n    // doesn't allocate new memory\n}	code	txt	2024-07-28 09:48:48.77452	5
-1299	418	In C++11, all containers received emplace variants of their typical\ninsert/push methods. The emplace variants can construct the element in place,\nsaving a move or copy.	text	txt	2024-07-28 09:48:49.526105	1
-1300	418	#include <vector>\n#include <string>	text	txt	2024-07-28 09:48:49.546821	2
-1301	418	std::vector<std::string> vec;	text	txt	2024-07-28 09:48:49.566733	3
-1303	418	{\n    std::string s("Hello World!");\n    vec.emplace_back(s); // Copy (same as push_back)\n    vec.emplace_back(std::move(s)); // Move (same as push_back)	text	txt	2024-07-28 09:48:49.611912	5
-1304	418	    // In-place construction, no move or copy:\n    vec.emplace_back("Hello World!");	text	txt	2024-07-28 09:48:49.632733	6
-1305	418	    // Note the difference, this is still a move:\n    vec.emplace_back(std::string{"Hello World!"});\n}	code	txt	2024-07-28 09:48:49.653807	7
-1306	419	To find a substring prior standard C++23:	text	txt	2024-07-28 09:48:50.503099	1
-1307	419	#include <string>\n#include <iostream>	text	txt	2024-07-28 09:48:50.523186	2
-1308	419	int main() {\n    std::string message{"Using prior C++23 standard."};	text	txt	2024-07-28 09:48:50.544059	3
-1309	419	    if (message.find("C++") != std::string::npos)\n        std::cout << "You are using C++\\\\n";\n}	code	txt	2024-07-28 09:48:50.567054	4
-1310	419	Using C++23:	text	txt	2024-07-28 09:48:50.588603	5
-1311	419	#include <string>\n#include <iostream>	text	txt	2024-07-28 09:48:50.609858	6
-1312	419	int main() {\n    std::string message{"Using C++23 standard."};	text	txt	2024-07-28 09:48:50.633503	7
-1313	419	    if (message.contains("C++"))\n        std::cout << "You are using C++\\\\n";\n}	code	txt	2024-07-28 09:48:50.654833	8
-1314	420	Using C++23:	text	txt	2024-07-28 09:48:51.076935	1
-1315	420	#include <string_view>	text	txt	2024-07-28 09:48:51.096539	2
-1316	420	bool secure_protocol(std::string_view url)\n{\n    if (url.starts_with("https"))\n        return true;	text	txt	2024-07-28 09:48:51.117077	3
-1317	420	    return false;\n}	code	txt	2024-07-28 09:48:51.13843	4
-1318	421	#include <string_view>	text	txt	2024-07-28 09:48:51.595657	1
-1319	421	bool org_domain(std::string_view url)\n{\n    if (url.ends_with(".org"))\n        return true;	text	txt	2024-07-28 09:48:51.616325	2
-1320	421	    return false;\n}	code	txt	2024-07-28 09:48:51.636754	3
-1321	422	auto si  = std::to_string(42); // "42"\nauto sl  = std::to_string(42L); // "42"\nauto su  = std::to_string(42u); // "42"\nauto sd  = std::to_wstring(42.0); // "42.000000"\nauto sld = std::to_wstring(42.0L); // "42.000000"	code	txt	2024-07-28 09:48:51.997505	1
-1322	423	auto i1 = std::stoi("42");\nauto i2 = std::stoi("101010", nullptr, 2);\nauto i3 = std::stoi("052", nullptr, 8);\nauto i7 = std::stoi("052", nullptr, 0);\nauto i4 = std::stoi("0x2A", nullptr, 16);\nauto i9 = std::stoi("0x2A", nullptr, 0);\nauto i10 = std::stoi("101010", nullptr, 2);\nauto i11 = std::stoi("22", nullptr, 20);\nauto i12 = std::stoi("-22", nullptr, 20);	text	txt	2024-07-28 09:48:52.863448	1
-1323	423	auto d1 = std::stod("123.45"); // d1 = 123.45000000000000\nauto d2 = std::stod("1.2345e+2"); // d2 = 123.45000000000000\nauto d3 = std::stod("0xF.6E6666p3"); // d3 = 123.44999980926514	code	txt	2024-07-28 09:48:52.883242	2
-1324	423	1. The first parameter is the input string.\n2. The second parameter is a pointer that, when not null, will receive the\n   number of characters that were processed. This can include any leading\n   whitespaces that were discarded, the sign, and the base prefix, so it\n   should not be confused with the number of digits the integral value has.\n3. A number indicating the base; by default, this is 10. Valid numbers of 2\n   to 36.	text	txt	2024-07-28 09:48:52.904194	3
-1325	423	template<typename T, typename = typename T = std::is_integral_v<T>>\nT stoi(std::string const& str, std::size_t* pos = 0, T base = 10);	text	txt	2024-07-28 09:48:52.925105	4
-1326	423	template<typename F, typename = typename F = std::is_floating_point_v<F>>\nF stof(std::string const& str, std::size_t* pos = 0);	code	txt	2024-07-28 09:48:52.94633	5
+4262	468	#include <chrono>\n\nusing namespace std::chrono_literals;\n\nauto timer {2h + 42min + 15s}; // std::chrono::duration<long long>\n\nauto year { 2035y }; // std::chrono::year (c++20)\nauto day { 15d }; // std::chrono::day (c++20)	code	cpp	2025-07-16 16:14:59.949302	1
+4263	470	// A day in a year can be specified using literals and operator/\nauto christmas_eve = 2023y/std::chrono::December/24d;\n// decltype(christmas_eve) == std::chrono::year_month_day\n\nauto specific_day = std::chrono::weekday{std::chrono::sys_days{christmas_eve}};\n// specific_day == std::chrono::Sunday	code	cpp	2025-07-16 16:15:29.987992	1
+1269	410	- Constructors that initialize members from parameters, for which move\n  operations are cheap, should take the argument by value and move it to the\n  member.\n- Constructors that initialize members from parameters, for which move\n  operations take a significant amount of time, should be overloaded for move\n  semantics for best performance.\n- In general, creating and initializing new values from parameters, for which\n  move operations are cheap, should take the arguments by value and move.\n  However, do not take by value and move to update/modify existing values.	text	txt	2024-07-28 09:48:43.149396	1
+4271	475	#include <vector>\n#include <iostream>\n\nint main() {\n    std::vector<int> data{1, 2, 3, 4, 5, 6};\n\n    // z is the literal suffix for signed size type\n    for (auto i = 0z; i < ssize(data); i++) {\n        int sum = 0;\n        if (i - 1 >= 0)\n            sum += data[i-1];\n        sum += data[i];\n        if (i + 1 < ssize(data))\n            sum += data[i+1];\n        std::cout << "" << sum << "\\\\n";\n    } // prints 3, 6, 9, 12, 15, 11\n}	code	cpp	2025-07-16 16:36:47.197495	2
+4264	471	#include <chrono>\n\nauto date{2024y/std::chrono::April/1d};\nfor (; date.month() == std::chrono::April; date += std::chrono::days{1})\n{\n    // iterate over all days in April 2024\n}	code	cpp	2025-07-16 16:15:36.804191	1
+4268	474	// C++17\nusing file_time_type = std::chrono::time_point</*trivial-clock*/>;\n\n// C++20\nusing file_time_type = std::chrono::time_point<std::chrono::file_clock>;	code	cpp	2025-07-16 16:18:39.549556	1
+4267	472	#include <iostream>\n#include <ctime>\n#include <sys/stat.h>\n\nint main(int argc, char** argv)\n{\n    char const* file_path{argv[0]};\n\n    struct stat file_stat;\n\n    if (stat(file_path, &file_stat) == 0)\n    {\n        std::time_t mod_time{file_stat.st_mtime};\n        char* str{std::asctime(std::localtime(&mod_time))};\n        std::cout << "Last modification time: " << str;;\n    }\n    else\n    {\n        std::cerr << "File status retrival failed\\\\n";\n    }\n}	code	cpp	2025-07-16 16:17:17.254314	1
+4269	474	#include <iostream>\n#include <filesystem>\n#include <chrono>\n\nint main(int argc, char** argv)\n{\n    std::filesystem::path file_path{argv[0]};\n    std::filesystem::file_time_type last_write_time = std::filesystem::last_write_time(file_path);\n    std::cout << std::format("{0:%F 0:%R}\\\\n", last_write_time);\n}	code	cpp	2025-07-16 16:18:59.149422	2
+4482	576	void do_something() {}\nvoid do_something_else() {}\n\n#include <thread>\n\nint main()\n{\n    std::thread thread_f(do_something);\n    thread_f.join();\n\n    background_task callable;\n    std::thread thread_c(callable);\n    thread_c.join();\n\nstruct background_task\n{\n    void operator()()\n    {\n        do_something();\n        do_something_else();\n    }\n};\n\n    // no to mistakenly call a thread like this:\n    //   std::thread thread_x(background_task());\n    // which can be correctly expressed like:\n    //   std::thread thread_x((background_task()));\n    //   std::thread thread_x{background_task()};\n\n    std::thread thread_l([]{\n        do_something();\n        do_something_else();\n    });\n    thread_l.join();\n}	code	cpp	2025-07-17 11:59:58.959257	1
+4604	636	create_directory(std::filesystem::path{"/tmp/notes"}); // OK\nremove(std::filesystem::path{"/tmp/note.txt"}); // OK\n\nstd::filesystem::create_directory("/tmp/note.txt"); // OK\nstd::filesystem::remove("/tmp/note.txt"); // OK\n\ncreate_directory("/tmp/notes"); // ERROR\nremove("/tmp/note.txt"); // OOPS: calls C function remove()	code	cpp	2025-07-17 12:19:10.858073	3
+4612	644	#include <filesystem>\n\nauto temp{std::filesystem::temp_directory_path()};	code	cpp	2025-07-17 12:20:16.752704	1
+4607	639	#include <iostream>\n#include <filesystem>\n\nint main()\n{\n    std::error_code ec;\n    std::filesystem::create_directory("/tmp/", ec);\n    if (ec)\n    {\n        std::cerr << ec.message() << std::endl;\n    }\n\n    if (ec == std::errc::read_only_file_system)\n    {\n        std::cerr << "directory is read only\\\\n";\n    }\n}	code	cpp	2025-07-17 12:19:29.502809	1
+4605	638	#include <iostream>\n#include <filesystem>\n\nint main()\n{\n    try\n    {\n        std::filesystem::create_directory("/tmp/");\n    }\n    catch (std::filesystem::filesystem_error const& exp)\n    {\n        std::cerr << exp.path1() << ": " << exp.what() << std::endl;\n    }\n}	code	cpp	2025-07-17 12:19:23.859883	1
+4609	641	#include <string>\n#include <filesystem>\n\nusing namespace std::string_literals;\n\nstd::filesystem::path{"/dev/null"s};    // std::string\nstd::filesystem::path{L"/dev/null"s};   // std::wstring\nstd::filesystem::u8path{u8"/dev/null"s};  // std::u8string\nstd::filesystem::u16path{u16"/dev/null"s}; // std::u16string\nstd::filesystem::u32path{u32"/dev/null"s}; // std::u32string	code	cpp	2025-07-17 12:19:56.557877	1
+4610	642	#include <string>\n#include <filesystem>\n\nstd::string filename{"/dev/random"};\nstd::filesystem::path{filename.begin(), filename.end()};	code	cpp	2025-07-17 12:20:00.233401	1
+2190	646	std::filesystem::path p{"assets/image.png"};\np.is_absolute(); // false\np.is_relative(); // true	code	cpp	2024-07-28 09:51:17.429978	1
 1327	424	* A sign, plus (+) or minus (-) (optional)\n* Prefix 0 to indicate an octal base (optional)\n* Prefix 0x or 0X to indicate a hexadecimal base (optional)\n* A sequence of digits	text	txt	2024-07-28 09:48:53.424476	1
-1328	424	auto i1 = std::stoi("42"); // 42\nauto i2 = std::stoi("    42"); // 42\nauto i3 = std::stoi("    42fortytwo"); // 42\nauto i4 = std::stoi("+42"); // 42\nauto i5 = std::stoi("-42"); // -42	code	txt	2024-07-28 09:48:53.44617	2
-1329	425	- `std::invalid_argument`: conversion cannot be performed.\n- `std::out_of_range`: converted value is outside the range of the result\n  type.	text	txt	2024-07-28 09:48:54.20091	1
-1330	425	try\n{\n    auto i1 = std::stoi("");\n}\ncatch (std::invalid_argument const& exp)\n{\n    std::cerr << exp.what() << '\\\\n';\n}	text	txt	2024-07-28 09:48:54.221671	2
-1331	425	try\n{\n    auto i2 = std::stoi("12345678901234");\n    auto i3 = std::stoi("12345678901234");\n}\ncatch (std::out_of_range const& exp)\n{\n    std::cerr << exp.what() << '\\\\n';\n}	code	txt	2024-07-28 09:48:54.242839	3
+4611	643	#include <filesystem>\n\nauto working_directory{std::filesystem::current_path()};	code	cpp	2025-07-17 12:20:10.882579	2
 1332	426	- Decimal floating-point expression (optional sign, sequence of decimal\n  digits with optional point, optional `e` or `E`, followed by exponent with\n  optional sign).\n- Binary floating-point expression (optional sign, `0x` or `0X` prefix,\n  sequence of hexadecimal digits with optional point, optional `p` or `P`,\n  followed by exponent with optional sign).\n- Infinity expression (optional sign followed by case-insensitive `INF` or\n  `INFINITY`).\n- A non-number expression (optional sign followed by case-insensitive `NAN`\n  and possibly other alphanumeric characters).	text	txt	2024-07-28 09:48:54.970496	1
-1333	426	auto d1 = std::stod("123.45");       // d1 = 123.45000000000000\nauto d2 = std::stod("+123.45");      // d2 = 123.45000000000000\nauto d3 = std::stod("-123.45");      // d3 = -123.45000000000000\nauto d4 = std::stod(" 123.45");      // d4 = 123.45000000000000\nauto d5 = std::stod(" -123.45abc");  // d5 = -123.45000000000000\nauto d6 = std::stod("1.2345e+2");    // d6 = 123.45000000000000\nauto d7 = std::stod("0xF.6E6666p3"); // d7 = 123.44999980926514\nauto d8 = std::stod("INF");          // d8 = inf\nauto d9 = std::stod("-infinity");    // d9 = -inf\nauto d10 = std::stod("NAN");         // d10 = nan\nauto d11 = std::stod("-nanabc");     // d11 = -nan	code	txt	2024-07-28 09:48:54.993014	2
-1334	427	#include <string>\n#include <string_view>	text	txt	2024-07-28 09:48:55.621418	1
-1335	427	using namespace std::string_literals;	text	txt	2024-07-28 09:48:55.641545	2
-1336	427	auto s1{ "text"s }; // std::string\nauto s2{ L"text"s }; // std::wstring\nauto s3{ u8"text"s }; // std::u8string\nauto s3{ u"text"s }; // std::u16string\nauto s4{ U"text"s }; // std::u32string	text	txt	2024-07-28 09:48:55.662145	3
-1337	427	using namespace std::string_view_literals;	text	txt	2024-07-28 09:48:55.683266	4
-1338	427	auto s5{ "text"sv }; // std::string_view	code	txt	2024-07-28 09:48:55.703935	5
-1339	428	#include <string>	text	txt	2024-07-28 09:48:56.131717	1
-1340	428	using namespace std::string_literals;	text	txt	2024-07-28 09:48:56.151439	2
-1341	428	auto filename { R"(C:\\\\Users\\\\Brian\\\\Documents\\\\)"s };\nauto pattern { R"((\\\\w[\\\\w\\\\d]*)=(\\\\d+))"s };	code	txt	2024-07-28 09:48:56.173321	3
-1342	429	#include <string>	text	txt	2024-07-28 09:48:56.744062	1
-1343	429	using namespace std::string_literals;	text	txt	2024-07-28 09:48:56.765548	2
-1344	429	auto s1{ R"(text)"s }; // std::string\nauto s2{ LR"(text)"s }; // std::wstring\nauto s3{ u8R"(text)"s }; // std::u8string\nauto s3{ uR"(text)"s }; // std::u16string\nauto s4{ UR"(text)"s }; // std::u32string	text	txt	2024-07-28 09:48:56.786935	3
-1345	429	using namespace std::string_view_literals;	text	txt	2024-07-28 09:48:56.807512	4
-1347	430	Passing `std::basic_string_view` to functions and returning\n`std::basic_string_view` still creates temporaries of this type, but these\nare small-sized objects on the stack (a pointer and a size could be 16 bytes\nfor 64-bit platforms); therefore, they should incur fewer performance costs\nthan allocating heap space and copying data.	text	txt	2024-07-28 09:48:57.487358	1
-1348	430	#include <string_view>	text	txt	2024-07-28 09:48:57.508818	2
-1349	430	std::string_view trim_view(std::string_view str)\n{\n    auto const pos1{ str.find_first_not_of(" ") };\n    auto const pos2{ str.find_last_not_of(" ") };\n    str.remove_suffix(str.length() - pos2 - 1);\n    str.remove_prefix(pos1);\n    return str;\n}	text	txt	2024-07-28 09:48:57.529348	3
-1350	430	auto sv1{ trim_view("sample") };\nauto sv2{ trim_view(" sample") };\nauto sv3{ trim_view("sample ") };\nauto sv4{ trim_view(" sample ") };	code	txt	2024-07-28 09:48:57.549508	4
-1351	431	#include <string_view>	text	txt	2024-07-28 09:48:57.909122	1
-1352	431	std::string_view message{"  something to show  "};	text	txt	2024-07-28 09:48:57.928415	2
-1353	431	std::size_t suffix{ str.find_last_not_of(" ") };\nstd::size_t prefix{ str.find_first_not_of(" ") };	code	txt	2024-07-28 09:48:57.949384	3
-1354	432	#include <string_view>	text	txt	2024-07-28 09:48:58.368724	1
-1355	432	std::string_view message{"  something to show  "};	text	txt	2024-07-28 09:48:58.390496	2
-1356	432	std::size_t suffix{ str.find_last_not_of(" ") };\nstd::size_t prefix{ str.find_first_not_of(" ") };	text	txt	2024-07-28 09:48:58.411204	3
-1357	432	str.remove_suffix(str.length() - pos2 - 1);\nstr.remove_prefix(pos1);	code	txt	2024-07-28 09:48:58.432423	4
+1299	418	In C++11, all containers received emplace variants of their typical\ninsert/push methods. The emplace variants can construct the element in place,\nsaving a move or copy.	text	txt	2024-07-28 09:48:49.526105	1
+1324	423	1. The first parameter is the input string.\n2. The second parameter is a pointer that, when not null, will receive the\n   number of characters that were processed. This can include any leading\n   whitespaces that were discarded, the sign, and the base prefix, so it\n   should not be confused with the number of digits the integral value has.\n3. A number indicating the base; by default, this is 10. Valid numbers of 2\n   to 36.	text	txt	2024-07-28 09:48:52.904194	2
+1328	424	auto i1 = std::stoi("42"); // 42\nauto i2 = std::stoi("    42"); // 42\nauto i3 = std::stoi("    42fortytwo"); // 42\nauto i4 = std::stoi("+42"); // 42\nauto i5 = std::stoi("-42"); // -42	code	cpp	2024-07-28 09:48:53.44617	2
+1329	425	- `std::invalid_argument`: conversion cannot be performed.\n- `std::out_of_range`: converted value is outside the range of the result\n  type.	text	txt	2024-07-28 09:48:54.20091	1
+1333	426	auto d1 = std::stod("123.45");       // d1 = 123.45000000000000\nauto d2 = std::stod("+123.45");      // d2 = 123.45000000000000\nauto d3 = std::stod("-123.45");      // d3 = -123.45000000000000\nauto d4 = std::stod(" 123.45");      // d4 = 123.45000000000000\nauto d5 = std::stod(" -123.45abc");  // d5 = -123.45000000000000\nauto d6 = std::stod("1.2345e+2");    // d6 = 123.45000000000000\nauto d7 = std::stod("0xF.6E6666p3"); // d7 = 123.44999980926514\nauto d8 = std::stod("INF");          // d8 = inf\nauto d9 = std::stod("-infinity");    // d9 = -inf\nauto d10 = std::stod("NAN");         // d10 = nan\nauto d11 = std::stod("-nanabc");     // d11 = -nan	code	cpp	2024-07-28 09:48:54.993014	2
+1306	419	To find a substring prior standard C++23:	text	txt	2024-07-28 09:48:50.503099	1
+1314	420	Using C++23:	text	txt	2024-07-28 09:48:51.076935	1
+1321	422	auto si  = std::to_string(42); // "42"\nauto sl  = std::to_string(42L); // "42"\nauto su  = std::to_string(42u); // "42"\nauto sd  = std::to_wstring(42.0); // "42.000000"\nauto sld = std::to_wstring(42.0L); // "42.000000"	code	cpp	2024-07-28 09:48:51.997505	1
 1358	433	Converting from an `std::basic_string_view` to an `std::basic_string` is not\npossible. You must explicitly construct an `std::basic_string` object from a\n`std::basic_string_view`.	text	txt	2024-07-28 09:48:58.818153	1
-1359	433	std::string_view sv{ "demo" };\nstd::string s{ sv };	code	txt	2024-07-28 09:48:58.839474	2
-1360	434	C++20 added prefix and suffix checking methods: starts_with and ends_with to both std::string and std::string_view.	text	txt	2024-07-28 09:48:59.47241	1
-1361	434	#include <string>\n#include <string_view>	text	txt	2024-07-28 09:48:59.493116	2
-1362	434	std::string str("the quick brown fox jumps over the lazy dog");\nbool t1 = str.starts_with("the quick"); // const char* overload\n                                        // t1 == true\nbool t2 = str.ends_with('g'); // char overload\n                              // t2 == true	text	txt	2024-07-28 09:48:59.513794	3
-1363	434	std::string_view needle = "lazy dog";\nbool t3 = str.ends_with(needle); // string_view overload\n                                 // t3 == true	text	txt	2024-07-28 09:48:59.53471	4
-1364	434	std::string_view haystack = "you are a lazy cat";\n// both starts_with and ends_with also available for string_view\nbool t4 = haystack.ends_with(needle);\n// t4 == false	code	txt	2024-07-28 09:48:59.555859	5
 1365	435	- You cannot format objects of user-defined types with printf.	text	txt	2024-07-28 09:48:59.777473	1
+1347	430	Passing `std::basic_string_view` to functions and returning\n`std::basic_string_view` still creates temporaries of this type, but these\nare small-sized objects on the stack (a pointer and a size could be 16 bytes\nfor 64-bit platforms); therefore, they should incur fewer performance costs\nthan allocating heap space and copying data.	text	txt	2024-07-28 09:48:57.487358	1
+1359	433	std::string_view sv{ "demo" };\nstd::string s{ sv };	code	cpp	2024-07-28 09:48:58.839474	2
+1360	434	C++20 added prefix and suffix checking methods: starts_with and ends_with to both std::string and std::string_view.	text	txt	2024-07-28 09:48:59.47241	1
 1366	436	`std::format` supports positional arguments i.e. referring to an argument by\nits index separated from format specifiers by the `:` character.	text	txt	2024-07-28 09:49:00.153432	1
-1367	436	#include <iostream>\n#include <format>	text	txt	2024-07-28 09:49:00.174405	2
-1368	436	std::clog << std::format("{0:02x} {1:02x} {2:02x}\\\\n", v0, v1, v2);	code	txt	2024-07-28 09:49:00.195387	3
-1369	437	#include <format>	text	txt	2024-07-28 09:49:00.492986	1
-1370	437	std::format("{02x}\\\\n", value);	code	txt	2024-07-28 09:49:00.511913	2
-1371	438	#include <format>\n#include <ostream>	text	txt	2024-07-28 09:49:01.133278	1
-1372	438	enum class color_code : std::uint_least8_t {};	text	txt	2024-07-28 09:49:01.15405	2
-1373	438	std::ostream& operator<<(std::ostream& os, color_code s)\n{\n    return os << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned>(s);\n}	text	txt	2024-07-28 09:49:01.174317	3
-1374	438	template <>\nstruct std::formatter<color_code> : std::formatter<unsigned>\n{\n    auto format(color_code const& code, format_context& ctx) {\n        return format_to(ctx.out(), "{:02x}", static_cast<unsigned>(code));\n    }\n};	text	txt	2024-07-28 09:49:01.194726	4
-1375	438	std::format("{}\\\\n", color_code);	code	txt	2024-07-28 09:49:01.215849	5
-1376	439	#include <format>\n#include <chrono>	text	txt	2024-07-28 09:49:01.525339	1
-1377	439	std::format("{:%F %T} UTC", std::chrono::system_clock::now());	code	txt	2024-07-28 09:49:01.545516	2
-1378	440	#include <iostream>\n#include <format>	text	txt	2024-07-28 09:49:01.845766	1
-1379	440	std::print("{} <{}>", "Brian Salehi", "salehibrian@gmail.com");	code	txt	2024-07-28 09:49:01.865153	2
-1380	441	#include <string>\n#include <regex>	text	txt	2024-07-28 09:49:02.303932	1
-1381	441	using namespace std::string_literals;	text	txt	2024-07-28 09:49:02.324158	2
-1382	441	std::string pattern{R"(...)"};	text	txt	2024-07-28 09:49:02.344938	3
-1383	441	std::regex srx{pattern};\nstd::regex lrx{R"(...)"s};	code	txt	2024-07-28 09:49:02.365336	4
-1384	442	std::regex irx{R"(...)"s, std::regex_constants::icase};	code	txt	2024-07-28 09:49:02.64907	1
-1385	443	#include <string>\n#include <regex>	text	txt	2024-07-28 09:49:03.463197	1
-1386	443	template<typename CharT>\nusing tstring = std::baisc_string<CharT, std::char_traits<CharT>, std::allocator<CharT>>;	text	txt	2024-07-28 09:49:03.483652	2
-1387	443	template<typename CharT>\nusing tregex = std::basic_regex<CharT>;	text	txt	2024-07-28 09:49:03.505512	3
-1388	443	template<typename CharT>\nbool matches(tstring<CharT> const& text, tstring<CharT> const& pattern)\n{\n    std::basic_regex<CharT> rx{pattern, std::regex_constants::icase};\n    return std::regex_match(text, rx);\n}	text	txt	2024-07-28 09:49:03.526991	4
-1389	443	int main()\n{\n    std::string text{R"(https://github.com - https://github.com/briansalehi/references)"};\n    std::string pattern{R"((\\\\w+)://([\\\\w.]+)/([\\\\w\\\\d._-]+)/([\\\\w\\\\d._-]+)[.git]?)"};	text	txt	2024-07-28 09:49:03.549389	5
-1390	443	    if(matches(text, pattern))\n        std::cout << text << '\\\\n';\n    else\n        std::cerr << "invalid repository link!\\\\n";\n}	code	txt	2024-07-28 09:49:03.570144	6
+1384	442	std::regex irx{R"(...)"s, std::regex_constants::icase};	code	cpp	2024-07-28 09:49:02.64907	1
 1391	444	The `std::regex_match()` method has overloads that take a reference to a\n`std::match_results` object to store the result of the match.	text	txt	2024-07-28 09:49:04.734617	1
 1392	444	If there is no match, then `std::match_results` is empty and its size is 0.\nOtherwise, its size is 1, plus the number of matched subexpressions.	text	txt	2024-07-28 09:49:04.755407	2
-1393	444	The class template `std::sub_match` represents a sequence of characters that\nmatches a capture group; this class is actually derived from std::pair, and\nits first and second members represent iterators to the first and the one-\npast-end characters in the match sequence. If there is no match sequence, the\ntwo iterators are equal:	text	txt	2024-07-28 09:49:04.77727	3
-1394	444	* `typedef sub_match<const char *> csub_match;`\n* `typedef sub_match<const wchar_t *> wcsub_match;`\n* `typedef sub_match<string::const_iterator> ssub_match;`\n* `typedef sub_match<wstring::const_iterator> wssub_match;`	text	txt	2024-07-28 09:49:04.797473	4
-1395	444	The class template `std::match_results` is a collection of matches; the first\nelement is always a full match in the target, while the other elements are\nmatches of subexpressions:	text	txt	2024-07-28 09:49:04.819322	5
-1396	444	* `typedef match_results<const char *> cmatch;`\n* `typedef match_results<const wchar_t *> wcmatch;`\n* `typedef match_results<string::const_iterator> smatch;`\n* `typedef match_results<wstring::const_iterator> wsmatch;`	text	txt	2024-07-28 09:49:04.839906	6
-1397	444	#include <string>\n#include <regex>	text	txt	2024-07-28 09:49:04.859582	7
-1398	444	int main()\n{\n    std::string text{R"(https://github.com - https://github.com/briansalehi/references)"};\n    std::string pattern{R"((\\\\w+)://([\\\\w.]+)/([\\\\w\\\\d._-]+)/([\\\\w\\\\d._-]+)[.git]?)"};	text	txt	2024-07-28 09:49:04.880622	8
-1399	444	    std::regex rx{pattern, std::regex_constants::icase};\n    std::smatch matches;\n    bool matched = std::regex_match(text, matches, rx);	text	txt	2024-07-28 09:49:04.901556	9
-1400	444	    if (auto [match, protocol, domain, username, project] = matches; matched)\n        std::cout << project << " owned by " << username\n                  << " hosted on " << domain\n                  << " using " << protocol << " protocol\\\\n";	code	txt	2024-07-28 09:49:04.922474	10
 1401	445	The C++ standard library supports six regular expression engines:	text	txt	2024-07-28 09:49:05.461067	1
 1402	445	* ECMAScript (default)\n* basic POSIX\n* extended POSIX\n* awk\n* grep\n* egrep (grep with the option -E)	text	txt	2024-07-28 09:49:05.481883	2
-1403	445	#include <regex>	text	txt	2024-07-28 09:49:05.501822	3
-1404	445	std::regex pattern{R"(...)", std::regex_constants::egrep};	code	txt	2024-07-28 09:49:05.522224	4
-1405	446	#include <string>\n#include <regex>	text	txt	2024-07-28 09:49:06.305757	1
-1406	446	std::string text {\nR"(\n# server address\naddress = 123.40.94.215\nport=22	text	txt	2024-07-28 09:49:06.327505	2
-1407	446	# time to live\nttl = 5\n)"};	text	txt	2024-07-28 09:49:06.347431	3
-1408	446	int main()\n{\n    std::string pattern{R"(^(?!#)(\\\\w+)\\\\s*=\\\\s*([\\\\w\\\\d]+[\\\\w\\\\d._,:-]*)$)"};\n    std::regex rx{pattern, std::regex_constants::icase};\n    std::smatch match{};	text	txt	2024-07-28 09:49:06.36908	4
-1409	446	    if (std::string variable, value; std::regex_search(text, match, rx))\n    {\n        variable = match[1];\n        value = match[2];\n    }\n}	code	txt	2024-07-28 09:49:06.391495	5
 1410	447	The iterators available in the regular expressions standard library are as\nfollows:	text	txt	2024-07-28 09:49:07.915783	1
 1411	447	* `std::regex_interator`: A constant forward iterator used to iterate through\n  the occurrences of a pattern in a string. It has a pointer to an\n  `std::basic_regex` that must live until the iterator is destroyed. Upon\n  creation and when incremented, the iterator calls `std::regex_search()` and\n  stores a copy of the `std::match_results` object returned by the algorithm.\n* `std::regex_token_iterator`: A constant forward iterator used to iterate\n  through the submatches of every match of a regular expression in a string.\n  Internally, it uses a `std::regex_iterator` to step through the submatches.\n  Since it stores a pointer to an `std::basic_regex` instance, the regular\n  expression object must live until the iterator is destroyed.	text	txt	2024-07-28 09:49:07.939133	2
 1412	447	The token iterators can return the unmatched parts of the string if the index\nof the subexpressions is -1, in which case it returns an `std::match_results`\nobject that corresponds to the sequence of characters between the last match\nand the end of the sequence:	text	txt	2024-07-28 09:49:07.96024	3
-1413	447	#include <string>\n#include <regex>	text	txt	2024-07-28 09:49:07.980177	4
-1414	447	std::string text {\nR"(\n# server address\naddress = 123.40.94.215\nport=22	text	txt	2024-07-28 09:49:08.000833	5
-1415	447	# time to live\nttl = 5\n)"};	text	txt	2024-07-28 09:49:08.021485	6
-1416	447	int main()\n{\n    std::string pattern{R"(^(?!#)(\\\\w+)\\\\s*=\\\\s*([\\\\w\\\\d]+[\\\\w\\\\d._,:-]*)$)"};\n    std::regex rx{pattern, std::regex_constants::icase};\n    std::sregex_iterator end{};	text	txt	2024-07-28 09:49:08.042548	7
-1417	447	    // iterate through regex matches\n    for (auto it = std::sregex_iterator{std::begin(text), std::end(text), rx};\n            it ! end; ++it)\n    {\n        std::string variable = (*it)[1];\n        std::string value = (*it)[2];\n    }	text	txt	2024-07-28 09:49:08.063166	8
-1418	447	    // iterate through unmatched tokens\n    for (auto it = std::sregex_iterator{std::begin(text), std::end(text), rx, -1};\n            it ! end; ++it)\n    {\n        std::string variable = (*it)[1];\n        std::string value = (*it)[2];\n    }	text	txt	2024-07-28 09:49:08.084537	9
-1419	447	    // iterate through tokens of regex matches\n    std::sregex_token_iterator tend{};\n    for (auto it = std::sregex_token_iterator{std::begin(text), std::end(text), rx};\n            it ! tend; ++it)\n    {\n        std::string token = *it;\n    }\n}	code	txt	2024-07-28 09:49:08.105455	10
-1420	448	#include <string>\n#include <regex>	text	txt	2024-07-28 09:49:08.558622	1
-1421	448	int main()\n{\n    std::string text{"this is a example with a error"};\n    std::regex rx{R"(\\\\ba ((a|e|i|o|u)\\\\w+))"};\n    std::regex_replace(text, rx, "an $1");\n}	code	txt	2024-07-28 09:49:08.580007	2
 1422	449	Apart from the identifiers of the subexpressions (`$1`, `$2`, and so on),\nthere are other identifiers for the entire match (`$&`), the part of the\nstring before the first match ($\\\\`), and the part of the string after the\nlast match (`$'`).	text	txt	2024-07-28 09:49:09.099723	1
-1423	449	#include <string>\n#include <regex>	text	txt	2024-07-28 09:49:09.120376	2
-1424	449	int main()\n{\n    std::string text{"current date: 3 10 2022"};\n    std::regex pattern{R"((\\\\d{1,2})\\\\s*(\\\\d{1,2})\\\\s*(\\\\d{2,4}))"};\n    std::string reformatted = std::regex_replace(text, pattern, R"([$`] $2 $1 $3 [$'])");\n}	code	txt	2024-07-28 09:49:09.141424	3
 1425	450	Standard types that are not arithmetic types, such as `std::complex<T>` or\n`std::nullptr_t`, do not have `std::numeric_limits` specializations.	text	txt	2024-07-28 09:49:10.043176	1
-1426	450	#include <limits>	text	txt	2024-07-28 09:49:10.063408	2
-1427	450	auto min_int = std::numeric_limits<int>::min();\nauto max_int = std::numeric_limits<int>::max();	text	txt	2024-07-28 09:49:10.084329	3
-1428	450	auto min_double = std::numeric_limits<double>::min();\nauto low_double = std::numeric_limits<double>::lowest();\nauto max_double = std::numeric_limits<double::lowest();	code	txt	2024-07-28 09:49:10.105092	4
-1429	450	In this example objects in a range should have `<` comparison operator overloaded.	text	txt	2024-07-28 09:49:10.124395	5
-1430	450	#include <limits>	text	txt	2024-07-28 09:49:10.144701	6
-1431	450	template<typename T, typename Iter>\nT minimum(Iter const start, Iter const end)\n{\n    T latest_minimum = std::numeric_limits<T>::max();	text	txt	2024-07-28 09:49:10.164447	7
-1432	450	    for (autp i = start; i < end; ++i)\n        if (*i < latest_minimum)\n            latest_minimum = *i;	text	txt	2024-07-28 09:49:10.184975	8
-1433	450	    return latest_minimum;\n}	code	txt	2024-07-28 09:49:10.205897	9
-1434	451	`digits` represents the number of bits (excluding the sign bit if present)\nand padding bits (if any) for integral types and the number of bits of the\nmantissa for floating-point types.	text	txt	2024-07-28 09:49:10.69293	1
-1435	451	#include <limits>	text	txt	2024-07-28 09:49:10.713393	2
-1436	451	auto s = std::numeric_limits<short>::digits;\nauto d = std::numeric_limits<double>::digits;	code	txt	2024-07-28 09:49:10.734611	3
-1437	452	#include <limits>	text	txt	2024-07-28 09:49:11.124051	1
-1438	452	auto s = std::numeric_limits<short>::digits10;\nauto d = std::numeric_limits<double>::digits10;	code	txt	2024-07-28 09:49:11.143339	2
-1439	453	#include <limits>	text	txt	2024-07-28 09:49:11.502615	1
-1440	453	auto value_is_signed = std::numeric_limist<T>::is_signed;	code	txt	2024-07-28 09:49:11.52406	2
-1441	454	#include <limits>	text	txt	2024-07-28 09:49:11.877154	1
-1442	454	auto value_is_integer = std::numeric_limist<T>::is_integer;	code	txt	2024-07-28 09:49:11.897741	2
-1443	455	#include <limits>	text	txt	2024-07-28 09:49:12.260637	1
-1444	455	auto value_is_exact = std::numeric_limist<T>::is_exact;	code	txt	2024-07-28 09:49:12.280032	2
-1445	456	#include <limits>	text	txt	2024-07-28 09:49:12.609411	1
-1446	456	auto value_has_infinity = std::numeric_limist<T>::has_infinity;	code	txt	2024-07-28 09:49:12.629795	2
-1447	457	#include <complex>	text	txt	2024-07-28 09:49:13.035705	1
-1448	457	using namespace std::complex_literals;	text	txt	2024-07-28 09:49:13.055301	2
-1449	457	auto c{ 12.0 + 4.2i }; // std::complex<double>	code	txt	2024-07-28 09:49:13.075705	3
-1450	458	Except for `random_device`, all engines produce numbers in a uniform distribution.	text	txt	2024-07-28 09:49:13.491277	1
-1451	458	#include <random>	text	txt	2024-07-28 09:49:13.512169	2
-1452	458	auto min = std::mt19937::min();\nauto max = std::mt19937::max();	code	txt	2024-07-28 09:49:13.533412	3
-1453	459	Random generators can be seeded using their constructors or the `seed()`\nmethod. Note that `random_device` cannot be seeded.	text	txt	2024-07-28 09:49:14.060533	1
-1454	459	#include <random>	text	txt	2024-07-28 09:49:14.081311	2
-1455	459	std::random_device seeder;\nstd::mt19937 generator1{seeder()};	text	txt	2024-07-28 09:49:14.103408	3
-1456	459	std::mt19937 generator2;\ngenerator2.seed(seeder());	code	txt	2024-07-28 09:49:14.124494	4
-1457	460	The function call operators of random engines are overloaded and generate a\nnew number uniformly distributed between `min()` and `max()`:	text	txt	2024-07-28 09:49:14.622394	1
-1458	460	#include <random>	text	txt	2024-07-28 09:49:14.643461	2
-1459	460	std::random_device seeder;\nstd::mt19937 generator{seeder()};\nauto number = generator();	code	txt	2024-07-28 09:49:14.665309	3
-1460	461	#include <random>	text	txt	2024-07-28 09:49:15.045216	1
-1461	461	std::mt19937 generator{};\ngenerator.discard(4); // discard 4 numbers	code	txt	2024-07-28 09:49:15.065887	2
-1462	462	The Mersenne twister engine has a bias toward producing some values\nrepeatedly and omitting others, thus generating numbers not in a uniform\ndistribution, but rather in a binomial or Poisson distribution.	text	txt	2024-07-28 09:49:15.686428	1
-1463	462	#include <random>\n#include <functional>	text	txt	2024-07-28 09:49:15.707636	2
-1464	462	int main()\n{\n    std::random_device seeder;	text	txt	2024-07-28 09:49:15.727749	3
-1465	462	    std::array<int, std::mt19937::state_size> seed_data{};\n    std::generate(std::begin(seed_data), std::end(seed_data), std::ref(seeder));\n    std::seed_seq seeds(std::begin(seed_data), std::end(seed_data));\n    std::mt19937 generator{seeds};\n    std::uniform_int_distribution<> dist{0, 10}; // [0, 10)\n    int random_number = dist(generator);\n}	code	txt	2024-07-28 09:49:15.749516	4
-1466	463	Difference of time points is a duration.	text	txt	2024-07-28 09:49:16.295539	1
-1467	463	#include <chrono>\n#include <thread>	text	txt	2024-07-28 09:49:16.316777	2
-1468	463	using namespace std::chrono_literals;	text	txt	2024-07-28 09:49:16.337121	3
-1469	463	auto tp1 = std::chrono::steady_clock::now();\nstd::this_thread::sleep_for(1ms);\nauto tp2 = std::chrono::steady_clock::now();	text	txt	2024-07-28 09:49:16.357419	4
-1470	463	auto duration = tp2 - tp1;\nstd::cout << duration << "\\\\n";\n// example output: 1115389ns	code	txt	2024-07-28 09:49:16.3791	5
-1471	464	#include <chrono>\n#include <thread>	text	txt	2024-07-28 09:49:16.876751	1
-1472	464	using namespace std::chrono_literals;	text	txt	2024-07-28 09:49:16.89764	2
-1473	464	auto tp1 = std::chrono::steady_clock::now();\nstd::this_thread::sleep_for(1ms);\nauto tp2 = std::chrono::steady_clock::now();	text	txt	2024-07-28 09:49:16.918559	3
-1474	464	// explicit type of duration, base type double, with micro precision\nstd::chrono::duration<double, std::micro> sleep_duration = tp2 - tp1;\nstd::cout << sleep_duration << "\\\\n";\n// example output: 1115.39µs	code	txt	2024-07-28 09:49:16.941761	4
-1475	465	Duractions can be converted between each other using `duration_cast`.	text	txt	2024-07-28 09:49:17.450555	1
-1476	465	#include <chrono>\n#include <thread>	text	txt	2024-07-28 09:49:17.472587	2
-1477	465	using namespace std::chrono_literals;	text	txt	2024-07-28 09:49:17.493318	3
-1478	465	auto tp1 = std::chrono::steady_clock::now();\nstd::this_thread::sleep_for(1ms);\nauto tp2 = std::chrono::steady_clock::now();	text	txt	2024-07-28 09:49:17.51469	4
-1479	465	auto micro = std::chrono::duration_cast<std::chrono::microseconds>(tp2 - tp1);\nstd::cout << micro << "\\\\n";\n// example output: 1115µs	code	txt	2024-07-28 09:49:17.535712	5
-1480	466	#include <chrono>	text	txt	2024-07-28 09:49:17.851207	1
-1481	466	bool system_is_steady = std::chrono::system_clock::is_steady;	code	txt	2024-07-28 09:49:17.872054	2
-1482	467	#include <chrono>	text	txt	2024-07-28 09:49:18.137106	1
-1483	467	auto resolution = std::chrono::system_clock::duration{1};	code	txt	2024-07-28 09:49:18.157148	2
-1484	468	#include <chrono>	text	txt	2024-07-28 09:49:18.595973	1
-1485	468	using namespace std::chrono_literals;	text	txt	2024-07-28 09:49:18.615466	2
-1486	468	auto timer {2h + 42min + 15s}; // std::chrono::duration<long long>	text	txt	2024-07-28 09:49:18.636698	3
-1487	468	auto year { 2035y }; // std::chrono::year (c++20)\nauto day { 15d }; // std::chrono::day (c++20)	code	txt	2024-07-28 09:49:18.656694	4
+1429	450	In this example objects in a range should have `<` comparison operator overloaded.	text	txt	2024-07-28 09:49:10.124395	3
+4491	577	#include <thread>\n#include <memory>\n#include <string>\n#include <string_view>\n\nvoid rvalue_write(std::string&&) { } // rvalue only\nvoid lvalue_write(std::string&) { } // lvalue only\nvoid pointer_write(std::string_view) { } // pointer only\nvoid smart_write(std::unique_ptr<std::string>) { } // non-copyable object only\n\nstruct X\n{\n    void do_lengthy_work(std::string&) {}\n};\n\nint main()\n{\n    // implicit cast from const char* to std::string\n    std::thread write_thread(rvalue_write, "text");\n    write_thread.join();\n\n    char text[1024];\n    sprintf(text, "%i", 1);\n\n    // use of local object in joinable thread\n    std::thread pointer_thread(pointer_write, text);\n    pointer_thread.join();\n\n    // use of copied local object before background thread invokation\n    std::thread local_thread(rvalue_write, std::string{text});\n    local_thread.detach();\n\n    // pass by lvalue reference to avoid copy\n    std::string str{text};\n    std::thread ref_thread(lvalue_write, std::ref(str));\n    ref_thread.join();\n\n    // bind method to thread\n    X some_work;\n    std::thread binding_thread(&X::do_lengthy_work, &some_work, std::ref(str));\n    binding_thread.join();\n\n    // explicitly move non-copyable objects\n    std::unique_ptr<std::string> non_copyable{new std::string{str}};\n    std::thread smart_thread(smart_write, std::move(non_copyable));\n    smart_thread.join();\n}	code	cpp	2025-07-17 12:00:36.505932	4
+4623	649	std::filesystem::path p{"/etc/os-release"};\n\np.string();\np.wstring();\np.u8string();\np.u16string();\np.u32string();	code	cpp	2025-07-17 12:21:03.452594	1
+4493	578	#include <thread>\n#include <chrono>\n\nvoid do_something()\n{\n    std::this_thread::sleep_for(std::chrono::seconds{1});\n}\n\nint main()\n{\n    std::jthread t0{do_something};\n}	code	cpp	2025-07-17 12:00:41.904476	1
+4621	647	p.has_filename(); // true\np.filename(); // version\n\nstd::filesystem::path p{"/usr/src/linux/version"};\n\np.has_relative_path(); // false\np.relative_path(); // (none)\n\np.begin();\np.end();\n\np.has_stem(); // false\np.stem(); // (none)\n\np.has_extension(); // false\np.extension(); // (none)\n\np.has_root_name(); // false\np.root_name(); // (none)\n\np.has_root_directory(); // true\np.root_directory(); // /\n\np.has_root_path(); // true\np.root_path(); // /\n\np.has_parent_path(); // true\np.parent_path(); // /usr/src/linux	text	cpp	2025-07-17 12:20:44.263271	1
+4624	651	std::filesystem::path p{"/dir\\\\\\\\subdir/subsubdir\\\\\\\\/./\\\\\\\\"};\n\np.generic_string(); // all the same: /dir/subdir/subsubdir//.//\np.generic_wstring();\np.generic_u8string();\np.generic_u16string();\np.generic_u32string();	code	cpp	2025-07-17 12:21:56.783101	1
+4622	648	std::filesystem::path p{"/etc/resolv.conf"};\n\np.lexically_normal();	code	cpp	2025-07-17 12:20:51.175226	1
+4636	664	std::filesystem::path p1{"/tmp/sym1"};\nstd::filesystem::path p2{"/tmp/sym2"};\n\nstd::filesystem::exists(p1); // true\nstd::filesystem::exists(p2); // true\nstd::filesystem::equivalent(p1, p2);	code	cpp	2025-07-17 12:25:34.378551	2
+4633	655	std::filesystem::path p;\n\nstd::string s{"/src/projects/linux"};\np.assign(s);\n\nstd::string_view sv{"/src/projects/linux-stable"};\np.assign(sv);\n\nstd::filesystem::path p2{"/src/projects/linux-hardened"};\np.assign(p2.begin(), p2.end());	code	cpp	2025-07-17 12:23:03.283761	1
+4630	653	std::filesystem::path p{"project"};\n\nauto p2 = p / ".git"; // project.git\n\np.append(".git"); // project.git\np /= ".git"; // project.git\n\nstd::filesystem::path p3{".git"};\np.append(p3.begin(), p3.end());	code	cpp	2025-07-17 12:22:34.759238	2
+4627	652	std::filesystem::path p{"project"};\n\nauto p2 = p + ".git"; // project.git\n\np += ".git"; // project.git\np2.concat(".git"); // project.git\n\nstd::filesystem::path p3{".git"};\np.concat(p3.begin(), p3.end()); // project.git	code	cpp	2025-07-17 12:22:21.536947	2
+2249	666	std::filesystem::is_symlink(p);\nstd::filesystem::is_regular_file(p);\nstd::filesystem::is_directory(p);	code	cpp	2024-07-28 09:51:26.926561	2
+4635	663	std::filesystem::path p1{"tmp/f"};\nstd::filesystem::path p2{"tmp/./f"};\n\np1 == p2; // false\np1.compare(p2); // not 0\np1.lexically_normal() == p2.lexically_normal(); // true\np1.lexically_normal().compare(p2.lexically_normal()); // 0	code	cpp	2025-07-17 12:25:26.004728	4
+4634	656	std::filesystem::path p1;\nstd::filesystem::path p2;\n\np1.swap(p2);\nstd::swap(p1, p2);	code	cpp	2025-07-17 12:23:07.290779	1
+2259	672	auto last_write = last_write_time(p);\nauto diff = std::filesystem::file_time_type::clock::now() - last_write;\nauto last_write_seconds = std::chrono::duration_cast<std::chrono::seconds>(diff).count();	code	cpp	2024-07-28 09:51:29.122914	4
 1488	469	- `operator""y`\n- `operator""d`	text	txt	2024-07-28 09:49:18.920083	1
-1489	470	// A day in a year can be specified using literals and operator/\nauto christmas_eve = 2023y/std::chrono::December/24d;\n// decltype(christmas_eve) == std::chrono::year_month_day	text	txt	2024-07-28 09:49:19.271953	1
-1490	470	auto specific_day = std::chrono::weekday{std::chrono::sys_days{christmas_eve}};\n// specific_day == std::chrono::Sunday	code	txt	2024-07-28 09:49:19.293242	2
-1491	471	#include <chrono>	text	txt	2024-07-28 09:49:19.64946	1
-1492	471	auto date{2024y/std::chrono::April/1d};\nfor (; date.month() == std::chrono::April; date += std::chrono::days{1})\n{\n    // iterate over all days in April 2024\n}	code	txt	2024-07-28 09:49:19.670721	2
-1493	472	#include <iostream>\n#include <ctime>\n#include <sys/stat.h>	text	txt	2024-07-28 09:49:20.366016	1
-1494	472	int main(int argc, char** argv)\n{\n    char const* file_path{argv[0]};	text	txt	2024-07-28 09:49:20.386552	2
-1495	472	    struct stat file_stat;	text	txt	2024-07-28 09:49:20.406628	3
-1496	472	    if (stat(file_path, &file_stat) == 0)\n    {\n        std::time_t mod_time{file_stat.st_mtime};\n        char* str{std::asctime(std::localtime(&mod_time))};\n        std::cout << "Last modification time: " << str;;\n    }\n    else\n    {\n        std::cerr << "File status retrival failed\\\\n";\n    }\n}	code	txt	2024-07-28 09:49:20.428222	4
+1434	451	`digits` represents the number of bits (excluding the sign bit if present)\nand padding bits (if any) for integral types and the number of bits of the\nmantissa for floating-point types.	text	txt	2024-07-28 09:49:10.69293	1
+1450	458	Except for `random_device`, all engines produce numbers in a uniform distribution.	text	txt	2024-07-28 09:49:13.491277	1
+1453	459	Random generators can be seeded using their constructors or the `seed()`\nmethod. Note that `random_device` cannot be seeded.	text	txt	2024-07-28 09:49:14.060533	1
+1457	460	The function call operators of random engines are overloaded and generate a\nnew number uniformly distributed between `min()` and `max()`:	text	txt	2024-07-28 09:49:14.622394	1
+1462	462	The Mersenne twister engine has a bias toward producing some values\nrepeatedly and omitting others, thus generating numbers not in a uniform\ndistribution, but rather in a binomial or Poisson distribution.	text	txt	2024-07-28 09:49:15.686428	1
+1466	463	Difference of time points is a duration.	text	txt	2024-07-28 09:49:16.295539	1
+1475	465	Duractions can be converted between each other using `duration_cast`.	text	txt	2024-07-28 09:49:17.450555	1
+1923	574	When implementing contract for overriden functions, the contract cannot be\nwider than the contract already defined for the virtual function within base\nclass.	text	txt	2024-07-28 09:50:30.104241	1
+4504	582	#include <thread>\n#include <cassert>\n\nvoid do_background_work() { }\n\nint main()\n{\n    std::thread task{do_background_work};\n    task.detach();\n    assert(!task.joinable());\n}	code	cpp	2025-07-17 12:01:31.246768	1
+4494	579	#include <thread>\n\nint main()\n{\n    std::jthread worker{[]{ return; }};\n    // destructor requests stop and joins\n}	code	cpp	2025-07-17 12:01:01.627599	3
 1497	473	We have one free function and a member function in `directory_entry`.\nThey both return file_time_type which in C++17 is defined as:	text	txt	2024-07-28 09:49:20.928923	1
-1498	473	// C++17\nusing file_time_type = std::chrono::time_point</*trivial-clock*/>;	code	txt	2024-07-28 09:49:20.949159	2
-1499	473	*Sample*\nauto filetime = std::filesystem::last_write_time(myPath);\nconst auto toNow = std::filesystem::file_time_type::clock::now() - filetime;\nconst auto elapsedSec = duration_cast<seconds>(toNow).count();	code	txt	2024-07-28 09:49:20.971189	3
-1500	474	// C++17\nusing file_time_type = std::chrono::time_point</*trivial-clock*/>;	text	txt	2024-07-28 09:49:21.6011	1
-1501	474	// C++20\nusing file_time_type = std::chrono::time_point<std::chrono::file_clock>;	code	txt	2024-07-28 09:49:21.621608	2
-1502	474	#include <iostream>\n#include <filesystem>\n#include <chrono>	text	txt	2024-07-28 09:49:21.641967	3
-1503	474	int main(int argc, char** argv)\n{\n    std::filesystem::path file_path{argv[0]};\n    std::filesystem::file_time_type last_write_time = std::filesystem::last_write_time(file_path);\n    std::cout << std::format("{0:%F 0:%R}\\\\n", last_write_time);\n}	code	txt	2024-07-28 09:49:21.662842	4
 3648	1167	    mov rdi, format_integral\n    mov rsi, rax\n    xor rax, rax\n    call printf	text	txt	2024-07-28 09:55:24.650697	17
+4498	580	#include <thread>\n#include <stdexcept>\n\nvoid do_something() { }\nvoid do_something_impossible() { throw std::runtime_error("fatal"); }\n\nint main()\n{\n    std::thread t(do_something);\n\n    try\n    {\n        do_something_impossible();\n    }\n    catch (std::exception const& exp)\n    {\n        t.join(); // reaches due exceptional exit but joins anyway\n        throw;\n    }\n\n    t.join();\n}	code	cpp	2025-07-17 12:01:12.616734	1
+4502	581	#include <thread>\n\nvoid do_something() { }\n\nclass thread_guard\n{\n    std::thread& _t;\n\npublic:\n    explicit thread_guard(std::thread& t): _t{t} {}\n    virtual ~thread_guard() { if (_t.joinable()) _t.join(); }\n    thread_guard(thread_guard const&) = delete;\n    thread_guard& operator =(thread_guard const&) = delete;\n};\n\nint main()\n{\n    std::thread t(do_something);\n    thread_guard joining_thread{t};\n}	code	cpp	2025-07-17 12:01:18.181728	1
+4507	583	#include <thread>\n\nvoid do_work() { }\n\nint main()\n{\n    std::thread t1{do_work}; // t1 joinable\n    std::thread t2{std::move(t1)}; // t1 empty, t2 joinable\n    t1 = std::thread{do_work}; // t1 joinable\n    std::thread t3 = std::move(t2); // t3 joinable, t2 empty\n    t2 = std::move(t1); // t2 joinable, t1 empty\n\n    // t1 is already empty\n    t2.join();\n    t3.join();\n}	code	cpp	2025-07-17 12:01:45.228852	1
+1498	473	// C++17\nusing file_time_type = std::chrono::time_point</*trivial-clock*/>;	code	cpp	2024-07-28 09:49:20.949159	2
+1499	473	*Sample*\nauto filetime = std::filesystem::last_write_time(myPath);\nconst auto toNow = std::filesystem::file_time_type::clock::now() - filetime;\nconst auto elapsedSec = duration_cast<seconds>(toNow).count();	code	cpp	2024-07-28 09:49:20.971189	3
 1504	475	`std::ssize()` is a C++20 function template that returns the size information\nof the passed-in range or array as a signed integer (typically\n`std::ptrdiff_t`). The range version `std::ranges::ssize()` instead uses the\nrange-style "customization point object" approach while maintaining the same\nfunctionality. This allows for simpler code when working with raw indexes.	text	txt	2024-07-28 09:49:22.341083	1
-1505	475	#include <vector>\n#include <iostream>	text	txt	2024-07-28 09:49:22.361731	2
-1506	475	int main() {\n    std::vector<int> data{1, 2, 3, 4, 5, 6};	text	txt	2024-07-28 09:49:22.381861	3
-1507	475	    // z is the literal suffix for signed size type\n    for (auto i = 0z; i < ssize(data); i++) {\n        int sum = 0;\n        if (i - 1 >= 0)\n            sum += data[i-1];\n        sum += data[i];\n        if (i + 1 < ssize(data))\n            sum += data[i+1];\n        std::cout << "" << sum << "\\\\n";\n    } // prints 3, 6, 9, 12, 15, 11\n}	code	txt	2024-07-28 09:49:22.403583	4
 1508	476	A *range* is denoted by a pair of *iterators*, or more generally, since\nC++20, an *iterator* and a *sentinel*.	text	txt	2024-07-28 09:49:23.503368	1
 1509	476	To reference the entire content of a data structure, we can use the `begin()`\nand `end()` methods that return an iterator to the first element and an\niterator one past the last element, respectively. Hence, the range [begin,\nend) contains all data structure elements.	text	txt	2024-07-28 09:49:23.525156	2
-1510	476	#include <algorithm>\n#include <iostream>\n#include <vector>	text	txt	2024-07-28 09:49:23.546342	3
-1511	476	int main()\n{\n    std::vector<int> numbers{1,2,3,4,5};\n    std::for_each(std::begin(numbers), std::end(numbers), [](auto e) { std::cout << e << " "; });\n}	code	txt	2024-07-28 09:49:23.568485	4
-1512	476	*Sentinels* follow the same idea. However, they do not need to be of an\n*iterator* type. Instead, they only need to be comparable to an *iterator*.\nThe exclusive end of the range is then the first iterator that compares equal\nto the sentinel.	text	txt	2024-07-28 09:49:23.590447	5
-1513	476	#include <iostream>\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:23.611915	6
-1514	476	template<typename T>\nstruct sentinel\n{\n    using iter_t = typename std::vector<T>::iterator;\n    iter_t begin;\n    std::iter_difference_t<iter_t> count;\n    bool operator==(iter_t const& other) const { return std::distance(begin, other) >= count; }\n};	text	txt	2024-07-28 09:49:23.632303	7
-1515	476	int main()\n{\n    std::vector<long> numbers{1,2,3,4,5};\n    std::vector<long>::iterator iter = numbers.begin();\n    std::ranges::for_each(iter, sentinel<long>{iter, 3}, [](auto e) { std::cout << e << " "; });\n}	code	txt	2024-07-28 09:49:23.652891	8
-1516	477	#include <algorithm>\n#include <vector>\n#include <list>	text	txt	2024-07-28 09:49:24.337007	1
-1517	477	int main()\n{\n    std::vector<long> random_access{1,2,3,4,5};\n    std::list<long> bidirectional{1,2,3,4,5};	text	txt	2024-07-28 09:49:24.35831	2
-1518	477	    auto random_access_iterator = random_access.begin();\n    random_access_iterator += 3; // OK\n    random_access_iterator++; // OK\n    ssize_t random_difference = random_access_iterator - random_access.begin(); // OK: 4	text	txt	2024-07-28 09:49:24.379499	3
-1519	477	    auto bidirectional_iterator = bidirectional.begin();\n    //bidirectional_iterator += 5; // ERROR\n    std::advance(bidirectional_iterator, 3); // OK\n    bidirectional_iterator++; // OK, all iterators provide advance operation\n    //ssize_t bidirectional_difference = bidirectional_iterator - bidirectional.begin(); // ERROR\n    ssize_t bidirectional_difference = std::distance(bidirectional.begin(), bidirectional_iterator); // OK: 4\n}	code	txt	2024-07-28 09:49:24.399462	4
+1512	476	*Sentinels* follow the same idea. However, they do not need to be of an\n*iterator* type. Instead, they only need to be comparable to an *iterator*.\nThe exclusive end of the range is then the first iterator that compares equal\nto the sentinel.	text	txt	2024-07-28 09:49:23.590447	4
 1520	478	When copying ranges, we need to take care when the input and output ranges\noverlap. For `std::copy`, only the tail of the destination range can overlap\nthe source range; for `std::copy_backward`, only the head of the destination\nrange can overlap the source range.	text	txt	2024-07-28 09:49:25.078243	1
-1521	478	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:49:25.099483	2
-1522	478	std::vector<int> data{ 1, 2, 3, 4, 5, 6, 7, 8, 9 };	text	txt	2024-07-28 09:49:25.120449	3
-1523	478	// OK for std::copy\n//         [ source range      ]\n// [ destination range ]\nstd::copy(data.begin() + 1, data.end(), data.begin());\n// data == {2, 3, 4, 5, 6, 7, 8, 9, 9}	text	txt	2024-07-28 09:49:25.142063	4
-1524	478	data = {1, 2, 3, 4, 5, 6, 7, 8, 9};	text	txt	2024-07-28 09:49:25.162159	5
-1525	478	// OK for std::copy_backward\n// [ source range      ]\n//         [ destination range ]\nstd::copy_backward(data.begin(), data.begin() + 8, data.end());\n// data == {1, 1, 2, 3, 4, 5, 6, 7, 8}	code	txt	2024-07-28 09:49:25.183124	6
 1526	479	- Iteration over a sequence for arbitrary action on each element: `for_each`, `for_each_n`, `transform`\n- Searching through a sequence: `find`, `find_if`, `find_end`, `search`, `count`, `any_of`, `adjacent_find`\n- Mutate the sequence: `copy`, `copy_if`, `move`, `fill`, `replacd`, `generate`, `rotate`\n- Sort in various ways: `sort`, `stable_sort`, `partial_sort`, `nth_element`, `is_sorted`\n- Reduction and scans: `reduce`, `transform_reduce`, `inclusive_scan`, `exclusive_scan`	text	txt	2024-07-28 09:49:25.548245	1
-1527	480	The algorithms that have the overload with `std::execution` enumeration as\nfirst parameter.	text	txt	2024-07-28 09:49:26.029294	1
-1528	480	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:49:26.049714	2
-1529	480	int main()\n{\n    std::vector<long> numbers{42,73,10,35,89,24};\n    std::sort(std::execution::par, std::begin(numbers), std::end(numbers));\n}	code	txt	2024-07-28 09:49:26.071209	3
+4512	585	#include <iostream>\n#include <format>\n#include <thread>\n#include <chrono>\n\nbool state{false};\n\nbool preconditions_apply()\n{\n    return state;\n}\n\nvoid do_something(std::stop_token caller)\n{\n    while (!caller.stop_requested())\n    {\n        /* process something */\n    }\n    std::cerr << std::format("{}\\\\n", "Halting worker");\n}\n\nvoid thread_controller(std::stop_source source)\n{\n    while (preconditions_apply())\n    {\n        std::this_thread::sleep_for(std::chrono::milliseconds{100});\n    }\n    source.request_stop();\n}\n\nint main()\n{\n    state = true; // preconditions apply\n    std::stop_source source_controller;\n    std::jthread worker{do_something, source_controller.get_token()};\n    std::jthread controller{thread_controller, std::ref(source_controller)};\n    std::this_thread::sleep_for(std::chrono::milliseconds{1000});\n    state = false; // break the contract\n}	code	cpp	2025-07-17 12:02:22.70438	2
+4515	588	#include <thread>\n\nint main()\n{\n    std::stop_source caller_source;\n    auto callable = [](std::stop_token caller) { while (!caller.stop_requested()); };\n    std::jthread stoppable_thread{callable, caller_source.get_token()};\n    std::jthread regular_thread{[]{ return; }};\n    caller_source.request_stop();\n}	code	cpp	2025-07-17 12:03:04.425264	2
+4514	587	#include <thread>\n#include <chrono>\n\nint main()\n{\n    std::jthread t{[](std::stop_token token) {\n        while (token.stop_requested())\n            break;\n        std::this_thread::sleep_for(std::chrono::milliseconds(100));\n    }};\n\n    std::this_thread::sleep_for(std::chrono::milliseconds(500));\n    t.request_stop();\n}	code	cpp	2025-07-17 12:02:47.739186	1
+4680	884	#include <iostream>\n#include <boost/asio.hpp>\n\nint main()\n{\n    boost::asio::io_service service;\n    boost::asio::io_service::work work{service};\n    service.run();\n    // will not be reached: blocking service\n}	code	cpp	2025-07-17 18:30:54.564642	2
+4638	679	#include <iostream>\n#include <filesystem>\n\nint main()\n{\n    std::filesystem::path existing_file{"/dev/random"};\n    std::filesystem::path non_existing_file{"/dev/none"};\n    std::filesystem::path existing_symlink{"/lib"};\n\n    std::filesystem::exists(existing_file);\n    std::filesystem::exists(non_existing_file);\n    std::filesystem::exists(symlink_status(existing_symlink));\n}	code	cpp	2025-07-17 12:27:43.196204	2
+2707	884	Running the `io_service` object's event processing loop will block the\nexecution of the thread and will run ready handlers until there are no more\nready handlers remaining or until the `io_service` object has been stopped.	text	txt	2024-07-28 09:52:53.944094	1
+2710	884	The `boost::asio::io_service::work` class is responsible for telling the\n`io_service` object when the work starts and when it has finished. It will\nmake sure that the `io_service::run()` function will not exit during the time\nthe work is underway. Also, it will make sure that the `io_service::run()`\nfunction exits when there is no unfinished work remaining.	text	txt	2024-07-28 09:52:54.006925	3
+4681	885	#include <iostream>\n#include <boost/asio.hpp>\n\nint main()\n{\n    boost::asio::io_service service;\n    boost::asio::io_service::work work{service};\n    service.poll();\n    // will be reached: non-blocking service\n}	code	cpp	2025-07-17 18:31:04.068212	2
+2714	886	The `post()` function requests the service to run its works after queueing up\nall the work. So it does not run the works immediately.	text	txt	2024-07-28 09:52:55.507289	1
 1530	481	The overhead of creating and managing threads on two operations costs highly.\nIt would be better to join the operations in one parallel execution.	text	txt	2024-07-28 09:49:26.660069	1
-1531	481	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:49:26.680584	2
-1532	481	int main()\n{\n    std::vector<long> numbers{1,2,3,4,5,6};	text	txt	2024-07-28 09:49:26.700129	3
-1533	481	    // we have two separate parallel execution\n    std::transform(std::execution::par, numbers.begin(), numbers.end());\n    std::reduce(std::execution::par, numbers.begin(), numbers.end());	text	txt	2024-07-28 09:49:26.721619	4
-1534	481	    // instead we can combine the two\n    std::transform_reduce(std::execution::par, numbers.begin(), numbers.end());\n}	code	txt	2024-07-28 09:49:26.741849	5
-1535	482	#include <algorithm>	text	txt	2024-07-28 09:49:27.106588	1
-1536	482	std::min(42, 87);\nstd::min({2,5,8,23,43});\nstd::max(34, 47);\nstd::max({4,8,12,42});	code	txt	2024-07-28 09:49:27.127207	2
 1537	483	Starting with C++23, basic strings support `starts_with()` operation:	text	txt	2024-07-28 09:49:27.512533	1
-1538	483	#include <ranges>	text	txt	2024-07-28 09:49:27.532606	2
-1539	483	std::ranges::starts_with("Hello World", "Hello");\n// true	code	txt	2024-07-28 09:49:27.553234	3
 1540	484	Starting with C++23, basic strings support `ends_with()` operation:	text	txt	2024-07-28 09:49:27.914929	1
-1541	484	#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:27.935656	2
-1542	484	std::vector nums {1, 2, 3, 4};\nstd::ranges::ends_with(v, {3, 4});\n// true	code	txt	2024-07-28 09:49:27.957605	3
 1543	485	C++23 standard includes `std::ranges::to<>`.	text	txt	2024-07-28 09:49:28.460855	1
-1544	485	#include <ranges>\n#include <string>	text	txt	2024-07-28 09:49:28.480668	2
-1545	485	int main()\n{\n    std::string alphabet = std::views::iota('a', 'z')\n                         | std::views::transform([](auto const v){ return v - 32; })\n                         | std::ranges::to<std::string>();	text	txt	2024-07-28 09:49:28.50115	3
-1546	485	    std::string abc = alphabet | std::views::take(3) | std::ranges::to<std::string>();\n}	code	txt	2024-07-28 09:49:28.522098	4
 1547	486	Containers of the same type can be easily compared using comparison\noperators. When we need to compare the content of containers of different\ntypes, we can use the `std::equal` and `std::is_permutation` algorithms.	text	txt	2024-07-28 09:49:29.349212	1
-1548	486	#include <algorithm>\n#include <vector>\n#include <set>	text	txt	2024-07-28 09:49:29.369273	2
-1549	486	std::vector<int> data1{2, 1, 3, 4, 5};\nstd::vector<int> data2{2, 4, 1, 3, 5};	text	txt	2024-07-28 09:49:29.389696	3
-1550	486	// Linear comparison:\nbool cmp1 = std::equal(data1.begin(), data1.end(), data2.begin());\n// cmp1 == false	text	txt	2024-07-28 09:49:29.410551	4
-1551	486	bool cmp2 = (data1 == data2);\n// cmp2 == false (same as std::equal if types match)	text	txt	2024-07-28 09:49:29.431532	5
-1552	486	// Elements match but are potentially out of order:\nbool cmp3 = std::is_permutation(data1.begin(), data1.end(), data2.begin());\n// cmp3 == true	text	txt	2024-07-28 09:49:29.451476	6
-1553	486	std::set<int> data3{1, 2, 3, 4, 5};	text	txt	2024-07-28 09:49:29.471845	7
-1554	486	// Linear comparison:\nbool cmp4 = std::ranges::equal(data1, data3);\n// cmp4 == false	text	txt	2024-07-28 09:49:29.492985	8
-1555	486	// Elements match but are potentially out of order:\nbool cmp5 = std::ranges::is_permutation(data1, data3);\n// cmp5 == true	code	txt	2024-07-28 09:49:29.514189	9
 1556	487	| `std::for_each` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:31.518172	1
 1557	487	Invokes the provided functor on each range element in order, ignoring the result.	text	txt	2024-07-28 09:49:31.539401	2
 1558	487	While the range-based for-loop has mostly replaced the use cases for\n`std::for_each`, it still comes in handy as a trivial parallelization tool\nand in its C++20 range version with projections.	text	txt	2024-07-28 09:49:31.559828	3
-1559	487	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:31.580267	4
-1560	487	int main()\n{\n    std::vector<long> numbers{1, 2, 3, 4, 5};\n    long sum{};	text	txt	2024-07-28 09:49:31.601289	5
-1561	487	    sum = std::for_each(numbers.begin(), numbers.end(), sum_predicate<long>{});\n    // sum == 15, using a unary predicate	text	txt	2024-07-28 09:49:31.621849	6
-1562	487	    std::for_each(numbers.begin(), numbers.end(), [&sum](auto v) { sum += v; });\n    // sum == 30, using a lambda	text	txt	2024-07-28 09:49:31.643334	7
-1563	487	    std::ranges::for_each(numbers, [&sum](auto v) { count++; sum += v; });\n    // sum == 45, using ranges	text	txt	2024-07-28 09:49:31.665113	8
-1564	487	    for (auto v: numbers) { sum += v; }\n    // sum == 60, using range-based for\n}	code	txt	2024-07-28 09:49:31.685801	9
-1565	487	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:49:31.706192	10
-1566	487	int main()\n{\n    std::vector<int> data{1, 2, 3, 4, 5};	text	txt	2024-07-28 09:49:31.726547	11
-1567	487	    std::for_each(data.begin(), data.end(), [i = 5](int& v) mutable { v += i--; });\n    // data == {6, 6, 6, 6, 6}\n}	code	txt	2024-07-28 09:49:31.748193	12
-1568	487	#include <algorithm>\n#include <execution>\n#include <vector>	text	txt	2024-07-28 09:49:31.768412	13
-1569	487	int main()\n{\n    struct Custom {};\n    void process(Custom&) {}\n    std::vector<Custom> rng(10, Custom{});	text	txt	2024-07-28 09:49:31.789686	14
-1570	487	    // parallel execution C++17\n    std::for_each(std::execution::par_unseq, // parallel, in any order\n            rng.begin(), rng.end(), // all elements\n            process // invoke process on each element\n            );\n}	code	txt	2024-07-28 09:49:31.810127	15
-1571	487	#include <algorithm>\n#include <vector>\n#include <optional>	text	txt	2024-07-28 09:49:31.829572	16
-1572	487	int main()\n{\n    std::vector<std::optional<int>> opt{{},2,{},4,{}};\n    // range version with projection C++20	text	txt	2024-07-28 09:49:31.849843	17
-1573	487	    std::ranges::for_each(opt,\n        [](int v) {\n            // iterate over projected values\n            // {0, 2, 0, 4, 0}\n        },\n        [](std::optional<int>& v){\n            // projection that will return\n            // the contained value or zero\n            return v.value_or(0);\n        }\n    );\n}	code	txt	2024-07-28 09:49:31.871037	18
-1574	488	As long as the operations are independent, there is no need for\nsynchronization primitives.	text	txt	2024-07-28 09:49:32.827695	1
-1575	488	#include <algorithm>\n#include <execution>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:32.84949	2
-1576	488	struct work\n{\n    void expensive_operation() { /* ... */ }\n};	text	txt	2024-07-28 09:49:32.870838	3
-1577	488	int main()\n{\n    std::vector<work> work_pool{work{}, work{}, work{}};\n    std::for_each(std::execution::par_unseq, work_pool.begin(), work_pool.end(), [](work& w) { w.expensive_operation(); });\n}	code	txt	2024-07-28 09:49:32.891628	4
-1578	488	When synchronization is required, operations need to be atmoic.	text	txt	2024-07-28 09:49:32.91238	5
-1579	488	#include <algorithm>\n#include <execution>\n#include <atomic>\n#include <vector>	text	txt	2024-07-28 09:49:32.931908	6
-1625	496	| `std::lexicographical_compare` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:40.113604	2
-1580	488	int main()\n{\n    std::vector<long> numbers{1,2,3,4,5};\n    std::atomic<size_t> sum{};\n    std::for_each(std::execution::par_unseq, numbers.begin(), numbers.end(), [&sum](auto& e) { sum += e; });\n}	code	txt	2024-07-28 09:49:32.951888	7
-1581	488	Note: parallel execution requires *libtbb* library to be linked.	text	txt	2024-07-28 09:49:32.971449	8
-1582	489	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:33.558091	1
-1583	489	struct work_unit\n{\n    size_t value;\n    work_unit(size_t initial): value{std::move(initial)} {}\n    size_t current() const { return value; }\n};	text	txt	2024-07-28 09:49:33.578815	2
-1584	489	int main()\n{\n    size_t sum{};\n    std::vector<work_unit> tasks{1,2,3};\n    std::ranges::for_each(tasks, [&sum](auto const& e) { sum += e; }, &work_unit::current);\n    // sum: 6\n}	code	txt	2024-07-28 09:49:33.599435	3
-1585	490	| `std::for_each_n` | standard |\n| --- | --- |\n| introduced | C++17 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:34.340596	1
-1586	490	While `std::for_each` operates on the entire range, the interval $[begin,\nend)$, while the `std::for_each_n` operates on the range $[first, first +\nn)$.	text	txt	2024-07-28 09:49:34.361015	2
-1587	490	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:49:34.382077	3
-1588	490	int main()\n{\n    std::vector<long> numbers{1,2,3,4,5,6};\n    std::size_t sum{};\n    std::for_each_n(numbers.begin(), 3, [&sum](auto const& e) { sum += e; });\n    // sum = 6\n}	code	txt	2024-07-28 09:49:34.402636	4
-1589	490	Importantly, because the algorithm does not have access to the end iterator\nof the source range, it does no out-of-bounds checking, and it is the\nresponsibility of the caller to ensure that the range $[first, first + n)$ is\nvalid.	text	txt	2024-07-28 09:49:34.42329	5
+4641	684	std::filesystem::path p{};\nstd::filesystem::file_status fs = std::filesystem::status(p);\nstd::filesystem::file_type ft = fs.type();\n\nswitch (fs.type())\n{\n    using std::filesystem::file_type;\n    case (file_type::regular):      std::cout << "regular"; break;\n    case (file_type::directory):    std::cout << "directory"; break;\n    case (file_type::block):        std::cout << "block"; break;\n    case (file_type::character):    std::cout << "char"; break;\n    case (file_type::symlink):      std::cout << "symlink"; break;\n    case (file_type::socket):       std::cout << "socket"; break;\n    case (file_type::fifo):         std::cout << "fifo"; break;\n    case (file_type::not_found):    std::cout << "not found"; break;\n    case (file_type::unknown):      std::cout << "unknown"; break;\n    case (file_type::none):         std::cout << "none"; break;\n}	code	cpp	2025-07-17 12:28:13.855618	1
+4643	687	std::filesystem::path p{};\nstd::filesystem::file_status fs = std::filesystem::symlink_status(fs);\nstd::filesystem::perms perms = fs.permissions();\nstd::filesystem::perms write_free = std::filesystem::perms::owner_write | std::filesystem::perms::group_write | std::filesystem::perms::others_write;\n\nif ((perms & write_free) != std::filesystem::perms::none)\n{\n}	code	cpp	2025-07-17 12:28:49.732634	2
+4640	683	std::filesystem::path p{};\nstd::filesystem::file_status fs = std::filesystem::status(p);\n\nstd::filesystem::is_regular_file(fs);\nstd::filesystem::is_directory(fs);\nstd::filesystem::is_symlink(fs);\nstd::filesystem::is_other(fs);\n\nstd::filesystem::is_character_file(fs);\nstd::filesystem::is_block_file(fs);\nstd::filesystem::is_fifo(fs);\nstd::filesystem::is_socket(fs);	code	cpp	2025-07-17 12:28:10.68912	1
+2292	687	if ((perms & std::filesystem::perms{0222}) != std::filesystem::perms::none)\n{\n}	code	cpp	2024-07-28 09:51:36.474865	4
+4642	686	#include <iostream>\n#include <filesystem>\n\nint main()\n{\n    std::filesystem::path file{"/etc/passwd"};\n    std::filesystem::file_status status{std::filesystem::status(file)};\n    std::cout << "file type: ";\n    std::cout << "\\\\n";\n}	code	cpp	2025-07-17 12:28:25.573274	1
+2715	886	Any thread calling `io_service::run()` function will block execution and wait\nfor tasks to be enqueued, or finish existing tasks. Best practice is to attach\n`io_service` to slave threads so that they wait for tasks to be given and\nexecute them while master threads assign new tasks to them.	text	txt	2024-07-28 09:52:55.528797	2
+2288	687	|Enum|Octal|POSIX|\n|---|---|---|\n|`none`|0||\n|`owner_read`|0400|`S_IRUSR`|\n|`owner_write`|0200|`S_IWUSR`|\n|`owner_exec`|0100|`S_IXUSR`|\n|`owner_all`|0700|`S_IRWXU`|\n|`group_read`|040|`S_IRGRP`|\n|`group_write`|020|`S_IWGRP`|\n|`group_exec`|010|`S_IXGRP`|\n|`group_all`|070|`S_IRWXG`|\n|`others_read`|04|`S_IROTH`|\n|`others_write`|02|`S_IWOTH`|\n|`others_exec`|01|`S_IXOTH`|\n|`others_all`|07|`S_IRWXO`|\n|`all`|0777||\n|`set_suid`|04000|`S_ISUID`|\n|`set_guid`|02000|`S_ISGID`|\n|`sticky_bit`|01000|`S_ISVTX`|\n|`mask`|07777||\n|`unknown`|0xFFFF||	text	txt	2024-07-28 09:51:36.391878	1
+2291	687	A shorter way to initialize a bitmask is:	text	txt	2024-07-28 09:51:36.453728	3
+4644	688	#include <fstream>\n\nstd::fstream file{"/tmp/non-existing-file"};	code	cpp	2025-07-17 12:29:07.888991	1
+4684	886	#include <thread>\n#include <chrono>\n#include <functional>\n#include <boost/asio.hpp>\n\nvoid finish_tasks(boost::asio::io_service& service)\n{\n    service.run();\n}\n\nvoid some_work(std::size_t s)\n{\n    std::this_thread::sleep_for(std::chrono::seconds(s));\n}\n\nint main()\n{\n    boost::asio::io_service service;\n    std::thread worker{finish_tasks, std::ref(service)};\n    service.post(std::bind(some_work, 2));\n    worker.join();\n}	code	cpp	2025-07-17 18:31:59.621498	3
+1589	490	Importantly, because the algorithm does not have access to the end iterator\nof the source range, it does no out-of-bounds checking, and it is the\nresponsibility of the caller to ensure that the range $[first, first + n)$ is\nvalid.	text	txt	2024-07-28 09:49:34.42329	4
 1590	491	| `std::swap` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:35.131004	1
 1591	491	Correctly calling swap requires pulling the default `std::swap` version to\nthe local scope.	text	txt	2024-07-28 09:49:35.151604	2
-1592	491	#include <algorithm>	text	txt	2024-07-28 09:49:35.172486	3
-1593	491	namespace library\n{\n    struct container { long value; };\n}	text	txt	2024-07-28 09:49:35.19244	4
-1594	491	int main()\n{\n    library::container a{3}, b{4};\n    std::ranges::swap(a, b); // first calls library::swap\n                             // then it calls the default move-swap\n}	code	txt	2024-07-28 09:49:35.213507	5
+1574	488	As long as the operations are independent, there is no need for\nsynchronization primitives.	text	txt	2024-07-28 09:49:32.827695	1
+1578	488	When synchronization is required, operations need to be atmoic.	text	txt	2024-07-28 09:49:32.91238	3
+1585	490	| `std::for_each_n` | standard |\n| --- | --- |\n| introduced | C++17 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:34.340596	1
+1586	490	While `std::for_each` operates on the entire range, the interval $[begin,\nend)$, while the `std::for_each_n` operates on the range $[first, first +\nn)$.	text	txt	2024-07-28 09:49:34.361015	2
 1595	492	| `std::iter_swap` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:35.923813	1
 1596	492	The `std::iter_swap` is an indirect swap, swapping values behind two forward\niterators.	text	txt	2024-07-28 09:49:35.945015	2
-1597	492	#include <algorithm>\n#include <memory>	text	txt	2024-07-28 09:49:35.966511	3
-1598	492	int main()\n{\n    auto p1 = std::make_unique<int>(1);\n    auto p2 = std::make_unique<int>(2);	text	txt	2024-07-28 09:49:35.987512	4
-1599	492	    int *p1_pre = p1.get();\n    int *p2_pre = p2.get();	text	txt	2024-07-28 09:49:36.007796	5
-1600	492	    std::ranges::swap(p1, p2);\n    // p1.get() == p1_pre, *p1 == 2\n    // p2.get() == p2_pre, *p2 == 1\n}	code	txt	2024-07-28 09:49:36.027781	6
 1601	493	| `std::swap_ranges` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:36.564865	1
-1602	493	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:49:36.586525	2
-1603	493	int main()\n{\n    std::vector<long> numbers{1,2,3,4,5,6};\n    std::swap_ranges(numbers.begin(), numbers.begin()+2, numbers.rbegin());\n    // numbers: {6,5,3,4,2,1}\n}	code	txt	2024-07-28 09:49:36.607324	3
 1604	494	Customizing swap for user-defined types and correctly calling swap with a\nfallback can be tricky. If we are not using the C++20 range version, we need\nto correctly implement the customized version as a friend function (making it\nvisible only to ADL) and pull in the default swap when calling it (to get the\nfallback).	text	txt	2024-07-28 09:49:37.685464	1
-1605	494	#include <algorithm>	text	txt	2024-07-28 09:49:37.706263	2
-1606	494	namespace MyNamespace\n{\nstruct MyClass\n{\n    // Use inline friend function to implement custom swap.\n    friend void swap(MyClass&, MyClass&) { }\n};	text	txt	2024-07-28 09:49:37.727367	3
-1607	494	struct MyOtherClass {};\n} // MyNamespace	text	txt	2024-07-28 09:49:37.748192	4
-1608	494	MyNamespace::MyClass a, b;\nMyNamespace::MyOtherClass x, y;	text	txt	2024-07-28 09:49:37.768323	5
-1609	494	// Fully qualified call, will always call std::swap\nstd::swap(a,b); // calls std::swap\nstd::swap(x,y); // calls std::swap	text	txt	2024-07-28 09:49:37.788551	6
-1610	494	// No suitable swap for MyOtherClass.\nswap(a,b); // calls MyNamespace::swap\n// swap(x,y); // would not compile	text	txt	2024-07-28 09:49:37.809483	7
-1611	494	// Pull std::swap as the default into local scope:\nswap(a,b); // calls MyNamespace::swap\nswap(x,y); // would not compile	text	txt	2024-07-28 09:49:37.829351	8
-1612	494	// Pull std::swap as the default into local scope:	text	txt	2024-07-28 09:49:37.849658	9
-1613	494	using std::swap;\nswap(a,b); // calls MyNamespace::swap\nswap(x,y); // calls std::swap	text	txt	2024-07-28 09:49:37.8709	10
-1614	494	// C++20 std::ranges::swap which will do the correct thing:\nstd::ranges::swap(x,y); // default swap\nstd::ranges::swap(a,b); // calls MyNamespace::swap	code	txt	2024-07-28 09:49:37.893131	11
 1615	495	Implementing a `strict_weak_ordering` for a custom type, at minimum requires\nproviding an overload of `operator<`.	text	txt	2024-07-28 09:49:38.913742	1
 1616	495	A good default for a `strict_weak_ordering` implementation is\n*lexicographical ordering*.	text	txt	2024-07-28 09:49:38.934985	2
-1617	495	Since C++20 introduced the spaceship operator, user-defined types can easily\naccess the default version of *lexicographical ordering*.	text	txt	2024-07-28 09:49:38.955427	3
-1618	495	struct Point {\n    int x;\n    int y;	text	txt	2024-07-28 09:49:38.975542	4
-1619	495	    // pre-C++20 lexicographical less-than\n    friend bool operator<(const Point& left, const Point& right)\n    {\n        if (left.x != right.x)\n            return left.x < right.x;\n        return left.y < right.y;\n    }	text	txt	2024-07-28 09:49:38.997603	5
-1620	495	    // default C++20 spaceship version of lexicographical comparison\n    friend auto operator<=>(const Point&, const Point&) = default;	text	txt	2024-07-28 09:49:39.019173	6
-1621	495	    // manual version of lexicographical comparison using operator <=>\n    friend auto operator<=>(const Point& left, const Point& right)\n    {\n        if (left.x != right.x)\n            return left.x <=> right.x;\n        return left.y <=> right.y;\n    }\n};	code	txt	2024-07-28 09:49:39.038423	7
-1622	495	The type returned for the spaceship operator is the common comparison\ncategory type for the bases and members, one of:	text	txt	2024-07-28 09:49:39.059432	8
-1623	495	* `std::strong_ordering`\n* `std::weak_ordering`\n* `std::partial_ordering`	text	txt	2024-07-28 09:49:39.079374	9
-1624	496	Lexicographical `strict_weak_ordering` for ranges is exposed through the\n`std::lexicographical_compare` algorithm.	text	txt	2024-07-28 09:49:40.092827	1
-1626	496	#include <algorithm>\n#include <ranges>\n#include <vector>\n#include <string>	text	txt	2024-07-28 09:49:40.135448	3
-1627	496	int main()\n{\n    std::vector<long> range1{1, 2, 3};\n    std::vector<long> range2{1, 3};\n    std::vector<long> range3{1, 3, 1};	text	txt	2024-07-28 09:49:40.157434	4
-1628	496	    bool cmp1 = std::lexicographical_compare(range1.cbegin(), range1.cend(), range2.cbegin(), range2.cend());\n    // same as\n    bool cmp2 = range1 < range2;\n    // cmp1 = cmp2 = true	text	txt	2024-07-28 09:49:40.178216	5
-1629	496	    bool cmp3 = std::lexicographical_compare(range2.cbegin(), range2.cend(), range3.cbegin(), range3.cend());\n    // same as\n    bool cmp4 = range2 < range3;\n    // cmp3 = cmp4 = true	text	txt	2024-07-28 09:49:40.199663	6
-1630	496	    std::vector<std::string> range4{"Zoe", "Alice"};\n    std::vector<std::string> range5{"Adam", "Maria"};\n    auto compare_length = [](auto const& l, auto const& r) { return l.length() < r.length(); };	text	txt	2024-07-28 09:49:40.221056	7
-1631	496	    bool cmp5 = std::ranges::lexicographical_compare(range4, range5, compare_length);\n    // different than\n    bool cmp6 = range1 < range2;\n    // cmp5 = true, cmp6 = false\n}	code	txt	2024-07-28 09:49:40.241766	8
-1632	497	| `std::lexicographical_compare_three_way` | standard |\n| --- | --- |\n| introduced | C++20 |\n| constexpr | C++20 |\n| paralllel | N/A |\n| rangified | N/A |	text	txt	2024-07-28 09:49:41.101865	1
+1625	496	| `std::lexicographical_compare` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:40.113604	2
+4521	591	#include <filesystem>\n#include <fstream>\n#include <thread>\n#include <chrono>\n\nint main(int argc, char** argv)\n{\n    std::stop_source worker_controller{};\n\n    std::jthread worker{\n        [](std::stop_token const& caller_token, std::filesystem::path file_path)\n        {\n            bool readable{};\n            std::ifstream file_stream{file_path};\n\n            if (file_stream.is_open())\n                readable = true;\n\n            std::stop_callback close_stream{caller_token, [&]{ readable = false; }};\n            while (readable)\n            {\n                /* do something with the file */\n            }\n\n            file_stream.close();\n        }, worker_controller.get_token(), argv[0]\n    };\n\n    worker.detach();\n    std::this_thread::sleep_for(std::chrono::seconds{5});\n    worker_controller.request_stop();\n    std::this_thread::sleep_for(std::chrono::seconds{5});\n}	code	cpp	2025-07-17 12:04:25.136159	2
 3666	1169	int main(void)\n{\n    int result = sum(4, 2);\n    printf("%i\\\\n", result);\n}	code	txt	2024-07-28 09:55:26.442235	8
+1641	498	The `std::sort` algorithm is the canonical `O(N log N)` sort (typically\nimplemented as *intro-sort*).	text	txt	2024-07-28 09:49:41.539178	1
+1642	498	Due to the `O(N log N)` complexity guarantee, `std::sort` only operates on\n`random_access` ranges. Notably, `std::list` offers a method with an\napproximate `O(N log N)` complexity.	text	txt	2024-07-28 09:49:41.560211	2
+1624	496	Lexicographical `strict_weak_ordering` for ranges is exposed through the\n`std::lexicographical_compare` algorithm.	text	txt	2024-07-28 09:49:40.092827	1
+1632	497	| `std::lexicographical_compare_three_way` | standard |\n| --- | --- |\n| introduced | C++20 |\n| constexpr | C++20 |\n| paralllel | N/A |\n| rangified | N/A |	text	txt	2024-07-28 09:49:41.101865	1
 1633	497	The `std::lexicographical_compare_three_way` is the spaceship operator\nequivalent to `std::lexicographical_compare`. It returns one of:	text	txt	2024-07-28 09:49:41.122621	2
 1634	497	* `std::strong_ordering`\n* `std::weak_ordering`\n* `std::partial_ordering`	text	txt	2024-07-28 09:49:41.144833	3
 1635	497	The type depends on the type returned by the elements’ spaceship operator.	text	txt	2024-07-28 09:49:41.165408	4
-1636	497	#include <algorithm>\n#include <vector>\n#include <string>	text	txt	2024-07-28 09:49:41.186377	5
-1637	497	int main()\n{\n    std::vector<long> numbers1{1, 1, 1};\n    std::vector<long> numbers2{1, 2, 3};	text	txt	2024-07-28 09:49:41.206747	6
-1638	497	    auto cmp1 = std::lexicographical_compare_three_way(numbers1.cbegin(), numbers1.cend(), numbers2.cbegin(), numbers2.cend());\n    // cmp1 = std::strong_ordering::less	text	txt	2024-07-28 09:49:41.227716	7
-1639	497	    std::vector<std::string> strings1{"Zoe", "Alice"};\n    std::vector<std::string> strings2{"Adam", "Maria"};	text	txt	2024-07-28 09:49:41.247867	8
-1640	497	    auto cmp2 = std::lexicographical_compare_three_way(strings1.cbegin(), strings1.cend(), strings2.cbegin(), strings2.cend());\n    // cmp2 = std::strong_ordering::greater\n}	code	txt	2024-07-28 09:49:41.269276	9
-1641	498	The `std::sort` algorithm is the canonical `O(N log N)` sort (typically\nimplemented as *intro-sort*).	text	txt	2024-07-28 09:49:41.539178	1
-1642	498	Due to the `O(N log N)` complexity guarantee, `std::sort` only operates on\n`random_access` ranges. Notably, `std::list` offers a method with an\napproximate `O(N log N)` complexity.	text	txt	2024-07-28 09:49:41.560211	2
 1643	499	| `std::sort` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:42.377113	1
-1644	499	#include <algorithm>\n#include <ranges>\n#include <vector>\n#include <list>	text	txt	2024-07-28 09:49:42.397309	2
-1645	499	struct Account\n{\n    long value() { return value_; }\n    long value_;\n};	text	txt	2024-07-28 09:49:42.417752	3
-1646	499	int main()\n{\n    std::vector<long> series1{6,2,4,1,5,3};\n    std::sort(series1.begin(), series1.end());	text	txt	2024-07-28 09:49:42.437528	4
-1647	499	    std::list<long> series2{6,2,4,1,5,3};\n    //std::sort(series2.begin(), series2.end()); // won't compile\n    series2.sort();	text	txt	2024-07-28 09:49:42.458464	5
-1648	499	    // With C++20, we can take advantage of projections to sort by a method or member\n    std::vector<Account> accounts{{6},{2},{4},{1},{5},{3}};\n    std::ranges::sort(accounts, std::greater<>{}, &Account::value);\n}	code	txt	2024-07-28 09:49:42.480332	6
 1649	500	The `std::sort` is free to re-arrange equivalent elements, which can be\nundesirable when re-sorting an already sorted range. The `std::stable_sort`\nprovides the additional guarantee of preserving the relative order of equal\nelements.	text	txt	2024-07-28 09:49:43.404862	1
 1650	500	| `std::stable_sort` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | N/A |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:43.425177	2
 1651	500	If additional memory is available, `stable_sort` remains `O(n log n)`.\nHowever, if it fails to allocate, it will degrade to an `O(n log n log n)` algorithm.	text	txt	2024-07-28 09:49:43.446374	3
-1652	500	#include <algorithm>\n#include <ranges>\n#include <vector>\n#include <string>	text	txt	2024-07-28 09:49:43.468537	4
-1653	500	struct Record\n{\n    std::string label;\n    short rank;\n};	text	txt	2024-07-28 09:49:43.490988	5
-1654	500	int main()\n{\n    std::vector<Record> records{{"b", 2}, {"e", 1}, {"c", 2}, {"a", 1}, {"d", 3}};	text	txt	2024-07-28 09:49:43.514136	6
-1655	500	    std::ranges::stable_sort(records, {}, &Record::label);\n    // guaranteed order: a-1, b-2, c-2, d-3, e-1	text	txt	2024-07-28 09:49:43.534403	7
-1656	500	    std::ranges::stable_sort(records, {}, &Record::rank);\n    // guaranteed order: a-1, e-1, b-2, c-2, d-3\n}	code	txt	2024-07-28 09:49:43.554988	8
 1657	501	| `std::is_sorted` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:44.236176	1
-1658	501	#include <algorithm>\n#include <vector>\n#include <ranges>	text	txt	2024-07-28 09:49:44.257527	2
-1659	501	int main()\n{\n    std::vector<int> data1 = {1, 2, 3, 4, 5};\n    bool test1 = std::is_sorted(data1.begin(), data1.end());\n    // test1 == true	text	txt	2024-07-28 09:49:44.278533	3
-1660	501	    std::vector<int> data2 = {5, 4, 3, 2, 1};\n    bool test2 = std::ranges::is_sorted(data2);\n    // test2 == false	text	txt	2024-07-28 09:49:44.298693	4
-1661	501	    bool test3 = std::ranges::is_sorted(data2, std::greater<>{});\n    // test3 == true\n}	code	txt	2024-07-28 09:49:44.318589	5
-1662	502	| `std::is_sorted_until` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:44.891993	1
-1663	502	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:44.913585	2
-1664	502	int main()\n{\n    std::vector<long> numbers{1,2,3,6,5,4};\n    auto iter = std::ranges::is_sorted_until(numbers);\n    // *iter = 6\n}	code	txt	2024-07-28 09:49:44.934107	3
-1665	503	| `std::partial_sort` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:45.692113	1
-1666	503	The `std::partial_sort` algorithm reorders the range’s elements such that the\nleading sub-range is in the same order it would when fully sorted. However,\nthe algorithm leaves the rest of the range in an unspecified order.	text	txt	2024-07-28 09:49:45.712544	2
-1667	503	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:45.732714	3
-1668	503	int main()\n{\n    std::vector<int> data{9, 8, 7, 6, 5, 4, 3, 2, 1};	text	txt	2024-07-28 09:49:45.75402	4
-1669	503	    std::partial_sort(data.begin(), data.begin()+3, data.end());\n    // data == {1, 2, 3, -unspecified order-}	text	txt	2024-07-28 09:49:45.774487	5
-1670	503	    std::ranges::partial_sort(data, data.begin()+3, std::greater<>());\n    // data == {9, 8, 7, -unspecified order-}\n}	code	txt	2024-07-28 09:49:45.794756	6
-1671	503	The benefit of using a partial sort is faster runtime — approximately `O(N\nlog K)`, where `K` is the number of elements sorted.	text	txt	2024-07-28 09:49:45.816738	7
-1672	504	| `std::partial_sort_copy` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:46.532627	1
-1673	504	The `std::partial_sort_copy` algorithm has the same behaviour as\n`std::partial_sort`; however, it does not operate inline. Instead, the\nalgorithm writes the results to a second range.	text	txt	2024-07-28 09:49:46.552944	2
-1674	504	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:46.572638	3
-1675	504	int main()\n{\n    std::vector<int> top(3);	text	txt	2024-07-28 09:49:46.594121	4
-1676	504	    // input == "0 1 2 3 4 5 6 7 8 9"\n    auto input = std::istream_iterator<int>(std::cin);\n    auto cnt = std::counted_iterator(input, 10);	text	txt	2024-07-28 09:49:46.615156	5
+4526	592	#include <thread>\n#include <vector>\n\nvoid task() { }\n\nint main()\n{\n    unsigned int const min_threads = 2;\n    unsigned int const hw_threads = std::thread::hardware_concurrency();\n    unsigned int const num_threads = hw_threads ? hw_threads : min_threads;\n\n    std::vector<std::thread> threads(num_threads-1); // count main thread as well\n\n    for (std::thread& t: threads)\n        t = std::thread{task};\n\n    for (std::thread& t: threads)\n        t.join();\n}	code	cpp	2025-07-17 12:05:03.400683	1
+4527	593	#include <thread>\n#include <iostream>\n\nint main()\n{\n    std::thread::id main_thread_id = std::this_thread::get_id();\n    std::cout << main_thread_id << std::endl;\n}	code	cpp	2025-07-17 12:05:07.521289	1
+4531	598	#include <iostream>\n#include <thread>\n#include <mutex>\n\nstd::mutex exclusive{};\n\nint main()\n{\n    exclusive.lock();\n    std::thread t{[&](){\n        std::lock_guard guard{exclusive};\n        std::puts("do this later");\n    }};\n    std::puts("do this first");\n    exclusive.unlock();\n    t.join();\n}	code	cpp	2025-07-17 12:05:49.819335	2
+4529	596	#include <iostream>\n#include <thread>\n#include <mutex>\n\nstd::mutex exclusive{};\n\nint main()\n{\n    exclusive.lock();\n    std::thread t{[&]() {\n        exclusive.lock();\n        exclusive.unlock();\n        std::puts("do this task later");\n    }};\n    std::puts("do this task first");\n    exclusive.unlock();\n    t.join();\n}	code	cpp	2025-07-17 12:05:28.915111	1
 3667	1169	gcc -g -o program main.c sum.o\n./program	code	txt	2024-07-28 09:55:26.463256	9
-1677	504	    std::ranges::partial_sort_copy(cnt, std::default_sentinel, top.begin(), top.end(), std::greater<>{});\n    // top == { 9, 8, 7 }\n}	code	txt	2024-07-28 09:49:46.636137	6
-1678	505	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:47.18393	1
-1679	505	int main()\n{\n    std::vector<long> numbers{1,2,3,4,5};	text	txt	2024-07-28 09:49:47.20466	2
-1680	505	    auto last_sorted = std::is_sorted_until(numbers.begin(), numbers.end());	text	txt	2024-07-28 09:49:47.224752	3
-1681	505	    for (auto iter = numbers.begin(); iter != last_sorted; ++iter)\n        continue;	text	txt	2024-07-28 09:49:47.244944	4
-1682	505	    for (auto v: std::ranges::subrange(numbers.begin(), last_sorted))\n        continue;\n}	code	txt	2024-07-28 09:49:47.265144	5
-1683	506	| `std::partition` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:48.12282	1
-1684	506	The `std::partition` algorithm provides the basic partitioning functionality,\nreordering elements based on a unary predicate. The algorithm returns the\npartition point, an iterator to the first element for which the predicate\nreturned `false`.	text	txt	2024-07-28 09:49:48.143601	2
-1685	506	#include <algorithm>\n#include <iostream>\n#include <vector>\n#include <string>	text	txt	2024-07-28 09:49:48.164472	3
-1686	506	struct ExamResult\n{\n    std::string student_name;\n    int score;\n};	text	txt	2024-07-28 09:49:48.186272	4
-1687	506	int main()\n{\n    std::vector<ExamResult> results{{"Jane Doe", 84}, {"John Doe", 78}, {"Liz Clarkson", 68}, {"David Teneth", 92}};	text	txt	2024-07-28 09:49:48.207779	5
-1688	506	    auto partition_point = std::partition(results.begin(), results.end(), [threshold=80](auto const& e) { return e.score >= threshold; });	text	txt	2024-07-28 09:49:48.227905	6
-1689	506	    std::for_each(results.begin(), partition_point, [](auto const& e) { std::cout << "[PASSED] " << e.student_name << "\\\\n"; });\n    std::for_each(partition_point, results.end(), [](auto const& e) { std::cout << "[FAILED] " << e.student_name << "\\\\n"; });\n}	code	txt	2024-07-28 09:49:48.250657	7
+4647	708	#include <source_location>\n#include <string_view>\n#include <iostream>\n\nvoid log(std::string_view const message, std::source_location const location = std::source_location::current)\n{\n    std::cerr << location.file_name() << ": " << location.line() << "\\\\n\\\\t"\n        << location.function_name() << ": " << message << "\\\\n";\n}\n\nvoid do_something()\n{\n    log("something is done here");\n}\n\nint main()\n{\n    do_something();\n}	code	cpp	2025-07-17 12:31:45.3452	1
 1690	507	| `std::stable_partition` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | N/A |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:48.796713	1
 1691	507	The `std::partition` algorithm is permitted to rearrange the elements with\nthe only guarantee that elements for which the predicate evaluated to true\nwill precede elements for which the predicate evaluated to false. But this\nbehaviour might be undesirable, for example, for UI elements.	text	txt	2024-07-28 09:49:48.818216	2
 1692	507	The `std::stable_partition` algorithm adds the guarantee of preserving the\nrelative order of elements in both partitions.	text	txt	2024-07-28 09:49:48.839369	3
-1693	507	auto& widget = get_widget();\nstd::ranges::stable_partition(widget.items, &Item::is_selected);	code	txt	2024-07-28 09:49:48.859925	4
+1662	502	| `std::is_sorted_until` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:44.891993	1
+1665	503	| `std::partial_sort` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:45.692113	1
+1666	503	The `std::partial_sort` algorithm reorders the range’s elements such that the\nleading sub-range is in the same order it would when fully sorted. However,\nthe algorithm leaves the rest of the range in an unspecified order.	text	txt	2024-07-28 09:49:45.712544	2
+1671	503	The benefit of using a partial sort is faster runtime — approximately `O(N\nlog K)`, where `K` is the number of elements sorted.	text	txt	2024-07-28 09:49:45.816738	4
+1672	504	| `std::partial_sort_copy` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:46.532627	1
+1673	504	The `std::partial_sort_copy` algorithm has the same behaviour as\n`std::partial_sort`; however, it does not operate inline. Instead, the\nalgorithm writes the results to a second range.	text	txt	2024-07-28 09:49:46.552944	2
+1683	506	| `std::partition` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:48.12282	1
+1684	506	The `std::partition` algorithm provides the basic partitioning functionality,\nreordering elements based on a unary predicate. The algorithm returns the\npartition point, an iterator to the first element for which the predicate\nreturned `false`.	text	txt	2024-07-28 09:49:48.143601	2
+1693	507	auto& widget = get_widget();\nstd::ranges::stable_partition(widget.items, &Item::is_selected);	code	cpp	2024-07-28 09:49:48.859925	4
 1694	508	| `std::is_partitioned` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:49.433274	1
-1695	508	#include <algorithm>\n#include <cassert>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:49.455279	2
-1696	508	int main()\n{\n    std::vector<long> series{2, 4, 6, 7, 9, 11};\n    auto is_even = [](auto v) { return v % 2 == 0; };\n    bool test = std::ranges::is_partitioned(series, is_even);\n    assert(test); // test = true\n}	code	txt	2024-07-28 09:49:49.476458	3
 1697	509	| `std::partition_copy` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:50.228294	1
 1698	509	The `std::partition_copy` is a variant of `std::partition` that, instead of\nreordering elements, will output the partitioned elements to the two output\nranges denoted by two iterators.	text	txt	2024-07-28 09:49:50.249579	2
-1699	509	#include <algorithm>\n#include <iterator>\n#include <cassert>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:50.270517	3
-1700	509	int main()\n{\n    std::vector<long> series{2, 4, 6, 7, 9, 11};\n    auto is_even = [](auto v) { return v % 2 == 0; };	text	txt	2024-07-28 09:49:50.290264	4
-1701	509	    std::vector<long> evens, odds;\n    std::ranges::partition_copy(series, std::back_inserter(evens), std::back_inserter(odds), is_even);	text	txt	2024-07-28 09:49:50.310319	5
-1702	509	    assert(evens.size() == 3);\n    assert(odds.size() == 3);\n}	code	txt	2024-07-28 09:49:50.330061	6
+4700	890	#include <thread>\n#include <chrono>\n#include <boost/asio.hpp>\n\nvoid some_work()\n{\n    std::this_thread::sleep_for(std::chrono::seconds(2));\n}\n\nvoid finish_tasks(boost::asio::io_service& service)\n{\n    service.run();\n}\n\nvoid timer_handler(boost::system::error_code const&)\n{\n}\n\nint main()\n{\n    boost::asio::io_context service;\n    boost::asio::io_context::strand strand{service};\n    std::thread worker{finish_tasks, std::ref(service)};\n    service.post(some_work);\n\n    boost::asio::deadline_timer timer{service};\n    timer.expires_from_now(boost::posix_time::seconds(1));\n    timer.async_wait(strand.wrap(timer_handler));\n\n    worker.join();\n    service.stop();\n}	code	cpp	2025-07-17 18:35:01.737424	1
+4706	891	#include <iostream>\n#include <thread>\n#include <chrono>\n#include <string>\n#include <boost/asio.hpp>\n\nvoid initialize_service(boost::asio::io_context& service)\n{\n    service.run();\n}\n\nint main()\n{\n    boost::asio::io_context service;\n    boost::asio::io_context::strand strand{service};\n\n    std::thread worker{initialize_service, std::ref(service)};\n    boost::asio::ip::tcp::socket socket{service};\n\n    try\n    {\n        boost::asio::ip::tcp::resolver resolver{service};\n        boost::asio::ip::tcp::resolver::query query{"example.com", std::to_string(80)};\n        boost::asio::ip::tcp::resolver::iterator iterator = resolver.resolve(query);\n        boost::asio::ip::tcp::endpoint endpoint = *iterator;\n\n        socket.connect(endpoint);\n        socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);\n        socket.close();\n    }\n    catch (std::exception const& exp)\n    {\n        std::cerr << exp.what() << std::endl;\n    }\n\n    worker.join();\n    service.stop();\n}	code	cpp	2025-07-17 18:35:42.843963	1
+4535	599	#include <initializer_list>\n#include <vector>\n#include <thread>\n#include <mutex>\n\ntemplate<typename T>\nclass some_task\n{\npublic:\n    some_task(std::initializer_list<T> range): tokens{range} {}\n    void append(some_task<T> const& other) noexcept\n    {\n        std::scoped_lock guard{exclusive, other.exclusive};\n        tokens.insert(tokens.end(), other.tokens.begin(), other.tokens.end());\n    }\n    std::size_t size() const noexcept\n    {\n        std::lock_guard guard{exclusive};\n        return tokens.size();\n    }\n\nprivate:\n    std::vector<T> tokens;\n    std::mutex exclusive;\n};\n\ntemplate<typename T>\nvoid merge_tasks(some_task<T>& a, some_task<T>& b)\n{\n    a.append(b);\n}\n\nint main()\n{\n    some_task<long> A{1,2,3,4}, B{5,6,7,8};\n    std::thread t1{&some_task<long>::size, A};\n    std::thread t2{merge_tasks<long>, A, B};\n}	code	cpp	2025-07-17 12:06:01.639825	1
+4652	713	*mpeg.cpp*\n#include <mpeg.hpp>\n\nusing namespace dp;\n\nmpeg::mpeg(std::chrono::seconds const& length)\n    : _length{length}\n{\n}\n\nstd::chrono::seconds mpeg::length() const noexcept\n{\n    return _length;\n}	code	cpp	2025-07-17 12:33:15.618513	2
 1703	510	| `std::nth_element` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:51.285752	1
-1704	510	The `std::nth_element` algorithm is a partitioning algorithm that ensures\nthat the element in the nth position is the element that would be in this\nposition if the range was sorted.	text	txt	2024-07-28 09:49:51.307415	2
-1705	510	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:51.328264	3
-1706	510	int main()\n{\n    std::vector<long> series1{6, 3, 5, 1, 2, 4};\n    std::nth_element(series1.begin(), std::next(series1.begin(), 2), series1.end());\n    // 1 2 3 5 6 4	text	txt	2024-07-28 09:49:51.348846	4
-1707	510	    std::vector<long> series2{6, 3, 5, 1, 2, 4};\n    std::ranges::nth_element(series2, std::ranges::next(series2.begin(), 2));\n    // 1 2 3 5 6 4	text	txt	2024-07-28 09:49:51.369293	5
-1708	510	    std::vector<long> series3{6, 3, 5, 1, 2, 4};\n    std::nth_element(series3.begin(), std::next(series3.begin(), 2), series3.end(), std::greater<long>{});\n    // 5 6 4 3 2 1	text	txt	2024-07-28 09:49:51.390529	6
-1709	510	    std::vector<long> series4{6, 3, 5, 1, 2, 4};\n    std::ranges::nth_element(series4, std::ranges::next(series4.begin(), 2), std::greater<long>{});\n    // 5 6 4 3 2 1\n}	code	txt	2024-07-28 09:49:51.411489	7
-1932	576	int main()\n{\n    std::thread thread_f(do_something);\n    thread_f.join();	text	txt	2024-07-28 09:50:31.869761	4
-1710	510	Because of its selection/partitioning nature, `std::nth_element` offers a\nbetter theoretical complexity than `std::partial_sort` - `O(n)` vs `O(n ∗\nlogk)`. However, note that the standard only mandates average `O(n)`\ncomplexity, and `std::nth_element` implementations can have high overhead, so\nalways test to determine which provides better performance for your use case.	text	txt	2024-07-28 09:49:51.431226	8
+1738	514	| `std::binary_search` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:55.659268	1
+1739	514	This function checks whether the requested value is present in the sorted\nrange or not.	text	txt	2024-07-28 09:49:55.679818	2
 1711	511	| `std::lower_bound` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:52.894552	1
 1712	511	| `std::upper_bound` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:52.915198	2
 1713	511	The two algorithms differ in which bound they return:	text	txt	2024-07-28 09:49:52.935686	3
 1714	511	* The `std::lower_bound` returns the first element for which `element < value` returns `false`.\n* The `std::upper_bound` returns the first element for which `value < element`.\n* If no such element exists, both algorithms return the end iterator.	text	txt	2024-07-28 09:49:52.956331	4
-1715	511	#include <algorithm>\n#include <vector>\n#include <string>	text	txt	2024-07-28 09:49:52.976909	5
-1716	511	struct ExamResult\n{\n    std::string student_name;\n    int score;\n};	text	txt	2024-07-28 09:49:52.996188	6
-1717	511	int main()\n{\n    std::vector<ExamResult> results{{"Jane", 65}, {"Maria", 80}, {"Liz", 70}, {"David", 90}, {"Paula", 70}};\n    std::ranges::sort(results, std::less<int>{}, &ExamResult::score);	text	txt	2024-07-28 09:49:53.017765	7
-1718	511	    auto lower = std::ranges::lower_bound(results, 70, {}, &ExamResult::score);\n    // lower.score == 70\n    auto upper = std::ranges::upper_bound(results, 70, {}, &ExamResult::score);\n    // upper.score == 80\n}	code	txt	2024-07-28 09:49:53.039323	8
-1719	511	While both algorithms will operate on any `forward_range`, the logarithmic\ndivide and conquer behavior is only available for `random_access_range`.	text	txt	2024-07-28 09:49:53.059473	9
-1720	511	Data structures like `std::set`, `std::multiset`, `std::map`, `std::multimap`\noffer their `O(log N)` implementations of lower and upper bound as methods.	text	txt	2024-07-28 09:49:53.079904	10
-1721	511	#include <algorithm>\n#include <set>	text	txt	2024-07-28 09:49:53.099244	11
-1722	511	int main()\n{\n    std::multiset<int> data{1,2,3,4,5,6,6,6,7,8,9};	text	txt	2024-07-28 09:49:53.119794	12
-1723	511	    auto lower = data.lower_bound(6);\n    // std::distance(data.begin(), lower) == 5	text	txt	2024-07-28 09:49:53.140901	13
-1724	511	    auto upper = data.upper_bound(6);\n    // std::distance(data.begin(), upper) == 8\n}	code	txt	2024-07-28 09:49:53.160499	14
+1719	511	While both algorithms will operate on any `forward_range`, the logarithmic\ndivide and conquer behavior is only available for `random_access_range`.	text	txt	2024-07-28 09:49:53.059473	6
+1720	511	Data structures like `std::set`, `std::multiset`, `std::map`, `std::multimap`\noffer their `O(log N)` implementations of lower and upper bound as methods.	text	txt	2024-07-28 09:49:53.079904	7
 1725	512	| `std::equal_range` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:53.711337	1
-1726	512	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:49:53.732267	2
-1727	512	int main()\n{\n    std::vector<long> data{1,2,3,4,5,6,6,6,7,8,9};	text	txt	2024-07-28 09:49:53.75327	3
-1728	512	    auto [lower, upper] = std::equal_range(data.begin(), data.end(), 6);\n    // std::distance(data.begin(), lower) == 5\n    // std::distance(data.begin(), upper) == 8\n}	code	txt	2024-07-28 09:49:53.774741	4
 1729	513	| `std::partition_point` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:54.744826	1
 1730	513	Despite the naming, `std::partition_point` works very similaryly to\n`std::upper_bound`, however instead of searching for a particular value, it\nsearches using a predicate.	text	txt	2024-07-28 09:49:54.766124	2
 1731	513	This algorithm will return either an iterator to the first element that\ndoesn't satisfy the provided predicate or the end iterator of the input range\nif all elements do.	text	txt	2024-07-28 09:49:54.786777	3
 1732	513	The input range or the projected range must be partitioned with respect to\nthe predicate.	text	txt	2024-07-28 09:49:54.807596	4
-1733	513	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:49:54.827933	5
-1734	513	int main()\n{\n    std::vector<long> sorted{1,2,3,4,5,6,7,8,9};	text	txt	2024-07-28 09:49:54.848679	6
-1735	513	    auto point = std::partition_point(data.begin(), data.end(), [](long v) { return v < 6; });\n    std::assert(std::distance(data.begin(), point) == 5);	text	txt	2024-07-28 09:49:54.869861	7
-1736	513	    auto lower_five = std::lower_bound(sorted.begin(), sorted.end(), 5);\n    auto least_five = std::partition_point(sorted.begin(), sorted.end(), [](long v) { return v < 5; });\n    std::assert(*lower_five == *least_five);	text	txt	2024-07-28 09:49:54.890113	8
-1737	513	    auto square = std::ranges::partition_point(sorted,\n        [](long v) { return v < 16; },\n        [](long v) { return v * v; } // project to {1,4,9,16,25,...}\n    );\n    std::assert(*square == 16);\n}	code	txt	2024-07-28 09:49:54.911392	9
-1738	514	| `std::binary_search` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:55.659268	1
-1739	514	This function checks whether the requested value is present in the sorted\nrange or not.	text	txt	2024-07-28 09:49:55.679818	2
-1740	514	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:55.701889	3
-1741	514	int main()\n{\n    std::vector<long> data{1,2,3,4,5,6};\n    std::binary_search(data.begin(), data.end(), 4);\n    // true\n    std::ranges::binary_search(data, 4);\n    // true\n}	code	txt	2024-07-28 09:49:55.723394	4
-1742	514	`std::binary_search` is equivalent to calling `std::equal_range` and checking\nwhether the returned is non-empty; however, `std::binary_search` offers a\nsingle lookup performance, where `std::equal_range` does two lookups to\ndetermine the lower and upper bounds.	text	txt	2024-07-28 09:49:55.744734	5
+4537	601	#include <thread>\n#include <string>\n#include <mutex>\n#include <shared_mutex>\n#include <map>\n\nclass some_task\n{\npublic:\n    void set(std::string key, std::string value)\n    {\n        std::unique_lock<std::shared_mutex> guard(shared_exclusive);\n        config.insert_or_assign(key, value);\n    }\n    std::string get(std::string const& key) const\n    {\n        std::shared_lock<std::shared_mutex> guard(shared_exclusive);\n        return config.at(key);\n    }\nprivate:\n    std::map<std::string, std::string> config;\n    mutable std::shared_mutex shared_exclusive;\n};\n\nint main()\n{\n    some_task task;\n    std::thread t1{&some_task::set, &task, "pgdata", "/opt/pgroot/data"};\n    t1.join();\n    std::string storage_path = task.get("pgdata");\n}	code	cpp	2025-07-17 12:06:27.364694	1
+4649	713	*main.cpp*\n#include <streamer.hpp>\n#include <mpeg.hpp>\n\n#include <iostream>\n#include <memory>\n\nint main()\n{\n    dp::streamer streamer;\n    std::shared_ptr<dp::video> video{streamer.record("mpeg")};\n    std::cout << video->length().count() << std::endl;\n}	code	cpp	2025-07-17 12:32:59.570566	1
+4655	713	*mpeg.hpp*\n#pragma once\n\n#include <video.hpp>\n\nnamespace dp\n{\nclass mpeg : public video\n{\npublic:\n    explicit mpeg(std::chrono::seconds const& length);\n    std::chrono::seconds length() const noexcept override;\n\nprivate:\n    std::chrono::seconds _length;\n};\n} // dp	code	cpp	2025-07-17 12:33:25.864833	3
+4660	713	*streamer.cpp*\n#include <streamer.hpp>\n#include <mpeg.hpp>\n\n#include <cstring>\n\nusing namespace dp;\n\nstd::shared_ptr<video> streamer::record(char const type[4])\n{\n    std::shared_ptr<video> stream_buffer{};\n\n    if (strcmp(type, "mpeg") == 0)\n    {\n        stream_buffer = std::make_shared<mpeg>(std::chrono::seconds{120});\n    }\n\n    return stream_buffer;\n}	code	cpp	2025-07-17 12:33:44.940038	4
+4662	713	*streamer.hpp*\n#pragma once\n\n#include <video_stream.hpp>\n\nnamespace dp\n{\nclass streamer : public video_stream\n{\npublic:\n    std::shared_ptr<video> record(char const type[4]) override;\n};\n} // dp	code	cpp	2025-07-17 12:33:56.043128	5
+4664	713	*video.hpp*\n#pragma once\n\n#include <chrono>\n\nnamespace dp\n{\nstruct video\n{\n    virtual std::chrono::seconds length() const noexcept = 0;\n};\n} // dp	code	cpp	2025-07-17 12:34:06.412439	6
 1743	515	| `std::includes` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:56.304633	1
-1744	515	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:56.325672	2
-1745	515	int main()\n{\n    std::ranges::includes({1,2,3,4,5}, {3,4});\n    // true\n}	code	txt	2024-07-28 09:49:56.347388	3
 1746	516	| `std::merge` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:57.181411	1
-1747	516	#include <algorithm>\n#include <execution>\n#include <iostream>\n#include <iterator>\n#include <ranges>\n#include <vector>\n#include <string>\n#include <map>	text	txt	2024-07-28 09:49:57.203568	2
-1748	516	int main()\n{\n    std::map<long, std::string> data1{{1, "first"}, {2, "first"}, {3, "first"}};\n    std::map<long, std::string> data2{{0, "second"}, {2, "second"}, {4, "second"}};\n    std::vector<std::pair<long, std::string>> result1, result2;\n    auto compare = [](auto const& left, auto const& right) { return left.first < right.first; };	text	txt	2024-07-28 09:49:57.224806	3
-1749	516	    std::ranges::merge(data1, data2, std::back_inserter(result1), compare);\n    std::ranges::for_each(result1, [](auto const& p) { std::cout << "{" << p.first << ", " << p.second << "} "; });\n    std::cout << "\\\\n";	text	txt	2024-07-28 09:49:57.245034	4
-1750	516	    std::merge(std::execution::par_unseq, data1.begin(), data1.end(), data2.begin(), data2.end(), std::back_inserter(result2), compare);\n    std::ranges::for_each(result2, [](auto const& p) { std::cout << "{" << p.first << ", " << p.second << "} "; });\n    std::cout << "\\\\n";\n}	code	txt	2024-07-28 09:49:57.266411	5
 1751	517	| `std::inplace_merge` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:57.781712	1
-1752	517	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:49:57.802731	2
-1753	517	int main()\n{\n    std::vector<long> range{1,3,5,2,4,6};\n    std::inplace_merge(range.begin(), range.begin()+3, range.end());\n    // range == {1,2,3,4,5,6}\n}	code	txt	2024-07-28 09:49:57.823851	3
 1754	518	| `std::unique` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:58.423195	1
-1755	518	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:58.444606	2
-1756	518	int main()\n{\n    std::vector<long> range{1,2,2,3,3,3,4,4,4,4,5,5,5,5,5};	text	txt	2024-07-28 09:49:58.466001	3
-1757	518	    auto last = std::unique(range.begin(), range.end());\n    range.resize(std::distance(range.begin(), last));\n    // range == {1,2,3,4,5};\n}	code	txt	2024-07-28 09:49:58.48672	4
 1758	519	| `std::unique_copy` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:59.077142	1
-1759	519	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:49:59.098205	2
-1760	519	int main()\n{\n    std::vector<long> range{1,2,2,3,3,3,4,4,4,4,5,5,5,5,5}, result;\n    std::ranges::unique_copy(range, std::back_inserter(result));\n    // range is untouched\n    // result == {1,2,3,4,5};\n}	code	txt	2024-07-28 09:49:59.119014	3
 1761	520	| `std::set_difference` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:49:59.705627	1
-1762	520	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:49:59.726206	2
-1763	520	int main()\n{\n    std::vector<long> data1{1,3,5,7,9};\n    std::vector<long> data2{3,4,5,6,7};\n    std::vector<long> difference;\n    std::ranges::set_difference(data1, data2, std::back_inserter(difference));\n    // difference == {1,9};\n}	code	txt	2024-07-28 09:49:59.747348	3
 1764	521	| `std::set_symmetric_difference` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:00.343863	1
-1765	521	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:50:00.363736	2
-1766	521	int main()\n{\n    std::vector<long> data1{1,3,5,7,9};\n    std::vector<long> data2{3,4,5,6,7};\n    std::vector<long> symmetric_difference;\n    std::ranges::set_symmetric_difference(data1, data2, std::back_inserter(symmetric_difference));\n    // symmetric_difference == {1,4,6,9};\n}	code	txt	2024-07-28 09:50:00.385283	3
 1767	522	| `std::set_union` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:00.974309	1
-1768	522	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:50:00.993972	2
-1769	522	int main()\n{\n    std::vector<long> data1{1,3,5,7,9};\n    std::vector<long> data2{3,4,5,6,7};\n    std::vector<long> union;\n    std::ranges::set_union(data1, data2, std::back_inserter(union));\n    // union == {1,3,4,5,6,7,9}\n}	code	txt	2024-07-28 09:50:01.014995	3
 1770	523	| `std::set_intersection` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:01.579405	1
-1771	523	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:50:01.600786	2
-1772	523	int main()\n{\n    std::vector<long> data1{1,3,5,7,9};\n    std::vector<long> data2{3,4,5,6,7};\n    std::vector<long> intersection;\n    std::ranges::set_intersection(data1, data2, std::back_inserter(intersection));\n    // intersection == {3,5,7}\n}	code	txt	2024-07-28 09:50:01.621731	3
 1773	524	| `std::transform` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:02.392142	1
-1774	524	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:50:02.412449	2
-1775	524	int main()\n{\n    std::vector<long> range{1,1,1,1,1};	text	txt	2024-07-28 09:50:02.432383	3
-1776	524	    // unary version\n    std::transform(range.begin(), range.end(), range.begin(), [](long e) { return e + 1; });\n    // {2,2,2,2,2}\n    std::transform(range.begin(), range.end(), range.begin(), range.begin(), [](long left, long right) { return left + right; });\n    // {4,4,4,4,4}	text	txt	2024-07-28 09:50:02.453233	4
-1777	524	    // binary version\n    std::ranges::transform(range, range.begin(), [](long e) { return e / e; });\n    // {1,1,1,1,1}\n    std::ranges::transform(range, range, range.begin(), [](long left, long right) { return left + right; });\n    // {2,2,2,2,2}\n}	code	txt	2024-07-28 09:50:02.475343	5
 1778	525	| `std::remove` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:02.986697	1
-1779	525	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:50:03.007778	2
-1780	525	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    auto last = std::remove(range.begin(), range.end(), 3);\n    range.erase(last, range.end());\n}	code	txt	2024-07-28 09:50:03.028437	3
+4667	713	*video_stream.hpp*\n#pragma once\n\n#include <memory>\n\nnamespace dp\n{\nclass video;\n\nclass video_stream\n{\npublic:\n    virtual std::shared_ptr<video> record(char const type[4]) = 0;\n};\n}	code	cpp	2025-07-17 12:34:17.875158	7
+1823	537	| `std::all_of` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:10.938543	1
+4716	892	#include <iostream>\n#include <thread>\n#include <string>\n#include <functional>\n#include <boost/asio.hpp>\n\nstatic constexpr auto port{8888};\nstatic constexpr auto address{"127.0.0.1"};\n\nvoid connection_worker(boost::asio::io_context& context)\n{\n    context.run();\n}\n\nint main()\n{\n    boost::asio::io_context context{};\n    boost::asio::io_context::strand strand{context};\n    boost::asio::ip::tcp::socket socket{context};\n    boost::asio::ip::tcp::resolver resolver{context};\n    boost::asio::ip::tcp::acceptor acceptor{context};\n\n    std::thread worker(connection_worker, std::ref(context));\n\n    boost::asio::ip::tcp::resolver::query query{address, std::to_string(port)};\n    boost::asio::ip::tcp::resolver::iterator iterator{resolver.resolve(query)};\n    boost::asio::ip::tcp::endpoint endpoint{*iterator};\n\n    acceptor.open(endpoint.protocol());\n    acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));\n    acceptor.bind(endpoint);\n    acceptor.listen(boost::asio::socket_base::max_connections);\n\n    boost::asio::ip::address local_addr{endpoint.address()};\n    boost::asio::ip::port_type local_port{port};\n    std::clog << "listening " << local_addr << ":" << local_port << std::endl;\n\n    acceptor.accept(socket);\n\n    boost::asio::ip::tcp::endpoint client{socket.remote_endpoint()};\n    boost::asio::ip::address client_addr{client.address()};\n    boost::asio::ip::port_type client_port{client.port()};\n    std::clog << "client " << client_addr << ":" << client_port << std::endl;\n\n    acceptor.close();\n    socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);\n    socket.close();\n    context.stop();\n    worker.join();\n}	code	cpp	2025-07-17 18:35:49.336671	1
+4541	606	#include <condition_variable>\n#include <thread>\n#include <vector>\n#include <mutex>\n\ntemplate<typename T>\nclass bag\n{\npublic:\n    void append(T value)\n    {\n        std::unique_lock<std::mutex> guard{exclusive};\n        container.push_back(std::move(value));\n        guard.unlock();\n        condition.notify_one();\n    }\n\n    T get() const\n    {\n        std::unique_lock<std::mutex> guard{exclusive};\n        while (container.empty())\n            condition.wait(guard);\n        T value = std::move(container.back());\n        return value;\n    }\n\nprivate:\n    mutable std::mutex exclusive;\n    mutable std::condition_variable condition;\n    std::vector<T> container;\n};\n\nint main()\n{\n    bag<long> numbers{};\n    numbers.append(42);\n    long n = numbers.get(); // 42\n}	code	cpp	2025-07-17 12:11:04.399822	1
+4722	895	#include <thread>\n#include <string>\n#include <boost/asio.hpp>\n\nvoid initialize_service(boost::asio::io_context& service)\n{\n    service.run();\n}\n\nint main()\n{\n    boost::asio::io_context service;\n    boost::asio::io_context::strand strand{service};\n\n    std::thread worker{initialize_service, std::ref(service)};\n\n    boost::asio::ip::tcp::socket socket{service};\n    boost::asio::ip::tcp::resolver resolver{service};\n    boost::asio::ip::tcp::resolver::query query{"127.0.0.1", std::to_string(9090)};\n    boost::asio::ip::tcp::resolver::iterator iterator = resolver.resolve(query);\n    boost::asio::ip::tcp::endpoint endpoint = *iterator;\n\n    socket.connect(endpoint);\n    socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);\n    socket.close();\n\n    worker.join();\n    service.stop();\n}	code	cpp	2025-07-17 18:36:05.393098	1
+4544	608	#include <atomic>\n#include <thread>\n\nstd::atomic<long> shared_value{};\n\nvoid increment_shared()\n{\n    shared_value++;\n}\n\nint main()\n{\n    std::thread t1{increment_shared};\n    std::thread t2{increment_shared};\n    t1.join();\n    t2.join();\n}	code	cpp	2025-07-17 12:11:35.635684	2
+4687	887	#include <thread>\n#include <chrono>\n#include <functional>\n#include <boost/asio.hpp>\n\nvoid some_work(std::size_t s)\n{\n    std::this_thread::sleep_for(std::chrono::seconds(s));\n}\n\nvoid finish_tasks(boost::asio::io_service& service)\n{\n    service.run();\n}\n\nint main()\n{\n    boost::asio::io_service service;\n    std::thread worker{finish_tasks, std::ref(service)};\n    boost::asio::dispatch(service, std::bind(some_work, 2));\n    worker.join();\n    service.stop();\n}	code	cpp	2025-07-17 18:32:13.026871	3
 1781	526	| `std::remove_if` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:03.5547	1
-1782	526	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:50:03.574881	2
-1783	526	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    auto last = std::remove_if(range.begin(), range.end(), [limit=4](long v) { return v > limit; });\n    range.erase(last, range.end());\n}	code	txt	2024-07-28 09:50:03.597643	3
 1784	527	| `std::replace` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:04.130555	1
-1785	527	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:50:04.151988	2
-1786	527	int main()\n{\n    std::vector<long> range{1,2,1,2,1};\n    std::ranges::replace(range, 2, 0);\n    // {1,0,1,0,1}\n}	code	txt	2024-07-28 09:50:04.173126	3
 1787	528	| `std::replace_if` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:04.739652	1
-1788	528	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:50:04.758982	2
-1789	528	int main()\n{\n    std::vector<long> range{1,2,1,2,1};\n    std::ranges::replace_if(range, [](long v) { return v > 1; }, 0);\n    // {1,0,1,0,1}\n}	code	txt	2024-07-28 09:50:04.780076	3
 1790	529	| `std::reverse` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:05.322232	1
-1791	529	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:50:05.342476	2
-1792	529	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::reverse(range);\n    // {5,4,3,2,1}\n}	code	txt	2024-07-28 09:50:05.364462	3
 1793	530	| `std::rotate` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:05.992156	1
-1794	530	#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:50:06.012257	2
-1795	530	int main()\n{\n    std::vector<long> range{1,2,3,4,5};	text	txt	2024-07-28 09:50:06.033322	3
-1796	530	    std::rotate(range.begin(), std::next(range.begin(), 3), range.end());\n    // {4,5,1,2,3}	text	txt	2024-07-28 09:50:06.054738	4
-1797	530	    std::ranges::rotate(range, std::next(range.begin(), 2));\n    // {1,2,3,4,5}\n}	code	txt	2024-07-28 09:50:06.074662	5
 1798	531	| `std::shift_left` | standard |\n| --- | --- |\n| introduced | C++20 |\n| paralllel | C++20 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:06.809623	1
 1799	531	| `std::shift_right` | standard |\n| --- | --- |\n| introduced | C++20 |\n| paralllel | C++20 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:06.830112	2
-1800	531	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:50:06.849949	3
-1801	531	int main()\n{\n    std::vector<long> range{1,2,3,4,5};	text	txt	2024-07-28 09:50:06.870738	4
-1802	531	    std::shift_left(range.begin(), range.end(), 3);\n    // {4,5,N,N,N}	text	txt	2024-07-28 09:50:06.890784	5
-1803	531	    std::shift_right(range.begin(), range.end(), 3);\n    // {N,N,N,4,5}\n}	code	txt	2024-07-28 09:50:06.910129	6
 1804	532	| `std::shuffle` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | N/A |\n| constexpr | N/A |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:07.514883	1
-1805	532	#include <algorithm>\n#include <vector>\n#include <ranges>\n#include <random>	text	txt	2024-07-28 09:50:07.534921	2
-1806	532	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::random_device rd{};\n    std::mt19937 generator{rd()};\n    std::ranges::shuffle(range, generator);\n}	code	txt	2024-07-28 09:50:07.555294	3
 1807	533	| `std::prev_permutation` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:08.383081	1
 1808	533	The `std::next_permutation` and `std::prev_permutation` algorithms reorder\nelements of a range into the next/previous lexicographical permutation.	text	txt	2024-07-28 09:50:08.404218	2
 1809	533	If no such permutation exists, both algorithms roll over and return `false`.	text	txt	2024-07-28 09:50:08.424584	3
-1810	533	#include <algorithm>\n#include <vector>\n#include <bitset>	text	txt	2024-07-28 09:50:08.443951	4
-1811	533	std::vector<int> data{1, 2, 3};\ndo {\n    // Iterate over:\n    // 123, 132, 213, 231, 312, 321\n} while(std::next_permutation(data.begin(), data.end()));\n// data == {1, 2, 3}	text	txt	2024-07-28 09:50:08.464993	5
-1812	533	std::vector<bool> bits(4);\nbits[0] = 1;\nbits[1] = 1;\ndo {\n    // Iterate over all 4 bit numbers with 2 bits set to 1\n    // 1100, 1010, 1001, 0110, 0101, 0011\n} while (std::prev_permutation(bits.begin(), bits.end()));\n// bits == {1, 1, 0, 0}	code	txt	2024-07-28 09:50:08.486692	6
 1813	534	| `std::next_permutation` | standard |\n| --- | --- |\n| introduced | C++98 |\n| paralllel | N/A |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:09.083918	1
-1814	534	#include <algorithm>\n#include <vector>\n#include <ranges>	text	txt	2024-07-28 09:50:09.104814	2
-1815	534	int main()\n{\n    std::vector<long> range{1,2,3};\n    // range == {1,2,3};\n    std::next_permutation(range.begin(), range.end());\n    // range == {1,3,2};\n    std::prev_permutation(range.begin(), range.end());\n    // range == {1,2,3};\n}	code	txt	2024-07-28 09:50:09.12555	3
 1816	535	| `std::is_permutation` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:09.687919	1
-1817	535	#include <algorithm>\n#include <vector>\n#include <ranges>	text	txt	2024-07-28 09:50:09.70817	2
-1818	535	int main()\n{\n    std::vector<long> range1{1,2,3}, range2{1,3,2};\n    std::ranges::is_permutation(range1, range2);\n    // true\n}	code	txt	2024-07-28 09:50:09.72786	3
 1819	536	| `std::all_of` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:10.322739	1
-1820	536	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:50:10.34361	2
-1821	536	int main()\n{\n    std::vector<long> range{1,2,3};	text	txt	2024-07-28 09:50:10.363921	3
-1822	536	    std::ranges::all_of(range, [](long e) { return e > 0; });\n    // all numbers are possitive: true\n}	code	txt	2024-07-28 09:50:10.383926	4
-1823	537	| `std::all_of` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:10.938543	1
-1824	537	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:50:10.959326	2
-1825	537	int main()\n{\n    std::vector<long> range{1,2,3};	text	txt	2024-07-28 09:50:10.980647	3
-1826	537	    std::ranges::any_of(range, [](long e) { return e % 2 == 0; });\n    // at least an even number exists: true\n}	code	txt	2024-07-28 09:50:11.002083	4
-1827	538	| `std::all_of` | standard |\n| --- | --- |\n| introduced | C++11 |\n| paralllel | C++17 |\n| constexpr | C++20 |\n| rangified | C++20 |	text	txt	2024-07-28 09:50:11.534362	1
-1828	538	#include <algorithm>\n#include <vector>	text	txt	2024-07-28 09:50:11.555476	2
-1829	538	int main()\n{\n    std::vector<long> range{1,2,3};	text	txt	2024-07-28 09:50:11.576202	3
-1830	538	    std::ranges::none_of(range, [](long e) { return e < 0; });\n    // not any number is negative: true\n}	code	txt	2024-07-28 09:50:11.598841	4
-1831	539	#include <string>	text	txt	2024-07-28 09:50:12.534653	1
-1832	539	template<typename CharT>\nusing tstring = std::basic_string<CharT, std::char_traits<CharT>, std::allocator<CharT>>;	text	txt	2024-07-28 09:50:12.555873	2
-1833	539	template<typename CharT>\ninline tstring<CharT> to_upper(tstring<CharT> text)\n{\n    std::transform(std::begin(text), std::end(text), std::begin(text), toupper);\n    return text;\n}	text	txt	2024-07-28 09:50:12.577162	3
-1834	539	template<typename CharT>\ninline tstring<CharT> to_upper(tstring<CharT>&& text)\n{\n    std::transform(std::begin(text), std::end(text), std::begin(text), toupper);\n    return text;\n}	text	txt	2024-07-28 09:50:12.598213	4
-1835	539	template<typename CharT>\ninline tstring<CharT> to_lower(tstring<CharT> text)\n{\n    std::transform(std::begin(text), std::end(text), std::begin(text), tolower);\n    return text;\n}	text	txt	2024-07-28 09:50:12.619419	5
-1836	539	template<typename CharT>\ninline tstring<CharT> to_lower(tstring<CharT>&& text)\n{\n    std::transform(std::begin(text), std::end(text), std::begin(text), tolower);\n    return text;\n}	code	txt	2024-07-28 09:50:12.639671	6
-1837	540	#include <string>	text	txt	2024-07-28 09:50:13.318593	1
-1838	540	template<typename CharT>\nusing tstring = std::basic_string<CharT, std::char_traits<CharT>, std::allocator<CharT>>;	text	txt	2024-07-28 09:50:13.340893	2
-1933	576	    background_task callable;\n    std::thread thread_c(callable);\n    thread_c.join();	text	txt	2024-07-28 09:50:31.8899	5
-1839	540	template<typename CharT>\ninline tstring<CharT> reverse(tstring<CharT> text)\n{\n    std::reverse(std::begin(text), std::end(text));\n    return text;\n}	text	txt	2024-07-28 09:50:13.360441	3
-1840	540	template<typename CharT>\ninline tstring<CharT> reverse(tstring<CharT>&& text)\n{\n    std::reverse(std::begin(text), std::end(text));\n    return text;\n}	code	txt	2024-07-28 09:50:13.381014	4
-1841	541	#include <string>\n#include <utility>	text	txt	2024-07-28 09:50:13.90487	1
-1842	541	template<typename CharT>\nusing tstring = std::basic_string<CharT, std::char_traits<CharT>, std::allocator<CharT>>;	text	txt	2024-07-28 09:50:13.926129	2
-1843	541	template<typename CharT>\ninline tstring<CharT> trim(tstring<CharT> const& text)\n{\n    tstring<CharT>::size first{text.find_first_not_of(' ')};\n    tstring<CharT>::size last{text.find_last_not_of(' ')};\n    return text.substr(first, (last - first + 1));\n}	code	txt	2024-07-28 09:50:13.947158	3
-1844	542	#include <string>\n#include <algorithm>	text	txt	2024-07-28 09:50:14.519086	1
-1845	542	template<typename CharT>\nusing tstring = std::basic_string<CharT, std::char_traits<CharT>, std::allocator<CharT>>;	text	txt	2024-07-28 09:50:14.539163	2
-1850	543	template<typename CharT>\ninline std::vector<tstring<CharT>> split(tstring<CharT> text, CharT const delimiter)\n{\n    auto sstream = tstringstream<CharT>{text};\n    auto tokens = std::vector<tstring<CharT>>{};\n    auto token = tstring<CharT>{};	text	txt	2024-07-28 09:50:15.40294	4
-1851	543	    while (std::getline(sstream, token, delimiter))\n    {\n        if (!token.empty())\n            tokens.push_back(token);\n    }	text	txt	2024-07-28 09:50:15.424217	5
-1852	543	    return tokens;\n}	code	txt	2024-07-28 09:50:15.445848	6
 1853	544	Following string operations are available in C++23:	text	txt	2024-07-28 09:50:15.777457	1
 1854	544	- `std::basic_string<CharT,Traits,Allocator>::insert_range`\n- `std::basic_string<CharT,Traits,Allocator>::append_range`\n- `std::basic_string<CharT,Traits,Allocator>::replace_with_range`	text	txt	2024-07-28 09:50:15.79933	2
-1856	545	#include <iostream>\n#include <iterator>\n#include <string>	text	txt	2024-07-28 09:50:16.479117	2
-1857	545	int main() {\n    auto const missing = {'l', 'i', 'b', '_'};\n    std::string library_name{"__cpp_containers_ranges"};	text	txt	2024-07-28 09:50:16.499378	3
-1858	545	    auto const pos = library_name.find("container");\n    auto iter = std::next(library_name.begin(), pos);	text	txt	2024-07-28 09:50:16.519579	4
-1859	545	#ifdef __cpp_lib_containers_ranges\n    library_name.insert_range(iter, missing);\n#else\n    library_name.insert(iter, missing.begin(), missing.end());\n#endif	text	txt	2024-07-28 09:50:16.54082	5
-1860	545	    std::cout << library_name;\n}	code	txt	2024-07-28 09:50:16.560681	6
-1861	546	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <string>\n#include <vector>\n#include <map>	text	txt	2024-07-28 09:50:17.149535	1
-1862	546	int main()\n{\n    std::map<long, std::string> map{ {0, "first"}, {1, "second"}, {2, "third"} };	text	txt	2024-07-28 09:50:17.170111	2
-1863	546	    std::ranges::copy(std::views::keys(map), std::ostream_iterator<long>(std::cout, " "));\n    // 0 1 2	text	txt	2024-07-28 09:50:17.189479	3
-1864	546	    std::ranges::copy(std::views::values(map), std::ostream_iterator<long>(std::cout, " "));\n    // first second third\n}	code	txt	2024-07-28 09:50:17.210879	4
-1865	547	#include <iostream>\n#include <iterator>p\n#include <algorithm>\n#include <ranges>\n#include <string>\n#include <vector>\n#include <tuple>	text	txt	2024-07-28 09:50:17.84435	1
-1866	547	int main()\n{\n    std::vector<std::tuple<long, std::string, long>> range{ {0, "John", 4}, {1, "Laura", 5}, {2, "Alice", 5} };	text	txt	2024-07-28 09:50:17.8652	2
-1867	547	    std::vector<std::string> names;\n    std::ranges::copy(range | std::views::elements<1>, std::ostream_iterator<long>(std::cout, " "));\n    // John Laura Alice	text	txt	2024-07-28 09:50:17.885093	3
-1868	547	    std::vector<std::size_t> name_length;\n    std::ranges::copy(range | std::views::elements<2>, std::ostream_iterator<long>(std::cout, " "));\n    // 4 5 5\n}	code	txt	2024-07-28 09:50:17.905407	4
-1869	548	#include <iostream>\n#include <iterator>p\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:50:18.440987	1
-1870	548	int main()\n{\n    std::vector<long> range{1,2,3,4,5};	text	txt	2024-07-28 09:50:18.462201	2
-1871	548	    std::ranges::copy(std::views::transform(range, [](long e) -> long { return e*e; }), std::ostream_iterator<long>(std::cout, " "));\n    // 1 4 9 16 25	text	txt	2024-07-28 09:50:18.482374	3
-1872	548	    std::ranges::copy(range | std::views::transform([](long e) -> long { return e*e; }), std::ostream_iterator<long>(std::cout, " "));\n    // 1 4 9 16 25\n}	code	txt	2024-07-28 09:50:18.503519	4
-1873	549	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:50:18.951263	1
-1874	549	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(range | std::views::take(3), std::ostream_iterator<long>(std::cout, " "));\n    // 1 2 3\n}	code	txt	2024-07-28 09:50:18.9723	2
-1875	550	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:50:19.443774	1
-1876	550	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(range | std::views::take_while([](long e) { return e <= 3; }), std::ostream_iterator<long>(std::cout, " "));\n    // 1 2 3\n}	code	txt	2024-07-28 09:50:19.464747	2
-1877	551	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:50:19.959671	1
-1878	551	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(range | std::views::drop(3), std::ostream_iterator<long>(std::cout, " "));\n    // 4 5\n}	code	txt	2024-07-28 09:50:19.981975	2
-1879	552	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:50:20.462165	1
-1880	552	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(range | std::views::drop_while([](long e) { return e <= 3; }), std::ostream_iterator<long>(std::cout, " "));\n    // 4 5\n}	code	txt	2024-07-28 09:50:20.483247	2
-1881	553	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:50:20.98313	1
+4729	896	#include <thread>\n#include <iostream>\n#include <functional>\n#include <boost/asio.hpp>\n\nvoid connection_worker(boost::asio::io_context& context)\n{\n    context.run();\n}\n\nvoid on_connect(boost::asio::ip::tcp::endpoint const& endpoint)\n{\n    std::cout << "connected to " << endpoint.address().to_string() << std::endl;\n}\n\nint main()\n{\n    boost::asio::io_context context{};\n    boost::asio::io_context::strand strand{context};\n    std::thread worker{connection_worker, std::ref(context)};\n\n    boost::asio::ip::tcp::socket socket{context};\n    boost::asio::ip::tcp::resolver resolver{context};\n\n    boost::asio::ip::tcp::resolver::query query{"127.0.0.1", "9000"};\n    boost::asio::ip::tcp::resolver::iterator endpoints = resolver.resolve(query);\n\n    boost::asio::ip::tcp::endpoint endpoint = *endpoints;\n    socket.async_connect(endpoint, std::bind(on_connect, std::ref(endpoint)));\n\n    socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);\n    socket.close();\n    worker.join();\n    context.stop();\n}	code	cpp	2025-07-17 18:37:01.611744	1
 2024	600		code	txt	2024-07-28 09:50:47.321231	2
-2199	647	p.has_relative_path(); // false\np.relative_path(); // (none)	text	txt	2024-07-28 09:51:18.546807	9
-1882	553	int main()\n{\n    std::vector<long> range{1,2,3,4,5,6};\n    std::ranges::copy(range | std::views::filter([](long e) { return e % 2 == 0; }), std::ostream_iterator<long>(std::cout, " "));\n    // 2 4 6\n}	code	txt	2024-07-28 09:50:21.004661	2
-1883	554	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:50:21.479345	1
-1884	554	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(range | std::views::reverse, std::ostream_iterator<long>(std::cout, " "));\n    // 5 4 3 2 1\n}	code	txt	2024-07-28 09:50:21.501032	2
-1885	555	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:50:21.952888	1
-1886	555	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(std::views::counted(std::next(range.begin()), 3), std::ostream_iterator<long>(std::cout, " "));\n    // 2 3 4\n}	code	txt	2024-07-28 09:50:21.973102	2
-1887	556	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:50:22.485653	1
-1888	556	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    auto common = range | std::views::take(3) | std::views::common;\n    std::copy(common.begin(), common.end(), std::ostream_iterator<long>(std::cout, " "));\n    // 1 2 3\n}	code	txt	2024-07-28 09:50:22.507815	2
-1889	557	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <vector>	text	txt	2024-07-28 09:50:23.006403	1
-1890	557	int main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::copy(std::views::all(range), std::ostream_iterator<long>(std::cout, " "));\n    // 1 2 3 4 5\n}	code	txt	2024-07-28 09:50:23.026836	2
-1891	558	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>\n#include <string>\n#include <charconv>	text	txt	2024-07-28 09:50:23.729247	1
-1892	558	int main()\n{\n    std::string version{"6.4.2"};\n    std::ranges::copy(\n        version |\n        std::views::split('.') |\n        std::views::transform([](auto v) {\n            int token;\n            std::from_chars(v.data(), v.data() + v.size(), token);\n            return token;\n        }),\n        std::ostream_iterator<int>(std::cout, " ")\n    );\n    // 6 4 2\n}	code	txt	2024-07-28 09:50:23.751296	2
 1893	559	incomplete	text	txt	2024-07-28 09:50:23.985942	1
-1894	560	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>	text	txt	2024-07-28 09:50:24.41785	1
-1895	560	int main()\n{\n    std::ranges::copy(std::views::empty<long>, std::ostream_iterator<long>(std::cout, " "));\n}	code	txt	2024-07-28 09:50:24.437171	2
-1896	561	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>	text	txt	2024-07-28 09:50:24.893841	1
-1897	561	int main()\n{\n    std::ranges::copy(std::views::single(4), std::ostream_iterator<long>(std::cout, " "));\n    // 4\n}	code	txt	2024-07-28 09:50:24.915201	2
-1898	562	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>	text	txt	2024-07-28 09:50:25.408398	1
-1899	562	int main()\n{\n    std::ranges::copy(std::views::iota(2,5), std::ostream_iterator<long>(std::cout, " "));\n    // 2 3 4	text	txt	2024-07-28 09:50:25.429813	2
-1900	562	    std::ranges::copy(std::views::iota(4) | std::views::take(3), std::ostream_iterator<long>(std::cout, " "));\n    // 4 5 6\n}	code	txt	2024-07-28 09:50:25.450879	3
-1901	563	#include <iostream>\n#include <iterator>\n#include <algorithm>\n#include <ranges>	text	txt	2024-07-28 09:50:25.882925	1
-1902	563	int main()\n{\n    std::ranges::copy(std::views::istream<long>(std::cin), std::ostream_iterator<long>(std::cout, " "));\n    // 1 2 3 4\n}	code	txt	2024-07-28 09:50:25.90447	2
-1903	564	int do_something(int input)\npre(input > 0),\npost(ret: ret < input)\n{\nreturn input - 1;\n}	code	txt	2024-07-28 09:50:26.277396	1
-1904	565	g++ -std=c++23 -O2 -fcontracts -fcontracts-nonattr	code	txt	2024-07-28 09:50:26.531872	1
 1905	566	The relationships between elements within a range cannot be directly stated.	text	txt	2024-07-28 09:50:26.74826	1
 1906	567	Narrow and wide contracts.	text	txt	2024-07-28 09:50:26.980541	1
-1907	568	A function that accepts any input has a wide contract.	text	txt	2024-07-28 09:50:27.701574	1
-1908	568	A function that is limited in its acceptable input has a narrow contract.\nNarrow contracts limits the possible values of a type.	text	txt	2024-07-28 09:50:27.72214	2
-1909	568	namespace std\n{\n    template <typename T, typename Allocator = allocator<T>>\n    class vector\n    {\n    public:\n        T& operator[](size_type pos);\n        // narrow: pos < size()	text	txt	2024-07-28 09:50:27.741413	3
-1910	568	        T& at(size_type pos);\n        // wide: throws if out of bound	text	txt	2024-07-28 09:50:27.760986	4
-1911	568	        T& front();\n        // narrow: 0 != empty()	text	txt	2024-07-28 09:50:27.782548	5
-1912	568	        vector(vector&&);\n        // wide\n    };\n} // std	code	txt	2024-07-28 09:50:27.803241	6
 1913	569	* Throwing exceptions, returning errors are part of the contract. Values or\n* states that are out of contract are bugs and they are not something to\n  handle.	text	txt	2024-07-28 09:50:28.055688	1
 1914	570	Calling a function that is out of contracts results in undefined behavior.	text	txt	2024-07-28 09:50:28.345186	1
 1915	570		code	txt	2024-07-28 09:50:28.36522	2
 1916	571	This handler should be used for logging not handling a contract like nothing\nhappened.	text	txt	2024-07-28 09:50:28.737411	1
 1917	571	You cannot call this function by yourself.	text	txt	2024-07-28 09:50:28.758315	2
-1918	571	void ::handle_contract_violation(std::contracts::contract_violation const& cv);	code	txt	2024-07-28 09:50:28.779406	3
 1919	572	* enforce\n* observe\n* ignore	text	txt	2024-07-28 09:50:29.109956	1
 1920	572		code	txt	2024-07-28 09:50:29.13097	2
-1921	573	The compiler will compile contracts, checks for their correctness, and when\neverything is checked all the contracts will be wiped from the code.	text	txt	2024-07-28 09:50:29.427889	1
-1922	573		code	txt	2024-07-28 09:50:29.447795	2
-1923	574	When implementing contract for overriden functions, the contract cannot be\nwider than the contract already defined for the virtual function within base\nclass.	text	txt	2024-07-28 09:50:30.104241	1
-1924	574	class base\n{\npublic:\n    virtual void do_something(int x)\n        pre(x < 100)\n    {\n    }\n};	text	txt	2024-07-28 09:50:30.124	2
-1925	574	class derived : public base\n{\npublic:\n    virtual void do_something(int x)\n        pre(x < 120)\n    {\n    }\n};	code	txt	2024-07-28 09:50:30.144674	3
-1926	575	#include <thread>\n#include <chrono>	text	txt	2024-07-28 09:50:30.729072	1
-1927	575	void do_something()\n{\n    using namespace std::chrono_literals;\n    std::this_thread::sleep_for(1s);\n}	text	txt	2024-07-28 09:50:30.751292	2
-1928	575	int main()\n{\n    std::thread worker{do_something};\n    worker.join();\n}	code	txt	2024-07-28 09:50:30.771576	3
-1929	576	#include <thread>	text	txt	2024-07-28 09:50:31.808004	1
-1930	576	void do_something() {}\nvoid do_something_else() {}	text	txt	2024-07-28 09:50:31.828728	2
-1931	576	struct background_task\n{\n    void operator()()\n    {\n        do_something();\n        do_something_else();\n    }\n};	text	txt	2024-07-28 09:50:31.848554	3
-1934	576	    // no to mistakenly call a thread like this:\n    //   std::thread thread_x(background_task());\n    // which can be correctly expressed like:\n    //   std::thread thread_x((background_task()));\n    //   std::thread thread_x{background_task()};	text	txt	2024-07-28 09:50:31.910166	6
-1935	576	    std::thread thread_l([]{\n        do_something();\n        do_something_else();\n    });\n    thread_l.join();\n}	code	txt	2024-07-28 09:50:31.930517	7
+1904	565	g++ -std=c++23 -O2 -fcontracts -fcontracts-nonattr	code	sh	2024-07-28 09:50:26.531872	1
+1903	564	int do_something(int input)\npre(input > 0),\npost(ret: ret < input)\n{\nreturn input - 1;\n}	code	cpp	2024-07-28 09:50:26.277396	1
+1907	568	A function that accepts any input has a wide contract.	text	txt	2024-07-28 09:50:27.701574	1
+1908	568	A function that is limited in its acceptable input has a narrow contract.\nNarrow contracts limits the possible values of a type.	text	txt	2024-07-28 09:50:27.72214	2
+1918	571	void ::handle_contract_violation(std::contracts::contract_violation const& cv);	code	cpp	2024-07-28 09:50:28.779406	3
+3668	1170	There are two types of inline assembly: **basic** and **extended**.	text	txt	2024-07-28 09:55:26.738942	1
+1973	584	Operating systems provide us with horrible killing mechanisms of stopping a\nthread, but that prevents us from cleaning up.	text	txt	2024-07-28 09:50:37.800748	1
 1936	577	The callable and arguments are copied into storage local to the new thread.	text	txt	2024-07-28 09:50:33.31016	1
 1937	577	This helps avoid dangling references and race conditions.	text	txt	2024-07-28 09:50:33.330353	2
 1938	577	Use `std::ref()` when you really want a reference, or use a lambda as the\ncallable.	text	txt	2024-07-28 09:50:33.350863	3
-1939	577	#include <thread>\n#include <memory>\n#include <string>\n#include <string_view>	text	txt	2024-07-28 09:50:33.370528	4
-1940	577	void rvalue_write(std::string&&) { } // rvalue only\nvoid lvalue_write(std::string&) { } // lvalue only\nvoid pointer_write(std::string_view) { } // pointer only\nvoid smart_write(std::unique_ptr<std::string>) { } // non-copyable object only	text	txt	2024-07-28 09:50:33.391016	5
-1941	577	struct X\n{\n    void do_lengthy_work(std::string&) {}\n};	text	txt	2024-07-28 09:50:33.411693	6
-1942	577	int main()\n{\n    // implicit cast from const char* to std::string\n    std::thread write_thread(rvalue_write, "text");\n    write_thread.join();	text	txt	2024-07-28 09:50:33.43325	7
-1943	577	    char text[1024];\n    sprintf(text, "%i", 1);	text	txt	2024-07-28 09:50:33.454413	8
-1944	577	    // use of local object in joinable thread\n    std::thread pointer_thread(pointer_write, text);\n    pointer_thread.join();	text	txt	2024-07-28 09:50:33.476001	9
-3668	1170	There are two types of inline assembly: **basic** and **extended**.	text	txt	2024-07-28 09:55:26.738942	1
-1945	577	    // use of copied local object before background thread invokation\n    std::thread local_thread(rvalue_write, std::string{text});\n    local_thread.detach();	text	txt	2024-07-28 09:50:33.496318	10
-1946	577	    // pass by lvalue reference to avoid copy\n    std::string str{text};\n    std::thread ref_thread(lvalue_write, std::ref(str));\n    ref_thread.join();	text	txt	2024-07-28 09:50:33.517113	11
-1947	577	    // bind method to thread\n    X some_work;\n    std::thread binding_thread(&X::do_lengthy_work, &some_work, std::ref(str));\n    binding_thread.join();	text	txt	2024-07-28 09:50:33.538605	12
-1948	577	    // explicitly move non-copyable objects\n    std::unique_ptr<std::string> non_copyable{new std::string{str}};\n    std::thread smart_thread(smart_write, std::move(non_copyable));\n    smart_thread.join();\n}	code	txt	2024-07-28 09:50:33.560452	13
-1949	578	#include <thread>\n#include <chrono>	text	txt	2024-07-28 09:50:34.086054	1
-1950	578	void do_something()\n{\n    std::this_thread::sleep_for(std::chrono::seconds{1});\n}	text	txt	2024-07-28 09:50:34.106911	2
-1951	578	int main()\n{\n    std::jthread t0{do_something};\n}	code	txt	2024-07-28 09:50:34.127938	3
 1952	579	For `std::thread`, the `joinable()` member function is checked first. If the\nthread is still joinable program will be terminated by calling\n`std::abort()`. All threads need to be joined before the destructor gets\ncalled, unless they are detached.	text	txt	2024-07-28 09:50:34.689298	1
 1953	579	For `std::jthread`, the `std::stop_source` member will be used to request a\nstop. Then, the thread will be joined.	text	txt	2024-07-28 09:50:34.71035	2
-1954	579	#include <thread>	text	txt	2024-07-28 09:50:34.730526	3
-1955	579	int main()\n{\n    std::jthread worker{[]{ return; }};\n    // destructor requests stop and joins\n}	code	txt	2024-07-28 09:50:34.751677	4
-1956	580	#include <thread>\n#include <stdexcept>	text	txt	2024-07-28 09:50:35.477039	1
-1957	580	void do_something() { }\nvoid do_something_impossible() { throw std::runtime_error("fatal"); }	text	txt	2024-07-28 09:50:35.498467	2
-1958	580	int main()\n{\n    std::thread t(do_something);	text	txt	2024-07-28 09:50:35.518585	3
-1959	580	    try\n    {\n        do_something_impossible();\n    }\n    catch (std::exception const& exp)\n    {\n        t.join(); // reaches due exceptional exit but joins anyway\n        throw;\n    }	text	txt	2024-07-28 09:50:35.539717	4
-1960	580	    t.join();\n}	code	txt	2024-07-28 09:50:35.559905	5
-1961	581	#include <thread>	text	txt	2024-07-28 09:50:36.241763	1
-1962	581	void do_something() { }	text	txt	2024-07-28 09:50:36.262015	2
-1963	581	class thread_guard\n{\n    std::thread& _t;	text	txt	2024-07-28 09:50:36.282167	3
-1964	581	public:\n    explicit thread_guard(std::thread& t): _t{t} {}\n    virtual ~thread_guard() { if (_t.joinable()) _t.join(); }\n    thread_guard(thread_guard const&) = delete;\n    thread_guard& operator =(thread_guard const&) = delete;\n};	text	txt	2024-07-28 09:50:36.303232	4
-1965	581	int main()\n{\n    std::thread t(do_something);\n    thread_guard joining_thread{t};\n}	code	txt	2024-07-28 09:50:36.323947	5
-1966	582	#include <thread>\n#include <cassert>	text	txt	2024-07-28 09:50:36.818156	1
-1967	582	void do_background_work() { }	text	txt	2024-07-28 09:50:36.837225	2
-1968	582	int main()\n{\n    std::thread task{do_background_work};\n    task.detach();\n    assert(!task.joinable());\n}	code	txt	2024-07-28 09:50:36.857842	3
-1969	583	#include <thread>	text	txt	2024-07-28 09:50:37.472843	1
-1970	583	void do_work() { }	text	txt	2024-07-28 09:50:37.494043	2
-1971	583	int main()\n{\n    std::thread t1{do_work}; // t1 joinable\n    std::thread t2{std::move(t1)}; // t1 empty, t2 joinable\n    t1 = std::thread{do_work}; // t1 joinable\n    std::thread t3 = std::move(t2); // t3 joinable, t2 empty\n    t2 = std::move(t1); // t2 joinable, t1 empty	text	txt	2024-07-28 09:50:37.51463	3
-1972	583	    // t1 is already empty\n    t2.join();\n    t3.join();\n}	code	txt	2024-07-28 09:50:37.535643	4
-1973	584	Operating systems provide us with horrible killing mechanisms of stopping a\nthread, but that prevents us from cleaning up.	text	txt	2024-07-28 09:50:37.800748	1
 1974	585	- Create a `std::stop_source`\n- Obtain a `std::stop_token` from the `std::stop_source`\n- Pass the `std::stop_token` to a new thread or task\n- When you want the operation to stop call `source.request_stop()`\n- Periodically call `token.stop_requested()` to check	text	txt	2024-07-28 09:50:38.955902	1
-1975	585	#include <iostream>\n#include <format>\n#include <thread>\n#include <chrono>	text	txt	2024-07-28 09:50:38.975445	2
-1976	585	bool state{false};	text	txt	2024-07-28 09:50:38.995189	3
-1977	585	bool preconditions_apply()\n{\n    return state;\n}	text	txt	2024-07-28 09:50:39.01528	4
-1978	585	void do_something(std::stop_token caller)\n{\n    while (!caller.stop_requested())\n    {\n        /* process something */\n    }\n    std::cerr << std::format("{}\\\\n", "Halting worker");\n}	text	txt	2024-07-28 09:50:39.036072	5
-1979	585	void thread_controller(std::stop_source source)\n{\n    while (preconditions_apply())\n    {\n        std::this_thread::sleep_for(std::chrono::milliseconds{100});\n    }\n    source.request_stop();\n}	text	txt	2024-07-28 09:50:39.056881	6
-2025	601	#include <thread>\n#include <string>\n#include <mutex>\n#include <shared_mutex>\n#include <map>	text	txt	2024-07-28 09:50:48.205381	1
-2200	647	p.begin();\np.end();	code	txt	2024-07-28 09:51:18.568369	10
-2201	648	std::filesystem::path p{"/etc/resolv.conf"};	text	txt	2024-07-28 09:51:18.87134	1
-1980	585	int main()\n{\n    state = true; // preconditions apply\n    std::stop_source source_controller;\n    std::jthread worker{do_something, source_controller.get_token()};\n    std::jthread controller{thread_controller, std::ref(source_controller)};\n    std::this_thread::sleep_for(std::chrono::milliseconds{1000});\n    state = false; // break the contract\n}	code	txt	2024-07-28 09:50:39.078222	7
-1981	586	std::jthread x{[]{}};\nx.get_stop_source();	code	txt	2024-07-28 09:50:39.3512	1
-1982	587	#include <thread>\n#include <chrono>	text	txt	2024-07-28 09:50:39.942084	1
-1983	587	int main()\n{\n    std::jthread t{[](std::stop_token token) {\n        while (token.stop_requested())\n            break;\n        std::this_thread::sleep_for(std::chrono::milliseconds(100));\n    }};	text	txt	2024-07-28 09:50:39.962618	2
-1984	587	    std::this_thread::sleep_for(std::chrono::milliseconds(500));\n    t.request_stop();\n}	code	txt	2024-07-28 09:50:39.983844	3
-1985	588	Callee function can optionally accept a `std::stop_token`. For backward\ncompatibility with existing code, functions without `std::stop_token`\nargument will be called regularly as with `std::thread`.	text	txt	2024-07-28 09:50:40.528176	1
-1986	588	#include <thread>	text	txt	2024-07-28 09:50:40.548334	2
-1987	588	int main()\n{\n    std::stop_source caller_source;\n    auto callable = [](std::stop_token caller) { while (!caller.stop_requested()); };\n    std::jthread stoppable_thread{callable, caller_source.get_token()};\n    std::jthread regular_thread{[]{ return; }};\n    caller_source.request_stop();\n}	code	txt	2024-07-28 09:50:40.570519	3
-1988	589	std::jthread x{[]{}};\nx.get_stop_token();	code	txt	2024-07-28 09:50:40.845813	1
-1989	590	std::thread x{[]{}};\nx.request_stop();\n// ^ equivalent v\nx.get_stop_source().request_stop();	code	txt	2024-07-28 09:50:41.16784	1
-1990	591	`std::stop_callback{std::stop_token, Args... args}` class template can be\nused to trigger a cancellation function when stop requested on a thread.	text	txt	2024-07-28 09:50:42.147758	1
-1991	591	#include <filesystem>\n#include <fstream>\n#include <thread>\n#include <chrono>	text	txt	2024-07-28 09:50:42.168628	2
-1992	591	int main(int argc, char** argv)\n{\n    std::stop_source worker_controller{};	text	txt	2024-07-28 09:50:42.190705	3
-1993	591	    std::jthread worker{\n        [](std::stop_token const& caller_token, std::filesystem::path file_path)\n        {\n            bool readable{};\n            std::ifstream file_stream{file_path};	text	txt	2024-07-28 09:50:42.211163	4
-1994	591	            if (file_stream.is_open())\n                readable = true;	text	txt	2024-07-28 09:50:42.231289	5
-1995	591	            std::stop_callback close_stream{caller_token, [&]{ readable = false; }};\n            while (readable)\n            {\n                /* do something with the file */\n            }	text	txt	2024-07-28 09:50:42.251976	6
-1996	591	            file_stream.close();\n        }, worker_controller.get_token(), argv[0]\n    };	text	txt	2024-07-28 09:50:42.272394	7
-1997	591	    worker.detach();\n    std::this_thread::sleep_for(std::chrono::seconds{5});\n    worker_controller.request_stop();\n    std::this_thread::sleep_for(std::chrono::seconds{5});\n}	code	txt	2024-07-28 09:50:42.294278	8
-1998	592	#include <thread>\n#include <vector>	text	txt	2024-07-28 09:50:42.9318	1
-1999	592	void task() { }	text	txt	2024-07-28 09:50:42.953188	2
-2000	592	int main()\n{\n    unsigned int const min_threads = 2;\n    unsigned int const hw_threads = std::thread::hardware_concurrency();\n    unsigned int const num_threads = hw_threads ? hw_threads : min_threads;	text	txt	2024-07-28 09:50:42.975243	3
-2001	592	    std::vector<std::thread> threads(num_threads-1); // count main thread as well	text	txt	2024-07-28 09:50:42.996165	4
-2002	592	    for (std::thread& t: threads)\n        t = std::thread{task};	text	txt	2024-07-28 09:50:43.016912	5
-2003	592	    for (std::thread& t: threads)\n        t.join();\n}	code	txt	2024-07-28 09:50:43.037869	6
-2004	593	#include <thread>\n#include <iostream>	text	txt	2024-07-28 09:50:43.439157	1
-2005	593	int main()\n{\n    std::thread::id main_thread_id = std::this_thread::get_id();\n    std::cout << main_thread_id << std::endl;\n}	code	txt	2024-07-28 09:50:43.460878	2
 2006	594	- Thread construction point\n- Thread joining point	text	txt	2024-07-28 09:50:43.776268	1
 2007	594		code	txt	2024-07-28 09:50:43.797516	2
 2008	595	- `std::atomic`\n- `std::mutex`\n- `std::future` and `std::promise`\n- `std::condition_variable`\n- `std::semaphore` <sup>(C++20)</sup>\n- `std::latch` <sup>(C++20)</sup>\n- `std::barrier` <sup>(C++20)</sup>	text	txt	2024-07-28 09:50:44.126782	1
-2009	596	#include <iostream>\n#include <thread>\n#include <mutex>	text	txt	2024-07-28 09:50:44.743955	1
-2010	596	std::mutex exclusive{};	text	txt	2024-07-28 09:50:44.764489	2
-2011	596	int main()\n{\n    exclusive.lock();\n    std::thread t{[&]() {\n        exclusive.lock();\n        exclusive.unlock();\n        std::puts("do this task later");\n    }};\n    std::puts("do this task first");\n    exclusive.unlock();\n    t.join();\n}	code	txt	2024-07-28 09:50:44.784746	3
 2012	597	- `void lock()`: blocks until the lock is acquired\n- `bool try_lock()`: returns immediately; `true` if lock acquired, `false` if not\n- `void unlock()`: release the lock; undefined behavior if current thread doesn't own the lock	text	txt	2024-07-28 09:50:45.101204	1
 2013	597		code	txt	2024-07-28 09:50:45.122231	2
+1981	586	std::jthread x{[]{}};\nx.get_stop_source();	code	cpp	2024-07-28 09:50:39.3512	1
+1985	588	Callee function can optionally accept a `std::stop_token`. For backward\ncompatibility with existing code, functions without `std::stop_token`\nargument will be called regularly as with `std::thread`.	text	txt	2024-07-28 09:50:40.528176	1
+1988	589	std::jthread x{[]{}};\nx.get_stop_token();	code	cpp	2024-07-28 09:50:40.845813	1
+1989	590	std::thread x{[]{}};\nx.request_stop();\n// ^ equivalent v\nx.get_stop_source().request_stop();	code	cpp	2024-07-28 09:50:41.16784	1
+1990	591	`std::stop_callback{std::stop_token, Args... args}` class template can be\nused to trigger a cancellation function when stop requested on a thread.	text	txt	2024-07-28 09:50:42.147758	1
 2014	598	When exceptions thrown after a mutex is locked, that mutex will remain\nlocked. To avoid that, we use `std::lock_guard<>` class template to\nautomatically lock and unlock the mutex.	text	txt	2024-07-28 09:50:45.820747	1
-2015	598	#include <iostream>\n#include <thread>\n#include <mutex>	text	txt	2024-07-28 09:50:45.840578	2
-2016	598	std::mutex exclusive{};	text	txt	2024-07-28 09:50:45.860709	3
-2017	598	int main()\n{\n    exclusive.lock();\n    std::thread t{[&](){\n        std::lock_guard guard{exclusive};\n        std::puts("do this later");\n    }};\n    std::puts("do this first");\n    exclusive.unlock();\n    t.join();\n}	code	txt	2024-07-28 09:50:45.881767	4
-2018	599	#include <initializer_list>\n#include <vector>\n#include <thread>\n#include <mutex>	text	txt	2024-07-28 09:50:46.895611	1
-2019	599	template<typename T>\nclass some_task\n{\npublic:\n    some_task(std::initializer_list<T> range): tokens{range} {}\n    void append(some_task<T> const& other) noexcept\n    {\n        std::scoped_lock guard{exclusive, other.exclusive};\n        tokens.insert(tokens.end(), other.tokens.begin(), other.tokens.end());\n    }\n    std::size_t size() const noexcept\n    {\n        std::lock_guard guard{exclusive};\n        return tokens.size();\n    }	text	txt	2024-07-28 09:50:46.917251	2
-2020	599	private:\n    std::vector<T> tokens;\n    std::mutex exclusive;\n};	text	txt	2024-07-28 09:50:46.938719	3
-2021	599	template<typename T>\nvoid merge_tasks(some_task<T>& a, some_task<T>& b)\n{\n    a.append(b);\n}	text	txt	2024-07-28 09:50:46.958264	4
-2022	599	int main()\n{\n    some_task<long> A{1,2,3,4}, B{5,6,7,8};\n    std::thread t1{&some_task<long>::size, A};\n    std::thread t2{merge_tasks<long>, A, B};\n}	code	txt	2024-07-28 09:50:46.978985	5
 2023	600	Almost whenever possible, use `std::scoped_lock` instead of `std::lock_guard`\nwhen C++17 can be used. `std::scoped_lock` takes multiple mutexes and handles\nthe proper locking sequence to avoid deadlock.	text	txt	2024-07-28 09:50:47.299796	1
-2026	601	class some_task\n{\npublic:\n    void set(std::string key, std::string value)\n    {\n        std::unique_lock<std::shared_mutex> guard(shared_exclusive);\n        config.insert_or_assign(key, value);\n    }\n    std::string get(std::string const& key) const\n    {\n        std::shared_lock<std::shared_mutex> guard(shared_exclusive);\n        return config.at(key);\n    }\nprivate:\n    std::map<std::string, std::string> config;\n    mutable std::shared_mutex shared_exclusive;\n};	text	txt	2024-07-28 09:50:48.226932	2
-2027	601	int main()\n{\n    some_task task;\n    std::thread t1{&some_task::set, &task, "pgdata", "/opt/pgroot/data"};\n    t1.join();\n    std::string storage_path = task.get("pgdata");\n}	code	txt	2024-07-28 09:50:48.249099	3
 2028	602	Constructor takes one shared mutex and calls `lock_shared()` on the mutex.	text	txt	2024-07-28 09:50:48.572279	1
 2029	602	The API of shared lock is similar to unique lock.	text	txt	2024-07-28 09:50:48.592023	2
 2030	602		code	txt	2024-07-28 09:50:48.612956	3
@@ -18172,127 +17394,48 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 2033	604	Recursive mutexes can be used when a function requires locking multiple\ntimes.	text	txt	2024-07-28 09:50:49.550763	1
 2034	604	Number of `lock()` calls must match exactly the number of `unlock()` calls.	text	txt	2024-07-28 09:50:49.571358	2
 2035	604	Only one thread can have exclusive ownership, or write access:	text	txt	2024-07-28 09:50:49.591151	3
-2036	604	m.lock();	code	txt	2024-07-28 09:50:49.610654	4
 2037	604	Many threads can get shared ownership, or read access:	text	txt	2024-07-28 09:50:49.630764	5
-2038	604	m.lock_shared();	code	txt	2024-07-28 09:50:49.6513	6
 2039	604	Calls to `lock_shared()` from other threads will succeed; calls to `lock()`\nwill block.	text	txt	2024-07-28 09:50:49.671883	7
 2040	605	Conditional variables are complicated to use correctly.	text	txt	2024-07-28 09:50:50.021324	1
 2041	605	Useful when some threads are waiting for a condition and other threads make\nthat condition true.	text	txt	2024-07-28 09:50:50.041465	2
 2042	605		code	txt	2024-07-28 09:50:50.061002	3
-2043	606	#include <condition_variable>\n#include <thread>\n#include <vector>\n#include <mutex>	text	txt	2024-07-28 09:50:51.168122	1
-2044	606	template<typename T>\nclass bag\n{\npublic:\n    void append(T value)\n    {\n        std::unique_lock<std::mutex> guard{exclusive};\n        container.push_back(std::move(value));\n        guard.unlock();\n        condition.notify_one();\n    }	text	txt	2024-07-28 09:50:51.190725	2
-2045	606	    T get() const\n    {\n        std::unique_lock<std::mutex> guard{exclusive};\n        while (container.empty())\n            condition.wait(guard);\n        T value = std::move(container.back());\n        return value;\n    }	text	txt	2024-07-28 09:50:51.211368	3
-2046	606	private:\n    mutable std::mutex exclusive;\n    mutable std::condition_variable condition;\n    std::vector<T> container;\n};	text	txt	2024-07-28 09:50:51.232931	4
-2047	606	int main()\n{\n    bag<long> numbers{};\n    numbers.append(42);\n    long n = numbers.get(); // 42\n}	code	txt	2024-07-28 09:50:51.255835	5
 2048	607	Primitive types.	text	txt	2024-07-28 09:50:51.5562	1
-2049	608	Without atomic type, we need to use a locking mechanism like mutual\nexclusions to avoid data races on the shared value. But using atomic types,\nthey are guaranteed to be accessed only by one thread at a time.	text	txt	2024-07-28 09:50:52.250491	1
-2050	608	#include <atomic>\n#include <thread>	text	txt	2024-07-28 09:50:52.270775	2
-2051	608	std::atomic<long> shared_value{};	text	txt	2024-07-28 09:50:52.290316	3
-2052	608	void increment_shared()\n{\n    shared_value++;\n}	text	txt	2024-07-28 09:50:52.312308	4
-2053	608	int main()\n{\n    std::thread t1{increment_shared};\n    std::thread t2{increment_shared};\n    t1.join();\n    t2.join();\n}	code	txt	2024-07-28 09:50:52.333734	5
 2054	609	`static` local variables are guaranteed to only initialize once.	text	txt	2024-07-28 09:50:52.628485	1
 2055	609		code	txt	2024-07-28 09:50:52.650665	2
-2056	610	The first thread to arrive will start initializing the static instance.	text	txt	2024-07-28 09:50:53.931497	1
-2057	610	#include <iostream>\n#include <thread>	text	txt	2024-07-28 09:50:53.952621	2
-2058	610	template<typename T>\nT do_something(T initial = {})\n{\n    static T instance{std::move(initial)};\n    return instance;\n}	text	txt	2024-07-28 09:50:53.972463	3
-2059	610	template<typename T>\nclass box\n{\npublic:\n    explicit box(T initial = {}): value{std::move(initial)} {}\n    box(box<T> const& other): value{other.value} {}\n    box<T>& operator=(box<T> const& other) { value = other.value; return *this; }\n    static inline box<T>& get_instance(T initial = {})\n    {\n        static box<T> instance{std::move(initial)};\n        std::cout << "initializing\\\\n";\n        return instance;\n    }\n    T value;\n};	text	txt	2024-07-28 09:50:53.993612	4
-2060	610	template<typename T>\nvoid initialize(box<T>& instance)\n{\n    instance = box<long>::get_instance(73);\n}	text	txt	2024-07-28 09:50:54.015768	5
-2061	610	int main()\n{\n    long fvalue = do_something<long>(42);\n    box<long> instance;\n    std::thread t1{initialize<long>, std::ref(instance)};\n    std::thread t2{initialize<long>, std::ref(instance)};\n    t1.join();\n    t2.join();\n    std::cout << instance.value << std::endl;\n}	code	txt	2024-07-28 09:50:54.036089	6
-2062	611	#include <optional>\n#include <thread>\n#include <mutex>	text	txt	2024-07-28 09:50:55.036934	1
-2063	611	template<typename T>\nclass some_task\n{\npublic:\n    void initialize(T init = {}) { std::call_once(execution, [&]{ value = std::move(init); }); }\n    std::optional<T> get() const { return value; }\nprivate:\n    std::once_flag execution;\n    std::optional<T> value;\n};	text	txt	2024-07-28 09:50:55.05951	2
-2064	611	template<typename T>\nvoid initialize(some_task<T>& task, T value)\n{\n    task.initialize(std::move(value));\n}	text	txt	2024-07-28 09:50:55.084128	3
-2065	611	int main()\n{\n    some_task<long> number;\n    std::thread t1{initialize<long>, std::ref(number), 42};\n    std::thread t2{initialize<long>, std::ref(number), 73};\n    t1.join();\n    t2.join();\n    long value = *number.get(); // either 42 or 73 without data race\n}	code	txt	2024-07-28 09:50:55.108112	4
 2066	612	Future provides a mechanism for a one-shot transfer of data between threads.	text	txt	2024-07-28 09:50:55.630074	1
 2067	612	|Method|Description|\n|---|---|\n|`std::future<T>`|Default constructor creates an empty object with no state|\n|`valid()`|Check if the future has state|\n|`get()`|Wait for the data and retrieve it|\n|`wait()`|Wait for the data to be ready|\n|`std::future_status status = wait_for(duration)`|Wait for the data to be ready for the specified duration|\n|`std::future_status status = wait_until(time_point)`|Wait for the data to be ready until the specified time|	text	txt	2024-07-28 09:50:55.652044	2
 2068	612		code	txt	2024-07-28 09:50:55.674756	3
-2069	613	If you require simple one-shot signalling between threads, the `void`\nspecializations of `std::future` and `std::shared_future` can serve as solid\nhigh-level choices for 1:1 and 1:N signalling.	text	txt	2024-07-28 09:50:56.835654	1
-2070	613	#include <thread>\n#include <future>	text	txt	2024-07-28 09:50:56.856654	2
-2071	613	// executes first stage eagerly, but wait for signal to continue the second stage\nauto wait_for_signal = [](auto future) {\n    // first stage\n    future.wait(); // wait for signal\n    // second stage\n};	text	txt	2024-07-28 09:50:56.877141	3
-2072	613	{ // 1:1 example\n    std::promise<void> sender;	text	txt	2024-07-28 09:50:56.898548	4
-2073	613	    auto t = std::jthread(wait_for_signal, sender.get_future());	text	txt	2024-07-28 09:50:56.920795	5
-2074	613	    // first stage eagerly executing\n    sender.set_value(); // unblock the second stage by sending a signal\n}	text	txt	2024-07-28 09:50:56.94226	6
-2075	613	{ // 1:N example\n    std::promise<void> sender;	text	txt	2024-07-28 09:50:56.962631	7
-2076	613	    // promise::get_future() can only be called once\n    std::shared_future<void> receiver(sender.get_future());	text	txt	2024-07-28 09:50:56.984188	8
-2077	613	    // start four threads, each running two-stage runner\n    std::vector<std::jthread> runners;	text	txt	2024-07-28 09:50:57.004169	9
-2078	613	    // eagerly execute first stage for all four threads\n    std::generate_n(std::back_inserter(runners), 4, [&]{ return std::jthread(wait_for_signal, receiver); });	text	txt	2024-07-28 09:50:57.024617	10
-2079	613	    sender.set_value(); // unblock the second stage by sending a signal\n}	code	txt	2024-07-28 09:50:57.045993	11
+2036	604	m.lock();	code	cpp	2024-07-28 09:50:49.610654	4
+2038	604	m.lock_shared();	code	cpp	2024-07-28 09:50:49.6513	6
+2049	608	Without atomic type, we need to use a locking mechanism like mutual\nexclusions to avoid data races on the shared value. But using atomic types,\nthey are guaranteed to be accessed only by one thread at a time.	text	txt	2024-07-28 09:50:52.250491	1
+2056	610	The first thread to arrive will start initializing the static instance.	text	txt	2024-07-28 09:50:53.931497	1
 2080	614	Launches a task that returns a value.	text	txt	2024-07-28 09:50:57.396582	1
 2081	614		code	txt	2024-07-28 09:50:57.416557	2
 3649	1167	    ; use and print the results of difference function\n    mov rdi, 7\n    mov rsi, 5\n    call difference	text	txt	2024-07-28 09:55:24.67062	18
 2082	615	|Method|Description|\n|---|---|\n|`std::promise<T>`|Default constructor creates an object with an empty state|\n|`valid()`|Check if the promise has state|\n|`set_value()`|Set the value in the state|\n|`set_exception(exception_pointer)`|Set the exception in state|\n|`get_future()`|Get the `std::future<T>` for the state|	text	txt	2024-07-28 09:50:57.895732	1
 2083	615		code	txt	2024-07-28 09:50:57.915248	2
-2084	616	#include <iostream>\n#include <format>\n#include <thread>\n#include <future>	text	txt	2024-07-28 09:50:58.487448	1
-2085	616	int main()\n{\n    std::promise<long> value_source;\n    std::future<long> value_target{value_source.get_future()};	text	txt	2024-07-28 09:50:58.507626	2
-2086	616	    std::jthread provider{[&value_target]{\n        std::cout << std::format("{}\\\\n", value_target.get());\n    }};	text	txt	2024-07-28 09:50:58.524933	3
-2087	616	    std::jthread consumer{[&value_source]{\n        value_source.set_value(42);\n    }};\n}	code	txt	2024-07-28 09:50:58.54219	4
-2088	617	std::promise<long> value_source;\nstd::future<long> value_target{value_source.get_future()};	text	txt	2024-07-28 09:50:59.049738	1
-2089	617	std::jthread provider{[&value_target]{\nstd::cout << std::format("{}\\\\n", value_target.get());\n// throws exception\n}};	text	txt	2024-07-28 09:50:59.070896	2
-2090	617	std::jthread consumer{[&value_source]{\nvalue_source.set_exception(\nstd::make_exception_ptr(std::exception{"reason"})\n)\n}};	code	txt	2024-07-28 09:50:59.088477	3
-2091	619	A mutex must be locked and unlocked in the same thread. But a semaphore can\nbe acquired in one thread, and released in another.\nstd::ptrdiff_t least_max_value = std::counting_semaphore::max();	code	txt	2024-07-28 09:50:59.608566	1
 2092	620	Counting semaphore is much more flexible than mutexes.	text	txt	2024-07-28 09:50:59.950477	1
 2093	620	Maintains an internal counter. `release()` increments the counter, and\n`acquire()` decrements the counter, or block if `counter = 0`.	text	txt	2024-07-28 09:50:59.968567	2
 2094	620		code	txt	2024-07-28 09:50:59.98955	3
 2095	621	|Method|\n|---|\n|`std::counting_semaphore::max()`|\n|`release(std::ptrdiff_t update = 1)`|\n|`acquire()`|\n|`try_acquire()`|\n|`try_acquire_for(duration)`|\n|`try_acquire_until(timepoint)`|	text	txt	2024-07-28 09:51:00.334801	1
-2096	622	In this sample, the counting semaphore is initialized with 0. Because of this\ninitialization, the `secondary_initialization()` method cannot acquire semaphore,\ntherefore the thread blocks. On the other hand, the `primary_initialization()` method\nreleases the semaphore, therefore its counter is incremented and the\n`secondary_initialization()` method continues to run.	text	txt	2024-07-28 09:51:01.726413	1
-2097	622	#include <iostream>\n#include <semaphore>\n#include <thread>\n#include <vector>	text	txt	2024-07-28 09:51:01.747122	2
-2098	622	template<typename T>\nclass data_structure\n{\nprivate:\n    std::vector<T> underlying_container;\n    std::counting_semaphore<1> underlying_synchronization;	text	txt	2024-07-28 09:51:01.769589	3
-2099	622	public:\n    data_structure():\n        underlying_container{},\n        underlying_synchronization{0}\n    {\n    }	text	txt	2024-07-28 09:51:01.78894	4
-2100	622	    void prepare()\n    {\n        std::jthread t0{&data_structure::secondary_initialization, this};\n        std::jthread t1{&data_structure::primary_initialization, this};\n    }	text	txt	2024-07-28 09:51:01.809004	5
-2101	622	    std::vector<T> get() const { return underlying_container; }	text	txt	2024-07-28 09:51:01.827703	6
-2102	622	private:\n    void secondary_initialization()\n    {\n        underlying_synchronization.acquire();\n        underlying_container[1] = 2;\n    }	text	txt	2024-07-28 09:51:01.848333	7
-2103	622	    void primary_initialization()\n    {\n        underlying_container = {1, 0, 3};\n        underlying_synchronization.release();\n    }\n};	text	txt	2024-07-28 09:51:01.868728	8
-2104	622	int main()\n{\n    data_structure<long> data{};\n    data.prepare();\n    for (auto element: data.get())\n        std::cout << element << " ";\n    std::cout << "\\\\n";\n}	code	txt	2024-07-28 09:51:01.889626	9
-2105	623	#include <thread>\n#include <chrono>\n#include <semaphore>	text	txt	2024-07-28 09:51:02.616949	1
-2106	623	std::binary_semaphore signal_main2thread{0}, signal_thread2main{0};	text	txt	2024-07-28 09:51:02.63814	2
-2107	623	void thread_task()\n{\n    signal_main2thread.acquire();\n    std::this_thread::sleep_for(std::chrono::seconds{1});\n    signal_thread2main.release();\n}	text	txt	2024-07-28 09:51:02.657348	3
-2108	623	int main()\n{\n    std::jthread thread_worker{thread_task};\n    signal_main2thread.release();\n    signal_thread2main.acquire();\n}	code	txt	2024-07-28 09:51:02.678888	4
 2109	624	`std::latch` is a single-use counter that allows threads to wait for the\ncounter to reach zero.	text	txt	2024-07-28 09:51:03.024535	1
 2110	624	`std::latch` is useful for managing one task leveraged by multiple threads.	text	txt	2024-07-28 09:51:03.045269	2
 2111	625	A thread waits at a synchronization point until the internal counter becomes\nzero. So latches are almost opposites of the semaphore in counting.	text	txt	2024-07-28 09:51:03.4522	1
+3739	1183	section .data\n    CREATE equ 1            ; use for conditional assembly\n    NR_create equ 85        ; create system call	text	txt	2024-07-28 09:55:38.098087	1
+3740	1183	section .text\n    global create	text	txt	2024-07-28 09:55:38.11817	2
+2091	619	A mutex must be locked and unlocked in the same thread. But a semaphore can\nbe acquired in one thread, and released in another.\nstd::ptrdiff_t least_max_value = std::counting_semaphore::max();	code	cpp	2024-07-28 09:50:59.608566	1
+2096	622	In this sample, the counting semaphore is initialized with 0. Because of this\ninitialization, the `secondary_initialization()` method cannot acquire semaphore,\ntherefore the thread blocks. On the other hand, the `primary_initialization()` method\nreleases the semaphore, therefore its counter is incremented and the\n`secondary_initialization()` method continues to run.	text	txt	2024-07-28 09:51:01.726413	1
 2112	625	- Create the latch with a **non-zero** counter\n- One or more threads decrease the count\n- Other threads may wait for the latch to be signalled\n- When the count reaches zero it is permanently signalled and all waiting\n  threads are woken.	text	txt	2024-07-28 09:51:03.472909	2
-2151	632	    /* expose ImplIface as any other PIMPL */\nprivate:\n    static std::once_flag flag_;\n    static std::unique_ptr<ImplIface> impl_;\n};	text	txt	2024-07-28 09:51:10.434327	18
-2152	632	std::once_flag MonoPIMPL::flag_;\nstd::unique_ptr<ImplIface> MonoPIMPL::impl_;	code	txt	2024-07-28 09:51:10.454765	19
-2202	648	p.lexically_normal();	code	txt	2024-07-28 09:51:18.892056	2
 2966	967	/etc/modules.d	code	txt	2024-07-28 09:53:37.415644	1
 2113	626	|Method|Description|\n|---|---|\n|`std::latch{std::ptrdiff_t count}`|Create a latch with the specified count|\n|`count_down(std::ptrdiff_t update = 1)`|Decrements internal counter `update` times without blocking the caller|\n|`try_wait()`|Returns `true` if internal counter equals zero|\n|`wait()`|Immediately returns if internal counter equals zero, blocks otherwise|\n|`arrive_and_wait(std::ptrdiff_t update = 1)`|Equivalent to subsequent call to `count_down(update)` and `wait()`|	text	txt	2024-07-28 09:51:03.834681	1
-2114	627	#include <thread>\n#include <latch>\n#include <mutex>\n#include <vector>	text	txt	2024-07-28 09:51:04.774323	1
-2115	627	std::size_t thread_max{std::thread::hardware_concurrency()};\nstd::mutex exclusive{};\nstd::latch works{static_cast<std::ptrdiff_t>(thread_max)};\nstd::vector<long> shared_storage(thread_max);	text	txt	2024-07-28 09:51:04.794816	2
-2116	627	void set_data(std::size_t index, long value)\n{\n    std::lock_guard<std::mutex> automatic_locker{exclusive};\n    shared_storage.at(index) = value;\n    works.count_down();\n}	text	txt	2024-07-28 09:51:04.815548	3
-2117	627	int main()\n{\n    std::vector<std::jthread> thread_pool(thread_max);	text	txt	2024-07-28 09:51:04.837537	4
-2118	627	    for (std::size_t thread_index{}; thread_index != thread_max; ++thread_index)\n    {\n        thread_pool.emplace_back(set_data, thread_index, thread_index);\n    }	text	txt	2024-07-28 09:51:04.859827	5
-2119	627	    works.wait();\n    // blocks until all <thread_max> threads have set data\n    // {0, 1, 2, 3, 4, 5, 6, 7} on a machine with 8 cores\n}	code	txt	2024-07-28 09:51:04.882135	6
 2120	628	`std::barrier<>` is helpful to manage repetitive task leveraged by multiple\nthreads.	text	txt	2024-07-28 09:51:05.280847	1
 2121	628	Shortly, `std::barrier<>` is a reusable `std::latch`.	text	txt	2024-07-28 09:51:05.30233	2
 2122	629	The constructor of a barrier takes a callable as the **completion function**.\nIn the completion phase, the callable is executed by an arbitrary thread.	text	txt	2024-07-28 09:51:05.964131	1
 2123	629	|Method|Description|\n|---|---|\n|`std::barrier<task_type>{count, task}`|Create a barrier with the specified count and completion function|\n|`auto arrival_token = x.arrive()`|Decrease the count. Trigger completion phase if count reaches zero|\n|`arrive(std::ptrdiff_t update = 1)`|Decrement internal counter `update` times|\n|`wait(arrival_token)`|Blocks at the synchronization point until the completion phase is done|\n|`arrive_and_wait()`|Equivalent to subsequent call to `auto arrival_token = arrive()` and `wait(arrival_token)`|\n|`arrive_and_drop()`|Decrease the internal counter permanently and potentially trigger the completion phase without waiting|	text	txt	2024-07-28 09:51:05.986698	2
 2124	629	- Construct a `std::barrier`, with a non-zero count and a completion\n  function.\n- One or more threads arrive at the barrier.\n- Some of these threads wait for the barrier to be signalled.\n- When the counter reaches zero, the barrier is signalled, the completion\n  function is called and the counter is reset.	text	txt	2024-07-28 09:51:06.008347	3
-2125	630	#include <iostream>\n#include <thread>\n#include <mutex>\n#include <barrier>\n#include <vector>	text	txt	2024-07-28 09:51:07.236416	1
-2126	630	std::barrier works{6};\nstd::mutex exclusive{};\nstd::vector<long> shared_storage(6);	text	txt	2024-07-28 09:51:07.257152	2
-2127	630	void part_time_job(std::size_t index, long value)\n{\n    std::lock_guard<std::mutex> automatic_locker{exclusive};\n    shared_storage.at(index) = value;\n    works.arrive_and_drop();\n    // decrement internal counter when done\n}	text	txt	2024-07-28 09:51:07.278374	3
-2128	630	void full_time_job(std::size_t index, long value)\n{\n        std::lock_guard<std::mutex> automatic_locker{exclusive};	text	txt	2024-07-28 09:51:07.298309	4
-2129	630	        shared_storage.at(index) = value;\n        works.arrive_and_wait();	text	txt	2024-07-28 09:51:07.319008	5
-2130	630	        shared_storage.at(index) = value;\n        works.arrive_and_wait();\n}	text	txt	2024-07-28 09:51:07.339683	6
-2131	630	int main()\n{\n    std::vector<std::jthread> thread_pool(6);	text	txt	2024-07-28 09:51:07.361329	7
-2132	630	    for (std::size_t index{}; index != 6; ++index)\n        thread_pool.emplace_back(full_time_job, index, index);\n}	code	txt	2024-07-28 09:51:07.382731	8
 2133	631	A function is a coroutine if its function body encloses a\ncoroutine-return-statement, an await-expression, or a yield-expression.	text	txt	2024-07-28 09:51:07.663696	1
 2134	632	The Monostate pattern (not to be confused with `std::monostate`) is a pattern\nwith similar goals to a Singleton. Where a Singleton only permits a single\ninstance, the Monostate pattern can be instantiated many times while ensuring\nonly one instance of its internal state.	text	txt	2024-07-28 09:51:10.077137	1
-2135	632	#include <mutex>\n#include <string>	text	txt	2024-07-28 09:51:10.098314	2
-2136	632	struct MonoConfig\n{\n    MonoConfig()\n    {\n        // ensure a single initialization outside of the static chain, if we\n        // don't need multi-threaded safety we can downgrade to a boolean flag\n        std::call_once(flag_, populate_config);\n    }	text	txt	2024-07-28 09:51:10.119861	3
-2137	632	    // interface to acess the monostate\n    std::uint64_t get_id() const { return field1; }\n    const std::string& get_label() const { return field2; }	text	txt	2024-07-28 09:51:10.141287	4
-2138	632	private:\n    static std::once_flag flag_;\n    static std::uint64_t field1;\n    static std::string field2;	text	txt	2024-07-28 09:51:10.164738	5
-2139	632	    static void populate_config()\n    {\n        /* read the fields from config source */\n        field1 = 42;\n        field2 = "Hello World";\n    };\n};	text	txt	2024-07-28 09:51:10.186179	6
-2140	632	// All static members left default initialized\nstd::once_flag MonoConfig::flag_;\nstd::uint64_t MonoConfig::field1;\nstd::string MonoConfig::field2;	text	txt	2024-07-28 09:51:10.20644	7
-2141	632	// create instance of the monostate object\nMonoConfig config;	text	txt	2024-07-28 09:51:10.226123	8
-2142	632	// access the global state\nconfig.get_label();	text	txt	2024-07-28 09:51:10.247409	9
-2143	632	// creating additional instances is a no-op. note that when stored as a member,\n// it will still take up minimum 1 byte unless we use [[no_unique_address]].\nMonoConfig a, b, c, d, e, f, g, i, j, k;	code	txt	2024-07-28 09:51:10.26826	10
-2144	632	A Monostate with all the downsides of a global state can be a better fit for\ntestability.	text	txt	2024-07-28 09:51:10.288481	11
-2145	632	#include <memory>	text	txt	2024-07-28 09:51:10.310352	12
-2146	632	// when combined with the PIMPL pattern we can mock/fake the global state\nstruct ImplIface {};	text	txt	2024-07-28 09:51:10.33157	13
-2147	632	struct Actual : ImplIface\n{\n    static std::unique_ptr<ImplIface> make()\n    {\n        return std::make_unique<Actual>();\n    }\n};	text	txt	2024-07-28 09:51:10.35283	14
-2148	632	struct Testing : ImplIface\n{\n    static std::unique_ptr<ImplIface> make()\n    {\n        return std::make_unique<Testing>();\n    }\n};	text	txt	2024-07-28 09:51:10.37342	15
-2149	632	// Switch active type based on testing/production\nusing ActiveType = Testing;	text	txt	2024-07-28 09:51:10.393088	16
-2150	632	struct MonoPIMPL\n{\n    MonoPIMPL()\n    {\n        std::call_once(flag_, [] { impl_ = ActiveType::make(); });\n    }	text	txt	2024-07-28 09:51:10.414679	17
-2341	713	#include <iostream>\n#include <memory>	text	txt	2024-07-28 09:51:49.75345	2
+2144	632	A Monostate with all the downsides of a global state can be a better fit for\ntestability.	text	txt	2024-07-28 09:51:10.288481	3
 2153	633	It consists of an optional *root name*, an optional *root directory*, and a\nsequence of filenames separated by *directory separators*.	text	txt	2024-07-28 09:51:10.845115	1
 2154	633	```\n[root name] [root directory] [filenames]\n/home/brian/\nC:\\\\Windows\\\\Users\\\\Brian\\\\Desktop\n``````	text	txt	2024-07-28 09:51:10.865614	2
 2155	634	The path can be **relative**, so that the file location depends on the current directory, or **absolute**.	text	txt	2024-07-28 09:51:11.402844	1
@@ -18305,225 +17448,118 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 2161	634	- The optional root name is implementation specific (e.g. `//host` on POSIX systems, `C:` on WIndows systems)\n- The optional root root directory is a directory separator\n- The relative path is a sequence of file names separated by directory separators	text	txt	2024-07-28 09:51:11.528163	7
 2162	635	In a normalized path:	text	txt	2024-07-28 09:51:11.855038	1
 2163	635	- Filenames are separated only by a single preferred directory separator.\n- The filename `.` is not used unless the whole path is nothing but `.`.\n- The filename does not contain `..` filenames unless they are at the\n  beginning of a relative path.\n- The path only ends with a directory separator if the trailing filename is a\n  directory with a name other than `.` or `..`.	text	txt	2024-07-28 09:51:11.875327	2
-2164	636	The filesystem library provides several functions, which can be both member\nand free-standing functions. **Member** functions are cheap because they are\npure lexical operations that do not take the actual filesystem into account,\nso that no operating system calls are necessary, e.g. `mypath.is_absolute()`.\n**Free-standing** functions on the other hand are expensive, because they\nusually take the actual filesystem into account, e.g. `equivalent(path1,\npath2)`. Sometimes, the filesystem library provides the same functionality\noperating both lexically and by the actual filesystem into account, e.g.\n`path1.lexically_relative(path2)`.	text	txt	2024-07-28 09:51:12.590971	1
-2165	636	Because of **Argument Dependent Lookup (ADL)** usually we don't have to\nspecify the full namespace `std::filesystem` when calling free-standing\nfilesystem functions.	text	txt	2024-07-28 09:51:12.612145	2
-2166	636	create_directory(std::filesystem::path{"/tmp/notes"}); // OK\nremove(std::filesystem::path{"/tmp/note.txt"}); // OK	text	txt	2024-07-28 09:51:12.633639	3
-2167	636	std::filesystem::create_directory("/tmp/note.txt"); // OK\nstd::filesystem::remove("/tmp/note.txt"); // OK	text	txt	2024-07-28 09:51:12.655463	4
-2168	636	create_directory("/tmp/notes"); // ERROR\nremove("/tmp/note.txt"); // OOPS: calls C function remove()	code	txt	2024-07-28 09:51:12.675011	5
 2169	637	Because dealing with exception is not always appropriate, the filesystem\nlibrary uses a mixed approach when dealing with the filesystem.	text	txt	2024-07-28 09:51:13.030056	1
 2170	637	Filesystem operations usually have two overloads for each operation.	text	txt	2024-07-28 09:51:13.051412	2
 2171	637	- By default, the operations throw `std::filesystem_error` exceptions on errors.\n- By passing an additional out parameter, an error code can be used instead.	text	txt	2024-07-28 09:51:13.071056	3
-2172	638	#include <iostream>\n#include <filesystem>	text	txt	2024-07-28 09:51:13.66077	1
-2173	638	int main()\n{\n    try\n    {\n        std::filesystem::create_directory("/tmp/");\n    }\n    catch (std::filesystem::filesystem_error const& exp)\n    {\n        std::cerr << exp.path1() << ": " << exp.what() << std::endl;\n    }\n}	code	txt	2024-07-28 09:51:13.681908	2
-2174	639	#include <iostream>\n#include <filesystem>	text	txt	2024-07-28 09:51:14.332478	1
-2175	639	int main()\n{\n    std::error_code ec;\n    std::filesystem::create_directory("/tmp/", ec);\n    if (ec)\n    {\n        std::cerr << ec.message() << std::endl;\n    }	text	txt	2024-07-28 09:51:14.352645	2
-2176	639	    if (ec == std::errc::read_only_file_system)\n    {\n        std::cerr << "directory is read only\\\\n";\n    }\n}	code	txt	2024-07-28 09:51:14.375125	3
 2177	640	The standard filesystem library defines an enumeration type `file_type`,\nwhich is standardized to have the following values:	text	txt	2024-07-28 09:51:14.924669	1
-2178	640	namespace std::filesystem\n{\n    enum class file_type\n    {\n        regular, directory, symlink,\n        block, character, fifo, socket,\n        ...\n        none, not_found, unknown\n    };\n}	code	txt	2024-07-28 09:51:14.945843	2
-2179	641	#include <string>\n#include <filesystem>	text	txt	2024-07-28 09:51:15.456854	1
-2180	641	using namespace std::string_literals;	text	txt	2024-07-28 09:51:15.477409	2
-2181	641	std::filesystem::path{"/dev/null"s};    // std::string\nstd::filesystem::path{L"/dev/null"s};   // std::wstring\nstd::filesystem::u8path{u8"/dev/null"s};  // std::u8string\nstd::filesystem::u16path{u16"/dev/null"s}; // std::u16string\nstd::filesystem::u32path{u32"/dev/null"s}; // std::u32string	code	txt	2024-07-28 09:51:15.499086	3
-2182	642	#include <string>\n#include <filesystem>	text	txt	2024-07-28 09:51:15.836639	1
-2183	642	std::string filename{"/dev/random"};\nstd::filesystem::path{filename.begin(), filename.end()};	code	txt	2024-07-28 09:51:15.858384	2
+2164	636	The filesystem library provides several functions, which can be both member\nand free-standing functions. **Member** functions are cheap because they are\npure lexical operations that do not take the actual filesystem into account,\nso that no operating system calls are necessary, e.g. `mypath.is_absolute()`.\n**Free-standing** functions on the other hand are expensive, because they\nusually take the actual filesystem into account, e.g. `equivalent(path1,\npath2)`. Sometimes, the filesystem library provides the same functionality\noperating both lexically and by the actual filesystem into account, e.g.\n`path1.lexically_relative(path2)`.	text	txt	2024-07-28 09:51:12.590971	1
+2178	640	namespace std::filesystem\n{\n    enum class file_type\n    {\n        regular, directory, symlink,\n        block, character, fifo, socket,\n        ...\n        none, not_found, unknown\n    };\n}	code	cpp	2024-07-28 09:51:14.945843	2
 2184	643	Note that `current_path()` is an expensive operation because it is based on\noperating system calls.	text	txt	2024-07-28 09:51:16.296116	1
-2185	643	#include <filesystem>	text	txt	2024-07-28 09:51:16.317359	2
-2186	643	auto working_directory{std::filesystem::current_path()};	code	txt	2024-07-28 09:51:16.33888	3
-2187	644	#include <filesystem>	text	txt	2024-07-28 09:51:16.667234	1
-2188	644	auto temp{std::filesystem::temp_directory_path()};	code	txt	2024-07-28 09:51:16.689481	2
-2189	645	std::filesystem::path p;\np.empty(); // true	code	txt	2024-07-28 09:51:17.084586	1
-2190	646	std::filesystem::path p{"assets/image.png"};\np.is_absolute(); // false\np.is_relative(); // true	code	txt	2024-07-28 09:51:17.429978	1
-2191	647	std::filesystem::path p{"/usr/src/linux/version"};	text	txt	2024-07-28 09:51:18.377562	1
-2192	647	p.has_filename(); // true\np.filename(); // version	text	txt	2024-07-28 09:51:18.399329	2
-2193	647	p.has_stem(); // false\np.stem(); // (none)	text	txt	2024-07-28 09:51:18.421331	3
-2194	647	p.has_extension(); // false\np.extension(); // (none)	text	txt	2024-07-28 09:51:18.441255	4
-2195	647	p.has_root_name(); // false\np.root_name(); // (none)	text	txt	2024-07-28 09:51:18.462281	5
-2196	647	p.has_root_directory(); // true\np.root_directory(); // /	text	txt	2024-07-28 09:51:18.48398	6
-2197	647	p.has_root_path(); // true\np.root_path(); // /	text	txt	2024-07-28 09:51:18.505399	7
-2198	647	p.has_parent_path(); // true\np.parent_path(); // /usr/src/linux	text	txt	2024-07-28 09:51:18.525764	8
-2203	649	std::filesystem::path p{"/etc/os-release"};	text	txt	2024-07-28 09:51:19.333554	1
-2204	649	p.string();\np.wstring();\np.u8string();\np.u16string();\np.u32string();	code	txt	2024-07-28 09:51:19.353753	2
+2189	645	std::filesystem::path p;\np.empty(); // true	code	cpp	2024-07-28 09:51:17.084586	1
+4740	897	#include <iostream>\n#include <memory>\n#include <thread>\n#include <string>\n#include <functional>\n#include <boost/asio.hpp>\n\nstatic constexpr auto port{8888};\nstatic constexpr auto address{"127.0.0.1"};\n\nvoid connection_worker(boost::asio::io_context& context)\n{\n    context.run();\n}\n\nvoid on_accept(boost::asio::ip::tcp::socket& socket, std::shared_ptr<boost::asio::io_context::work> work)\n{\n    boost::asio::ip::tcp::endpoint client{socket.remote_endpoint()};\n    boost::asio::ip::address client_addr{client.address()};\n    boost::asio::ip::port_type client_port{client.port()};\n    std::clog << "client " << client_addr << ":" << client_port << std::endl;\n\n    socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);\n    socket.close();\n    work.reset();\n}\n\nint main()\n{\n    boost::asio::io_context context{};\n    boost::asio::io_context::strand strand{context};\n    auto work{std::make_shared<boost::asio::io_context::work>(context)};\n    boost::asio::ip::tcp::socket socket{context};\n    boost::asio::ip::tcp::resolver resolver{context};\n    boost::asio::ip::tcp::acceptor acceptor{context};\n\n    std::thread worker(connection_worker, std::ref(context));\n\n    boost::asio::ip::tcp::resolver::query query{address, std::to_string(port)};\n    boost::asio::ip::tcp::resolver::iterator iterator{resolver.resolve(query)};\n    boost::asio::ip::tcp::endpoint endpoint{*iterator};\n\n    acceptor.open(endpoint.protocol());\n    acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));\n    acceptor.bind(endpoint);\n    acceptor.listen(boost::asio::socket_base::max_connections);\n\n    boost::asio::ip::address local_addr{endpoint.address()};\n    boost::asio::ip::port_type local_port{port};\n    std::clog << "listening " << local_addr << ":" << local_port << std::endl;\n\n    acceptor.async_accept(socket, std::bind(on_accept, std::ref(socket), std::move(work)));\n\n    worker.join();\n    acceptor.close();\n    context.stop();\n}	code	cpp	2025-07-17 18:37:08.340421	1
 2205	650	Lexically relative path can be used in symbolic link creation.	text	txt	2024-07-28 09:51:19.8993	1
 2206	650	Lexical relative path yields the empty path if there is no relative path from p1 to p2.	text	txt	2024-07-28 09:51:19.922663	2
-2207	650	std::filesystem::path{"a/b/c"}.lexically_relative("/a/d"); // ../b/c\nstd::filesystem::path{"a/d"}.lexically_relative("/a/b/c"); // ../../d	code	txt	2024-07-28 09:51:19.943385	3
 2208	650	Lexical proximate path yields p1 if there is no relative path from p1 to p2.	text	txt	2024-07-28 09:51:19.965002	4
-2209	650	std::filesystem::path{"a/b"}.lexically_relative("c/d"}; // ""\nstd::filesystem::path{"a/b"}.lexically_proximate("c/d"}; // "a/b"	code	txt	2024-07-28 09:51:19.98584	5
-2210	651	std::filesystem::path p{"/dir\\\\\\\\subdir/subsubdir\\\\\\\\/./\\\\\\\\"};	text	txt	2024-07-28 09:51:20.775342	1
 3651	1167	    ; use and print the results of area function\n    mov xmm0, qword[radius]\n    call area	text	txt	2024-07-28 09:55:24.710791	20
-2211	651	p.generic_string(); // all the same: /dir/subdir/subsubdir//.//\np.generic_wstring();\np.generic_u8string();\np.generic_u16string();\np.generic_u32string();	code	txt	2024-07-28 09:51:20.795627	2
-2212	651	`native()` yields the path converted to the native string encoding, which is\ndefined by the type `std::filesystem::path::string_type`. Under Windows this\ntype is `std::wstring`, so that you have to use `std::wcout`.	text	txt	2024-07-28 09:51:20.816668	3
-2213	651	`c_str()` does the same but yields the result as a null terminated character\nsequence. Note that using this function is also not portable.	text	txt	2024-07-28 09:51:20.83829	4
-2214	651	`make_preferred()` replaces any directory separator except for the root name\nby the native directory separator.	text	txt	2024-07-28 09:51:20.859487	5
-2215	651	p.native(); // /dir\\\\subdir/subsubdir\\\\/./\\\\\np.c_str(); // same\np.preferred(); // \\\\\\\\dir\\\\\\\\subdir\\\\\\\\subsubdir\\\\\\\\\\\\\\\\.\\\\\\\\\\\\\\\\	code	txt	2024-07-28 09:51:20.882119	6
-2216	652	`+` , `+=` and `concat()` just append new characters to a path.	text	txt	2024-07-28 09:51:21.39431	1
-2217	652	std::filesystem::path p{"project"};	text	txt	2024-07-28 09:51:21.415327	2
-2218	652	auto p2 = p + ".git"; // project.git	text	txt	2024-07-28 09:51:21.435605	3
-2219	652	p += ".git"; // project.git\np2.concat(".git"); // project.git	text	txt	2024-07-28 09:51:21.456836	4
-2220	652	std::filesystem::path p3{".git"};\np.concat(p3.begin(), p3.end()); // project.git	code	txt	2024-07-28 09:51:21.478171	5
-2221	653	`/` , `/=` and `append()` add a subpath separated with the current directory\nseparator.	text	txt	2024-07-28 09:51:21.996342	1
-2222	653	std::filesystem::path p{"project"};	text	txt	2024-07-28 09:51:22.015559	2
-2223	653	auto p2 = p / ".git"; // project.git	text	txt	2024-07-28 09:51:22.034219	3
-2224	653	p.append(".git"); // project.git\np /= ".git"; // project.git	text	txt	2024-07-28 09:51:22.054803	4
-2225	653	std::filesystem::path p3{".git"};\np.append(p3.begin(), p3.end());	code	txt	2024-07-28 09:51:22.076276	5
-2226	654	std::filesystem::path p{"/src/project/main"};\np.replace_extension(".cpp"); // /src/project/main.cpp	code	txt	2024-07-28 09:51:22.343987	1
-2227	655	std::filesystem::path p;	text	txt	2024-07-28 09:51:22.775294	1
-2228	655	std::string s{"/src/projects/linux"};\np.assign(s);	text	txt	2024-07-28 09:51:22.795498	2
-2229	655	std::string_view sv{"/src/projects/linux-stable"};\np.assign(sv);	text	txt	2024-07-28 09:51:22.817023	3
-2230	655	std::filesystem::path p2{"/src/projects/linux-hardened"};\np.assign(p2.begin(), p2.end());	code	txt	2024-07-28 09:51:22.837905	4
-2231	656	std::filesystem::path p1;\nstd::filesystem::path p2;	text	txt	2024-07-28 09:51:23.174247	1
-2232	656	p1.swap(p2);\nstd::swap(p1, p2);	code	txt	2024-07-28 09:51:23.194617	2
-2233	657	std::filesystem::path p{"/src/project/main.cpp"};\np.replace_filename("window.cpp"); // /src/project/window.cpp	code	txt	2024-07-28 09:51:23.472503	1
-2234	658	std::filesystem::path p{"/src/project/main.cpp"};\np.replace_extension("hpp"); // /src/project/main.hpp	code	txt	2024-07-28 09:51:23.76231	1
-2235	659	std::filesystem::path p;\np.make_preferred();	code	txt	2024-07-28 09:51:24.022566	1
-2236	660	std::filesystem::path p{"/src/project/main.cpp"};\np.remove_filename(); // /src/project/	code	txt	2024-07-28 09:51:24.317858	1
-2237	661	std::filesystem::path p{"/src/project/main.cpp"};\np.replace_extension(); // /src/project/main	code	txt	2024-07-28 09:51:24.643586	1
 2238	662	`==` , `!=` , `<` , `>` , `<=` , `>=` , `compare(p2)` , `compare(sv)` and `equivalent(p1, p2)` are available.	text	txt	2024-07-28 09:51:24.88894	1
+2248	666	Note that these functions follow symbolic links.\nSo for a symbolic link to a directory both `is_symlink()` and `is_directory()` yield true.	text	txt	2024-07-28 09:51:26.90415	1
+2207	650	std::filesystem::path{"a/b/c"}.lexically_relative("/a/d"); // ../b/c\nstd::filesystem::path{"a/d"}.lexically_relative("/a/b/c"); // ../../d	code	cpp	2024-07-28 09:51:19.943385	3
+2209	650	std::filesystem::path{"a/b"}.lexically_relative("c/d"}; // ""\nstd::filesystem::path{"a/b"}.lexically_proximate("c/d"}; // "a/b"	code	cpp	2024-07-28 09:51:19.98584	5
+2212	651	`native()` yields the path converted to the native string encoding, which is\ndefined by the type `std::filesystem::path::string_type`. Under Windows this\ntype is `std::wstring`, so that you have to use `std::wcout`.	text	txt	2024-07-28 09:51:20.816668	2
+2213	651	`c_str()` does the same but yields the result as a null terminated character\nsequence. Note that using this function is also not portable.	text	txt	2024-07-28 09:51:20.83829	3
+2214	651	`make_preferred()` replaces any directory separator except for the root name\nby the native directory separator.	text	txt	2024-07-28 09:51:20.859487	4
+2233	657	std::filesystem::path p{"/src/project/main.cpp"};\np.replace_filename("window.cpp"); // /src/project/window.cpp	code	cpp	2024-07-28 09:51:23.472503	1
+2215	651	p.native(); // /dir\\\\subdir/subsubdir\\\\/./\\\\\np.c_str(); // same\np.preferred(); // \\\\\\\\dir\\\\\\\\subdir\\\\\\\\subsubdir\\\\\\\\\\\\\\\\.\\\\\\\\\\\\\\\\	code	cpp	2024-07-28 09:51:20.882119	5
+2216	652	`+` , `+=` and `concat()` just append new characters to a path.	text	txt	2024-07-28 09:51:21.39431	1
+2221	653	`/` , `/=` and `append()` add a subpath separated with the current directory\nseparator.	text	txt	2024-07-28 09:51:21.996342	1
+2226	654	std::filesystem::path p{"/src/project/main"};\np.replace_extension(".cpp"); // /src/project/main.cpp	code	cpp	2024-07-28 09:51:22.343987	1
+2234	658	std::filesystem::path p{"/src/project/main.cpp"};\np.replace_extension("hpp"); // /src/project/main.hpp	code	cpp	2024-07-28 09:51:23.76231	1
+2235	659	std::filesystem::path p;\np.make_preferred();	code	cpp	2024-07-28 09:51:24.022566	1
+2236	660	std::filesystem::path p{"/src/project/main.cpp"};\np.remove_filename(); // /src/project/	code	cpp	2024-07-28 09:51:24.317858	1
+2237	661	std::filesystem::path p{"/src/project/main.cpp"};\np.replace_extension(); // /src/project/main	code	cpp	2024-07-28 09:51:24.643586	1
 2239	663	Using `==` , `!=` and `compare()` the following paths are all different:	text	txt	2024-07-28 09:51:25.596887	1
 2240	663	```\ntmp/f\n./tmp/f\ntmp/./f\ntmp/subtmp/../f\ntmp//f\n/tmp\\\\f\ntmp/\\\\/f\n``````	text	txt	2024-07-28 09:51:25.617541	2
 2241	663	Only if you call `lexically_normal()` for each path, all of the paths above are equal.	text	txt	2024-07-28 09:51:25.639331	3
-2242	663	std::filesystem::path p1{"tmp/f"};\nstd::filesystem::path p2{"tmp/./f"};	text	txt	2024-07-28 09:51:25.660242	4
-2243	663	p1 == p2; // false\np1.compare(p2); // not 0\np1.lexically_normal() == p2.lexically_normal(); // true\np1.lexically_normal().compare(p2.lexically_normal()); // 0	code	txt	2024-07-28 09:51:25.680166	5
 2244	664	To take the filesystem into account so that symbolic links are correctly\nhandled, use `equivalent()`. Note that this function requires that both paths\nrepresent existing files.	text	txt	2024-07-28 09:51:26.154175	1
-2245	664	std::filesystem::path p1{"/tmp/sym1"};\nstd::filesystem::path p2{"/tmp/sym2"};	text	txt	2024-07-28 09:51:26.176288	2
-2246	664	std::filesystem::exists(p1); // true\nstd::filesystem::exists(p2); // true\nstd::filesystem::equivalent(p1, p2);	code	txt	2024-07-28 09:51:26.196455	3
-2247	665	std::filesystem::exists(p);	code	txt	2024-07-28 09:51:26.482796	1
-2248	666	Note that these functions follow symbolic links.\nSo for a symbolic link to a directory both `is_symlink()` and `is_directory()` yield true.	text	txt	2024-07-28 09:51:26.90415	1
-2249	666	std::filesystem::is_symlink(p);\nstd::filesystem::is_regular_file(p);\nstd::filesystem::is_directory(p);	code	txt	2024-07-28 09:51:26.926561	2
-2250	667	std::filesystem::is_other(p);	code	txt	2024-07-28 09:51:27.185322	1
-2251	668	std::filesystem::is_block_file(p);\nstd::filesystem::is_character_file(p);\nstd::filesystem::is_fifo(p);\nstd::filesystem::is_socket(p);	code	txt	2024-07-28 09:51:27.53257	1
-2252	669	std::filesytem::is_empty(p);	code	txt	2024-07-28 09:51:27.812025	1
+2247	665	std::filesystem::exists(p);	code	cpp	2024-07-28 09:51:26.482796	1
 2253	670	This free-standing function returns the size of file p in bytes if it exists\nas regular file. For all other files the result is implementation-defined and\nnot portable.	text	txt	2024-07-28 09:51:28.219629	1
-2254	670	auto bytes = std::filesystem::file_size(p);	code	txt	2024-07-28 09:51:28.239394	2
-2255	671	std::filesystem::hard_link_count(p);	code	txt	2024-07-28 09:51:28.517075	1
 2256	672	Returns the timepoint of the last modification or write access of the file. The return type is a special `std::chrono::time_point` type.	text	txt	2024-07-28 09:51:29.060468	1
 2967	968		code	txt	2024-07-28 09:53:37.643449	1
-2257	672	namespace std::filesystem {\n    using file_time_type = chrono::time_point<trivialClock>;\n}	code	txt	2024-07-28 09:51:29.082889	2
 2258	672	The clock type is an implementation specific clock type that reflects the resolution and range of file time values.	text	txt	2024-07-28 09:51:29.103359	3
-2259	672	auto last_write = last_write_time(p);\nauto diff = std::filesystem::file_time_type::clock::now() - last_write;\nauto last_write_seconds = std::chrono::duration_cast<std::chrono::seconds>(diff).count();	code	txt	2024-07-28 09:51:29.122914	4
-2260	673	std::filesystem::space_info = std::filesystem::space(p);	code	txt	2024-07-28 09:51:29.665785	1
 2261	673	The return value of `space()` is the following signature:	text	txt	2024-07-28 09:51:29.68544	2
-2262	673	namespace std::filesystem {\n    struct space_info {\n        uintmax_t capacity;\n        uintmax_t free;\n        uintmax_t available;\n    };\n}	code	txt	2024-07-28 09:51:29.706359	3
 3652	1167	    mov rdi, format_floating\n    mov rax, 1\n    call printf	text	txt	2024-07-28 09:55:24.731554	21
 2263	674	`rename()` can deal with any type of file including directories and symbolic\nlinks.	text	txt	2024-07-28 09:51:30.108171	1
 2264	674	Renaming symbolic links will rename the link, not where it refers to.	text	txt	2024-07-28 09:51:30.129784	2
-2265	674	std::filesystem::rename(old, new);	code	txt	2024-07-28 09:51:30.150541	3
-2266	675	std::filesystem::last_write_time(p, newtime);\nstd::filesystem::last_write_time(p, std::filesystem::file_time_type::clock::now());	code	txt	2024-07-28 09:51:30.454654	1
-2267	676	std::filesystem::permissions(p, perms);\nstd::filesystem::permissions(p, perms, mode);	code	txt	2024-07-28 09:51:31.024784	1
 2268	676	The optional `mode` is of the bitmask enumeration type `perm_options`,\ndefined in namespace `std::filesystem`. It allows on one hand to choose\nbetween `replace`, `add`, and `remove` and on the other hand with `nofollow`\nto modify permissions of the symbolic links instead of the files they refer\nto.	text	txt	2024-07-28 09:51:31.04556	2
-2269	676	// remove write access for group and any access for others\nstd::filesystem::permissions(p, std::filesystem::perms::owner_write | std::filesystem::perms::others_all, std::filesystem::perm_options::remove);	code	txt	2024-07-28 09:51:31.066136	3
-2270	677	std::filesystem::resize_file(p, newSize);	code	txt	2024-07-28 09:51:31.380303	1
-2271	678	std::filesystem::current_path(p);	code	txt	2024-07-28 09:51:31.712666	1
-2272	679	`exists()` follows symbolic links. So, it yields `false` if there is a\nsymbolic link to a non-existing file. To avoid following symbolic links, use\n`symlink_status()` and then call `exists()` using the returned `file_status`\nobject.	text	txt	2024-07-28 09:51:32.398793	1
-2273	679	#include <iostream>\n#include <filesystem>	text	txt	2024-07-28 09:51:32.419743	2
-2274	679	int main()\n{\n    std::filesystem::path existing_file{"/dev/random"};\n    std::filesystem::path non_existing_file{"/dev/none"};\n    std::filesystem::path existing_symlink{"/lib"};	text	txt	2024-07-28 09:51:32.441117	3
-2275	679	    std::filesystem::exists(existing_file);\n    std::filesystem::exists(non_existing_file);\n    std::filesystem::exists(symlink_status(existing_symlink));\n}	code	txt	2024-07-28 09:51:32.462799	4
 2276	680	Use `symlink_status()` function to return a `file_status` object and call\nthese functions with it.	text	txt	2024-07-28 09:51:32.892488	1
-2277	680	// check if p doesn't exist yet (as symbolic link)\nif (!exists(symlink_status(p)))\n    ...	code	txt	2024-07-28 09:51:32.912931	2
-2278	681	std::filesystem::status(p);	code	txt	2024-07-28 09:51:33.173695	1
-2279	682	std::filesystem::symlink_status(p);	code	txt	2024-07-28 09:51:33.461488	1
-2280	683	std::filesystem::path p{};\nstd::filesystem::file_status fs = std::filesystem::status(p);	text	txt	2024-07-28 09:51:33.933297	1
-2281	683	std::filesystem::is_regular_file(fs);\nstd::filesystem::is_directory(fs);\nstd::filesystem::is_symlink(fs);\nstd::filesystem::is_other(fs);	text	txt	2024-07-28 09:51:33.953561	2
-2282	683	std::filesystem::is_character_file(fs);\nstd::filesystem::is_block_file(fs);\nstd::filesystem::is_fifo(fs);\nstd::filesystem::is_socket(fs);	code	txt	2024-07-28 09:51:33.974546	3
-2283	684	std::filesystem::path p{};\nstd::filesystem::file_status fs = std::filesystem::status(p);\nstd::filesystem::file_type ft = fs.type();	text	txt	2024-07-28 09:51:34.589291	1
-2284	684	switch (fs.type())\n{\n    using std::filesystem::file_type;\n    case (file_type::regular):      std::cout << "regular"; break;\n    case (file_type::directory):    std::cout << "directory"; break;\n    case (file_type::block):        std::cout << "block"; break;\n    case (file_type::character):    std::cout << "char"; break;\n    case (file_type::symlink):      std::cout << "symlink"; break;\n    case (file_type::socket):       std::cout << "socket"; break;\n    case (file_type::fifo):         std::cout << "fifo"; break;\n    case (file_type::not_found):    std::cout << "not found"; break;\n    case (file_type::unknown):      std::cout << "unknown"; break;\n    case (file_type::none):         std::cout << "none"; break;\n}	code	txt	2024-07-28 09:51:34.612483	2
-2285	685	std::filesystem::path p{};\nstd::filesysetm::file_status fs = std::filesystem::status(p);\nstd::filesystem::perms file_permissions = fs.permissions();	code	txt	2024-07-28 09:51:34.896079	1
-2286	686	#include <iostream>\n#include <filesystem>	text	txt	2024-07-28 09:51:35.332317	1
-2287	686	int main()\n{\n    std::filesystem::path file{"/etc/passwd"};\n    std::filesystem::file_status status{std::filesystem::status(file)};\n    std::cout << "file type: ";\n    std::cout << "\\\\n";\n}	code	txt	2024-07-28 09:51:35.352836	2
-2288	687	|Enum|Octal|POSIX|\n|---|---|---|\n|`none`|0||\n|`owner_read`|0400|`S_IRUSR`|\n|`owner_write`|0200|`S_IWUSR`|\n|`owner_exec`|0100|`S_IXUSR`|\n|`owner_all`|0700|`S_IRWXU`|\n|`group_read`|040|`S_IRGRP`|\n|`group_write`|020|`S_IWGRP`|\n|`group_exec`|010|`S_IXGRP`|\n|`group_all`|070|`S_IRWXG`|\n|`others_read`|04|`S_IROTH`|\n|`others_write`|02|`S_IWOTH`|\n|`others_exec`|01|`S_IXOTH`|\n|`others_all`|07|`S_IRWXO`|\n|`all`|0777||\n|`set_suid`|04000|`S_ISUID`|\n|`set_guid`|02000|`S_ISGID`|\n|`sticky_bit`|01000|`S_ISVTX`|\n|`mask`|07777||\n|`unknown`|0xFFFF||	text	txt	2024-07-28 09:51:36.391878	1
-2289	687	std::filesystem::path p{};\nstd::filesystem::file_status fs = std::filesystem::symlink_status(fs);\nstd::filesystem::perms perms = fs.permissions();\nstd::filesystem::perms write_free = std::filesystem::perms::owner_write | std::filesystem::perms::group_write | std::filesystem::perms::others_write;	text	txt	2024-07-28 09:51:36.413533	2
-2290	687	if ((perms & write_free) != std::filesystem::perms::none)\n{\n}	code	txt	2024-07-28 09:51:36.43397	3
-2291	687	A shorter way to initialize a bitmask is:	text	txt	2024-07-28 09:51:36.453728	4
-2292	687	if ((perms & std::filesystem::perms{0222}) != std::filesystem::perms::none)\n{\n}	code	txt	2024-07-28 09:51:36.474865	5
-2293	688	#include <fstream>	text	txt	2024-07-28 09:51:36.850335	1
-2294	688	std::fstream file{"/tmp/non-existing-file"};	code	txt	2024-07-28 09:51:36.870479	2
-2295	689	std::filesystem::create_directory(p);\nstd::filesystem::create_directory(p, attributes);	code	txt	2024-07-28 09:51:37.404998	1
+3676	1172	__asm__(\n    ".intel_syntax noprefix;"\n    "mov rbx, rdx;"\n    "imul rbx, rcx;"\n    "mov rax, rbx;"\n    :"=a"(eproduct)\n    :"d"(x), "c"(y)\n    :"rbx"\n);	text	txt	2024-07-28 09:55:28.461292	4
+3677	1172	printf("The extended inline product is %i\\\\n", eproduct);	code	txt	2024-07-28 09:55:28.482158	5
+3741	1183	; \\\\pre rdi address of filename string\n; \\\\post rax error code\ncreate:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:55:38.139778	3
+2250	667	std::filesystem::is_other(p);	code	cpp	2024-07-28 09:51:27.185322	1
+2251	668	std::filesystem::is_block_file(p);\nstd::filesystem::is_character_file(p);\nstd::filesystem::is_fifo(p);\nstd::filesystem::is_socket(p);	code	cpp	2024-07-28 09:51:27.53257	1
+2252	669	std::filesytem::is_empty(p);	code	cpp	2024-07-28 09:51:27.812025	1
+2254	670	auto bytes = std::filesystem::file_size(p);	code	cpp	2024-07-28 09:51:28.239394	2
+2255	671	std::filesystem::hard_link_count(p);	code	cpp	2024-07-28 09:51:28.517075	1
+2257	672	namespace std::filesystem {\n    using file_time_type = chrono::time_point<trivialClock>;\n}	code	cpp	2024-07-28 09:51:29.082889	2
+2260	673	std::filesystem::space_info = std::filesystem::space(p);	code	cpp	2024-07-28 09:51:29.665785	1
+2262	673	namespace std::filesystem {\n    struct space_info {\n        uintmax_t capacity;\n        uintmax_t free;\n        uintmax_t available;\n    };\n}	code	cpp	2024-07-28 09:51:29.706359	3
+2265	674	std::filesystem::rename(old, new);	code	cpp	2024-07-28 09:51:30.150541	3
+2266	675	std::filesystem::last_write_time(p, newtime);\nstd::filesystem::last_write_time(p, std::filesystem::file_time_type::clock::now());	code	cpp	2024-07-28 09:51:30.454654	1
+2267	676	std::filesystem::permissions(p, perms);\nstd::filesystem::permissions(p, perms, mode);	code	cpp	2024-07-28 09:51:31.024784	1
+2269	676	// remove write access for group and any access for others\nstd::filesystem::permissions(p, std::filesystem::perms::owner_write | std::filesystem::perms::others_all, std::filesystem::perm_options::remove);	code	cpp	2024-07-28 09:51:31.066136	3
+2270	677	std::filesystem::resize_file(p, newSize);	code	cpp	2024-07-28 09:51:31.380303	1
+2271	678	std::filesystem::current_path(p);	code	cpp	2024-07-28 09:51:31.712666	1
+2272	679	`exists()` follows symbolic links. So, it yields `false` if there is a\nsymbolic link to a non-existing file. To avoid following symbolic links, use\n`symlink_status()` and then call `exists()` using the returned `file_status`\nobject.	text	txt	2024-07-28 09:51:32.398793	1
+2277	680	// check if p doesn't exist yet (as symbolic link)\nif (!exists(symlink_status(p)))\n    ...	code	cpp	2024-07-28 09:51:32.912931	2
+2278	681	std::filesystem::status(p);	code	cpp	2024-07-28 09:51:33.173695	1
+2279	682	std::filesystem::symlink_status(p);	code	cpp	2024-07-28 09:51:33.461488	1
+2285	685	std::filesystem::path p{};\nstd::filesysetm::file_status fs = std::filesystem::status(p);\nstd::filesystem::perms file_permissions = fs.permissions();	code	cpp	2024-07-28 09:51:34.896079	1
 2296	689	The functions to create one or more directories return whether a new\ndirectory was created. Thus, finding a directory that is already there is not\nan error. However, finding a file there that is not a directory is also not\nan error.	text	txt	2024-07-28 09:51:37.425163	2
-2297	689	if (!create_directory(p) && !is_directory(p))\n{\n    std::cerr << p << " already exists as a non-directory\\\\n";\n}	code	txt	2024-07-28 09:51:37.445216	3
-2298	690	std::filesystem::create_directories(p);	code	txt	2024-07-28 09:51:37.705673	1
 2299	691	If path already exists as a symbolic link to a non-existing file, it will try\nto create the symbolic link at the location where already the symbolic link\nexists and raise a corresponding exception.	text	txt	2024-07-28 09:51:38.078631	1
-2300	691	std::filesystem::create_symlink(to, new);	code	txt	2024-07-28 09:51:38.098557	2
-2301	692	std::filesystem::create_directory_symlink(to, new);	code	txt	2024-07-28 09:51:38.342163	1
-2302	693	std::filesystem::create_hard_link(p);	code	txt	2024-07-28 09:51:38.599437	1
-2303	694	std::filesystem::copy(from, to);\nstd::filesystem::copy(from, to, options);	code	txt	2024-07-28 09:51:38.935775	1
 3653	1167	    mov rsp, rbp\n    pop rbp\n    ret	code	txt	2024-07-28 09:55:24.751974	22
-2304	695	std::filesystem::copy_file(from, to);\nstd::filesystem::copy_file(from, to, options);	code	txt	2024-07-28 09:51:39.2015	1
 2305	696	Copy functions:	text	txt	2024-07-28 09:51:39.91234	1
 2306	696	- Don't work with special file types.\n- Report an error if existing files are overwritten.\n- Don't operate recursively.\n- Follow symbolic links.	text	txt	2024-07-28 09:51:39.934069	2
-2307	696	enum class std::filesystem::copy_options {\n    none,\n    skip_existing,      // skip overwriting existing files\n    overwrite_existing, // overwrite existing files\n    update_existing,    // overwrite existing files if the new files are newer\n    recursive,          // recursively copy sub-directories and their contents\n    copy_symlinks,      // copy symbolic links as symbolic links\n    skip_symlinks,      // ignore symbolic links\n    directories_only,   // copy directories only\n    create_hard_links,  // create additional hard links instead of copies of files\n    create_symlinks     // create symbolic links instead of copies of files\n    // for latter option the source path must be absolute path unless\n    // the destination path is in the current directory\n};	code	txt	2024-07-28 09:51:39.955776	3
 2308	697	Both symlinks would refer to the same file.	text	txt	2024-07-28 09:51:40.249749	1
-2309	697	std::filesystem::copy_symlink(from, to);	code	txt	2024-07-28 09:51:40.26952	2
-2310	698	std::filesystem::remove(p);	code	txt	2024-07-28 09:51:40.553697	1
 2311	699	Removes a file or recursively a directory. It returns as `uintmax_t` value\nhow many files were removed. It returns 0 if there was no file and\n`uintmax_t(-1)` if an error occured and no exception is thrown.	text	txt	2024-07-28 09:51:40.866295	1
-2312	699	std::filesystem::remove_all(p);	code	txt	2024-07-28 09:51:40.886868	2
 2313	700	The symbolic link and the file it refers to must already exist.	text	txt	2024-07-28 09:51:41.218023	1
-2314	700	std::filesystem::read_symlink(symlink);	code	txt	2024-07-28 09:51:41.238528	2
 2315	701	`absolute()` function does not follow symbolic links.	text	txt	2024-07-28 09:51:41.711433	1
-2316	701	std::filesystem::absolute(p);	code	txt	2024-07-28 09:51:41.73268	2
 2317	701	`canonical()` function follows symbolic links.\nThe file must already exist for this function to work.	text	txt	2024-07-28 09:51:41.753854	3
-2318	701	std::filesystem::canonical(p);\nstd::filesystem::weakly_canonical(p);	code	txt	2024-07-28 09:51:41.774229	4
-2319	702	std::filesystem::relative(p);\nstd::filesystem::proximate(p);	code	txt	2024-07-28 09:51:42.058147	1
-2320	703	std::filesystem::relative(p, base);\nstd::filesystem::proximate(p, base);	code	txt	2024-07-28 09:51:42.353024	1
 2321	704	The most convenient way to do is to use a range-based for loop.	text	txt	2024-07-28 09:51:42.769538	1
-2322	704	for (auto const& entry: std::filesystem::directory_iterator(dir))\n{\n    std::cout << entry.lexically_normal().string() << '\\\\n';\n}	code	txt	2024-07-28 09:51:42.790286	2
 2323	705		code	txt	2024-07-28 09:51:43.047768	1
 2324	706	When iterating over directories you can pass values of type\n`directory_options`. The type is a bitmask scoped enumeration type, defined\nin namespace `std::filesystem` as follows:	text	txt	2024-07-28 09:51:43.674651	1
-2325	706	namespace std::filesystem {\n    enum class directory_options {\n        none,\n        follow_directory_symlink,\n        skip_permission_denied\n    };\n}	code	txt	2024-07-28 09:51:43.69443	2
 2326	706	The default is not to follow symbolic links and to skip directories you are\nnot allowed to iterate over. With `skip_permission_denied` iterating over a\ndenied directory, results in an exception.	text	txt	2024-07-28 09:51:43.714274	3
 2327	707	The elements directory iterators iterate over are of type\n`std::filesystem::directory_entry`. These iterators are input iterators. The\nreason is that iterating over a directory might result into different results\nas at any time directory entries might change. This has to be taken into\naccount when using directory iterators in parallel.	text	txt	2024-07-28 09:51:44.614666	1
-2328	707	e.path();\ne.exists()\ne.is_regular_file()\ne.is_directory()\ne.is_symlink()\ne.is_other()\ne.is_block_file()\ne.is_character_file()\ne.is_fifo()\ne.is_socket()\ne.file_size()\ne.hard_link_count()\ne.last_write_time()\ne.status()\ne.symlink_status()\ne1 == e2\ne1 != e2\ne1 < e2\ne1 <= e2\ne1 > e2\ne1 >= e2\ne.assign(p)\ne.replace_filename(p)\ne.refresh()	code	txt	2024-07-28 09:51:44.63619	2
 2329	707	`assign()` and `replace_filename()` call the corresponding modifying path\noperations but do not modify the files in the underlying filesystem.	text	txt	2024-07-28 09:51:44.656446	3
-2330	708	#include <source_location>\n#include <string_view>\n#include <iostream>	text	txt	2024-07-28 09:51:45.2993	1
-2331	708	void log(std::string_view const message, std::source_location const location = std::source_location::current)\n{\n    std::cerr << location.file_name() << ": " << location.line() << "\\\\n\\\\t"\n        << location.function_name() << ": " << message << "\\\\n";\n}	text	txt	2024-07-28 09:51:45.321424	2
-2332	708	void do_something()\n{\n    log("something is done here");\n}	text	txt	2024-07-28 09:51:45.342666	3
-2333	708	int main()\n{\n    do_something();\n}	code	txt	2024-07-28 09:51:45.362621	4
+2295	689	std::filesystem::create_directory(p);\nstd::filesystem::create_directory(p, attributes);	code	cpp	2024-07-28 09:51:37.404998	1
+2297	689	if (!create_directory(p) && !is_directory(p))\n{\n    std::cerr << p << " already exists as a non-directory\\\\n";\n}	code	cpp	2024-07-28 09:51:37.445216	3
+2298	690	std::filesystem::create_directories(p);	code	cpp	2024-07-28 09:51:37.705673	1
+2300	691	std::filesystem::create_symlink(to, new);	code	cpp	2024-07-28 09:51:38.098557	2
+2301	692	std::filesystem::create_directory_symlink(to, new);	code	cpp	2024-07-28 09:51:38.342163	1
+2302	693	std::filesystem::create_hard_link(p);	code	cpp	2024-07-28 09:51:38.599437	1
+2303	694	std::filesystem::copy(from, to);\nstd::filesystem::copy(from, to, options);	code	cpp	2024-07-28 09:51:38.935775	1
+2304	695	std::filesystem::copy_file(from, to);\nstd::filesystem::copy_file(from, to, options);	code	cpp	2024-07-28 09:51:39.2015	1
+2307	696	enum class std::filesystem::copy_options {\n    none,\n    skip_existing,      // skip overwriting existing files\n    overwrite_existing, // overwrite existing files\n    update_existing,    // overwrite existing files if the new files are newer\n    recursive,          // recursively copy sub-directories and their contents\n    copy_symlinks,      // copy symbolic links as symbolic links\n    skip_symlinks,      // ignore symbolic links\n    directories_only,   // copy directories only\n    create_hard_links,  // create additional hard links instead of copies of files\n    create_symlinks     // create symbolic links instead of copies of files\n    // for latter option the source path must be absolute path unless\n    // the destination path is in the current directory\n};	code	cpp	2024-07-28 09:51:39.955776	3
+2309	697	std::filesystem::copy_symlink(from, to);	code	cpp	2024-07-28 09:51:40.26952	2
+2310	698	std::filesystem::remove(p);	code	cpp	2024-07-28 09:51:40.553697	1
+2312	699	std::filesystem::remove_all(p);	code	cpp	2024-07-28 09:51:40.886868	2
+2314	700	std::filesystem::read_symlink(symlink);	code	cpp	2024-07-28 09:51:41.238528	2
+2316	701	std::filesystem::absolute(p);	code	cpp	2024-07-28 09:51:41.73268	2
+2318	701	std::filesystem::canonical(p);\nstd::filesystem::weakly_canonical(p);	code	cpp	2024-07-28 09:51:41.774229	4
+2319	702	std::filesystem::relative(p);\nstd::filesystem::proximate(p);	code	cpp	2024-07-28 09:51:42.058147	1
+2320	703	std::filesystem::relative(p, base);\nstd::filesystem::proximate(p, base);	code	cpp	2024-07-28 09:51:42.353024	1
+2322	704	for (auto const& entry: std::filesystem::directory_iterator(dir))\n{\n    std::cout << entry.lexically_normal().string() << '\\\\n';\n}	code	cpp	2024-07-28 09:51:42.790286	2
+2325	706	namespace std::filesystem {\n    enum class directory_options {\n        none,\n        follow_directory_symlink,\n        skip_permission_denied\n    };\n}	code	cpp	2024-07-28 09:51:43.69443	2
+2328	707	e.path();\ne.exists()\ne.is_regular_file()\ne.is_directory()\ne.is_symlink()\ne.is_other()\ne.is_block_file()\ne.is_character_file()\ne.is_fifo()\ne.is_socket()\ne.file_size()\ne.hard_link_count()\ne.last_write_time()\ne.status()\ne.symlink_status()\ne1 == e2\ne1 != e2\ne1 < e2\ne1 <= e2\ne1 > e2\ne1 >= e2\ne.assign(p)\ne.replace_filename(p)\ne.refresh()	code	cpp	2024-07-28 09:51:44.63619	2
 2334	709	- Creational Patterns\n- Behavioral Patterns\n- Structural Patterns	text	txt	2024-07-28 09:51:45.654718	1
 2335	710	- Factory Method\n- Abstract Factory\n- Builder\n- Prototype\n- Singleton	text	txt	2024-07-28 09:51:45.935224	1
 2336	711	- Encapsulates object creation in one method\n- Provides interface to create subclasses	text	txt	2024-07-28 09:51:46.183432	1
 2337	712	When there are different products sharing similar properties and there might\nbe more products later to be added to the program. In that case, an abstract\nproduct generalizing all similar products should be created. And then, all\nvariations of concrete products inherit from abstract product.	text	txt	2024-07-28 09:51:46.872426	1
-2338	712	@startuml\nabstract Product {\n}\nconcrete ProductVariation1 {\n}\nconcrete ProductVariation2 {\n}\nabstract Creator {\n}\nconcrete ConcreteCreator {\n    + getProduct(): Product\n}\n@enduml	code	txt	2024-07-28 09:51:46.893279	2
 2339	712	On the other hand, There should be an abstract creator class that provides\nproduct generation methods. Then, there should be a concrete factory which\ncomposes a factory method returning abstract product.	text	txt	2024-07-28 09:51:46.913398	3
-2340	713	*main.cpp*\n#include <streamer.hpp>\n#include <mpeg.hpp>	text	txt	2024-07-28 09:51:49.733156	1
-2342	713	int main()\n{\n    dp::streamer streamer;\n    std::shared_ptr<dp::video> video{streamer.record("mpeg")};\n    std::cout << video->length().count() << std::endl;\n}	code	txt	2024-07-28 09:51:49.77383	3
-2343	713	*mpeg.cpp*\n#include <mpeg.hpp>	text	txt	2024-07-28 09:51:49.793131	4
-2344	713	using namespace dp;	text	txt	2024-07-28 09:51:49.814431	5
-2345	713	mpeg::mpeg(std::chrono::seconds const& length)\n    : _length{length}\n{\n}	text	txt	2024-07-28 09:51:49.836282	6
-2346	713	std::chrono::seconds mpeg::length() const noexcept\n{\n    return _length;\n}	code	txt	2024-07-28 09:51:49.856402	7
-2347	713	*mpeg.hpp*\n#pragma once	text	txt	2024-07-28 09:51:49.877867	8
-2348	713	#include <video.hpp>	text	txt	2024-07-28 09:51:49.897507	9
 3654	1168	*header.nasm*\nglobal pi	text	txt	2024-07-28 09:55:25.319097	1
-2349	713	namespace dp\n{\nclass mpeg : public video\n{\npublic:\n    explicit mpeg(std::chrono::seconds const& length);\n    std::chrono::seconds length() const noexcept override;	text	txt	2024-07-28 09:51:49.917509	10
-2350	713	private:\n    std::chrono::seconds _length;\n};\n} // dp	code	txt	2024-07-28 09:51:49.938203	11
-2351	713	*streamer.cpp*\n#include <streamer.hpp>\n#include <mpeg.hpp>	text	txt	2024-07-28 09:51:49.958829	12
-2352	713	#include <cstring>	text	txt	2024-07-28 09:51:49.979005	13
-2353	713	using namespace dp;	text	txt	2024-07-28 09:51:49.999792	14
-2354	713	std::shared_ptr<video> streamer::record(char const type[4])\n{\n    std::shared_ptr<video> stream_buffer{};	text	txt	2024-07-28 09:51:50.022008	15
-2355	713	    if (strcmp(type, "mpeg") == 0)\n    {\n        stream_buffer = std::make_shared<mpeg>(std::chrono::seconds{120});\n    }	text	txt	2024-07-28 09:51:50.044289	16
-2356	713	    return stream_buffer;\n}	code	txt	2024-07-28 09:51:50.065212	17
-2357	713	*streamer.hpp*\n#pragma once	text	txt	2024-07-28 09:51:50.086618	18
-2358	713	#include <video_stream.hpp>	text	txt	2024-07-28 09:51:50.106631	19
-2359	713	namespace dp\n{\nclass streamer : public video_stream\n{\npublic:\n    std::shared_ptr<video> record(char const type[4]) override;\n};\n} // dp	code	txt	2024-07-28 09:51:50.129503	20
-2360	713	*video.hpp*\n#pragma once	text	txt	2024-07-28 09:51:50.151154	21
-2361	713	#include <chrono>	text	txt	2024-07-28 09:51:50.172641	22
-2362	713	namespace dp\n{\nstruct video\n{\n    virtual std::chrono::seconds length() const noexcept = 0;\n};\n} // dp	code	txt	2024-07-28 09:51:50.192718	23
-2363	713	*video_stream.hpp*\n#pragma once	text	txt	2024-07-28 09:51:50.215106	24
-2364	713	#include <memory>	text	txt	2024-07-28 09:51:50.236497	25
-2365	713	namespace dp\n{\nclass video;	text	txt	2024-07-28 09:51:50.258949	26
-2366	713	class video_stream\n{\npublic:\n    virtual std::shared_ptr<video> record(char const type[4]) = 0;\n};\n}	code	txt	2024-07-28 09:51:50.280789	27
 2367	714	With builder pattern, we can build a product one component at a time.	text	txt	2024-07-28 09:51:50.566394	1
-2368	715	@startuml\nabstract practice {\n    # question(): string\n    # answer(): string\n    # origins(): string[]\n    # references(): string[]\n    # hash(): string\n}	text	txt	2024-07-28 09:51:52.425012	1
-2369	715	class markdown_practice {\n    - question: string\n    - answer: string\n    - origins: string[]\n    - references: string[]\n    - id: hash\n    # question(): string\n    # answer(): string\n    # origins(): string[]\n    # references(): string[]\n    # hash(): string\n}	text	txt	2024-07-28 09:51:52.446045	2
-2370	715	practice <|-- markdown_practice	text	txt	2024-07-28 09:51:52.468118	3
-2371	715	class html_practice {\n    - question: string\n    - answer: string\n    - origins: string[]\n    - references: string[]\n    - id: hash\n    # question(): string\n    # answer(): string\n    # origins(): string[]\n    # references(): string[]\n    # hash(): string\n}	text	txt	2024-07-28 09:51:52.491088	4
-2372	715	practice <|-- html_practice	text	txt	2024-07-28 09:51:52.512804	5
-2373	715	abstract builder {\n    # create_title(string): void\n    # write_answer(string): void\n    # list_origins(string[]): void\n    # list_references(string[]): void\n    # get_practice(): practice*\n}	text	txt	2024-07-28 09:51:52.534512	6
-2374	715	practice ..right..> builder	text	txt	2024-07-28 09:51:52.556282	7
-2375	715	class markdown_builder {\n    # create_title(string): void\n    # write_answer(string): void\n    # list_origins(string[]): void\n    # list_references(string[]): void\n    # get_practice(): markdown_practice*\n}	text	txt	2024-07-28 09:51:52.578732	8
-2376	715	builder <|-- markdown_builder	text	txt	2024-07-28 09:51:52.599022	9
-2377	715	class html_builder {\n    # create_title(string): void\n    # write_answer(string): void\n    # list_origins(string[]): void\n    # list_references(string[]): void\n    # get_practice(): html_practice*\n}	text	txt	2024-07-28 09:51:52.618464	10
-2378	715	builder <|-- html_builder	text	txt	2024-07-28 09:51:52.638743	11
-2379	715	class director {\n    + html_practice(): html_practice*\n    + markdown_practice(): markdown_practice*\n}	text	txt	2024-07-28 09:51:52.660378	12
-2380	715	markdown_builder ..> director\nhtml_builder ..> director\n@enduml	code	txt	2024-07-28 09:51:52.680854	13
 2381	716	**Redundant Array of Independent Drives** is a mechanism in which multiple\ndisks are combined for more reliablity and speed.	text	txt	2024-07-28 09:51:53.014757	1
 2382	717	**RAID 0**\n**RAID 1**\n**RAID 3**	text	txt	2024-07-28 09:51:53.37869	1
+2338	712	@startuml\nabstract Product {\n}\nconcrete ProductVariation1 {\n}\nconcrete ProductVariation2 {\n}\nabstract Creator {\n}\nconcrete ConcreteCreator {\n    + getProduct(): Product\n}\n@enduml	code	plantuml	2024-07-28 09:51:46.893279	2
 2383	717	Similar to RAID 5 but with parities on only one drive.	text	txt	2024-07-28 09:51:53.39894	2
 2384	718	**RAID 4**\n**RAID 5**\n**RAID 6**\n**RAID 10**	text	txt	2024-07-28 09:51:53.678645	1
 2385	718	mdadm --create --verbose /dev/md0 --level 5 --raid-devices 3 /dev/sda /dev/sdb /dev/sdc	code	txt	2024-07-28 09:51:53.697893	2
@@ -18673,6 +17709,7 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 2528	791	docker container run --interactive --tty --restart unless-stopped ubuntu /usr/bin	code	txt	2024-07-28 09:52:19.573171	2
 2529	792	The `on-failure` policy will restart a container if it exits with a non-zero\nexit code. It will also restart containers when the Docker daemon restarts,\neven containers that were in the `stopped` state.	text	txt	2024-07-28 09:52:19.949808	1
 2530	792	docker container run --interactive --tty --restart on-failure ubuntu /usr/bin	code	txt	2024-07-28 09:52:19.970826	2
+3742	1183	    mov rax, NR_create\n    mov rsi, S_IRUSR | S_IWUSR\n    syscall	text	txt	2024-07-28 09:55:38.160844	4
 2531	793	Lists all containers in the running (UP) state. If you add the `-a` flag you\nwill also see containers in the stopped (Exited) state.	text	txt	2024-07-28 09:52:20.383077	1
 2532	793	docker container list --all	code	txt	2024-07-28 09:52:20.40359	2
 2533	794	FROM alpine\nLABEL maintainer="maintainer@domain.tld"\nLABEL description="Web service"\nLABEL version="0.1"	code	txt	2024-07-28 09:52:20.795367	1
@@ -18712,6 +17749,8 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 2565	810	Swarm implements a form of active-passive multi-manager high availability\nmechanism. This means that although you have multiple *managers*, only one of\nthem is *active* at any given moment. This active *manager* is called the\n*leader*, and is the only *manager* that will ever issue live commands\nagainst the *swarm*. So, it's only ever the *leader* that changes the config,\nor issues tasks to workers. If a *follower manager* (passive) receives\ncommands for the swarm, it proxies them across the *leader*.	text	txt	2024-07-28 09:52:26.673299	1
 2566	811	1. Deploy an odd number of managers.\n2. Don't deploy too many managers (3 or 5 is recommended)	text	txt	2024-07-28 09:52:27.150177	1
 2567	811	Having an odd number of *managers* reduced the chance of split-brain\ncondition. For example, if you had 4 *managers* and the network partitioned,\nyou could be left with two managers on each side of the partition. This is\nknown as a split brain, each side knows there used to be 4 but can now only\nsee 2. But crucially, neither side has any way of knowing if the other are\nstill alive and whether it holds a majority (quorum). A swarm cluster\ncontinues to operate during split-brain condition, but you are no longer able\nto alter the configuration, or add and manage application workloads. However,\nif you have 3 or 5 managers and the same network partition occurs, it is\nimpossible to have an equal number of managers on both sides of the parition,\nthen one side achieves quorum and full cluster management services remain\navailable.	text	txt	2024-07-28 09:52:27.173761	2
+3743	1183	    leave\n    ret	code	txt	2024-07-28 09:55:38.182003	5
+3744	1183	section .data\n    CREATE equ 1            ; use for conditional assembly\n    NR_create equ 85        ; create system call	text	txt	2024-07-28 09:55:38.203265	6
 2568	812	Restarting an old manager or restoring an old backup has the potential to\ncompromise the cluster. Old managers re-joining a swarm automatically decrypt\nand gain access to the Raft log time-series database, this can pose security\nconcerns. Restoring old backups can also wipe the current swarm\nconfiguration.	text	txt	2024-07-28 09:52:27.538768	1
 2569	812	To prevent situations like these, Docker allows to lock a swarm with the\nAutolock feature. This forces restarted managers to present the cluster\nunlock key before being admitted back into the cluster.	text	txt	2024-07-28 09:52:27.559701	2
 2570	813	To apply a lock directly to a new swarm:	text	txt	2024-07-28 09:52:27.991235	1
@@ -18816,10 +17855,6 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 2668	856	Running service can be found in cluster by following command:	text	txt	2024-07-28 09:52:44.639646	3
 2669	856	docker service ps my-service	code	txt	2024-07-28 09:52:44.661076	4
 2670	857	Assuming an application running on two nodes of a cluster and both have write\naccess to the shared volume.	text	txt	2024-07-28 09:52:45.153925	1
-2714	886	The `post()` function requests the service to run its works after queueing up\nall the work. So it does not run the works immediately.	text	txt	2024-07-28 09:52:55.507289	1
-2715	886	Any thread calling `io_service::run()` function will block execution and wait\nfor tasks to be enqueued, or finish existing tasks. Best practice is to attach\n`io_service` to slave threads so that they wait for tasks to be given and\nexecute them while master threads assign new tasks to them.	text	txt	2024-07-28 09:52:55.528797	2
-2716	886	#include <thread>\n#include <chrono>\n#include <functional>\n#include <boost/asio.hpp>	text	txt	2024-07-28 09:52:55.550048	3
-2717	886	void finish_tasks(boost::asio::io_service& service)\n{\n    service.run();\n}	text	txt	2024-07-28 09:52:55.570467	4
 3152	1036	MODULE_INFO(tag, info);	code	txt	2024-07-28 09:54:11.436843	1
 3656	1168	section .text\n    ...	code	txt	2024-07-28 09:55:25.36245	3
 3657	1168	*main.nasm*>\nextern pi	text	txt	2024-07-28 09:55:25.382183	4
@@ -18864,112 +17899,15 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 2704	881	gdb ./program\n(gdb) set remote exec-file ./program\n(gdb) set sysroot /\n(gdb) target extended-remote | vgdb --multi --vargs -q\n(gdb) start\n(gdb) help valgrind\n(gdb) help memcheck\n(gdb) help helgrind	code	txt	2024-07-28 09:52:52.666568	1
 2705	882	The I/O service is a channel that is used to access operating system\nresources and establish communication between our program and the operating\nsystem that performs I/O requests.	text	txt	2024-07-28 09:52:52.960134	1
 2706	883	The I/O object has the role of submitting I/O requests. For instance, the\n`tcp::socket` object will provide a socket programming request from our\nprogram to the operating system.	text	txt	2024-07-28 09:52:53.245876	1
-2707	884	Running the `io_service` object's event processing loop will block the\nexecution of the thread and will run ready handlers until there are no more\nready handlers remaining or until the `io_service` object has been stopped.	text	txt	2024-07-28 09:52:53.944094	1
-2708	884	#include <iostream>\n#include <boost/asio.hpp>	text	txt	2024-07-28 09:52:53.964368	2
-2709	884	int main()\n{\n    boost::asio::io_service service;\n    boost::asio::io_service::work work{service};\n    service.run();\n    // will not be reached: blocking service\n}	code	txt	2024-07-28 09:52:53.98535	3
-2710	884	The `boost::asio::io_service::work` class is responsible for telling the\n`io_service` object when the work starts and when it has finished. It will\nmake sure that the `io_service::run()` function will not exit during the time\nthe work is underway. Also, it will make sure that the `io_service::run()`\nfunction exits when there is no unfinished work remaining.	text	txt	2024-07-28 09:52:54.006925	4
+2726	888	Strand is a class in the <code>io_service</code> object that provides handler\nexecution serialization. It can be used to ensure the work we have will be\nexecuted serially.	text	txt	2024-07-28 09:52:57.595848	1
+2731	888	The `boost::asio::io_context::strand::wrap()` function creates a new handler\nfunction object that will automatically pass the wrapped handler to the strand\nobject's dispatch function when it is called.	text	txt	2024-07-28 09:52:57.698388	3
 2711	885	The `poll()` function will run the `io_service` object's event processing loop\nwithout blocking the execution of the thread. This will run the handlers until\nthere are no more ready handlers remaining or until the `io_service` object\nhas been stopped.	text	txt	2024-07-28 09:52:54.576944	1
-2712	885	#include <iostream>\n#include <boost/asio.hpp>	text	txt	2024-07-28 09:52:54.597406	2
-2713	885	int main()\n{\n    boost::asio::io_service service;\n    boost::asio::io_service::work work{service};\n    service.poll();\n    // will be reached: non-blocking service\n}	code	txt	2024-07-28 09:52:54.619393	3
-2718	886	void some_work(std::size_t s)\n{\n    std::this_thread::sleep_for(std::chrono::seconds(s));\n}	text	txt	2024-07-28 09:52:55.59311	5
-2719	886	int main()\n{\n    boost::asio::io_service service;\n    std::thread worker{finish_tasks, std::ref(service)};\n    service.post(std::bind(some_work, 2));\n    worker.join();\n}	code	txt	2024-07-28 09:52:55.61417	6
 2720	887	The `dispatch()` function requests the service to run its works right away\nwithout queueing up.	text	txt	2024-07-28 09:52:56.557112	1
 2721	887	The `dispatch()` function can be invoked from the current worker thread, while\nthe `post()` function has to wait until the handler of the worker is complete\nbefore it can be invoked. In other words, the `dispatch()` function's events\ncan be executed from the current worker thread even if there are other pending\nevents queued up, while the `post()` function's events have to wait until the\nhandler completes the execution before being allowed to be executed.	text	txt	2024-07-28 09:52:56.577591	2
-2722	887	#include <thread>\n#include <chrono>\n#include <functional>\n#include <boost/asio.hpp>	text	txt	2024-07-28 09:52:56.597561	3
-2723	887	void some_work(std::size_t s)\n{\n    std::this_thread::sleep_for(std::chrono::seconds(s));\n}	text	txt	2024-07-28 09:52:56.61807	4
-2724	887	void finish_tasks(boost::asio::io_service& service)\n{\n    service.run();\n}	text	txt	2024-07-28 09:52:56.638279	5
-2725	887	int main()\n{\n    boost::asio::io_service service;\n    std::thread worker{finish_tasks, std::ref(service)};\n    boost::asio::dispatch(service, std::bind(some_work, 2));\n    worker.join();\n    service.stop();\n}	code	txt	2024-07-28 09:52:56.658485	6
-2726	888	Strand is a class in the <code>io_service</code> object that provides handler\nexecution serialization. It can be used to ensure the work we have will be\nexecuted serially.	text	txt	2024-07-28 09:52:57.595848	1
-2727	888	#include <thread>\n#include <chrono>\n#include <functional>\n#include <boost/asio.hpp>	text	txt	2024-07-28 09:52:57.615943	2
-2728	888	void some_work(std::size_t s)\n{\n    std::this_thread::sleep_for(std::chrono::seconds(s));\n}	text	txt	2024-07-28 09:52:57.636771	3
-2729	888	void finish_tasks(boost::asio::io_service& service)\n{\n    service.run();\n}	text	txt	2024-07-28 09:52:57.656721	4
-2730	888	int main()\n{\n    boost::asio::io_context service;\n    boost::asio::io_context::strand strand{service};\n    std::thread worker{finish_tasks, std::ref(service)};\n    strand.post(std::bind(some_work, 2));\n    service.post(strand.wrap(std::bind(some_work, 2)));\n    worker.join();\n    service.stop();\n}	code	txt	2024-07-28 09:52:57.678062	5
-2731	888	The `boost::asio::io_context::strand::wrap()` function creates a new handler\nfunction object that will automatically pass the wrapped handler to the strand\nobject's dispatch function when it is called.	text	txt	2024-07-28 09:52:57.698388	6
-2732	889	#include <thread>\n#include <mutex>\n#include <iostream>\n#include <exception>\n#include <boost/asio.hpp>	text	txt	2024-07-28 09:52:58.66555	1
-2733	889	std::mutex ostream_lock;	text	txt	2024-07-28 09:52:58.685142	2
-2734	889	void some_work()\n{\n    throw std::runtime_error("i/o failure");\n}	text	txt	2024-07-28 09:52:58.704992	3
-2735	889	void finish_tasks(boost::asio::io_service& service)\n{\n    try\n    {\n        service.run();\n    }\n    catch (std::runtime_error const& exp)\n    {\n        std::lock_guard<std::mutex> lock{ostream_lock};\n        std::cerr << exp.what() << "\\\\n";\n    }\n}	text	txt	2024-07-28 09:52:58.72587	4
-2736	889	int main()\n{\n    boost::asio::io_context service;\n    std::thread worker{finish_tasks, std::ref(service)};\n    service.post(some_work);\n    service.post(some_work); // no more io context to dispatch\n    worker.join();\n    service.stop();\n}	code	txt	2024-07-28 09:52:58.747873	5
-2737	890	#include <thread>\n#include <chrono>\n#include <boost/asio.hpp>	text	txt	2024-07-28 09:52:59.644094	1
-2738	890	void some_work()\n{\n    std::this_thread::sleep_for(std::chrono::seconds(2));\n}	text	txt	2024-07-28 09:52:59.664329	2
-2739	890	void finish_tasks(boost::asio::io_service& service)\n{\n    service.run();\n}	text	txt	2024-07-28 09:52:59.684397	3
-2740	890	void timer_handler(boost::system::error_code const&)\n{\n}	text	txt	2024-07-28 09:52:59.705632	4
-2741	890	int main()\n{\n    boost::asio::io_context service;\n    boost::asio::io_context::strand strand{service};\n    std::thread worker{finish_tasks, std::ref(service)};\n    service.post(some_work);	text	txt	2024-07-28 09:52:59.726571	5
-2742	890	    boost::asio::deadline_timer timer{service};\n    timer.expires_from_now(boost::posix_time::seconds(1));\n    timer.async_wait(strand.wrap(timer_handler));	text	txt	2024-07-28 09:52:59.748355	6
-2743	890	    worker.join();\n    service.stop();\n}	code	txt	2024-07-28 09:52:59.769233	7
-2744	891	#include <iostream>\n#include <thread>\n#include <chrono>\n#include <string>\n#include <boost/asio.hpp>	text	txt	2024-07-28 09:53:00.86916	1
-2745	891	void initialize_service(boost::asio::io_context& service)\n{\n    service.run();\n}	text	txt	2024-07-28 09:53:00.890811	2
-2746	891	int main()\n{\n    boost::asio::io_context service;\n    boost::asio::io_context::strand strand{service};	text	txt	2024-07-28 09:53:00.912153	3
-2747	891	    std::thread worker{initialize_service, std::ref(service)};\n    boost::asio::ip::tcp::socket socket{service};	text	txt	2024-07-28 09:53:00.933005	4
-2748	891	    try\n    {\n        boost::asio::ip::tcp::resolver resolver{service};\n        boost::asio::ip::tcp::resolver::query query{"example.com", std::to_string(80)};\n        boost::asio::ip::tcp::resolver::iterator iterator = resolver.resolve(query);\n        boost::asio::ip::tcp::endpoint endpoint = *iterator;	text	txt	2024-07-28 09:53:00.956347	5
-2749	891	        socket.connect(endpoint);\n        socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);\n        socket.close();\n    }\n    catch (std::exception const& exp)\n    {\n        std::cerr << exp.what() << std::endl;\n    }	text	txt	2024-07-28 09:53:00.978674	6
-2750	891	    worker.join();\n    service.stop();\n}	code	txt	2024-07-28 09:53:00.999116	7
-2751	892	#include <iostream>\n#include <thread>\n#include <string>\n#include <functional>\n#include <boost/asio.hpp>	text	txt	2024-07-28 09:53:02.281273	1
-2752	892	static constexpr auto port{8888};\nstatic constexpr auto address{"127.0.0.1"};	text	txt	2024-07-28 09:53:02.302163	2
-2753	892	void connection_worker(boost::asio::io_context& context)\n{\n    context.run();\n}	text	txt	2024-07-28 09:53:02.322279	3
-2754	892	int main()\n{\n    boost::asio::io_context context{};\n    boost::asio::io_context::strand strand{context};\n    boost::asio::ip::tcp::socket socket{context};\n    boost::asio::ip::tcp::resolver resolver{context};\n    boost::asio::ip::tcp::acceptor acceptor{context};	text	txt	2024-07-28 09:53:02.342698	4
-2755	892	    std::thread worker(connection_worker, std::ref(context));	text	txt	2024-07-28 09:53:02.36387	5
-2756	892	    boost::asio::ip::tcp::resolver::query query{address, std::to_string(port)};\n    boost::asio::ip::tcp::resolver::iterator iterator{resolver.resolve(query)};\n    boost::asio::ip::tcp::endpoint endpoint{*iterator};	text	txt	2024-07-28 09:53:02.384892	6
-2757	892	    acceptor.open(endpoint.protocol());\n    acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));\n    acceptor.bind(endpoint);\n    acceptor.listen(boost::asio::socket_base::max_connections);	text	txt	2024-07-28 09:53:02.406238	7
-2758	892	    boost::asio::ip::address local_addr{endpoint.address()};\n    boost::asio::ip::port_type local_port{port};\n    std::clog << "listening " << local_addr << ":" << local_port << std::endl;	text	txt	2024-07-28 09:53:02.426869	8
-2759	892	    acceptor.accept(socket);	text	txt	2024-07-28 09:53:02.447302	9
-2760	892	    boost::asio::ip::tcp::endpoint client{socket.remote_endpoint()};\n    boost::asio::ip::address client_addr{client.address()};\n    boost::asio::ip::port_type client_port{client.port()};\n    std::clog << "client " << client_addr << ":" << client_port << std::endl;	text	txt	2024-07-28 09:53:02.468127	10
-2761	892	    acceptor.close();\n    socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);\n    socket.close();\n    context.stop();\n    worker.join();\n}	code	txt	2024-07-28 09:53:02.488754	11
 2762	893		code	txt	2024-07-28 09:53:02.731008	1
 2763	894		code	txt	2024-07-28 09:53:02.945519	1
-2764	895	#include <thread>\n#include <string>\n#include <boost/asio.hpp>	text	txt	2024-07-28 09:53:03.815209	1
-2765	895	void initialize_service(boost::asio::io_context& service)\n{\n    service.run();\n}	text	txt	2024-07-28 09:53:03.835594	2
-2766	895	int main()\n{\n    boost::asio::io_context service;\n    boost::asio::io_context::strand strand{service};	text	txt	2024-07-28 09:53:03.856003	3
-2767	895	    std::thread worker{initialize_service, std::ref(service)};	text	txt	2024-07-28 09:53:03.877764	4
-2768	895	    boost::asio::ip::tcp::socket socket{service};\n    boost::asio::ip::tcp::resolver resolver{service};\n    boost::asio::ip::tcp::resolver::query query{"127.0.0.1", std::to_string(9090)};\n    boost::asio::ip::tcp::resolver::iterator iterator = resolver.resolve(query);\n    boost::asio::ip::tcp::endpoint endpoint = *iterator;	text	txt	2024-07-28 09:53:03.900019	5
-2769	895	    socket.connect(endpoint);\n    socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);\n    socket.close();	text	txt	2024-07-28 09:53:03.921209	6
-2770	895	    worker.join();\n    service.stop();\n}	code	txt	2024-07-28 09:53:03.941867	7
-2771	896	#include <thread>\n#include <iostream>\n#include <functional>\n#include <boost/asio.hpp>	text	txt	2024-07-28 09:53:04.921908	1
-2772	896	void connection_worker(boost::asio::io_context& context)\n{\n    context.run();\n}	text	txt	2024-07-28 09:53:04.942401	2
-2773	896	void on_connect(boost::asio::ip::tcp::endpoint const& endpoint)\n{\n    std::cout << "connected to " << endpoint.address().to_string() << std::endl;\n}	text	txt	2024-07-28 09:53:04.962424	3
-2774	896	int main()\n{\n    boost::asio::io_context context{};\n    boost::asio::io_context::strand strand{context};\n    std::thread worker{connection_worker, std::ref(context)};	text	txt	2024-07-28 09:53:04.984167	4
-2775	896	    boost::asio::ip::tcp::socket socket{context};\n    boost::asio::ip::tcp::resolver resolver{context};	text	txt	2024-07-28 09:53:05.004417	5
-2776	896	    boost::asio::ip::tcp::resolver::query query{"127.0.0.1", "9000"};\n    boost::asio::ip::tcp::resolver::iterator endpoints = resolver.resolve(query);	text	txt	2024-07-28 09:53:05.025668	6
-2777	896	    boost::asio::ip::tcp::endpoint endpoint = *endpoints;\n    socket.async_connect(endpoint, std::bind(on_connect, std::ref(endpoint)));	text	txt	2024-07-28 09:53:05.047992	7
-2778	896	    socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);\n    socket.close();\n    worker.join();\n    context.stop();\n}	code	txt	2024-07-28 09:53:05.069141	8
-2779	897	#include <iostream>\n#include <memory>\n#include <thread>\n#include <string>\n#include <functional>\n#include <boost/asio.hpp>	text	txt	2024-07-28 09:53:06.467595	1
-2780	897	static constexpr auto port{8888};\nstatic constexpr auto address{"127.0.0.1"};	text	txt	2024-07-28 09:53:06.489296	2
-2781	897	void connection_worker(boost::asio::io_context& context)\n{\n    context.run();\n}	text	txt	2024-07-28 09:53:06.509451	3
-2782	897	void on_accept(boost::asio::ip::tcp::socket& socket, std::shared_ptr<boost::asio::io_context::work> work)\n{\n    boost::asio::ip::tcp::endpoint client{socket.remote_endpoint()};\n    boost::asio::ip::address client_addr{client.address()};\n    boost::asio::ip::port_type client_port{client.port()};\n    std::clog << "client " << client_addr << ":" << client_port << std::endl;	text	txt	2024-07-28 09:53:06.53003	4
-2783	897	    socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);\n    socket.close();\n    work.reset();\n}	text	txt	2024-07-28 09:53:06.550551	5
-2784	897	int main()\n{\n    boost::asio::io_context context{};\n    boost::asio::io_context::strand strand{context};\n    auto work{std::make_shared<boost::asio::io_context::work>(context)};\n    boost::asio::ip::tcp::socket socket{context};\n    boost::asio::ip::tcp::resolver resolver{context};\n    boost::asio::ip::tcp::acceptor acceptor{context};	text	txt	2024-07-28 09:53:06.573768	6
-2785	897	    std::thread worker(connection_worker, std::ref(context));	text	txt	2024-07-28 09:53:06.594461	7
-2786	897	    boost::asio::ip::tcp::resolver::query query{address, std::to_string(port)};\n    boost::asio::ip::tcp::resolver::iterator iterator{resolver.resolve(query)};\n    boost::asio::ip::tcp::endpoint endpoint{*iterator};	text	txt	2024-07-28 09:53:06.615013	8
-2787	897	    acceptor.open(endpoint.protocol());\n    acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));\n    acceptor.bind(endpoint);\n    acceptor.listen(boost::asio::socket_base::max_connections);	text	txt	2024-07-28 09:53:06.636164	9
-2788	897	    boost::asio::ip::address local_addr{endpoint.address()};\n    boost::asio::ip::port_type local_port{port};\n    std::clog << "listening " << local_addr << ":" << local_port << std::endl;	text	txt	2024-07-28 09:53:06.657291	10
-2789	897	    acceptor.async_accept(socket, std::bind(on_accept, std::ref(socket), std::move(work)));	text	txt	2024-07-28 09:53:06.677659	11
-2790	897	    worker.join();\n    acceptor.close();\n    context.stop();\n}	code	txt	2024-07-28 09:53:06.697825	12
-2791	898	#include <iostream>\n#include <algorithm>\n#include <numeric>\n#include <memory>\n#include <thread>\n#include <string>\n#include <vector>\n#include <list>\n#include <functional>\n#include <boost/asio.hpp>	text	txt	2024-07-28 09:53:09.523628	1
-2792	898	static constexpr auto port{8888};\nstatic constexpr auto address{"127.0.0.1"};	text	txt	2024-07-28 09:53:09.545286	2
-2793	898	std::vector<std::uint8_t> receive_buffer(4096);\nstd::size_t receive_buffer_index{};\nstd::list<std::vector<std::uint8_t>> send_buffer;	text	txt	2024-07-28 09:53:09.565822	3
-2794	898	void connection_worker(boost::asio::io_context&);\nvoid on_send(boost::asio::ip::tcp::socket&, std::list<std::vector<std::uint8_t>>::iterator);\nvoid send(boost::asio::ip::tcp::socket&, void const*, std::size_t);\nvoid on_receive(boost::asio::ip::tcp::socket&, std::size_t);\nvoid receive(boost::asio::ip::tcp::socket&);\nvoid on_accept(boost::asio::ip::tcp::socket&, std::shared_ptr<boost::asio::io_context::work>);	text	txt	2024-07-28 09:53:09.586983	4
-2795	898	void connection_worker(boost::asio::io_context& context)\n{\n    context.run();\n}	text	txt	2024-07-28 09:53:09.606618	5
-2796	898	void on_send(boost::asio::ip::tcp::socket& socket, std::list<std::vector<std::uint8_t>>::iterator node)\n{\n    send_buffer.erase(node);	text	txt	2024-07-28 09:53:09.627245	6
 2831	904	If these variables are not specified, the native host machine is going to be\ntargeted.	text	txt	2024-07-28 09:53:13.175479	3
 2832	904	make help	code	txt	2024-07-28 09:53:13.195794	4
-2797	898	    if (!send_buffer.empty())\n    {\n        boost::asio::async_write(\n            socket,\n            boost::asio::buffer(send_buffer.front()),\n            std::bind(on_send, boost::asio::placeholders::error, send_buffer.begin())\n        );\n    }\n}	text	txt	2024-07-28 09:53:09.647757	7
-2798	898	void send(boost::asio::ip::tcp::socket& socket, void const* buffer, std::size_t length)\n{\n    std::vector<std::uint8_t> output;\n    std::copy((std::uint8_t const*)buffer, (std::uint8_t const*)buffer + length, std::back_inserter(output));	text	txt	2024-07-28 09:53:09.669113	8
-2799	898	    send_buffer.push_back(output);	text	txt	2024-07-28 09:53:09.688649	9
-2800	898	    boost::asio::async_write(\n        socket,\n        boost::asio::buffer(send_buffer.front()),\n        std::bind(on_send, boost::asio::placeholders::error, send_buffer.begin())\n    );\n}	text	txt	2024-07-28 09:53:09.709838	10
-2801	898	void on_receive(boost::asio::ip::tcp::socket& socket, std::size_t bytes_transferred)\n{\n    receive_buffer_index += bytes_transferred;	text	txt	2024-07-28 09:53:09.730807	11
-2802	898	    for (std::size_t index{}; index < receive_buffer_index; ++index)\n    {\n        std::cout << (char)receive_buffer[index] << " ";\n    }\n    std::cout << std::endl;\n    receive_buffer_index = 0;	text	txt	2024-07-28 09:53:09.752677	12
-2803	898	    receive(socket);\n}	text	txt	2024-07-28 09:53:09.775188	13
-2804	898	void receive(boost::asio::ip::tcp::socket& socket)\n{\n    socket.async_read_some(\n        boost::asio::buffer(\n            &receive_buffer[receive_buffer_index],\n            receive_buffer.size() - receive_buffer_index\n        ),\n        std::bind(on_receive, std::ref(socket), 1)\n    );\n}	text	txt	2024-07-28 09:53:09.797311	14
-2805	898	void on_accept(boost::asio::ip::tcp::socket& socket, std::shared_ptr<boost::asio::io_context::work> work)\n{\n    boost::asio::ip::tcp::endpoint client{socket.remote_endpoint()};\n    boost::asio::ip::address client_addr{client.address()};\n    boost::asio::ip::port_type client_port{client.port()};\n    std::clog << "client " << client_addr << ":" << client_port << std::endl;	text	txt	2024-07-28 09:53:09.819022	15
-2806	898	    send(socket, "payload", 7);\n    receive(socket);	text	txt	2024-07-28 09:53:09.840738	16
-2807	898	    socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);\n    socket.close();\n    work.reset();\n}	text	txt	2024-07-28 09:53:09.862384	17
-2808	898	int main()\n{\n    boost::asio::io_context context{};\n    boost::asio::io_context::strand strand{context};\n    auto work{std::make_shared<boost::asio::io_context::work>(context)};\n    boost::asio::ip::tcp::socket socket{context};\n    boost::asio::ip::tcp::resolver resolver{context};\n    boost::asio::ip::tcp::acceptor acceptor{context};	text	txt	2024-07-28 09:53:09.883762	18
-2809	898	    std::thread worker(connection_worker, std::ref(context));	text	txt	2024-07-28 09:53:09.904536	19
-2810	898	    boost::asio::ip::tcp::resolver::query query{address, std::to_string(port)};\n    boost::asio::ip::tcp::resolver::iterator iterator{resolver.resolve(query)};\n    boost::asio::ip::tcp::endpoint endpoint{*iterator};	text	txt	2024-07-28 09:53:09.926971	20
-2811	898	    acceptor.open(endpoint.protocol());\n    acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));\n    acceptor.bind(endpoint);\n    acceptor.listen(boost::asio::socket_base::max_connections);	text	txt	2024-07-28 09:53:09.947719	21
-2812	898	    boost::asio::ip::address local_addr{endpoint.address()};\n    boost::asio::ip::port_type local_port{port};\n    std::clog << "listening " << local_addr << ":" << local_port << std::endl;	text	txt	2024-07-28 09:53:09.969333	22
-2813	898	    acceptor.async_accept(socket, std::bind(on_accept, std::ref(socket), std::move(work)));	text	txt	2024-07-28 09:53:09.989011	23
-2814	898	    worker.join();\n    acceptor.close();\n    context.stop();\n}	code	txt	2024-07-28 09:53:10.009872	24
 2815	899	Follow up overviews of each kernel release on **KernelNewbies** to see changes.	text	txt	2024-07-28 09:53:10.294082	1
 2816	900	The source can be downloaded as an archive but without any git history:	text	txt	2024-07-28 09:53:10.932494	1
 2817	900	wget https://cdn.kernel.org - https://cdn.kernel.org/pub/linux/kernel/v5.4/linux-v5.4.tar.xz	code	txt	2024-07-28 09:53:10.952572	2
@@ -19068,6 +18006,12 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 2910	941	`make` can leverage the host's CPU performance by running multiple jobs in\nparallel:	text	txt	2024-07-28 09:53:26.389348	1
 2911	941	make -j8	code	txt	2024-07-28 09:53:26.409722	2
 2912	942	make -j $(($(nproc)/2)) ARCH=arm CROSS_COMPILE=arm-rpi-linux-gnueabihf- V=1 zImage	code	txt	2024-07-28 09:53:26.678246	1
+3745	1183	section .text\n    global create	text	txt	2024-07-28 09:55:38.224127	7
+3746	1183	; \\\\pre rdi file descriptor\n; \\\\post rax error code\ncreate:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:55:38.244762	8
+3747	1183	    mov rax, NR_create\n    mov rsi, S_IRUSR | S_IWUSR\n    syscall	text	txt	2024-07-28 09:55:38.264129	9
+3748	1183	    leave\n    ret	code	txt	2024-07-28 09:55:38.284275	10
+3749	1183	extern create\nextern close	text	txt	2024-07-28 09:55:38.304427	11
+3750	1183	section .text\n    global main	text	txt	2024-07-28 09:55:38.326061	12
 2913	944	- `arch/$ARCH/boot`: the directory containing vmlinux image converted for\n  bootloaders.\n- `arch/$ARCH/boot/Image`: An uncompressed kernel image that can be booted.\n- `arch/$ARCH/boot/*Image*`: A compressed kernel image that can also be\n  booted.\n- `arch/$ARCH/boot/dts/*.dtb`: Provides compiled device tree blobs for the\n  selected CPU variant.\n- `vmlinux`: A raw, uncompressed, and unstripped kernel image in ELF format\n  suited for debugging by `kgdb` but generally not used for booting purposes.\n- `zImage`: compressed version of `Image`.\n- `uImage`: `zImage` plus a 64-byte U-Boot header.\n- `System.map`: the symbol table in a human-readable form.	text	txt	2024-07-28 09:53:27.454525	1
 2914	944	mkimage --help\nmkimage -A arm -O linux -T kernel -C gzip -a 0x80008000 0e 0x80008000 -n 'Linux' -d zImage uImage	code	txt	2024-07-28 09:53:27.476275	2
 2915	945	Raspberry Pi is a little different here. So prebuilt binaries or patched\nsources are preferred:	text	txt	2024-07-28 09:53:28.863149	1
@@ -19145,6 +18089,8 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 2995	977	module_init(sample_module);\nmodule_exit(sample_cleanup);\nMODULE_LICENSE("GPL");	code	txt	2024-07-28 09:53:41.689847	6
 2996	978	* https://github.com - https://github.com/devicetree-org/devicetree-specification/releases	text	txt	2024-07-28 09:53:41.915632	1
 2997	979	- Device tree begins with a root node.\n- **reg** property referes to a range of units in a register space.	text	txt	2024-07-28 09:53:42.646056	1
+3751	1183	main:\n    section .data\n        fd dq 0                 ; to hold file descriptor	text	txt	2024-07-28 09:55:38.346885	13
+3752	1183	    section .text\n        push rbp\n        mov rbp, rsp	text	txt	2024-07-28 09:55:38.368273	14
 2998	979	/dts-v1/;\n/{\n    model = "TI AM335x BeagleBone";\n    compatible = "ti,am33xx";\n    #address-cells = <1>;\n    #size-cells = <1>;\n    cpus {\n        #address-cells = <1>;\n        #size-cells = <0>;\n        cpu@0 {\n            compatible = "arm,cortex-a8";\n            device_type = "cpu";\n            reg = <0>;\n        };\n    };\n    memory@80000000 {\n        device_type = "memory";\n        reg = <0x80000000 0x20000000>; /* 512 MB */\n    };\n};	code	txt	2024-07-28 09:53:42.668424	2
 2999	980	- Labels used can be expressed in connections to reference to a node.\n- Labels are also referred to as **phandles**.\n- **interrupt-controller** property identifies not as interrupt controller.\n- **interrupt-parrent** property references the interrupt controller.	text	txt	2024-07-28 09:53:43.355763	1
 3000	980	/dts-v1/;\n{\n    intc: interrupt-controller@48200000 {\n        compatible = "ti,am33xx-intc";\n        interrupt-controller;\n        #interrupt-cells = <1>;\n        reg = <0x48200000 0x1000>;\n    };\n    lcdc: lcdc@48200000 {\n        compatible = "ti,am33xx-tilcdc";\n        reg = <0x4830e000 0x1000>;\n        interrupt-parent = <&intc>;\n        interrupts = <36>;\n        ti,hwmods = "lcdc";\n        status = "disabled";\n    };\n};	code	txt	2024-07-28 09:53:43.37679	2
@@ -19213,6 +18159,7 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 3063	1004	static DEFINE_SPINLOCK(my_spinlock);	code	txt	2024-07-28 09:53:55.954014	2
 3064	1004	This macro is defined in `include/linux/spinlock_types.h`.	text	txt	2024-07-28 09:53:55.974623	3
 3065	1004	For dynamic (runtime) allocation, it's better to embed the spinlock into a\nbigger structure, allocating memory for this structure and then calling\n`spin_lock_init()` on the spinlock element:	text	txt	2024-07-28 09:53:55.995885	4
+3753	1183	    %IF CREATE\n        mov rdi, filename\n        call create\n        mov qword[fd], rax      ; save file descriptor\n    %ENDIF	text	txt	2024-07-28 09:55:38.389003	15
 3066	1004	struct bigger_struct {\n    spinlock_t lock;\n    unsigned int foo;\n    [...]\n};\nstatic struct bigger_struct *fake_init_function()\n{\n    struct bigger_struct *bs;\n    bs = kmalloc(sizeof(struct bigger_struct), GFP_KERNEL);\n    if (!bs)\n        return -ENOMEM;\n    spin_lock_init(&bs->lock);\n    return bs;\n}	code	txt	2024-07-28 09:53:56.017358	5
 3067	1005	We can lock/unlock the spinlock using `spin_lock()` and `spin_unlock()`\ninline functions, both defined in `include/linux/spinlock.h`:	text	txt	2024-07-28 09:53:56.401562	1
 3068	1005	static __always_inline void spin_unlock(spinlock_t *lock);\nstatic __always_inline void spin_lock(spinlock_t *lock);	code	txt	2024-07-28 09:53:56.423695	2
@@ -19280,6 +18227,7 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 3129	1026	wait_event_timeout(&smoe_event, condition, timeout)	code	txt	2024-07-28 09:54:07.437946	2
 3130	1026	Time unit for `timeout` is a jiffy.	text	txt	2024-07-28 09:54:07.458181	3
 3131	1027	This function has two behaviors, depending on the timeout having elapsed or\nnot.	text	txt	2024-07-28 09:54:07.768329	1
+3754	1183	    %IF CLOSE\n        mov rdi, qword[fd]      ; file descriptor\n        call close\n    %ENDIF	code	txt	2024-07-28 09:55:38.409978	16
 3132	1027	- **Timeout elapsed:** the function returns 0 if the condition is evaluated\n  to `false` or 1 if it is evaluated `true`.\n- **Timeout not elapsed yet:** the function returns the remaining time (in\n  jiffies at least 1) if the condition is evaluated to `true`.	text	txt	2024-07-28 09:54:07.788581	2
 3133	1028	After a change on any variable that could affect the result of the wait\nqueue, call the appropriate `wake_up*` family function.	text	txt	2024-07-28 09:54:08.274796	1
 3134	1028	In order to wake up a process sleeping on a wait queue, you should call\neither of the following functions. Whenever you call any of these functions,\nthe condition is re-evaluated again. If the condition is `true` at that time,\nthen a process (or all processes for the `_all()` variant) in the wait queue\nwill be awakened, and its state set to `TASK_RUNNING`; otherwise, nothing\nhappens.	text	txt	2024-07-28 09:54:08.29759	2
@@ -19308,6 +18256,10 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 3160	1041	KERNEL_SRC ?= /lib/modules/$(shell uname -r)/build	text	txt	2024-07-28 09:54:13.524648	2
 3161	1041	all default: modules\ninstall: modules_install	text	txt	2024-07-28 09:54:13.545898	3
 3162	1041	modules modules_install help clean:\n    $(MAKE) -C $(KERNEL_SRC) M=$(shell pwd) $@	code	txt	2024-07-28 09:54:13.566494	4
+3755	1184	section .data\n    CREATE equ 1            ; use for conditional assembly	text	txt	2024-07-28 09:55:39.565712	1
+3756	1184	section .text\n    global create	text	txt	2024-07-28 09:55:39.587005	2
+3757	1184	create:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:55:39.607123	3
+3758	1184	    leave\n    ret	code	txt	2024-07-28 09:55:39.627696	4
 3163	1041	`KERNEL_SRC`: This is the location of the prebuilt kernel source which usually is `/lib/modules/$(uname -r)/build`.\nThere is also a symbolic link `/usr/src/linux` pointing to this directory.\nAs we said earlier, we need a prebuilt kernel in order to build any module.\nIf you have built your kernel from the source, you should set this variable with the absolute path of the built source directory.\n`–C` instructs the make utility to change into the specified directory reading the makefiles.	text	txt	2024-07-28 09:54:13.588716	5
 3164	1041	`M`: This is relevant to the kernel build system.\nThe `Makefile` kernel uses this variable to locate the directory of an external module to build.\nYour `.c` files should be placed in that directory.	text	txt	2024-07-28 09:54:13.609505	6
 3165	1041	`$(MAKE) -C $(KERNEL_SRC) M=$(shell pwd) $@`: This is the rule to be executed for each of the targets enumerated previously.\nUsing this kind of magic word prevents us from writing as many (identical) lines as there are targets.	text	txt	2024-07-28 09:54:13.631019	7
@@ -19391,6 +18343,7 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 3245	1062	err_alloc:\n    return ret;	code	txt	2024-07-28 09:54:24.260452	9
 3246	1062	By using the `goto` statement, we have straight control flow instead of a nest.	text	txt	2024-07-28 09:54:24.279474	10
 3247	1062	That said, you should only use `goto` to move forward in a function, not backward, nor to implement loops (as is the case in an assembler).	text	txt	2024-07-28 09:54:24.299043	11
+3759	1184	extern create\nextern close\nextern write	text	txt	2024-07-28 09:55:39.647875	5
 3248	1063	When it comes to returning an error from functions that are supposed to return a pointer, functions often return the `NULL` pointer.\nIt is functional but it is a quite meaningless approach, since we do not exactly know why this `NULL` pointer is returned.\nFor that purpose, the kernel provides three functions, `ERR_PTR`, `IS_ERR`, and `PTR_ERR`, defined as follows:	text	txt	2024-07-28 09:54:25.423237	1
 3249	1063	void *ERR_PTR(long error);\nlong IS_ERR(const void *ptr);\nlong PTR_ERR(const void *ptr);	code	txt	2024-07-28 09:54:25.44439	2
 3250	1063	* `ERR_PTR`: The first macro returns the error value as a pointer.\n* `IS_ERR`: The second macro is used to check whether the returned value is a pointer error using `if(IS_ERR(foo))`.\n* `PTR_ERR`: The last one returns the actual error code, `return PTR_ERR(foo)`.	text	txt	2024-07-28 09:54:25.467382	3
@@ -19456,6 +18409,7 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 3307	1081	static DEFINE_MUTEX(my_mutex);	code	txt	2024-07-28 09:54:33.293403	2
 3308	1081	A second approach the kernel offers is dynamic initialization, possible thanks to a call to a `__mutex_init()` low-level function, which is actually wrapped by a much more user-friendly macro, `mutex_init()`.	text	txt	2024-07-28 09:54:33.312869	3
 3309	1081	struct fake_data {\n    struct i2c_client *client;\n    u16 reg_conf;\n    struct mutex mutex;\n};	text	txt	2024-07-28 09:54:33.33376	4
+3760	1184	section .text\n    global main	text	txt	2024-07-28 09:55:39.668657	6
 3310	1081	static int fake_probe(struct i2c_client *client)\n{\n    [...]\n        mutex_init(&data->mutex);\n    [...]\n}	code	txt	2024-07-28 09:54:33.354874	5
 3311	1082	Acquiring (aka locking) a mutex is as simple as calling one of the following three functions:	text	txt	2024-07-28 09:54:33.850573	1
 3312	1082	void mutex_lock(struct mutex *lock);\nint mutex_lock_interruptible(struct mutex *lock);\nint mutex_lock_killable(struct mutex *lock);	code	txt	2024-07-28 09:54:33.87061	2
@@ -19746,6 +18700,8 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 3600	1164	success_func:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:55:18.473409	11
 3601	1164	    mov rax, 0	text	txt	2024-07-28 09:55:18.494407	12
 3602	1164	    leave\n    ret	code	txt	2024-07-28 09:55:18.515331	13
+3761	1184	main:\n    section .data\n        fd dq 0                 ; to hold file descriptor	text	txt	2024-07-28 09:55:39.688366	7
+3762	1184	    section .text\n        push rbp\n        mov rbp, rsp	text	txt	2024-07-28 09:55:39.709923	8
 3603	1165	* Following calling conventions are for System V AMD64 ABI:\n* For integral types, registers are `rdi`, `rsi`, `rdx`, `rcx`, `r8`, `r9`\n  respectively, and additional arguments are passed via the stack and in\n  reverse order so that we can pop off in the right order.\n* Function's return address `rip` is pushed on the stack, just after the\n  arguments.\n* In function, then `rbp` is pushed, there maybe another 8 bytes needed to be\n  pushed to align the stack in 16 bytes.\n* For floating point types, registers are `xmm0` to `xmm7`, additional\n  arguments are passed via the stack but not with `push` instruction. Will be\n  discussed later.	text	txt	2024-07-28 09:55:20.457548	1
 3604	1165	section .text\n    global main	text	txt	2024-07-28 09:55:20.478138	2
 3605	1165	main:\n    section .data\n        .first   dq 1\n        .second  dq 2\n        .third   dq 3\n        .forth   dq 4\n        .fifth   dq 5\n        .sixth   dq 6\n        .seventh dq 7\n        .eighth  dq 8\n        .ninth   dq 9\n        .tenth   dq 10	text	txt	2024-07-28 09:55:20.498529	3
@@ -19794,12 +18750,11 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 3673	1172	General syntax of extended inline assembly is as follows:	text	txt	2024-07-28 09:55:28.398983	1
 3674	1172	__asm__(\n    assembler code\n    : output operands\n    : input operands\n    : list of clobbered registers\n);	code	txt	2024-07-28 09:55:28.419093	2
 3675	1172	* After the assembler code, additional and optional information is used.\n* Instruction orders must be respected.	text	txt	2024-07-28 09:55:28.440053	3
-3676	1172	__asm__(\n    ".intel_syntax noprefix;"\n    "mov rbx, rdx;"\n    "imul rbx, rcx;"\n    "mov rax, rbx;"\n    :"=a"(eproduct)\n    :"d"(x), "c"(y)\n    :"rbx"\n);	text	txt	2024-07-28 09:55:28.461292	4
-3677	1172	printf("The extended inline product is %i\\\\n", eproduct);	code	txt	2024-07-28 09:55:28.482158	5
 3678	1172	`a`, `d`, `c` are register constraints, and they map to the registers `rax`,\n`rdx`, `rcx`, respectively. `:"=a"(eproduct)` means that the output will be\nin `rax`, and `rax` will refer to the variable `eproduct`. Register `rdx`\nrefers to `x`, and `rcx` refers to `y`, which are the input variables. `rbx`\nis considered clobbered in the code and will be restored to its original\nvalue, because it was declared in the list of clobbering registers.	text	txt	2024-07-28 09:55:28.504929	6
 3679	1172	a -> rax, eax, ax, al\nb -> rbx, ebx, bx, bl\nc -> rcx, ecx, cx, cl\nd -> rdx, edx, dx, dl\nS -> rsi, esi, si\nD -> rdi, edi, di\nr -> any register	code	txt	2024-07-28 09:55:28.526264	7
 3680	1173	extern printf	text	txt	2024-07-28 09:55:29.520284	1
 3681	1173	; multiply value v by shifting it n times\n%define multiply(v, n) sal v, n	text	txt	2024-07-28 09:55:29.540955	2
+3763	1184	    %IF CREATE\n        mov rdi, filename\n        call create\n        mov qword[fd], rax      ; save file descriptor\n    %ENDIF	text	txt	2024-07-28 09:55:39.730901	9
 3682	1173	; having two arguments\n%macro print 2\n    section .data\n        %%detail db %1, 0\n        %%format_string db "%s: %i", 10, 0\n    section .text\n        xor rax, rax\n        mov rdi, %%format_string\n        mov rsi, %%detail\n        mov rdx, %2\n        call printf\n%endmacro	text	txt	2024-07-28 09:55:29.562689	3
 3683	1173	section .data\n    number dq 42	text	txt	2024-07-28 09:55:29.582805	4
 3684	1173	section .text\n    global main	text	txt	2024-07-28 09:55:29.602595	5
@@ -19812,7 +18767,6 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 3691	1174	%IF CONDITION\n    xor rdi, rdi\n%ELSE\n    mov rdi, 1\n%ENDIF	text	txt	2024-07-28 09:55:30.321722	4
 3692	1174	    leave\n    ret	code	txt	2024-07-28 09:55:30.341765	5
 3693	1175	section .text\n    global write	text	txt	2024-07-28 09:55:30.948467	1
-3694	1175	; preconditions:\n; address of string be set to rsi\n; length of string be set to rdx\nwrite:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:55:30.968894	2
 3695	1175	    mov rax, 1  ; write system call number\n    mov rdi, 1  ; stdout\n    syscall	text	txt	2024-07-28 09:55:30.988539	3
 3696	1175	    xor rax, rax\n    leave\n    ret	code	txt	2024-07-28 09:55:31.008935	4
 3697	1176	section .text\n    global read	text	txt	2024-07-28 09:55:31.557594	1
@@ -19856,31 +18810,6 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 3736	1180	    leave\n    ret	code	txt	2024-07-28 09:55:35.969394	8
 3737	1181	info registers rdi rsi rsp\nx/1xg <the pointer in rdi>\nx/s <address where the pointer in rdi points to>\nx/s <address where the pointer in rdi points to + 8>\nx/s <address where the pointer in rdi points to + 16>	code	txt	2024-07-28 09:55:36.281728	1
 3738	1182	`/usr/include/asm-generic/fcntl.h`	text	txt	2024-07-28 09:55:36.494241	1
-3739	1183	section .data\n    CREATE equ 1            ; use for conditional assembly\n    NR_create equ 85        ; create system call	text	txt	2024-07-28 09:55:38.098087	1
-3740	1183	section .text\n    global create	text	txt	2024-07-28 09:55:38.11817	2
-3741	1183	; \\\\pre rdi address of filename string\n; \\\\post rax error code\ncreate:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:55:38.139778	3
-3742	1183	    mov rax, NR_create\n    mov rsi, S_IRUSR | S_IWUSR\n    syscall	text	txt	2024-07-28 09:55:38.160844	4
-3743	1183	    leave\n    ret	code	txt	2024-07-28 09:55:38.182003	5
-3744	1183	section .data\n    CREATE equ 1            ; use for conditional assembly\n    NR_create equ 85        ; create system call	text	txt	2024-07-28 09:55:38.203265	6
-3745	1183	section .text\n    global create	text	txt	2024-07-28 09:55:38.224127	7
-3746	1183	; \\\\pre rdi file descriptor\n; \\\\post rax error code\ncreate:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:55:38.244762	8
-3747	1183	    mov rax, NR_create\n    mov rsi, S_IRUSR | S_IWUSR\n    syscall	text	txt	2024-07-28 09:55:38.264129	9
-3748	1183	    leave\n    ret	code	txt	2024-07-28 09:55:38.284275	10
-3749	1183	extern create\nextern close	text	txt	2024-07-28 09:55:38.304427	11
-3750	1183	section .text\n    global main	text	txt	2024-07-28 09:55:38.326061	12
-3751	1183	main:\n    section .data\n        fd dq 0                 ; to hold file descriptor	text	txt	2024-07-28 09:55:38.346885	13
-3752	1183	    section .text\n        push rbp\n        mov rbp, rsp	text	txt	2024-07-28 09:55:38.368273	14
-3753	1183	    %IF CREATE\n        mov rdi, filename\n        call create\n        mov qword[fd], rax      ; save file descriptor\n    %ENDIF	text	txt	2024-07-28 09:55:38.389003	15
-3754	1183	    %IF CLOSE\n        mov rdi, qword[fd]      ; file descriptor\n        call close\n    %ENDIF	code	txt	2024-07-28 09:55:38.409978	16
-3755	1184	section .data\n    CREATE equ 1            ; use for conditional assembly	text	txt	2024-07-28 09:55:39.565712	1
-3756	1184	section .text\n    global create	text	txt	2024-07-28 09:55:39.587005	2
-3757	1184	create:\n    push rbp\n    mov rbp, rsp	text	txt	2024-07-28 09:55:39.607123	3
-3758	1184	    leave\n    ret	code	txt	2024-07-28 09:55:39.627696	4
-3759	1184	extern create\nextern close\nextern write	text	txt	2024-07-28 09:55:39.647875	5
-3760	1184	section .text\n    global main	text	txt	2024-07-28 09:55:39.668657	6
-3761	1184	main:\n    section .data\n        fd dq 0                 ; to hold file descriptor	text	txt	2024-07-28 09:55:39.688366	7
-3762	1184	    section .text\n        push rbp\n        mov rbp, rsp	text	txt	2024-07-28 09:55:39.709923	8
-3763	1184	    %IF CREATE\n        mov rdi, filename\n        call create\n        mov qword[fd], rax      ; save file descriptor\n    %ENDIF	text	txt	2024-07-28 09:55:39.730901	9
 3764	1184	    %IF WRITE\n        mov rdi, qword[fd]      ; file descriptor\n        mov rsi, text           ; address of string\n        mov rdx, qword[length]  ; length of string\n        call write\n    %ENDIF	text	txt	2024-07-28 09:55:39.752144	10
 3765	1184	    %IF CLOSE\n        mov rdi, qword[fd]      ; file descriptor\n        call close\n    %ENDIF	code	txt	2024-07-28 09:55:39.77242	11
 3766	1185	section .data\n    CREATE equ 1            ; use for conditional assembly	text	txt	2024-07-28 09:55:40.944032	1
@@ -19947,14 +18876,263 @@ COPY milestone.practice_blocks (id, practice_id, content, type, language, update
 3837	262	#include <iostream>\n#include <initializer_list>\n#include <string>\n#include <vector>\n#include <map>\n\nvoid func(int const a, int const b, int const c)\n{\n    std::cout << a << b << c << '\\\\n';\n}\n\nvoid func(std::initializer_list<int> const list)\n{\n    for (auto const& e: list)\n        std::cout << e;\n    std::cout << '\\\\n';\n}\n\nint main()\n{\n    std::string s1("text"); // direct initialization\n    std::string s2 = "text"; // copy initialization\n    std::string s3{"text"}; // direct list-initialization\n    std::string s4 = {"text"}; // copy list-initialization\n\n    std::vector<int> v{1, 2, 3};\n    std::map<int, std::string> m{{1, "one"}, {2, "two"}};\n\n    func({1, 2, 3}); // call std::initializer_list<int> overload\n\n    std::vector v1{4}; // size = 1\n    std::vector v2(4); // size = 4\n\n    auto a = {42}; // std::initializer_list<int>\n    auto b{42}; // int\n    auto c = {4, 2}; //std::initializer_list<int>\n    auto d{4, 2}; // error, too many elements	code	cpp	2025-07-14 13:09:53.17377	2
 3842	264	#include <string>\n#include <vector>\n\nstruct Data\n{\n    int x;\n    double y;\n    std::string label = "Hello World!"; // only permitted since C++14\n    std::vector<int> arr;\n};\n\nstruct X\n{\n    int a;\n    int b;\n};\n\nstruct Y\n{\n    X x;\n    X y;\n};\n\n// Initialization is done in declaration order:\nData a = {10, 2.3};\n// a.x == 10, a.y == 2.3\n// a.label == "Hello World!", a.arr == std::vector<int>{}\n\n// Nested brackets can be omitted:\nY b = { 10, 20, 30 };\n// b.x == {10, 20}, b.y == {30, int{} == 0}	code	cpp	2025-07-14 16:42:58.546421	2
 3849	265	#include <string>\n\nstruct Data {\n    int a;\n    double b;\n    std::string c;\n};\n\nData x = { .b = 2.4 };\n// x == { 0, 2.4, "" }\n\n// Typical use case with default-heavy aggregate:\nstruct Configuration {\n    enum class options { enabled, disabled };\n    struct Coords { int x; int y; };\n\n    options used_option = options::enabled;\n    std::string label = "default label";\n    Coords coords = { 10, 20 };\n};\n\nConfiguration config = { .label = "some label" };\n// config == {options::enabled, "some label", {10, 20}};\n\n// A clunky but functional option for named agruments in C++\nstruct Arg { const std::string& label; int64_t id; };\nvoid some_func(Arg arg) {}\n\nsome_func({.label = config.label, .id = 42});	code	cpp	2025-07-14 21:19:18.235921	2
-\.
-
-
---
--- Data for Name: practice_editing; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.practice_editing (id, user_id, practice_id, action, updated) FROM stdin;
+3853	269	C++23 brings `if consteval` conditional statement.\n\nThis `if` statement takes no condition but would only evaluate during\nconstant evaluation. Otherwise, the `else` statement is evaluated.\n\nconsteval int f(int i) { return i; }\n\nconstexpr int g(int i)\n{\n    if consteval\n    {\n        return f(i) + 1; // immediate function context\n    }\n    else\n    {\n        return 42;\n    }\n}\n\nconsteval int h(int i)\n{\n    return f(i) + 1; // immediate function context\n}	code	cpp	2025-07-15 09:24:18.592781	1
+3859	272	#include <memory>\n\nstruct Data{};\n\n// Function returning a unique_ptr handing off ownership to caller.\nstd::unique_ptr<Data> producer() { return std::make_unique<Data>(); }\n\n// Function accepting a unique_ptr taking over ownership.\nvoid consumer(std::unique_ptr<Data> data) {}\n\n// Helps with Single Reponsibility Principle\n// by separating resource management from logic\nstruct Holder {\n    Holder() : data_{std::make_unique<Data>()} {}\n    // implicitly defaulted move constructor && move assignment\n    // implicitly deleted copy constructor && copy assignment\nprivate:\n    std::unique_ptr<Data> data_;\n};\n\n// shared_ptr has a fast constructor from unique_ptr\nstd::shared_ptr<Data> sptr = producer();\n\n// Even in cases when manual resource management is required,\n// a unique_ptr on the interface might be preferable:\nvoid manual_handler(std::unique_ptr<Data> ptr) {\n    Data* raw = ptr.release();\n    // manual resource management\n}	code	cpp	2025-07-15 10:04:19.384019	2
+3861	273	#include <iostream>\n\nint main()\n{\n    using std::cout;\n    using std::endl;\n\n    cout << 42 << endl;\n}	code	cpp	2025-07-15 10:10:47.086144	1
+540	274	Unnamed namespaces as well as all namespaces declared directly or indirectly\nwithin an unnamed namespace have internal linkage, which means that any name\nthat is declared within an unnamed namespace has internal linkage.	text	txt	2024-07-28 09:46:50.680303	1
+3865	274	namespace\n{\n    void f() { } // ::(unique)::f\n}\n\nf(); // OK\n\nnamespace A\n{\n    void f() { } // A::f\n}\n\nusing namespace A;\n\nf(); // Error: ::(unique)::f and A::f both in scope	code	cpp	2025-07-15 10:13:10.323432	2
+546	275	Prior to C++11, non-type template arguments could not be named with internal\nlinkage, so `static` variables were not allowed.\nVC++ compiler still doesn't support it.	text	txt	2024-07-28 09:46:51.380161	1
+3868	275	template <int const& Size>\nclass test {};\n\nstatic int Size1 = 10; // internal linkage due static\n\nnamespace\n{\n    int Size2 = 10; // internal linkage due unnamed namespace\n}\n\ntest<Size1> t1; // error only on VC++\ntest<Size2> t2; // okay	code	cpp	2025-07-15 10:40:52.962384	2
+3893	283	module;               // global module fragment\n\n#define X\n#include "code.h"\n\nexport module geometry;   // module declaration\n\nimport std;      // module preamble\n\n// module purview\n\nexport template<typename T, typename = typename std::enable_if_t<std::is_arithmetic_v<T>, T>>\nstruct point\n{\n    T x;\n    T y;\n};\n\nexport using int_point = point<int>;\n\nexport constexpr int_point int_point_zero{0, 0};\n\nexport template<typename T>\ndouble distance(point<T> const& p1, point<T> const& p2)\n{\n    return std::sqrt((p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y));\n}	code	cpp	2025-07-15 12:14:25.146642	2
+3894	283	import std;\nimport geometry;\n\nint main()\n{\n    int_point p{3, 4};\n    std::cout << distance(int_point_zero, p) << std::endl;\n}	code	cpp	2025-07-15 12:14:41.011353	3
+553	276	* Specialization of a template is required to be done in the same namespace\n  where the template was declared.\n* Define the content of the library inside a namespace\n* Define each version of the library or parts of it inside an inner inline\n  namespace\n* Use preprocessor macros to enable a particular version of the library	text	txt	2024-07-28 09:46:53.903544	3
+597	285	A module unit that is a partition that exports entities is called a **module\ninterface partition**.	text	txt	2024-07-28 09:47:00.35894	1
+3883	276	namespace incorrect_implementation\n{\n    namespace v1\n    {\n        template<typename T>\n        int test(T value) { return 1; }\n    }\n\n    namespace v2\n    {\n        template<typename T>\n        int test(T value) { return 2; }\n    }\n\n    #ifndef _lib_version_1\n        using namespace v1;\n    #endif\n\n    #ifndef _lib_version_2\n        using namespace v2;\n    #endif\n}\n\nnamespace broken_client_code\n{\n    // okay\n    auto x = incorrect_implementation::test(42);\n\n    struct foo { int a; };\n\n    // breaks\n    namespace incorrect_implementation\n    {\n        template <>\n        int test(foo value) { return value.a; }\n    }\n\n    // won't compile\n    auto y = incorrect_implementation::test(foor{42});\n\n    // library leaks implementation details\n    namespace incorrect_implementation\n    {\n        namespace version_2\n        {\n            template<>\n            int test(foo value) { return value.a; }\n        }\n    }\n\n    // okay, but client needs to be aware of implementation details\n    auto y = incorrect_implementation::test(foor{42});\n}\n\nnamespace correct_implementation\n{\n    #ifndef _lib_version_1\n    inline namespace v1\n    {\n        template<typename T>\n        int test(T value) { return 1; }\n    }\n    #endif\n\n    #ifndef _lib_version_2\n    inline namespace v2\n    {\n        template<typename T>\n        int test(T value) { return 2; }\n    }\n    #endif\n}\n\nnamespace working_client_code\n{\n    // okay\n    auto x = correct_implementation::test(42);\n\n    struct foo { int a; };\n\n    namespace correct_implementation\n    {\n        template <>\n        int test(foo value) { return value.a; }\n    }\n\n    // okay\n    auto y = correct_implementation::test(foor{42});\n}	code	cpp	2025-07-15 10:46:39.802283	4
+3884	277	// before C++17\nnamespace A\n{\n    namespace B\n    {\n        namespace C\n        {\n            /* ... */\n        }\n    }\n}\n\n// since C++16\nnamespace A::B::C\n{\n    /* ... */\n};	code	cpp	2025-07-15 11:21:06.660083	1
+3885	279	import std;\n\nint main()\n{\n    std::cout << std::format("{}\\\\n", "modules are working");\n}	code	cpp	2025-07-15 11:22:18.217297	1
+4272	476	#include <algorithm>\n#include <iostream>\n#include <vector>\n\nint main()\n{\n    std::vector<int> numbers{1,2,3,4,5};\n    std::for_each(std::begin(numbers), std::end(numbers), [](auto e) { std::cout << e << " "; });\n}	code	cpp	2025-07-17 10:07:38.1498	3
+4274	476	#include <iostream>\n#include <algorithm>\n#include <ranges>\n#include <vector>\n\ntemplate<typename T>\nstruct sentinel\n{\n    using iter_t = typename std::vector<T>::iterator;\n    iter_t begin;\n    std::iter_difference_t<iter_t> count;\n    bool operator==(iter_t const& other) const { return std::distance(begin, other) >= count; }\n};\n\nint main()\n{\n    std::vector<long> numbers{1,2,3,4,5};\n    std::vector<long>::iterator iter = numbers.begin();\n    std::ranges::for_each(iter, sentinel<long>{iter, 3}, [](auto e) { std::cout << e << " "; });\n}	code	cpp	2025-07-17 10:07:51.546162	5
+598	285	Here the `geometry-core.cppm` and `geometry-literals.cppm` are internal partitions.	text	txt	2024-07-28 09:47:00.380515	2
+3896	285	*geometry-core.cppm*\nexport module geometry:core;\n\nimport std.core;\n\nexport template<typename T, typename = typename std::enable_if_t<std::is_arithmetic_v<T>, T>>\nstruct point\n{\n    T x;\n    T y;\n};	code	cpp	2025-07-15 19:25:13.860133	3
+3898	285	*geometry-literals.cppm*\nexport module geometry.literals;\n\nimport std.core;\n\nnamespace geometry_literals\n{\n    export point<int> operator ""_p(const char* ptr, std::size_t const size)\n    {\n        int x{}, y{};\n        ...\n        return {x , y};\n    }\n}	code	cpp	2025-07-15 19:25:47.77262	4
+605	285	In the primary module interface unit, import and then export the partitions\nwith statements of the form `export import :partitionname`.	text	txt	2024-07-28 09:47:00.524852	5
+3899	285	*geometry.cppm*\nexport module geometry;\n\nexport import :core;\nexport import :literals;	code	cpp	2025-07-15 19:26:10.938543	6
+608	285	The code importing a module composed from multiple partitions only sees the\nmodule as a whole if it was built from a single module unit:	text	txt	2024-07-28 09:47:00.586687	7
+3901	285	import std.core;\nimport geometry;\n\nint main()\n{\n    point<int> p{4, 2};\n\n    {\n        using namespace geometry_literals;\n        point<int> origin{"0,0"_p};\n    }\n}	code	cpp	2025-07-15 19:26:42.762726	8
+4548	610	#include <iostream>\n#include <thread>\n\ntemplate<typename T>\nT do_something(T initial = {})\n{\n    static T instance{std::move(initial)};\n    return instance;\n}\n\ntemplate<typename T>\nclass box\n{\npublic:\n    explicit box(T initial = {}): value{std::move(initial)} {}\n    box(box<T> const& other): value{other.value} {}\n    box<T>& operator=(box<T> const& other) { value = other.value; return *this; }\n    static inline box<T>& get_instance(T initial = {})\n    {\n        static box<T> instance{std::move(initial)};\n        std::cout << "initializing\\\\n";\n        return instance;\n    }\n    T value;\n};\n\ntemplate<typename T>\nvoid initialize(box<T>& instance)\n{\n    instance = box<long>::get_instance(73);\n}\n\nint main()\n{\n    long fvalue = do_something<long>(42);\n    box<long> instance;\n    std::thread t1{initialize<long>, std::ref(instance)};\n    std::thread t2{initialize<long>, std::ref(instance)};\n    t1.join();\n    t2.join();\n    std::cout << instance.value << std::endl;\n}	code	cpp	2025-07-17 12:12:09.367798	2
+3947	300	#include <expected>\n#include <system_error>\n#include <string>\n\nstd::expected<std::string, std::error_condition> read_input();\nstd::expected<int, std::error_condition> to_int(const std::string& s);\nint increase(int v);\nstd::expected<int, std::error_condition> log_error(const std::error_condition& err);\n\nauto result = read_input()\n    .and_then(to_int) // invoked if the expected contains a value\n    // the callable has to return a std::expected, but can change\n    // the type: std::expected<T,Err> -> std::expected<U,Err>\n    .transform(increase) // invoked if the expected contains a value\n    // the callable can return any type\n    // std::expected<T,Err> -> std::expected<U,Err>\n    .or_else(log_error); // invoked if the expected contains an error\n    // the callable has to return a std::expected, but can change\n    // the type: std::expected<V,T> -> std::expected<V,U>	code	cpp	2025-07-15 21:44:51.843137	2
+3904	286	modulename:partitionname;`.\n\n*geometry-details.cppm*\nmodule geometry:details;\n\nimport std.core;\n\nstd::pair<int, int> split(char const* ptr, std::size_t const size)\n{\n    int x{}, y{};\n    ...\n    return {x, y};\n}	code	cpp	2025-07-15 19:50:15.815487	3
+3906	286	*geometry-literals.cppm*\nexport module geometry:literals;\n\nimport :core;\nimport :details;\n\nnamespace geometry_literals\n{\n    export point<int> operator ""_p(const char* ptr, std::size_t size)\n    {\n        auto [x, y] = split(ptr, size);\n        return {x, y};\n    }\n}	code	cpp	2025-07-15 19:51:06.409088	4
+3937	297	#include <variant>\n#include <string>\n\nstd::variant<int, double, std::string> v{10};\nint number;\n\nnumber = std::get<int>(v);\nnumber = std::get<0>(v); // same as above but with index	code	cpp	2025-07-15 21:41:23.34397	2
+704	300	The `std::expected` (C++23) comes with a monadic interface. Relying on the\nmonadic interface prevents the typical if-then-else verbose error checking.\nThe `and_then()` and `or_else()` methods expect a callable that accepts a\nvalue/error and returns a `std::expected`. The `transform` and\n`transform_error` methods expect a callable that accepts a value/error and\nreturns a value/error.	text	txt	2024-07-28 09:47:13.477597	1
+3939	297	#include <variant>\n#include <string>\n\nstd::variant<int, double, std::string> v{10};\n\ndouble value = std::get<double>(v);\n// throws std::bad_variant_access	code	cpp	2025-07-15 21:41:37.250157	4
+3945	299	#include <variant>\n#include <string>\n#include <iostream>\n\nstd::variant<int, double, std::string> v;\n\ntemplate<typename ...Ts>\nstruct overloaded : Ts...\n{\n    using Ts::operator()...;\n};\n\nv = 3.14;\n\nstd::visit(overloaded{\n    [](int& x) {\n        std::cout << "int: " << x << '\\\\n';\n    },\n    [](double& x) {\n        std::cout << "double: " << x << '\\\\n';\n    },\n    [](std::string& x) {\n        std::cout << "std::string: " << x << '\\\\n';\n    }\n}, v);\n// prints "double: 3.14"	code	cpp	2025-07-15 21:43:15.053373	1
+3907	287	*sample-core.cppm*\nexport module sample:core;\n\nexport constexpr double fraction{7 / 5};	code	cpp	2025-07-15 19:55:29.714244	3
+3909	287	*sample-details.cppm*\nmodule sample:details;\n\nimport :core;\n\nconstexpr double power{fraction * fraction};	code	cpp	2025-07-15 19:55:49.31077	4
+3948	301	class Value\n{\n    long id;\n\npublic:\n    bool operator==(Value const& rhs) const { return id == rhs.id; }\n    bool operator!=(Value const& rhs) const { return !(*this == rhs); }\n    bool operator< (Value const& rhs) const { return id < rhs.id; }\n    bool operator<=(Value const& rhs) const { return !(*this < rhs); }\n    bool operator> (Value const& rhs) const { return rhs < *this; }\n    bool operator>=(Value const& rhs) const { return !(rhs < *this); }\n};	code	cpp	2025-07-15 21:45:33.308217	2
+3910	287	*sample.cppm*\nexport module sample;\n\nexport import :core;	code	cpp	2025-07-15 19:56:11.377051	5
+3911	287	*consumer.cpp*\nimport std.core;\nimport sample;\n\nstd::cout << power << "\\\\n";	code	cpp	2025-07-15 19:56:23.72385	6
+3912	287	*sample-core.cppm*\nexport module sample.core;\n\nexport constexpr double fraction{7 / 5};	code	cpp	2025-07-15 19:56:39.58146	8
+3914	287	*sample-details.cppm*\nmodule sample.details;\n\nimport sample.core;\n\nconstexpr double power{fraction * fraction};	code	cpp	2025-07-15 19:56:55.575191	9
+3915	287	*sample.cppm*\nexport module sample;\n\nexport import sample.core;	code	cpp	2025-07-15 19:57:12.995892	10
+642	287	So far, we have two modules: `sample.core` and `sample`. Here `sample`\nimports and then re-exports the entire content of `sample.core`. Because of\nthis, the core in the `consumer.cpp` does not need to change. By solely\nimporting the `sample` module, we get access to the content of the\n`sample.core` module.	text	txt	2024-07-28 09:47:04.251552	12
+643	287	However, if we do not define the `sample` module anymore, then we need to explicitly import `sample.core` module:	text	txt	2024-07-28 09:47:04.272721	13
+3941	298	#include <variant>\n#include <string>\n#include <iostream>\n\nstd::varian<int, double, std::string> v{"sample string"};\n\nstd::visit([](auto&& x) {\n    std::cout << x << '\\\\n';\n}, v);\n// prints "sample string"	code	cpp	2025-07-15 21:42:05.684617	3
+3935	296	#include <variant>\n#include <string>\n\nstd::variant<int, double, std::string> v;\nv = 10;	code	cpp	2025-07-15 21:40:55.134056	2
+715	301	Since C++20 `operator ==` also implies `operator !=`, therefore, for `a` of\ntype `TypeA` and `b` of `TypeB`, the compiler will be able to compile `a !=\nb` if there is:	text	txt	2024-07-28 09:47:15.608539	6
+716	301	- a freestanding `operator !=(TypeA, TypeB)`\n- a freestanding `operator ==(TypeA, TypeB)`\n- a freestanding `operator ==(TypeB, TypeA)`\n- a member function `TypeA::operator!=(TypeB)`\n- a member function `TypeA::operator==(TypeB)`\n- a member function `TypeB::operator==(TypeA)`	text	txt	2024-07-28 09:47:15.629665	7
+4277	477	#include <algorithm>\n#include <vector>\n#include <list>\n\nint main()\n{\n    std::vector<long> random_access{1,2,3,4,5};\n    std::list<long> bidirectional{1,2,3,4,5};\n\n    auto random_access_iterator = random_access.begin();\n    random_access_iterator += 3; // OK\n    random_access_iterator++; // OK\n    ssize_t random_difference = random_access_iterator - random_access.begin(); // OK: 4\n\n    auto bidirectional_iterator = bidirectional.begin();\n    //bidirectional_iterator += 5; // ERROR\n    std::advance(bidirectional_iterator, 3); // OK\n    bidirectional_iterator++; // OK, all iterators provide advance operation\n    //ssize_t bidirectional_difference = bidirectional_iterator - bidirectional.begin(); // ERROR\n    ssize_t bidirectional_difference = std::distance(bidirectional.begin(), bidirectional_iterator); // OK: 4\n}	code	cpp	2025-07-17 10:11:38.521831	1
+3916	287	*consumer.cpp*\nimport std.core;\nimport sample;\n\nstd::cout << power << "\\\\n";	code	cpp	2025-07-15 19:57:26.648786	11
+646	287	Choosing between using partitions or multiple modules for componentizing your\nsource code should depend on the particularities of your project. If you use\nmultiple smaller modules, you provide better granularity for imports. This\ncan be important if you're developing a large library because users should\nonly import things they use.	text	txt	2024-07-28 09:47:04.337692	15
+3917	287	*consumer.cpp*\nimport std.core;\nimport sample.core;\n\nstd::cout << power << "\\\\n";	code	cpp	2025-07-15 19:57:45.490528	14
+717	301	Having both a freestanding and a member function is an ambiguity error.	text	txt	2024-07-28 09:47:15.649983	8
+718	301	Since C++20 it is enough to declare `operator <=>` with `=default` so that\nthe defaulted member `operator <=>` generates a corresponding member\n`operator ==`:	text	txt	2024-07-28 09:47:15.671329	9
+720	301	Both operators use their default implementation to compare objects member by\nmember. The order to the members in the class matter.	text	txt	2024-07-28 09:47:15.713293	11
+721	301	In addition, even when declaring the spaceship operator as a member function,\nthe generated operators:	text	txt	2024-07-28 09:47:15.733108	12
+722	301	- are `noexcept` if comparing the members never throws\n- are `constexpr` if comparing the members is possible at compile time\n- implicit type conversions for the first operand are also supported if a\n  corresponding implicit type conversion is defined\n- may warn if the result of a comparison is not used (compiler dependent)	text	txt	2024-07-28 09:47:15.754684	13
+3949	301	class Value\n{\n    long id;\n\npublic:\n    [[nodiscard]] friend constexpr bool operator==(Value const& lhs, Value const& rhs) noexcept { return lhs.id == rhs.id; }\n    [[nodiscard]] friend constexpr bool operator!=(Value const& lhs, Value const& rhs) noexcept { return !(lhs == rhs); }\n    [[nodiscard]] friend constexpr bool operator< (Value const& lhs, Value const& rhs) noexcept { return lhs.id < rhs.id; }\n    [[nodiscard]] friend constexpr bool operator<=(Value const& lhs, Value const& rhs) noexcept { return !(lhs < rhs); }\n    [[nodiscard]] friend constexpr bool operator> (Value const& lhs, Value const& rhs) noexcept { return rhs < lhs; }\n    [[nodiscard]] friend constexpr bool operator>=(Value const& lhs, Value const& rhs) noexcept { return !(rhs < lhs); }\n};	code	cpp	2025-07-15 21:45:52.482938	5
+719	301	class Value\n{\n    auto operator<=>(Value const& rhs) const = default;\n    auto operator==(Value const& rhs) const = default; // implicitly generated\n};	code	cpp	2024-07-28 09:47:15.69261	10
+3951	302	#include <compare>\n\nclass Value\n{\n    long id;\n\npublic:\n    std::strong_ordering operator<=>(Value const& rhs) const\n    {\n        return id < rhs.id ? std::strong_ordering::less :\n            id > rhs.id ? std::strong_ordering::greater :\n                std::strong_ordering::equivalent;\n    }\n};	code	cpp	2025-07-15 21:46:46.741047	5
+734	302	The member function has to take the second parameter as `const` lvalue\nreference with `=default`. A friend function might also take both parameters\nby value.	text	txt	2024-07-28 09:47:17.26293	8
+3953	302	#include <compare>\n\nclass Value\n{\n    long id;\n\npublic:\n    auto operator<=>(Value const& rhs) const\n    {\n        return id <=> rhs.id;\n    }\n};	code	cpp	2025-07-15 21:47:05.456747	7
+3956	304	#include <compare>\n#include <string>\n\nclass Person\n{\n    std::string name;\n    double weight;\n\npublic:\n    std::partial_ordering operator<=>(Person const& rhs) const\n    {\n        auto cmp1 = name <=> rhs.name;\n        if (name != 0) return cmp1; // std::strong_ordering\n\n        return weight <=> rhs.weight; // std::partial_ordering\n    }\n};	code	cpp	2025-07-15 21:47:56.189792	2
+745	304	If you do not know the comparison types, use\n`std::common_comparison_category<>` type trait that computes the strongest\ncomparison category.	text	txt	2024-07-28 09:47:19.485991	3
+649	288	Preconditions of using `auto`:	text	txt	2024-07-28 09:47:05.633075	3
+650	288	* `auto` does not retain cv-ref qualifiers.\n* `auto` cannot be used for non-movable objects.\n* `auto` cannot be used for multi-word types like long long.	text	txt	2024-07-28 09:47:05.654222	4
+3923	288	#include <string>\n#include <vector>\n#include <memory>\n\nint main()\n{\n    auto i = 42; // int\n    auto d = 42.5; // double\n    auto c = "text"; // char const*\n    auto z = {1, 2, 3}; // std::initializer_list<int>\n\n    auto b = new char[10]{0}; // char*\n    auto s = std::string{"text"}; // std::string\n    auto v = std::vector<int>{1, 2, 3}; // std::vector<int>\n    auto p = std::make_shared<int>(42); // std::shared_ptr<int>\n\n    auto upper = [](char const c) { return toupper(c); };\n    auto add = [](auto const a, auto const b) { return a + b; };\n\n    template<typename F, typename F>\n    auto apply(F&& f, T value)\n    {\n        return f(value);\n    }\n}\n\nclass foo\n{\n    int _x;\npublic:\n    foo(int const x = 0): _x{x} {}\n    int& get() { return _x; }\n};\n\ndecltype(auto) proxy_gen(foo& f) { return f.get(); }\n// ^__ decltype() preserves cv-ref qualification of return type	code	cpp	2025-07-15 21:30:53.176986	5
+4281	478	#include <algorithm>\n#include <vector>\n\nstd::vector<int> data{ 1, 2, 3, 4, 5, 6, 7, 8, 9 };\n\n// OK for std::copy\n//         [ source range      ]\n// [ destination range ]\nstd::copy(data.begin() + 1, data.end(), data.begin());\n// data == {2, 3, 4, 5, 6, 7, 8, 9, 9}\n\ndata = {1, 2, 3, 4, 5, 6, 7, 8, 9};\n\n// OK for std::copy_backward\n// [ source range      ]\n//         [ destination range ]\nstd::copy_backward(data.begin(), data.begin() + 8, data.end());\n// data == {1, 1, 2, 3, 4, 5, 6, 7, 8}	code	cpp	2025-07-17 10:12:00.038621	2
+3931	293	enum class status: unsigned int; // forward declared\n\nstatus do_something(); // function declaration/prototype\n\nenum class status : unsigned int\n{\n    success = 0,\n    failed = 1,\n    unknown = 0xffff0000U\n};\n\nstatus do_something() { return status::success; }	code	cpp	2025-07-15 21:38:05.547993	4
+3925	290	#include <iostream>\n#include <set>\n\nint main()\n{\n    std::set<int> numbers;\n\n    if (auto const [iter, inserted] = numbers.insert(1); inserted)\n        std::cout << std::distance(numbers.cbegin(), iter);\n}	code	cpp	2025-07-15 21:33:18.587318	2
+1527	480	The algorithms that have the overload with `std::execution` enumeration as\nfirst parameter.	text	txt	2024-07-28 09:49:26.029294	1
+4282	480	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> numbers{42,73,10,35,89,24};\n    std::sort(std::execution::par, std::begin(numbers), std::end(numbers));\n}	code	cpp	2025-07-17 10:12:43.429739	2
+4551	611	#include <optional>\n#include <thread>\n#include <mutex>\n\ntemplate<typename T>\nclass some_task\n{\npublic:\n    void initialize(T init = {}) { std::call_once(execution, [&]{ value = std::move(init); }); }\n    std::optional<T> get() const { return value; }\nprivate:\n    std::once_flag execution;\n    std::optional<T> value;\n};\n\ntemplate<typename T>\nvoid initialize(some_task<T>& task, T value)\n{\n    task.initialize(std::move(value));\n}\n\nint main()\n{\n    some_task<long> number;\n    std::thread t1{initialize<long>, std::ref(number), 42};\n    std::thread t2{initialize<long>, std::ref(number), 73};\n    t1.join();\n    t2.join();\n    long value = *number.get(); // either 42 or 73 without data race\n}	code	cpp	2025-07-17 12:12:25.748586	1
+3928	292	#include <bitset>\n\nusing byte = std::bitset<8>;\nusing fn = void(byte, double);\nusing fn_ptr = void(*)(byte, double);\n\nvoid func(byte b, double d) { /* ... */ }\n\nint main()\n{\n    byte b{001101001};\n    fn* f = func;\n    fn_ptr fp = func;\n}	code	cpp	2025-07-15 21:35:38.109099	1
+3933	294	#include <string>\n\nenum class status : unsigned int\n{\n    success = 0,\n    failure = 1,\n    unknown = 0xffff0000U\n};\n\nstd::string_view to_string(status const s)\n{\n    switch (s)\n    {\n        using enum status;\n        case success: return "success";\n        case failure: return "failure";\n        case unknown: return "unknown";\n    }\n}	code	cpp	2025-07-15 21:38:36.737068	1
+3934	295	#include <variant>\n#include <string>\n\nstd::variant<int, double, std::string> v{"some characters"};\nbool x = std::holds_alternative<std::string>(v);\n// x == true	code	cpp	2025-07-15 21:40:10.184971	3
+3959	304	#include <compare>\n#include <string>\n\nclass Person\n{\n    std::string name;\n    double weight;\n\npublic:\n    auto operator<=>(Person const& rhs) const\n        -> std::common_comparison_category_t<decltype(name <=> rhs.name),\n                                             decltype(weight <=> rhs.name)>\n    {\n        auto cmp1 = name <=> rhs.name;\n        if (name != 0) return cmp1; // std::strong_ordering\n\n        return weight <=> rhs.weight; // std::partial_ordering\n    }\n};	code	cpp	2025-07-15 21:48:18.520261	4
+770	306	This code no longer works in C++20 due to endless recursion. The reason is\nthat inside the global function the expression `t == i` can also call the\nglobal `operator ==` itself, because the compiler also tries to rewrite the\ncall as `i == t`:	text	txt	2024-07-28 09:47:22.856012	6
+772	306	Unfortunately, the rewritten statement is a better match, because it does not\nneed the implicit type conversion.	text	txt	2024-07-28 09:47:22.90029	8
+773	306	To fix this defect, either use an explicit conversion, or a feature test\nmacro to disable the new feature.	text	txt	2024-07-28 09:47:22.920434	9
+3965	306	class MyType\n{\n    int i;\n\npublic:\n    // implicit constructor from int\n    MyType(int i);\n\n    // before C++20 enables implicit conversion for the second operand\n    bool operator==(MyType const&) const;\n};	code	cpp	2025-07-15 21:50:28.471529	2
+771	306	bool operator==(int i, MyType const& t)\n{\n    return t == i;\n    // tries operator==(i, t) in addition to t.operator(MyType{i})\n}	code	cpp	2024-07-28 09:47:22.877836	7
+3961	305	struct Base\n{\n    bool operator==(Base const&) const;\n    bool operator<(Base const&) const;\n};\n\nstruct Derived: public Base\n{\n    std::strong_ordering operator<=>(Derived const&) const = default;\n};\n\nDerived d1, d2;\nd1 > d2; // calls Base::operator== and Base::operator<	code	cpp	2025-07-15 21:48:55.107587	2
+3962	305	struct Base\n{\n    bool operator==(Base const&) const;\n    bool operator<(Base const&) const;\n};\n\nstruct Derived: public Base\n{\n    auto operator<=>(Derived const&) const = default;\n};	code	cpp	2025-07-15 21:49:22.746141	6
+760	305	Checks for equality work for Derived because `operator ==` automatically\ndeclared equivalent to `operator <=>`:	text	txt	2024-07-28 09:47:21.26387	8
+774	306	bool operator==(int i, MyType const& t)\n{\n    return t == MyType{i};\n    // doesn't try operator==(i, t) causing infinit recursion\n    // only uses t.operator(MyType{i});\n}	code	cpp	2024-07-28 09:47:22.941101	10
+3963	305	struct Derived: public Base\n{\n    auto operator<=>(Derived const&) const = default;\n    bool operator==(Derived const&) const = default;\n};\n\nDerived d1, d2;\nd1 > d2; // ERROR: cannot deduce comparison category of operator <=>\nd1 == d2; // OK: only tries operator <=> and Base::operator==	code	cpp	2025-07-15 21:49:39.381832	9
+937	350	To inform compiler about the best match of two overloads with same signature,\nwe can use concepts as a type constraint.	text	txt	2024-07-28 09:47:49.015818	2
+4013	356	template<typename T>\nclass Stack\n{\npublic:\n    Stack(Stack const&);\n\n    template<typename U>\n    friend std::ostream& operator<<(std::ostream&, Stack<U> const&);\n};	code	cpp	2025-07-16 14:12:32.650297	3
+4006	350	template<typename T>\nconcept has_push_back = requires (Container c, Container::value_type v) { c.push_back(v); };\n\ntemplate<typename T>\nconcept has_insert = requires (Container c, Container::value_type v) { c.insert(v); };\n\nvoid add(has_push_back auto& container, auto const& value)\n{\n    container.push_back(value);\n}\n\nvoid add(has_insert auto& container, auto const& value)\n{\n    container.insert(value);\n}	code	cpp	2025-07-16 14:10:42.601141	3
+4010	352	template<typename T>\nclass Stack\n{\nprivate:\n    std::vector<T> data;\n\npublic:\n    void push(T const&);\n    void pop() const;\n    T const& top() const;\n    bool empty() const;\n};	code	cpp	2025-07-16 14:11:30.104055	3
+4009	351	template<typename T>\nconcept has_push_back = requies (Container c, Container::value_type v) { c.push_back(v); };\n\ntemplate<has_push_back C, typename T>\nvoid add(C& container, T const& value)\n{\n    container.push_back(value);\n}\n\nvoid add(has_push_back auto& container, auto const& value)\n{\n    container.push_back(value);\n}\n\nvoid add(auto& container, auto const& value)\n{\n    if constexpr (requires { container.push_back(value); })\n    {\n        container.push_back(value);\n    }\n    else\n    {\n        container.insert(value);\n    }\n}	code	cpp	2025-07-16 14:11:02.515213	1
+956	354	To define a member function of a class template, you have to specify that it\nis a template, and you have to use the full type qualification of the class\ntemplate.	text	txt	2024-07-28 09:47:52.233889	1
+4012	354	template<typename T>\nclass Stack\n{\n    void push(T const&);\n    void pop();\n};\n\ntemplate<typename T>\nvoid Stack<T>::push(T const&) { }\n\ntemplate<typename T>\nvoid Stack<T>::pop() { }	code	cpp	2025-07-16 14:11:52.075904	2
+971	356	Note the `<T>` behind the function name `operator<<`. Thus, we declare a\nspecialization of the nonmember function template as friend. Without `<T>` we\nwould declare a new nontemplate function.	text	txt	2024-07-28 09:47:54.544082	6
+3969	307	#include <memory>\n\nclass string_buffer\n{\npublic:\n    explicit string_buffer() {}\n    explicit string_buffer(std::size_t const size) {}\n    explicit string_buffer(char const* const ptr) {}\n    explicit operator bool() const { return false; }\n    explicit operator char* const () const { return nullptr; }\n};\n\nint main()\n{\n    std::shared_ptr<char> str;\n    string_buffer b1;            // calls string_buffer()\n    string_buffer b2(20);        // calls string_buffer(std::size_t const)\n    string_buffer b3(str.get()); // calls string_buffer(char const*)\n\n    enum item_size { small, medium, large };\n\n    // implicit conversion cases when explicit not specified\n    string_buffer b4 = 'a';      // would call string_buffer(std::size_t const)\n    string_buffer b5 = small;    // would call string_buffer(std::size_t const)\n}	code	cpp	2025-07-15 21:51:51.616913	1
+4285	481	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> numbers{1,2,3,4,5,6};\n\n    // we have two separate parallel execution\n    std::transform(std::execution::par, numbers.begin(), numbers.end());\n    std::reduce(std::execution::par, numbers.begin(), numbers.end());\n\n    // instead we can combine the two\n    std::transform_reduce(std::execution::par, numbers.begin(), numbers.end());\n}	code	cpp	2025-07-17 10:23:22.419703	2
+3975	313	*C++20*\nstruct Holder\n{\n    [[nodiscard]] Holder(int value);\n    Holder();\n};\n\nint main()\n{\n    Holder{42}; // warning here\n    Holder h{42}; // constructed object not discarded, no warning\n    Holder{}; // default constructed, no warning\n}	code	cpp	2025-07-15 21:53:53.51629	1
+809	321	template<typename T>\nT max(T a, T b)\n{\n    return b < a ? a : b;\n}	code	cpp	2024-07-28 09:47:30.364146	2
+391	211	The simplest way to run tests for a built project is to call ctest in the\ngenerated build tree:	text	txt	2024-07-28 09:46:24.523912	1
+3973	308	struct base\n{\n    // default member initialization\n    const int height = 14;\n    const int width = 80;\n\n    v_align valign = v_align::middle;\n    h_align halign = h_align::left;\n\n    std::string text;\n\n    // constructor initialization list\n    base(std::string const& t): text{t}\n    {}\n\n    base(std::string const& t, v_align const va, h_align const ha): text{t}, valign{va}, halign{ha}\n    {}\n};	code	cpp	2025-07-15 21:52:28.004625	1
+3976	323	#include <iostream>\n\nvoid print_container(auto const& container)\n{\n    for (auto const& element: container)\n    {\n        std::cout << element << '\\\\n';\n    }\n}	code	cpp	2025-07-15 21:56:11.281862	1
+3974	312	struct [[nodiscard]] ErrorType{};\nErrorType get_value();\n\nint main()\n{\n    get_value(); // warning here\n}	code	cpp	2025-07-15 21:53:35.183684	1
+3983	326	template<typename T>\nT max(T a, T b) { return a < b ? b : a; }\n\nint const c = 42;\nmax(i, c);    // OK: T deduced as int\nmax(c, c);    // OK: T deduced as int\n\nint& ir = i;\nmax(i, ir);   // OK: T deduced as int\n\nint arr[4];\nmax(&i, arr); // OK: T deduced as int*\n\nmax(4, 7.2);  // ERROR: T can be dudeced as int or double\n\nstd::string s;\nmax("text", s); // ERROR: T can be deduced as char const[5] or std::string	code	cpp	2025-07-15 21:57:25.29908	2
+3977	324	template<typename T>\nT max(T a, T b) { return b < a ? a : b; }\n\nmax(7, 42); // 42\n::max(3.4, -6.7); // 3.4\n::max("mathematics", "math"); // mathematics	code	cpp	2025-07-15 21:56:34.511859	1
+3985	327	#include <type_traits>\n\ntemplate<typename T, typename R>\nauto max(T a, R b) -> std::common_type_t<T, R>\n{\n    return a < b ? b : a;\n}\n\nmax<double>(4, 7.2);	code	cpp	2025-07-15 21:58:05.234503	6
+3978	325	template<typename T>\nT max(T const& a, T const& b) { return a < b ? b : a; }\n\nmax(7, 42); // T is int	code	cpp	2025-07-15 21:56:57.276498	3
+3991	331	template<typename T1, typename T2, typename RT>\nRT max(T1 a, T2 b);\n\nmax<int, double, double>(4, 7.2); // OK, but tedious	code	cpp	2025-07-15 22:01:20.472789	3
+3996	335	void num_args() { }\n\ntemplate<typename T, typename... Types>\nvoid num_args(T first, Types... rest)\n{\n    std::cout << sizeof...(rest) + 1 << '\\\\n';\n}	code	cpp	2025-07-15 22:04:00.717008	1
+859	334	It is a template parameter representing multiple parameters with different types.	text	txt	2024-07-28 09:47:37.983517	1
+3988	328	template<typename T = std::string>\nvoid f(T = "");\n\nf();    // OK: f<std::string>()	code	cpp	2025-07-15 21:59:16.971079	4
+3989	328	template<typename T>\nvoid f(T = "");\n\nf(1);   // OK: f<int>(1)\nf();    // ERROR: cannot deduce T	code	cpp	2025-07-15 21:59:56.371463	2
+4001	341	#include <type_traits>\n\ntemplate<typename T1, typename T2,\n          typename RT = std::decay_t<decltype(true ? T1() : T2())>>	code	cpp	2025-07-16 14:09:18.915151	2
+3990	329	template<typename T1, typename T2>\nT1 max(T1 a, T2 b)\n{\n    return b < a ? a : b;\n}\n\nauto m = ::max(4, 7.2); // OK:: but max returns int	code	cpp	2025-07-15 22:01:00.500284	1
+4002	341	RT max(T1 a, T2 b);\n\ntemplate<typename T1, typename T2, typename RT = std::commot_type_t<T1, T2>>\nRT max(T1 a, T2 b);	code	cpp	2025-07-16 14:09:25.85498	4
+3997	336	template<typename... Args>\nauto print(Args... args)\n{\n    (std::cout << ... << args) << std::endl;\n}\n\nprint(42, "42", 42.0);	code	cpp	2025-07-15 22:05:27.847752	2
+3992	331	template <typaname RT, typename T1, typename T2>\nRT max(T1 a, T2 b);\n\nmax<double>(4, 7.2); // OK	code	cpp	2025-07-15 22:02:20.287953	5
+3994	333	#include <iostream>\n#include <algorithm>\n#include <iterator>\n#include <vector>\n\ntemplate<template<typename> typename V, typename T>\nvoid print(V<T> const& container)\n{\n    for (auto const& item: container)\n        std::cout << item << " ";\n    std::cout << std::endl;\n}\n\nint main()\n{\n    print(std::vector<int>{1,2,3,4});\n}	code	cpp	2025-07-15 22:03:23.437946	1
+3995	334	void print() { }\n\ntemplate<typename T, typename... Types>\nvoid print(T first, Types... rest)\n{\n    std::cout << first << '\\\\n';\n    print(rest...);\n}	code	cpp	2025-07-15 22:03:45.459907	2
+3998	339	#include <type_traits>\n\ntemplate<typename T1, typename T2>\nauto max(T1 a, T2 b) -> typename std::decay<decltype(true ? a : b)>::type;	code	cpp	2025-07-16 14:08:00.480194	2
+3999	340	#include <type_traits>\n\ntemplate<typename T1, typename T2>\ntypename std::common_type<T1, T2>::type max(T1 a, T2 b);	code	cpp	2025-07-16 14:08:28.112224	2
+4000	340	#include <type_traits>\n\ntemplate<typename T1, typename T2>\nstd::common_type_t<T1, T2> max(T1 a, T2 b);	code	cpp	2025-07-16 14:08:34.631286	4
+4003	342	template<typename RT = long, typename T1, typename T2>\nRT max(T1 a, T2 b);\n\nint i;\nlong l;\nmax(i, l);  // returns long due default argument of template parameter for return type\nmax<int>(7, 42);    // returns int as explicitly specified, T1 and T2 deduced by function arguments	code	cpp	2025-07-16 14:09:46.985342	2
+934	348	template<typename T>\nrequires std::is_copyable<T> && supports_less_than<T>\nT max_value(T a, T b)\n{\n    return b < a ? a : b;\n}	code	cpp	2024-07-28 09:47:47.986862	2
+4016	356	template<typename T>\nclass Stack;\n\ntemplate<typename T>\nstd::ostream& operator<<(std::ostream&, Stack<T> const&);\n\ntemplate<typename T>\nclass Stack\n{\npublic:\n    Stack(Stack const&);\n\n    friend std::ostream& operator<<<T>(std::ostream&, Stack<T> const&);\n};	code	cpp	2025-07-16 14:12:49.239489	5
+4286	482	#include <algorithm>\n\nstd::min(42, 87);\nstd::min({2,5,8,23,43});\nstd::max(34, 47);\nstd::max({4,8,12,42});	code	cpp	2025-07-17 10:23:39.94719	1
+4019	357	template<typename T>\nclass Stack\n{\n    void push(T const&);\n};\n\ntemplate<typename T>\nvoid Stack<T>::push(T const&) { }\n\ntemplate<>\nStack<std::string>\n{\n    void push(std::string const&);\n};\n\nvoid Stack<std::string>::push(std::string const&) { }	code	cpp	2025-07-16 14:13:18.000498	2
+4287	483	#include <ranges>\n\nstd::ranges::starts_with("Hello World", "Hello");\n// true	code	cpp	2025-07-17 10:23:54.873581	2
+1006	362	Since C++14, the standard library uses this technique to define shortcuts for\nall type traits in the standard library that yield a type:	text	txt	2024-07-28 09:47:59.629697	4
+4029	360	template<typename T, typename C = std::vector<T>>\nclass Stack\n{\nprivate:\n    C container;\n\npublic:\n    void push(T const&);\n    void pop();\n    T const& top() const;\n    bool empty() const;\n};\n\ntemplate<typename T, typename C>\nvoid Stack<T, C>::push(T const& value)\n{\n    container.push_back(value);\n}\n\ntemplate<typename T, typename C>\nvoid Stack<T, C>::pop()\n{\n    container.pop_back();\n}\n\ntemplate<typename T, typename C>\nT const& Stack<T, C>::top() const\n{\n    if (container.empty()) throw std::exception{"empty container"};\n    return container.back();\n}\n\ntemplate<typename T, typename C>\nbool Stack<T, C>::empty() const\n{\n    return container.empty();\n}	code	cpp	2025-07-16 14:17:45.750803	1
+4022	358	template<typename T>\nclass Stack\n{\n    void push(T const&);\n};\n\ntemplate<typename T>\nvoid Stack<T> push(T const&) { }\n\ntemplate<typename T>\nclass Stack<T*>\n{\n    void push(T*);\n};\n\ntemplate<typename T>\nvoid Stack<T*>::push(T*) { }	code	cpp	2025-07-16 14:13:39.482773	2
+4030	362	struct Matrix\n{\n    using iterator = ...;\n};\n\ntemplate<typename T>\nusing MatrixIterator = typename Matrix<T>::iterator;	code	cpp	2025-07-16 14:22:26.224873	2
+1007	362	std::add_const_t<T> // C++14 abbreviate equivalent to std::add_const<T>::type available since C++11\nstd::enable_if_v<T> // C++14 abbreviate equivalent to std::enable_if<T>::value available since C++11	code	cpp	2024-07-28 09:47:59.650938	5
+4288	484	#include <ranges>\n#include <vector>\n\nstd::vector nums {1, 2, 3, 4};\nstd::ranges::ends_with(v, {3, 4});\n// true	code	cpp	2025-07-17 10:24:03.467153	2
+4024	359	template<typename T>\nclass Stack<T, T>;\n\ntemplate<typename T>\nclass Stack<T, int>;\n\ntemplate<typename T1, typename T2>\nclass Stack<T1*, T2*>;	code	cpp	2025-07-16 14:14:01.889553	3
+4290	485	#include <ranges>\n#include <string>\n\nint main()\n{\n    std::string alphabet = std::views::iota('a', 'z')\n                         | std::views::transform([](auto const v){ return v - 32; })\n                         | std::ranges::to<std::string>();\n\n    std::string abc = alphabet | std::views::take(3) | std::ranges::to<std::string>();\n}	code	cpp	2025-07-17 10:24:14.167585	2
+1011	364	1. Number of arguments must match\n2. Types must fit (including implicit conversions)\n3. Choose best match:\n  - Perfect match over template\n  - Template over conversion\n  - For non-empty brace initialization, `std::initializer_list<>` has highest\n    priority	text	txt	2024-07-28 09:48:02.284768	2
+4302	487	#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> numbers{1, 2, 3, 4, 5};\n    long sum{};\n\n    sum = std::for_each(numbers.begin(), numbers.end(), sum_predicate<long>{});\n    // sum == 15, using a unary predicate\n\n    std::for_each(numbers.begin(), numbers.end(), [&sum](auto v) { sum += v; });\n    // sum == 30, using a lambda\n\n    std::ranges::for_each(numbers, [&sum](auto v) { count++; sum += v; });\n    // sum == 45, using ranges\n\n    for (auto v: numbers) { sum += v; }\n    // sum == 60, using range-based for\n}	code	cpp	2025-07-17 10:40:08.95584	4
+4297	486	#include <algorithm>\n#include <vector>\n#include <set>\n\nstd::vector<int> data1{2, 1, 3, 4, 5};\nstd::vector<int> data2{2, 4, 1, 3, 5};\n\n// Linear comparison:\nbool cmp1 = std::equal(data1.begin(), data1.end(), data2.begin());\n// cmp1 == false\n\nbool cmp2 = (data1 == data2);\n// cmp2 == false (same as std::equal if types match)\n\n// Elements match but are potentially out of order:\nbool cmp3 = std::is_permutation(data1.begin(), data1.end(), data2.begin());\n// cmp3 == true\n\nstd::set<int> data3{1, 2, 3, 4, 5};\n\n// Linear comparison:\nbool cmp4 = std::ranges::equal(data1, data3);\n// cmp4 == false\n\n// Elements match but are potentially out of order:\nbool cmp5 = std::ranges::is_permutation(data1, data3);\n// cmp5 == true	code	cpp	2025-07-17 10:24:44.871858	2
+2069	613	If you require simple one-shot signalling between threads, the `void`\nspecializations of `std::future` and `std::shared_future` can serve as solid\nhigh-level choices for 1:1 and 1:N signalling.	text	txt	2024-07-28 09:50:56.835654	1
+4304	487	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<int> data{1, 2, 3, 4, 5};\n\n    std::for_each(data.begin(), data.end(), [i = 5](int& v) mutable { v += i--; });\n    // data == {6, 6, 6, 6, 6}\n}	code	cpp	2025-07-17 10:40:18.81642	5
+4306	487	#include <algorithm>\n#include <execution>\n#include <vector>\n\nint main()\n{\n    struct Custom {};\n    void process(Custom&) {}\n    std::vector<Custom> rng(10, Custom{});\n\n    // parallel execution C++17\n    std::for_each(std::execution::par_unseq, // parallel, in any order\n            rng.begin(), rng.end(), // all elements\n            process // invoke process on each element\n            );\n}	code	cpp	2025-07-17 10:40:29.185698	6
+4308	487	#include <algorithm>\n#include <vector>\n#include <optional>\n\nint main()\n{\n    std::vector<std::optional<int>> opt{{},2,{},4,{}};\n    // range version with projection C++20\n\n    std::ranges::for_each(opt,\n        [](int v) {\n            // iterate over projected values\n            // {0, 2, 0, 4, 0}\n        },\n        [](std::optional<int>& v){\n            // projection that will return\n            // the contained value or zero\n            return v.value_or(0);\n        }\n    );\n}	code	cpp	2025-07-17 10:40:40.325099	7
+4310	488	#include <algorithm>\n#include <execution>\n#include <ranges>\n#include <vector>\n\nstruct work\n{\n    void expensive_operation() { /* ... */ }\n};\n\nint main()\n{\n    std::vector<work> work_pool{work{}, work{}, work{}};\n    std::for_each(std::execution::par_unseq, work_pool.begin(), work_pool.end(), [](work& w) { w.expensive_operation(); });\n}	code	cpp	2025-07-17 10:40:53.344579	2
+4313	489	#include <algorithm>\n#include <ranges>\n#include <vector>\n\nstruct work_unit\n{\n    size_t value;\n    work_unit(size_t initial): value{std::move(initial)} {}\n    size_t current() const { return value; }\n};\n\nint main()\n{\n    size_t sum{};\n    std::vector<work_unit> tasks{1,2,3};\n    std::ranges::for_each(tasks, [&sum](auto const& e) { sum += e; }, &work_unit::current);\n    // sum: 6\n}	code	cpp	2025-07-17 10:41:20.477548	1
+1581	488	Note: parallel execution requires *libtbb* library to be linked.	text	txt	2024-07-28 09:49:32.971449	5
+4311	488	#include <algorithm>\n#include <execution>\n#include <atomic>\n#include <vector>\n\nint main()\n{\n    std::vector<long> numbers{1,2,3,4,5};\n    std::atomic<size_t> sum{};\n    std::for_each(std::execution::par_unseq, numbers.begin(), numbers.end(), [&sum](auto& e) { sum += e; });\n}	code	cpp	2025-07-17 10:41:08.622196	4
+4319	492	#include <algorithm>\n#include <memory>\n\nint main()\n{\n    auto p1 = std::make_unique<int>(1);\n    auto p2 = std::make_unique<int>(2);\n\n    int *p1_pre = p1.get();\n    int *p2_pre = p2.get();\n\n    std::ranges::swap(p1, p2);\n    // p1.get() == p1_pre, *p1 == 2\n    // p2.get() == p2_pre, *p2 == 1\n}	code	cpp	2025-07-17 10:42:02.628435	3
+4314	490	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> numbers{1,2,3,4,5,6};\n    std::size_t sum{};\n    std::for_each_n(numbers.begin(), 3, [&sum](auto const& e) { sum += e; });\n    // sum = 6\n}	code	cpp	2025-07-17 10:41:31.406918	3
+4316	491	#include <algorithm>\n\nnamespace library\n{\n    struct container { long value; };\n}\n\nint main()\n{\n    library::container a{3}, b{4};\n    std::ranges::swap(a, b); // first calls library::swap\n                             // then it calls the default move-swap\n}	code	cpp	2025-07-17 10:41:47.997882	3
+4320	493	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> numbers{1,2,3,4,5,6};\n    std::swap_ranges(numbers.begin(), numbers.begin()+2, numbers.rbegin());\n    // numbers: {6,5,3,4,2,1}\n}	code	cpp	2025-07-17 10:42:12.733342	2
+4560	613	#include <thread>\n#include <future>\n\n// executes first stage eagerly, but wait for signal to continue the second stage\nauto wait_for_signal = [](auto future) {\n    // first stage\n    future.wait(); // wait for signal\n    // second stage\n};\n\n{ // 1:1 example\n    std::promise<void> sender;\n\n    auto t = std::jthread(wait_for_signal, sender.get_future());\n\n    // first stage eagerly executing\n    sender.set_value(); // unblock the second stage by sending a signal\n}\n\n{ // 1:N example\n    std::promise<void> sender;\n\n    // promise::get_future() can only be called once\n    std::shared_future<void> receiver(sender.get_future());\n\n    // start four threads, each running two-stage runner\n    std::vector<std::jthread> runners;\n\n    // eagerly execute first stage for all four threads\n    std::generate_n(std::back_inserter(runners), 4, [&]{ return std::jthread(wait_for_signal, receiver); });\n\n    sender.set_value(); // unblock the second stage by sending a signal\n}	code	cpp	2025-07-17 12:13:02.998676	2
+4565	617	std::promise<long> value_source;\nstd::future<long> value_target{value_source.get_future()};\n\nstd::jthread provider{[&value_target]{\nstd::cout << std::format("{}\\\\n", value_target.get());\n// throws exception\n}};\n\nstd::jthread consumer{[&value_source]{\nvalue_source.set_exception(\nstd::make_exception_ptr(std::exception{"reason"})\n)\n}};	code	cpp	2025-07-17 12:13:29.544707	1
+4563	616	#include <iostream>\n#include <format>\n#include <thread>\n#include <future>\n\nint main()\n{\n    std::promise<long> value_source;\n    std::future<long> value_target{value_source.get_future()};\n\n    std::jthread provider{[&value_target]{\n        std::cout << std::format("{}\\\\n", value_target.get());\n    }};\n\n    std::jthread consumer{[&value_source]{\n        value_source.set_value(42);\n    }};\n}	code	cpp	2025-07-17 12:13:22.483379	1
+4041	364	namespace std\n{\n    template<typename ElemT, typename Allocator = allocator<T>>\n    class vector\n    {\n    public:\n        vector() noexcept(noexcept(Allocator()));\n\n        explicit vector(Allocator const&) noexcept;\n\n        explicit vector(size_t n, Allocator const& = Allocator());\n\n        vector(size_t n, ElemT const& value, Allocator const& = Allocator());\n\n        template<typename Iter>\n        vector(Iter beg, Iter end, Allocator const& = Allocator());\n\n        vector(vector const& x);\n\n        vector(vector&&) noexcept;\n\n        vector(vector const&, Allocator const&);\n\n        vector(vector&&, Allocator const&);\n\n        vector(vector&&, Allocator const&);\n\n        vector(initializer_list<ElemT>, Allocator const& = Allocator());\n    };\n} // std\n\nint main()\n{\n    std::vector v1(42, 73);\n}	code	cpp	2025-07-16 14:23:45.148707	3
+1252	409	But this solely prevents objects with names. So we should implement two\noverloads that pass by values and move:	text	txt	2024-07-28 09:48:42.421675	10
+1253	409	Overloading both for rvalue and lvalue references lead to many different\ncombinations of parameters.	text	txt	2024-07-28 09:48:42.442683	11
+4119	403	Deleting the move operations and enabling the copy operations really makes no sense:\nclass Person\n{\npublic:\n    ...\n    // copy constructor explicitly declared:\n    Person(const Person& p) = default;\n    Person& operator=(const Person&) = default;\n\n    // move constructor/assignment declared as deleted:\n    Person(Person&&) = delete;\n    Person& operator=(Person&&) = delete;\n    ...\n};\n\nPerson p{"Tina", "Fox"};\ncoll.push_back(p); // OK: copying enabled\ncoll.push_back(std::move(p)); // ERROR: moving disabled	code	cpp	2025-07-16 14:40:23.980828	4
+4051	367	template<typename T>\nclass Stack\n{\nprivate:\n    std::vector<T> container;\n\npublic:\n    Stack(T value): container({std::move(value)}) { }\n    // initialize stack with one element by value to decay on class template argument deduction\n};	code	cpp	2025-07-16 14:25:40.056214	4
+1024	364	By following the overload resolution matching rules, the first rule *number\nof arguments* specifies that we have 6 following matches that fit two\nparameters:	text	txt	2024-07-28 09:48:02.551094	4
+4046	364	explicit vector(size_t n, Allocator const& = Allocator());\n\nvector(size_t n, ElemT const& value, Allocator const& = Allocator());\n\ntemplate<typename Iter>\nvector(Iter beg, Iter end, Allocator const& = Allocator());\n\nvector(vector&&, Allocator const&);\n\nvector(vector&&, Allocator const&);\n\nvector(initializer_list<ElemT>, Allocator const& = Allocator());	code	cpp	2025-07-16 14:24:12.87054	5
+1031	364	By applying the second rule *types must fit* we will only have the following\n3 remaining overload resolutions:	text	txt	2024-07-28 09:48:02.698736	6
+1057	368	Stack(const char*) -> Stack<std::string>;	code	cpp	2024-07-28 09:48:06.351616	3
+1035	364	The second overload resolution might seem strange that integers fit two\niterators, but compiler only sees two matching arguments having the same type\nwhich can also be `int`.	text	txt	2024-07-28 09:48:02.782795	8
+1036	364	Going further, the third rule of *choose the best match*, we would lose the\nfirst two because if we have an initializer list for constructing an object,\nthe overload resolution having `std::initializer_list<>` is a best match. So\nwe would only have the last overload:	text	txt	2024-07-28 09:48:02.8052	9
+4048	364	vector(size_t n, ElemT const& value, Allocator const& = Allocator());\n\ntemplate<typename Iter>\nvector(Iter beg, Iter end, Allocator const& = Allocator());\n\nvector(initializer_list<ElemT>, Allocator const& = Allocator());	code	cpp	2025-07-16 14:24:30.68525	7
+1037	364	vector(initializer_list<ElemT>, Allocator const& = Allocator());	code	cpp	2024-07-28 09:48:02.82573	10
+1220	405	class Customer\n{\n    ...\npublic:\n    ...\n    Customer(const Customer&) = default;    // disable move semantics\n    Customer& operator=(const Customer&) = default;     // disable move semantics\n};	code	cpp	2024-07-28 09:48:35.72559	2
+4049	365	template<typename T>\nclass Stack\n{\nprivate:\n    std::vector<T> container;\n\npublic:\n    Stack() = default;\n    Stack(T const& value): container({value}) { }\n};	code	cpp	2025-07-16 14:24:57.801991	2
+4050	366	template<typename T>\nclass Stack\n{\nprivate:\n    std::vector<T> container;\n\npublic:\n    Stack() = default;\n    Stack(T const& value): container({value}) { }\n};	code	cpp	2025-07-16 14:25:17.37479	4
+1061	369	The type of objects without template arguments are not types, but act as a\nplaceholder for a type that activates CTAD. When compiler encouters it, it\nbuilds a set of deduction guides which can be complemented by user with user\ndefined deduction rules.	text	txt	2024-07-28 09:48:07.385832	1
+4121	406	class Customer\n{\n    ...\npublic:\n    ...\n    Customer(const Customer&) = default;\n    // copying calls enabled\n    Customer& operator=(const Customer&) = default; // copying calls enabled\n    Customer(Customer&&) = delete;\n    // moving calls disabled\n    Customer& operator=(Customer&&) = delete;\n    // moving calls disabled\n};\n\nclass Invoice\n{\n    std::string id;\n    Customer cust;\npublic:\n    ... // no special member functions\n};\n\nInvoice i;\nInvoice i1{std::move(i)}; // OK, moves id, copies cust	code	cpp	2025-07-16 14:44:19.672377	2
+4122	407	class Base\n{\npublic:\n    virtual void do_something() const = 0;\n    virtual ~Base() = default;\n};\n\nclass Derived: public Base\n{\npublic:\n    virtual void do_something() const override;\n    virtual ~Derived() = default; // BAD, redundant, disables move\n};	code	cpp	2025-07-16 14:44:34.678988	2
+4124	408	void fooByVal(std::string str);\nvoid fooByRRef(std::string&& str);;\n\nstd::string s1{"data"}, s2{"data"};\n\nfooByVal(std::move(s1));    // s1 is moved\nfooByRRef(std::move(s2));   // s2 might be moved	code	cpp	2025-07-16 14:45:16.189084	2
+4055	369	std::pair p{42, "demo"};    // std::pair<int, char const*>\nstd::vector v{1, 2};        // std::vector<int>\n\n// declaration of the template\ntemplate<typename T>\nstruct container\n{\n    container(T t) {}\n\n    template<typename Iter>\n    container(Iter beg, Iter end);\n};\n\n// additional deduction guide\ntemplate<typename Iter>\ncontainer(Iter b, Iter e) -> container<typename std::iterator_traits<Iter>::value_type>;\n\n// use cases\ncontainer c(7); // OK: deduces container<int> using an implicitly-generated guide\nstd::vector<double> v = {/* ... */};\nauto d = container(v.begin(), v.end()); // OK: deduces container<double>\ncontainer e{5, 6}; // Error: there is no std::iterator_traits<int>::value_type	code	cpp	2025-07-16 14:27:06.724713	3
+4056	371	ValueWithComment(char const*, char const*) -> ValueWithComment<std::string>;\n\nValueWithComment vc = {"secret", "my secret message"}; // ValueWithComment<std::string> deduced	code	cpp	2025-07-16 14:28:12.865543	4
+4572	622	#include <iostream>\n#include <semaphore>\n#include <thread>\n#include <vector>\n\ntemplate<typename T>\nclass data_structure\n{\nprivate:\n    std::vector<T> underlying_container;\n    std::counting_semaphore<1> underlying_synchronization;\n\npublic:\n    data_structure():\n        underlying_container{},\n        underlying_synchronization{0}\n    {\n    }\n\n    void prepare()\n    {\n        std::jthread t0{&data_structure::secondary_initialization, this};\n        std::jthread t1{&data_structure::primary_initialization, this};\n    }\n\n    std::vector<T> get() const { return underlying_container; }\n\nprivate:\n    void secondary_initialization()\n    {\n        underlying_synchronization.acquire();\n        underlying_container[1] = 2;\n    }\n\n    void primary_initialization()\n    {\n        underlying_container = {1, 0, 3};\n        underlying_synchronization.release();\n    }\n};\n\nint main()\n{\n    data_structure<long> data{};\n    data.prepare();\n    for (auto element: data.get())\n        std::cout << element << " ";\n    std::cout << "\\\\n";\n}	code	cpp	2025-07-17 12:14:45.748262	2
+4127	409	#include <string>\n\nclass box\n{\nprivate:\n    std::string first;\n    std::string last;\n\npublic:\n    box(std::string const& f, std::string const& l): first{f}, last{l} {}\n    // f, l allocated\n    // first, last also allocated\n};\n\nbox b{"First", "Last"};	code	cpp	2025-07-16 14:45:37.757281	3
+4129	409	#include <string>\n\nclass box\n{\nprivate:\n    std::string first;\n    std::string last;\n\npublic:\n    box(std::string f, std::string l): first{std::move(f)}, last{std::move(l)} {}\n};	code	cpp	2025-07-16 14:45:51.397513	5
+1254	409	In some cases, move operations take significant time. For example, if we have\na class with a string and a vector of values, taking by value and move is\nusually the right approach. However, if we have a `std::array` member, moving\nit will take significant time even if the members are moved.	text	txt	2024-07-28 09:48:42.463009	12
+1258	409	Often, pass by value is useful when we *create and initialize* a new value.\nBut if we already have a value, which we update or modify, using this\napproach would be counterproductive. A simple example would be setters:	text	txt	2024-07-28 09:48:42.551019	14
+1263	409	Each time we set a new firstname we create a new temporary parameter `s`\nwhich allocates its own memory. But by implementing in the traditional way\ntaking a const lvalue reference we avoid allocations:	text	txt	2024-07-28 09:48:42.657736	16
+1267	409	Even with move semantics, the best approach for setting existing values is to\ntake the new values by const lvalue reference and assign without using move\noperation.	text	txt	2024-07-28 09:48:42.745615	18
+4063	372	#include <vector>\n#include <map>\n\nstd::vector<int> get_numbers()\n{\n    return std::vector<int>{1, 2, 3, 4, 5};\n}\n\nstd::map<int, double> get_doubles()\n{\n    return std::map<int, double>{\n        {0, 0.0},\n        {1, 1.1},\n        {2, 2.2}\n    };\n}\n\nint main()\n{\n    auto numbers = std::vector<int>{1, 2, 3, 4, 5};\n    auto copies = std::vector<int>(numbers.size() * 4);\n\n    for (int element: numbers)\n        copies.push_back(element);\n\n    for (int& element: numbers)\n        copies.push_back(element);\n\n    for (auto&& element: get_numbers())\n        copies.push_back(element);\n\n    for (auto&& [key, value]: get_doubles())\n        copies.push_back(key);\n}	code	cpp	2025-07-16 14:29:01.682728	1
+1617	495	Since C++20 introduced the spaceship operator, user-defined types can easily\naccess the default version of *lexicographical ordering*.	text	txt	2024-07-28 09:49:38.955427	3
+1622	495	The type returned for the spaceship operator is the common comparison\ncategory type for the bases and members, one of:	text	txt	2024-07-28 09:49:39.059432	5
+1623	495	* `std::strong_ordering`\n* `std::weak_ordering`\n* `std::partial_ordering`	text	txt	2024-07-28 09:49:39.079374	6
+4131	409	#include <string>\n#include <vector>\n\nclass box\n{\nprivate:\n    std::string first;\n    std::vector<std::string> values;\n\npublic:\n    box(std::string f, std::vector<std::string> v): first{std::move(f)}, values{std::move(v)} {}\n    insert(std::string n) { values.push_back(std::move(n)); }\n};	code	cpp	2025-07-16 14:46:03.788955	7
+4133	409	#include <string>\n\nclass box\n{\nprivate:\n    std::string first;\n    std::string last;\n\npublic:\n    box(std::string&& f, std::string&& l): first{std::move(f)}, last{std::move(l)} {}\n};	code	cpp	2025-07-16 14:46:12.845512	9
+4332	495	struct Point {\n    int x;\n    int y;\n\n    // pre-C++20 lexicographical less-than\n    friend bool operator<(const Point& left, const Point& right)\n    {\n        if (left.x != right.x)\n            return left.x < right.x;\n        return left.y < right.y;\n    }\n\n    // default C++20 spaceship version of lexicographical comparison\n    friend auto operator<=>(const Point&, const Point&) = default;\n\n    // manual version of lexicographical comparison using operator <=>\n    friend auto operator<=>(const Point& left, const Point& right)\n    {\n        if (left.x != right.x)\n            return left.x <=> right.x;\n        return left.y <=> right.y;\n    }\n};	code	cpp	2025-07-17 10:47:31.076882	4
+4135	409	#include <string>\n#include <array>\n\nclass box\n{\nprivate:\n    std::string first;\n    std::array<std::string, 1000> values;\n\npublic:\n    box(std::string f, std::array<std::string, 1000>& v): first{std::move(f)}, values{v} {}\n    box(std::string f, std::array<std::string, 1000>&& v): first{std::move(f)}, values{std::move(v)} {}\n};	code	cpp	2025-07-16 14:46:26.477634	13
+1268	409	Taking a parameter by value and moving it to where the new value is needed is\nonly useful when we store the passed value somewhere as a new value where we\nneed new memory allocation anyway. When modifying an existing value, this\npolicy might be counterproductive.	text	txt	2024-07-28 09:48:42.767129	19
+4329	494	#include <algorithm>\n\nnamespace MyNamespace\n{\nstruct MyClass\n{\n    // Use inline friend function to implement custom swap.\n    friend void swap(MyClass&, MyClass&) { }\n};\n\nstruct MyOtherClass {};\n} // MyNamespace\n\nMyNamespace::MyClass a, b;\nMyNamespace::MyOtherClass x, y;\n\n// Fully qualified call, will always call std::swap\nstd::swap(a,b); // calls std::swap\nstd::swap(x,y); // calls std::swap\n\n// No suitable swap for MyOtherClass.\nswap(a,b); // calls MyNamespace::swap\n// swap(x,y); // would not compile\n\n// Pull std::swap as the default into local scope:\nswap(a,b); // calls MyNamespace::swap\nswap(x,y); // would not compile\n\n// Pull std::swap as the default into local scope:\n\nusing std::swap;\nswap(a,b); // calls MyNamespace::swap\nswap(x,y); // calls std::swap\n\n// C++20 std::ranges::swap which will do the correct thing:\nstd::ranges::swap(x,y); // default swap\nstd::ranges::swap(a,b); // calls MyNamespace::swap	code	cpp	2025-07-17 10:47:00.470233	2
+4575	623	#include <thread>\n#include <chrono>\n#include <semaphore>\n\nstd::binary_semaphore signal_main2thread{0}, signal_thread2main{0};\n\nvoid thread_task()\n{\n    signal_main2thread.acquire();\n    std::this_thread::sleep_for(std::chrono::seconds{1});\n    signal_thread2main.release();\n}\n\nint main()\n{\n    std::jthread thread_worker{thread_task};\n    signal_main2thread.release();\n    signal_thread2main.acquire();\n}	code	cpp	2025-07-17 12:15:00.667113	1
+4337	496	#include <algorithm>\n#include <ranges>\n#include <vector>\n#include <string>\n\nint main()\n{\n    std::vector<long> range1{1, 2, 3};\n    std::vector<long> range2{1, 3};\n    std::vector<long> range3{1, 3, 1};\n\n    bool cmp1 = std::lexicographical_compare(range1.cbegin(), range1.cend(), range2.cbegin(), range2.cend());\n    // same as\n    bool cmp2 = range1 < range2;\n    // cmp1 = cmp2 = true\n\n    bool cmp3 = std::lexicographical_compare(range2.cbegin(), range2.cend(), range3.cbegin(), range3.cend());\n    // same as\n    bool cmp4 = range2 < range3;\n    // cmp3 = cmp4 = true\n\n    std::vector<std::string> range4{"Zoe", "Alice"};\n    std::vector<std::string> range5{"Adam", "Maria"};\n    auto compare_length = [](auto const& l, auto const& r) { return l.length() < r.length(); };\n\n    bool cmp5 = std::ranges::lexicographical_compare(range4, range5, compare_length);\n    // different than\n    bool cmp6 = range1 < range2;\n    // cmp5 = true, cmp6 = false\n}	code	cpp	2025-07-17 10:48:00.364817	3
+4345	499	#include <algorithm>\n#include <ranges>\n#include <vector>\n#include <list>\n\nstruct Account\n{\n    long value() { return value_; }\n    long value_;\n};\n\nint main()\n{\n    std::vector<long> series1{6,2,4,1,5,3};\n    std::sort(series1.begin(), series1.end());\n\n    std::list<long> series2{6,2,4,1,5,3};\n    //std::sort(series2.begin(), series2.end()); // won't compile\n    series2.sort();\n\n    // With C++20, we can take advantage of projections to sort by a method or member\n    std::vector<Account> accounts{{6},{2},{4},{1},{5},{3}};\n    std::ranges::sort(accounts, std::greater<>{}, &Account::value);\n}	code	cpp	2025-07-17 10:48:49.496108	2
+4341	497	#include <algorithm>\n#include <vector>\n#include <string>\n\nint main()\n{\n    std::vector<long> numbers1{1, 1, 1};\n    std::vector<long> numbers2{1, 2, 3};\n\n    auto cmp1 = std::lexicographical_compare_three_way(numbers1.cbegin(), numbers1.cend(), numbers2.cbegin(), numbers2.cend());\n    // cmp1 = std::strong_ordering::less\n\n    std::vector<std::string> strings1{"Zoe", "Alice"};\n    std::vector<std::string> strings2{"Adam", "Maria"};\n\n    auto cmp2 = std::lexicographical_compare_three_way(strings1.cbegin(), strings1.cend(), strings2.cbegin(), strings2.cend());\n    // cmp2 = std::strong_ordering::greater\n}	code	cpp	2025-07-17 10:48:22.00284	5
+4349	500	#include <algorithm>\n#include <ranges>\n#include <vector>\n#include <string>\n\nstruct Record\n{\n    std::string label;\n    short rank;\n};\n\nint main()\n{\n    std::vector<Record> records{{"b", 2}, {"e", 1}, {"c", 2}, {"a", 1}, {"d", 3}};\n\n    std::ranges::stable_sort(records, {}, &Record::label);\n    // guaranteed order: a-1, b-2, c-2, d-3, e-1\n\n    std::ranges::stable_sort(records, {}, &Record::rank);\n    // guaranteed order: a-1, e-1, b-2, c-2, d-3\n}	code	cpp	2025-07-17 10:49:12.052988	4
+4352	501	#include <algorithm>\n#include <vector>\n#include <ranges>\n\nint main()\n{\n    std::vector<int> data1 = {1, 2, 3, 4, 5};\n    bool test1 = std::is_sorted(data1.begin(), data1.end());\n    // test1 == true\n\n    std::vector<int> data2 = {5, 4, 3, 2, 1};\n    bool test2 = std::ranges::is_sorted(data2);\n    // test2 == false\n\n    bool test3 = std::ranges::is_sorted(data2, std::greater<>{});\n    // test3 == true\n}	code	cpp	2025-07-17 10:49:27.03408	2
+4353	502	#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> numbers{1,2,3,6,5,4};\n    auto iter = std::ranges::is_sorted_until(numbers);\n    // *iter = 6\n}	code	cpp	2025-07-17 10:49:35.381573	2
+4580	627	#include <thread>\n#include <latch>\n#include <mutex>\n#include <vector>\n\nstd::size_t thread_max{std::thread::hardware_concurrency()};\nstd::mutex exclusive{};\nstd::latch works{static_cast<std::ptrdiff_t>(thread_max)};\nstd::vector<long> shared_storage(thread_max);\n\nvoid set_data(std::size_t index, long value)\n{\n    std::lock_guard<std::mutex> automatic_locker{exclusive};\n    shared_storage.at(index) = value;\n    works.count_down();\n}\n\nint main()\n{\n    std::vector<std::jthread> thread_pool(thread_max);\n\n    for (std::size_t thread_index{}; thread_index != thread_max; ++thread_index)\n    {\n        thread_pool.emplace_back(set_data, thread_index, thread_index);\n    }\n\n    works.wait();\n    // blocks until all <thread_max> threads have set data\n    // {0, 1, 2, 3, 4, 5, 6, 7} on a machine with 8 cores\n}	code	cpp	2025-07-17 12:15:13.644048	1
+4368	508	#include <algorithm>\n#include <cassert>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> series{2, 4, 6, 7, 9, 11};\n    auto is_even = [](auto v) { return v % 2 == 0; };\n    bool test = std::ranges::is_partitioned(series, is_even);\n    assert(test); // test = true\n}	code	cpp	2025-07-17 10:51:41.101722	2
+4367	506	#include <algorithm>\n#include <iostream>\n#include <vector>\n#include <string>\n\nstruct ExamResult\n{\n    std::string student_name;\n    int score;\n};\n\nint main()\n{\n    std::vector<ExamResult> results{{"Jane Doe", 84}, {"John Doe", 78}, {"Liz Clarkson", 68}, {"David Teneth", 92}};\n\n    auto partition_point = std::partition(results.begin(), results.end(), [threshold=80](auto const& e) { return e.score >= threshold; });\n\n    std::for_each(results.begin(), partition_point, [](auto const& e) { std::cout << "[PASSED] " << e.student_name << "\\\\n"; });\n    std::for_each(partition_point, results.end(), [](auto const& e) { std::cout << "[FAILED] " << e.student_name << "\\\\n"; });\n}	code	cpp	2025-07-17 10:51:08.937347	3
+4363	505	#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> numbers{1,2,3,4,5};\n\n    auto last_sorted = std::is_sorted_until(numbers.begin(), numbers.end());\n\n    for (auto iter = numbers.begin(); iter != last_sorted; ++iter)\n        continue;\n\n    for (auto v: std::ranges::subrange(numbers.begin(), last_sorted))\n        continue;\n}	code	cpp	2025-07-17 10:50:26.814351	1
+4356	503	#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<int> data{9, 8, 7, 6, 5, 4, 3, 2, 1};\n\n    std::partial_sort(data.begin(), data.begin()+3, data.end());\n    // data == {1, 2, 3, -unspecified order-}\n\n    std::ranges::partial_sort(data, data.begin()+3, std::greater<>());\n    // data == {9, 8, 7, -unspecified order-}\n}	code	cpp	2025-07-17 10:49:49.398772	3
+4359	504	#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<int> top(3);\n\n    // input == "0 1 2 3 4 5 6 7 8 9"\n    auto input = std::istream_iterator<int>(std::cin);\n    auto cnt = std::counted_iterator(input, 10);\n\n    std::ranges::partial_sort_copy(cnt, std::default_sentinel, top.begin(), top.end(), std::greater<>{});\n    // top == { 9, 8, 7 }\n}	code	cpp	2025-07-17 10:50:04.746732	3
+4371	509	#include <algorithm>\n#include <iterator>\n#include <cassert>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> series{2, 4, 6, 7, 9, 11};\n    auto is_even = [](auto v) { return v % 2 == 0; };\n\n    std::vector<long> evens, odds;\n    std::ranges::partition_copy(series, std::back_inserter(evens), std::back_inserter(odds), is_even);\n\n    assert(evens.size() == 3);\n    assert(odds.size() == 3);\n}	code	cpp	2025-07-17 10:51:52.985244	3
+1704	510	The `std::nth_element` algorithm is a partitioning algorithm that ensures\nthat the element in the nth position is the element that would be in this\nposition if the range was sorted.	text	txt	2024-07-28 09:49:51.307415	2
+1710	510	Because of its selection/partitioning nature, `std::nth_element` offers a\nbetter theoretical complexity than `std::partial_sort` - `O(n)` vs `O(n ∗\nlogk)`. However, note that the standard only mandates average `O(n)`\ncomplexity, and `std::nth_element` implementations can have high overhead, so\nalways test to determine which provides better performance for your use case.	text	txt	2024-07-28 09:49:51.431226	4
+4375	510	#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> series1{6, 3, 5, 1, 2, 4};\n    std::nth_element(series1.begin(), std::next(series1.begin(), 2), series1.end());\n    // 1 2 3 5 6 4\n\n    std::vector<long> series2{6, 3, 5, 1, 2, 4};\n    std::ranges::nth_element(series2, std::ranges::next(series2.begin(), 2));\n    // 1 2 3 5 6 4\n\n    std::vector<long> series3{6, 3, 5, 1, 2, 4};\n    std::nth_element(series3.begin(), std::next(series3.begin(), 2), series3.end(), std::greater<long>{});\n    // 5 6 4 3 2 1\n\n    std::vector<long> series4{6, 3, 5, 1, 2, 4};\n    std::ranges::nth_element(series4, std::ranges::next(series4.begin(), 2), std::greater<long>{});\n    // 5 6 4 3 2 1\n}	code	cpp	2025-07-17 10:52:17.860584	3
+4381	511	#include <algorithm>\n#include <set>\n\nint main()\n{\n    std::multiset<int> data{1,2,3,4,5,6,6,6,7,8,9};\n\n    auto lower = data.lower_bound(6);\n    // std::distance(data.begin(), lower) == 5\n\n    auto upper = data.upper_bound(6);\n    // std::distance(data.begin(), upper) == 8\n}	code	cpp	2025-07-17 10:53:13.669206	8
+4387	513	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> sorted{1,2,3,4,5,6,7,8,9};\n\n    auto point = std::partition_point(data.begin(), data.end(), [](long v) { return v < 6; });\n    std::assert(std::distance(data.begin(), point) == 5);\n\n    auto lower_five = std::lower_bound(sorted.begin(), sorted.end(), 5);\n    auto least_five = std::partition_point(sorted.begin(), sorted.end(), [](long v) { return v < 5; });\n    std::assert(*lower_five == *least_five);\n\n    auto square = std::ranges::partition_point(sorted,\n        [](long v) { return v < 16; },\n        [](long v) { return v * v; } // project to {1,4,9,16,25,...}\n    );\n    std::assert(*square == 16);\n}	code	cpp	2025-07-17 10:53:42.324998	5
+1742	514	`std::binary_search` is equivalent to calling `std::equal_range` and checking\nwhether the returned is non-empty; however, `std::binary_search` offers a\nsingle lookup performance, where `std::equal_range` does two lookups to\ndetermine the lower and upper bounds.	text	txt	2024-07-28 09:49:55.744734	4
+4378	511	#include <algorithm>\n#include <vector>\n#include <string>\n\nstruct ExamResult\n{\n    std::string student_name;\n    int score;\n};\n\nint main()\n{\n    std::vector<ExamResult> results{{"Jane", 65}, {"Maria", 80}, {"Liz", 70}, {"David", 90}, {"Paula", 70}};\n    std::ranges::sort(results, std::less<int>{}, &ExamResult::score);\n\n    auto lower = std::ranges::lower_bound(results, 70, {}, &ExamResult::score);\n    // lower.score == 70\n    auto upper = std::ranges::upper_bound(results, 70, {}, &ExamResult::score);\n    // upper.score == 80\n}	code	cpp	2025-07-17 10:52:59.81749	5
+4388	514	#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> data{1,2,3,4,5,6};\n    std::binary_search(data.begin(), data.end(), 4);\n    // true\n    std::ranges::binary_search(data, 4);\n    // true\n}	code	cpp	2025-07-17 10:53:53.708932	3
+4383	512	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> data{1,2,3,4,5,6,6,6,7,8,9};\n\n    auto [lower, upper] = std::equal_range(data.begin(), data.end(), 6);\n    // std::distance(data.begin(), lower) == 5\n    // std::distance(data.begin(), upper) == 8\n}	code	cpp	2025-07-17 10:53:24.221035	2
+4389	515	#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::ranges::includes({1,2,3,4,5}, {3,4});\n    // true\n}	code	cpp	2025-07-17 10:54:10.448033	2
+4392	516	#include <algorithm>\n#include <execution>\n#include <iostream>\n#include <iterator>\n#include <ranges>\n#include <vector>\n#include <string>\n#include <map>\n\nint main()\n{\n    std::map<long, std::string> data1{{1, "first"}, {2, "first"}, {3, "first"}};\n    std::map<long, std::string> data2{{0, "second"}, {2, "second"}, {4, "second"}};\n    std::vector<std::pair<long, std::string>> result1, result2;\n    auto compare = [](auto const& left, auto const& right) { return left.first < right.first; };\n\n    std::ranges::merge(data1, data2, std::back_inserter(result1), compare);\n    std::ranges::for_each(result1, [](auto const& p) { std::cout << "{" << p.first << ", " << p.second << "} "; });\n    std::cout << "\\\\n";\n\n    std::merge(std::execution::par_unseq, data1.begin(), data1.end(), data2.begin(), data2.end(), std::back_inserter(result2), compare);\n    std::ranges::for_each(result2, [](auto const& p) { std::cout << "{" << p.first << ", " << p.second << "} "; });\n    std::cout << "\\\\n";\n}	code	cpp	2025-07-17 10:54:30.512075	2
+4396	519	#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,2,3,3,3,4,4,4,4,5,5,5,5,5}, result;\n    std::ranges::unique_copy(range, std::back_inserter(result));\n    // range is untouched\n    // result == {1,2,3,4,5};\n}	code	cpp	2025-07-17 10:55:04.6189	2
+4081	373	#include <iostream>\n#include <stdexcept>\n#include <iterator>\n\ntemplate<typename T, std::size_t const S>\nclass dummy_array\n{\n    T data[S] = {};\n\npublic:\n    T const& at(std::size_t const index) const\n    {\n        if (index < S) return data[index];\n        throw std::out_of_range("index out of range");\n    }\n\n    void insert(std::size_t const index, T const& value)\n    {\n        if (index < S) data[index] = value;\n        else throw std::out_of_range("index out of range");\n    }\n\n    std::size_t size() const { return S; }\n};\n\ntemplate<typename T, typename C, std::size_t const S>\nclass dummy_array_iterator_type\n{\npublic:\n    dummy_array_iterator_type(C& collection, std::size_t const index): index{index}, collection{collection}\n    {}\n\n    bool operator !=(dummy_array_iterator_type const& other) const\n    {\n        return index != other.index;\n    }\n\n    T const& operator *() const\n    {\n        return collection.at(index);\n    }\n\n    dummy_array_iterator_type& operator ++()\n    {\n        ++index;\n        return *this;\n    }\n\n    dummy_array_iterator_type operator ++(int)\n    {\n        auto temp = *this;\n        ++*temp;\n        return temp;\n    }\n\nprivate:\n    std::size_t index;\n    C& collection;\n};\n\ntemplate<typename T, std::size_t const S>\nusing dummy_array_iterator = dummy_array_iterator_type<T, dummy_array<T, S>, S>;\n\ntemplate<typename T, std::size_t const S>\nusing dummy_array_const_iterator = dummy_array_iterator_type<T, dummy_array<T, S> const, S>;\n\ntemplate<typename T, std::size_t const S>\ninline dummy_array_iterator<T, S> begin(dummy_array<T, S>& collection)\n{\n    return dummy_array_iterator<T, S>(collection, 0);\n}\n\ntemplate<typename T, std::size_t const S>\ninline dummy_array_iterator<T, S> end(dummy_array<T, S>& collection)\n{\n    return dummy_array_iterator<T, S>(collection, collection.size());\n}\n\ntemplate<typename T, std::size_t const S>\ninline dummy_array_const_iterator<T, S> begin(dummy_array<T, S> const& collection)\n{\n    return dummy_array_const_iterator<T, S>(collection, 0);\n}\n\ntemplate<typename T, std::size_t const S>\ninline dummy_array_const_iterator<T, S> end(dummy_array<T, S> const& collection)\n{\n    return dummy_array_const_iterator<T, S>(collection, collection.size());\n}\n\nint main()\n{\n    dummy_array<int, 5> numbers;\n    numbers.insert(0, 1);\n    numbers.insert(1, 2);\n    numbers.insert(2, 3);\n    numbers.insert(3, 4);\n    numbers.insert(4, 5);\n\n    for (auto&& element: numbers)\n        std::cout << element << ' ';\n    std::cout << '\\\\n';\n}	code	cpp	2025-07-16 14:30:53.699656	1
+4393	517	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,3,5,2,4,6};\n    std::inplace_merge(range.begin(), range.begin()+3, range.end());\n    // range == {1,2,3,4,5,6}\n}	code	cpp	2025-07-17 10:54:43.330776	2
+4399	522	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> data1{1,3,5,7,9};\n    std::vector<long> data2{3,4,5,6,7};\n    std::vector<long> union;\n    std::ranges::set_union(data1, data2, std::back_inserter(union));\n    // union == {1,3,4,5,6,7,9}\n}	code	cpp	2025-07-17 10:55:38.596207	2
+4397	520	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> data1{1,3,5,7,9};\n    std::vector<long> data2{3,4,5,6,7};\n    std::vector<long> difference;\n    std::ranges::set_difference(data1, data2, std::back_inserter(difference));\n    // difference == {1,9};\n}	code	cpp	2025-07-17 10:55:22.767147	2
+4395	518	#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,2,3,3,3,4,4,4,4,5,5,5,5,5};\n\n    auto last = std::unique(range.begin(), range.end());\n    range.resize(std::distance(range.begin(), last));\n    // range == {1,2,3,4,5};\n}	code	cpp	2025-07-17 10:54:55.930689	2
+4587	630	#include <iostream>\n#include <thread>\n#include <mutex>\n#include <barrier>\n#include <vector>\n\nstd::barrier works{6};\nstd::mutex exclusive{};\nstd::vector<long> shared_storage(6);\n\nvoid part_time_job(std::size_t index, long value)\n{\n    std::lock_guard<std::mutex> automatic_locker{exclusive};\n    shared_storage.at(index) = value;\n    works.arrive_and_drop();\n    // decrement internal counter when done\n}\n\nvoid full_time_job(std::size_t index, long value)\n{\n        std::lock_guard<std::mutex> automatic_locker{exclusive};\n\n        shared_storage.at(index) = value;\n        works.arrive_and_wait();\n\n        shared_storage.at(index) = value;\n        works.arrive_and_wait();\n}\n\nint main()\n{\n    std::vector<std::jthread> thread_pool(6);\n\n    for (std::size_t index{}; index != 6; ++index)\n        thread_pool.emplace_back(full_time_job, index, index);\n}	code	cpp	2025-07-17 12:15:52.896627	1
+4400	523	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> data1{1,3,5,7,9};\n    std::vector<long> data2{3,4,5,6,7};\n    std::vector<long> intersection;\n    std::ranges::set_intersection(data1, data2, std::back_inserter(intersection));\n    // intersection == {3,5,7}\n}	code	cpp	2025-07-17 10:55:46.592196	2
+4398	521	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> data1{1,3,5,7,9};\n    std::vector<long> data2{3,4,5,6,7};\n    std::vector<long> symmetric_difference;\n    std::ranges::set_symmetric_difference(data1, data2, std::back_inserter(symmetric_difference));\n    // symmetric_difference == {1,4,6,9};\n}	code	cpp	2025-07-17 10:55:30.240163	2
+4086	374	struct foo1         // size = 1, alignment = 1\n{                   // foo1:    +-+\n    char a;         // members: |a|\n};\n\nstruct foo2         // size = 2, alignment = 1\n{                   // foo1:    +-+-+\n    char a;         // members: |a|b|\n    char b;\n};\n\nstruct foo3         // size = 8, alignment = 4\n{                   // foo1:    +----+----+\n    char a;         // members: |a...|bbbb|\n    int  b;\n};\n\nstruct foo3_\n{\n    char a;         // 1 byte\n    char _pad0[3];  // 3 bytes\n    int  b;         // 4 byte\n};\n\nstruct foo4         // size = 24, alignment = 8\n{                   // foo4:    +--------+--------+--------+--------+\n    int a;          // members: |aaaa....|cccc....|dddddddd|e.......|\n    char b;\n    float c;\n    double d;\n    bool e;\n};\n\nstruct foo4_\n{\n    int a;          // 4 bytes\n    char b;         // 1 byte\n    char _pad0[3];  // 3 bytes\n    float c;        // 4 bytes\n    char _pad1[4];  // 4 bytes\n    double d;       // 8 bytes\n    bool e;         // 1 byte\n    char _pad2[7];  // 7 bytes\n};	code	cpp	2025-07-16 14:31:56.052473	2
+4403	524	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,1,1,1,1};\n\n    // unary version\n    std::transform(range.begin(), range.end(), range.begin(), [](long e) { return e + 1; });\n    // {2,2,2,2,2}\n    std::transform(range.begin(), range.end(), range.begin(), range.begin(), [](long left, long right) { return left + right; });\n    // {4,4,4,4,4}\n\n    // binary version\n    std::ranges::transform(range, range.begin(), [](long e) { return e / e; });\n    // {1,1,1,1,1}\n    std::ranges::transform(range, range, range.begin(), [](long left, long right) { return left + right; });\n    // {2,2,2,2,2}\n}	code	cpp	2025-07-17 10:56:12.475645	2
+4087	375	struct alignas(4) foo     // size: 4, alignment: 4\n{                         // foo:     +----+\n    char a;               // members: |ab..|\n    char b;\n};\n\nalignof(foo);   // 4\nsizeof(foo);    // 4\nalignof(foo&);  // 4\nalignof(char);  // 1\nalignof(int);   // 4\nalignof(int*);  // 8 (64-bit)\nalignof(int[4]);// 4 (natural alignment of element is 4)	code	cpp	2025-07-16 14:32:10.63828	2
+4414	531	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n\n    std::shift_left(range.begin(), range.end(), 3);\n    // {4,5,N,N,N}\n\n    std::shift_right(range.begin(), range.end(), 3);\n    // {N,N,N,4,5}\n}	code	cpp	2025-07-17 10:58:27.726191	3
+4404	525	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    auto last = std::remove(range.begin(), range.end(), 3);\n    range.erase(last, range.end());\n}	code	cpp	2025-07-17 10:56:22.84397	2
+4405	526	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    auto last = std::remove_if(range.begin(), range.end(), [limit=4](long v) { return v > limit; });\n    range.erase(last, range.end());\n}	code	cpp	2025-07-17 10:56:37.369759	2
+4406	527	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,1,2,1};\n    std::ranges::replace(range, 2, 0);\n    // {1,0,1,0,1}\n}	code	cpp	2025-07-17 10:56:45.962203	2
+4411	530	#include <algorithm>\n#include <ranges>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n\n    std::rotate(range.begin(), std::next(range.begin(), 3), range.end());\n    // {4,5,1,2,3}\n\n    std::ranges::rotate(range, std::next(range.begin(), 2));\n    // {1,2,3,4,5}\n}	code	cpp	2025-07-17 10:58:10.82983	2
+4407	528	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,1,2,1};\n    std::ranges::replace_if(range, [](long v) { return v > 1; }, 0);\n    // {1,0,1,0,1}\n}	code	cpp	2025-07-17 10:56:56.786182	2
+4408	529	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::ranges::reverse(range);\n    // {5,4,3,2,1}\n}	code	cpp	2025-07-17 10:57:05.141953	2
+4418	534	#include <algorithm>\n#include <vector>\n#include <ranges>\n\nint main()\n{\n    std::vector<long> range{1,2,3};\n    // range == {1,2,3};\n    std::next_permutation(range.begin(), range.end());\n    // range == {1,3,2};\n    std::prev_permutation(range.begin(), range.end());\n    // range == {1,2,3};\n}	code	cpp	2025-07-17 11:00:10.897461	2
+4417	533	#include <algorithm>\n#include <vector>\n#include <bitset>\n\nstd::vector<int> data{1, 2, 3};\ndo {\n    // Iterate over:\n    // 123, 132, 213, 231, 312, 321\n} while(std::next_permutation(data.begin(), data.end()));\n// data == {1, 2, 3}\n\nstd::vector<bool> bits(4);\nbits[0] = 1;\nbits[1] = 1;\ndo {\n    // Iterate over all 4 bit numbers with 2 bits set to 1\n    // 1100, 1010, 1001, 0110, 0101, 0011\n} while (std::prev_permutation(bits.begin(), bits.end()));\n// bits == {1, 1, 0, 0}	code	cpp	2025-07-17 10:59:41.006968	4
+4415	532	#include <algorithm>\n#include <vector>\n#include <ranges>\n#include <random>\n\nint main()\n{\n    std::vector<long> range{1,2,3,4,5};\n    std::random_device rd{};\n    std::mt19937 generator{rd()};\n    std::ranges::shuffle(range, generator);\n}	code	cpp	2025-07-17 10:58:35.600816	2
+4419	535	#include <algorithm>\n#include <vector>\n#include <ranges>\n\nint main()\n{\n    std::vector<long> range1{1,2,3}, range2{1,3,2};\n    std::ranges::is_permutation(range1, range2);\n    // true\n}	code	cpp	2025-07-17 11:00:17.845037	2
+4111	383	#include <utility>\n\nclass bag\n{\nprivate:\n    unsigned int _count;\n    int* _storage;\n\npublic:\n    bag(int const& number): _count{0}, _storage{nullptr}\n    {\n        _count++;\n        _storage = new int{number};\n    }\n\n    virtual ~bag()\n    {\n        if (_count)\n            delete _storage;\n    }\n\n    bag(bag const& other): _count{other._count}\n    {\n        _storage = new int{*other._storage};\n    }\n\n    bag(bag&& other): _count{other._count}, _storage{other._storage}\n    {\n        other._count = 0;\n        other._storage = nullptr;\n    }\n};\n\nint main()\n{\n    bag a{1};\n    bag b{std::move(a)};\n}	code	cpp	2025-07-16 14:36:43.884824	1
+4763	898	#include <iostream>\n#include <algorithm>\n#include <numeric>\n#include <memory>\n#include <thread>\n#include <string>\n#include <vector>\n#include <list>\n#include <functional>\n#include <boost/asio.hpp>\n\nstatic constexpr auto port{8888};\nstatic constexpr auto address{"127.0.0.1"};\n\nstd::vector<std::uint8_t> receive_buffer(4096);\nstd::size_t receive_buffer_index{};\nstd::list<std::vector<std::uint8_t>> send_buffer;\n\nvoid connection_worker(boost::asio::io_context&);\nvoid on_send(boost::asio::ip::tcp::socket&, std::list<std::vector<std::uint8_t>>::iterator);\nvoid send(boost::asio::ip::tcp::socket&, void const*, std::size_t);\nvoid on_receive(boost::asio::ip::tcp::socket&, std::size_t);\nvoid receive(boost::asio::ip::tcp::socket&);\nvoid on_accept(boost::asio::ip::tcp::socket&, std::shared_ptr<boost::asio::io_context::work>);\n\nvoid connection_worker(boost::asio::io_context& context)\n{\n    context.run();\n}\n\nvoid on_send(boost::asio::ip::tcp::socket& socket, std::list<std::vector<std::uint8_t>>::iterator node)\n{\n    send_buffer.erase(node);\n\n    if (!send_buffer.empty())\n    {\n        boost::asio::async_write(\n            socket,\n            boost::asio::buffer(send_buffer.front()),\n            std::bind(on_send, boost::asio::placeholders::error, send_buffer.begin())\n        );\n    }\n}\n\nvoid send(boost::asio::ip::tcp::socket& socket, void const* buffer, std::size_t length)\n{\n    std::vector<std::uint8_t> output;\n    std::copy((std::uint8_t const*)buffer, (std::uint8_t const*)buffer + length, std::back_inserter(output));\n\n    send_buffer.push_back(output);\n\n    boost::asio::async_write(\n        socket,\n        boost::asio::buffer(send_buffer.front()),\n        std::bind(on_send, boost::asio::placeholders::error, send_buffer.begin())\n    );\n}\n\nvoid on_receive(boost::asio::ip::tcp::socket& socket, std::size_t bytes_transferred)\n{\n    receive_buffer_index += bytes_transferred;\n\n    for (std::size_t index{}; index < receive_buffer_index; ++index)\n    {\n        std::cout << (char)receive_buffer[index] << " ";\n    }\n    std::cout << std::endl;\n    receive_buffer_index = 0;\n\n    receive(socket);\n}\n\nvoid receive(boost::asio::ip::tcp::socket& socket)\n{\n    socket.async_read_some(\n        boost::asio::buffer(\n            &receive_buffer[receive_buffer_index],\n            receive_buffer.size() - receive_buffer_index\n        ),\n        std::bind(on_receive, std::ref(socket), 1)\n    );\n}\n\nvoid on_accept(boost::asio::ip::tcp::socket& socket, std::shared_ptr<boost::asio::io_context::work> work)\n{\n    boost::asio::ip::tcp::endpoint client{socket.remote_endpoint()};\n    boost::asio::ip::address client_addr{client.address()};\n    boost::asio::ip::port_type client_port{client.port()};\n    std::clog << "client " << client_addr << ":" << client_port << std::endl;\n\n    send(socket, "payload", 7);\n    receive(socket);\n\n    socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);\n    socket.close();\n    work.reset();\n}\n\nint main()\n{\n    boost::asio::io_context context{};\n    boost::asio::io_context::strand strand{context};\n    auto work{std::make_shared<boost::asio::io_context::work>(context)};\n    boost::asio::ip::tcp::socket socket{context};\n    boost::asio::ip::tcp::resolver resolver{context};\n    boost::asio::ip::tcp::acceptor acceptor{context};\n\n    std::thread worker(connection_worker, std::ref(context));\n\n    boost::asio::ip::tcp::resolver::query query{address, std::to_string(port)};\n    boost::asio::ip::tcp::resolver::iterator iterator{resolver.resolve(query)};\n    boost::asio::ip::tcp::endpoint endpoint{*iterator};\n\n    acceptor.open(endpoint.protocol());\n    acceptor.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));\n    acceptor.bind(endpoint);\n    acceptor.listen(boost::asio::socket_base::max_connections);\n\n    boost::asio::ip::address local_addr{endpoint.address()};\n    boost::asio::ip::port_type local_port{port};\n    std::clog << "listening " << local_addr << ":" << local_port << std::endl;\n\n    acceptor.async_accept(socket, std::bind(on_accept, std::ref(socket), std::move(work)));\n\n    worker.join();\n    acceptor.close();\n    context.stop();\n}	code	cpp	2025-07-17 18:37:43.543659	1
+4112	388	std::vector<std::string> coll;\nconst std::string s{"data"};\n\ncoll.push_back(std::move(s));   // OK, calls push_back(const std::string &)	code	cpp	2025-07-16 14:37:21.054244	2
+4421	536	#include <algorithm>\n#include <vector>\n\nint main()\n{\n    std::vector<long> range{1,2,3};\n\n    std::ranges::all_of(range, [](long e) { return e > 0; });\n    // all numbers are possitive: true\n}	code	cpp	2025-07-17 11:01:45.179769	2
+4114	391	std::string s{"data"};\n\nfoo(std::move(s));\n\nstd::cout << s << '\\\\n'; // OK (don't know which value is written)\nstd::cout << s.size() << '\\\\n';  // OK (writes current number of characters)\nstd::cout << s[0] << '\\\\n';  // ERROR (potentially undefined behavior)\nstd::cout << s.front() << '\\\\n'; // ERROR (potentially undefined behavior)\ns = "new value";  // OK	code	cpp	2025-07-16 14:38:00.271586	2
+4117	403	class Person\n{\npublic:\n    ...\n    // NO copy constructor declared\n\n    // move constructor/assignment declared as deleted:\n    Person(Person&&) = delete;\n    Person& operator=(Person&&) = delete;\n    ...\n};\n\nPerson p{"Tina", "Fox"};\ncoll.push_back(p); // ERROR: copying disabled\ncoll.push_back(std::move(p)); // ERROR: moving disabled	code	cpp	2025-07-16 14:39:58.187432	2
+1212	403	You get the same effect by declaring copying special member functions as\ndeleted and that is probably less confusing for other programmers.	text	txt	2024-07-28 09:48:34.517545	3
+4115	392	void foo(std::string&& rv);\nstd::string s{"data"};\n\nfoo(s);     // ERROR\nfoo(std::move(s));      // OK\nfoo(returnStringByValue());     // OK	code	cpp	2025-07-16 14:38:17.569822	3
+1178	393	void foo(std::string& arg);	code	cpp	2024-07-28 09:48:28.598669	8
+1198	398	class Person\n{\n    ...\npublic:\n    ...\n    // NO copy constructor/assignment declared\n    // NO move constructor/assignment declared\n    // NO destructor declared\n};	code	cpp	2024-07-28 09:48:30.918305	2
+1216	403	In this case, `=delete` disables the fallback mechanism.	text	txt	2024-07-28 09:48:34.602877	5
+4093	376	// alignas specifier applied to struct\nstruct alignas(4) foo1  // size = 4, aligned as = 4\n{                       // foo1:    +----+\n    char a;             // members: |a.b.|\n    char b;\n};\n\nstruct foo1_            // size = 4, aligned as = 1\n{\n    char a;             // 1 byte\n    char b;             // 1 byte\n    char _pad0[2];      // 2 bytes\n};\n\n// alignas specifier applied to member data declarations\nstruct foo2             // size = 16, aligned as = 8\n{                       // foo2:    +--------+--------+\n    alignas(2) char a;  // members: |aa......|bbbb....|\n    alignas(8) int b;\n};\n\nstruct foo2_            // size = 16, aligned as = 4\n{\n    char a;             // 2 bytes\n    char _pad0[6];      // 6 bytes\n    int b;              // 4 bytes\n    char _pad1[4];      // 4 bytes\n};\n\n// the alignas specifier applied to the struct is less than alignas\n// specifier applied to member data declaration, thus will be ignored.\nstruct alignas(4) foo3  // size = 16, aligned as = 8\n{                       // foo3:    +--------+--------+\n    alignas(2) char a;  // members: |aa......|bbbbbbbb|\n    alignas(8) int b;\n};\n\nstruct foo3_            // size = 16, aligned as = 4\n{\n    char a;             // 2 byte\n    char _pad0[6];      // 6 bytes\n    int b;              // 4 bytes\n    char _pad1[4];      // 4 bytes\n};\n\nalignas(8) int a;       // size = 4, alignment = 8\nalignas(256) long b[4]; // size = 32, alignment = 256	code	cpp	2025-07-16 14:32:44.377664	4
+4094	377	#include <iostream>\n\nint main()\n{\n    std::cout << sizeof(long double) << '\\\\n';\n}	code	cpp	2025-07-16 14:33:22.826192	1
+4096	379	namespace units\n{\n    inline namespace literals\n    {\n        inline namespace units_literals\n        {\n            constexpr size_t operator ""_KB(unsigned long long const size)\n            {\n                return static_cast<size_t>(size * 1024);\n            }\n        }\n    }\n}\n\nint main()\n{\n    using namespace units::units_literals;\n\n    size_t bytes = "1024"_KB;\n}	code	cpp	2025-07-16 14:34:54.728646	1
+4097	380	T operator ""_suffix(char const*);\n\ntemplate <char...>\nT operator ""_suffix();	code	cpp	2025-07-16 14:35:22.850456	2
+4103	381	namespace binary\n{\n    using numeric = unsigned int;\n\n    inline namespace binary_literals\n    {\n        namespace binary_internals\n        {\n            template<typename T, char... bits>\n            struct bit_seq;\n\n            template<typename T, '0', char... bits>\n            struct bit_seq\n            {\n                static constexpr T value { bit_seq<T, bits...>::value };\n            };\n\n            template<typename T, '1', char... bits>\n            struct bit_seq\n            {\n                static constexpr T value {\n                    bit_seq<T, bits...>::value | static_cast<T>(1 << sizeof...(bits))\n                };\n            };\n\n            template<typename T>\n            struct bit_seq<T>\n            {\n                static constexpr T value{0};\n            };\n        }\n\n        template <char... bits>\n        constexpr numeric operator ""_byte()\n        {\n            static_assert(sizeof...(bits) <= 32, "binary literals only hold 32 bits");\n\n            return binary_internals::bit_seq<numeric, bits...>::value;\n        }\n    }\n}	code	cpp	2025-07-16 14:35:48.760149	1
+4105	382	#include <vector>\n#include <string>\n\nstd::vector<std::string> f()\n{\n    std::vector<std::string> cells; // default constructed vector without allocations\n    cells.reserve(3);               // allocate 3 elements of std::string\n    std::string s{"data"};          // default constructed std::string\n    cells.push_back(s);             // 1st vector element copy constructed\n    cells.push_back(s+s);           // default construction of temporary object; move construction of 2nd vector element\n    cells.push_back(std::move(s));  // move constructed 3rd vector element; empty out s object\n    return cells;                   // optimize out vector as return value\n}\n\nint main()\n{\n    std::vector<std::string> v;\n    v = f();                        // move assigned constructed vector by return value\n}	code	cpp	2025-07-16 14:36:20.573766	1
+4595	632	#include <mutex>\n#include <string>\n\nstruct MonoConfig\n{\n    MonoConfig()\n    {\n        // ensure a single initialization outside of the static chain, if we\n        // don't need multi-threaded safety we can downgrade to a boolean flag\n        std::call_once(flag_, populate_config);\n    }\n\n    // interface to acess the monostate\n    std::uint64_t get_id() const { return field1; }\n    const std::string& get_label() const { return field2; }\n\nprivate:\n    static std::once_flag flag_;\n    static std::uint64_t field1;\n    static std::string field2;\n\n    static void populate_config()\n    {\n        /* read the fields from config source */\n        field1 = 42;\n        field2 = "Hello World";\n    };\n};\n\n// All static members left default initialized\nstd::once_flag MonoConfig::flag_;\nstd::uint64_t MonoConfig::field1;\nstd::string MonoConfig::field2;\n\n// create instance of the monostate object\nMonoConfig config;\n\n// access the global state\nconfig.get_label();\n\n// creating additional instances is a no-op. note that when stored as a member,\n// it will still take up minimum 1 byte unless we use [[no_unique_address]].\nMonoConfig a, b, c, d, e, f, g, i, j, k;	code	cpp	2025-07-17 12:16:50.445172	2
+4679	715	@startuml\nabstract practice {\n    # question(): string\n    # answer(): string\n    # origins(): string[]\n    # references(): string[]\n    # hash(): string\n}\n\nclass markdown_practice {\n    - question: string\n    - answer: string\n    - origins: string[]\n    - references: string[]\n    - id: hash\n    # question(): string\n    # answer(): string\n    # origins(): string[]\n    # references(): string[]\n    # hash(): string\n}\n\npractice <|-- markdown_practice\n\nclass html_practice {\n    - question: string\n    - answer: string\n    - origins: string[]\n    - references: string[]\n    - id: hash\n    # question(): string\n    # answer(): string\n    # origins(): string[]\n    # references(): string[]\n    # hash(): string\n}\n\npractice <|-- html_practice\n\nabstract builder {\n    # create_title(string): void\n    # write_answer(string): void\n    # list_origins(string[]): void\n    # list_references(string[]): void\n    # get_practice(): practice*\n}\n\npractice ..right..> builder\n\nclass markdown_builder {\n    # create_title(string): void\n    # write_answer(string): void\n    # list_origins(string[]): void\n    # list_references(string[]): void\n    # get_practice(): markdown_practice*\n}\n\nbuilder <|-- markdown_builder\n\nclass html_builder {\n    # create_title(string): void\n    # write_answer(string): void\n    # list_origins(string[]): void\n    # list_references(string[]): void\n    # get_practice(): html_practice*\n}\n\nbuilder <|-- html_builder\n\nclass director {\n    + html_practice(): html_practice*\n    + markdown_practice(): markdown_practice*\n}\n\nmarkdown_builder ..> director\nhtml_builder ..> director\n@enduml	code	plantuml	2025-07-17 12:34:56.663547	1
 \.
 
 
@@ -20743,14 +19921,6 @@ COPY milestone.practice_resources (id, practice_id, section_id) FROM stdin;
 817	1190	496
 818	1191	496
 819	1192	496
-\.
-
-
---
--- Data for Name: practice_usage; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.practice_usage (id, user_id, practice_id, duration, updated) FROM stdin;
 \.
 
 
@@ -21955,34 +21125,6 @@ COPY milestone.practices (id, topic_id, heading, creation, updated, "position") 
 
 
 --
--- Data for Name: progress; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.progress (user_id, topic_id, updated) FROM stdin;
-1	1	2024-08-10 16:07:40.034905
-1	21	2024-08-10 16:07:40.034905
-1	30	2024-08-10 16:07:40.034905
-1	33	2024-08-10 16:07:40.034905
-1	46	2024-08-10 16:07:40.034905
-1	69	2024-08-10 16:07:40.034905
-1	84	2024-08-10 16:07:40.034905
-1	109	2024-08-10 16:07:40.034905
-1	111	2024-08-10 16:07:40.034905
-1	321	2024-08-10 16:07:40.034905
-1	329	2024-08-10 16:07:40.034905
-1	333	2024-08-10 16:07:40.034905
-1	365	2024-08-10 16:07:40.034905
-1	366	2024-08-10 16:07:40.034905
-1	367	2024-08-10 16:07:40.034905
-1	372	2024-08-10 16:07:40.034905
-1	386	2024-08-10 16:07:40.034905
-1	419	2024-08-10 16:07:40.034905
-1	422	2024-08-10 16:07:40.034905
-1	424	2024-08-10 16:07:40.034905
-\.
-
-
---
 -- Data for Name: references; Type: TABLE DATA; Schema: milestone; Owner: milestone
 --
 
@@ -22182,118 +21324,6 @@ COPY milestone."references" (id, practice_id, origin, type, updated) FROM stdin;
 
 
 --
--- Data for Name: resource_editing; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.resource_editing (id, user_id, resource_id, action, updated) FROM stdin;
-\.
-
-
---
--- Data for Name: resource_watching; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.resource_watching (user_id, resource_id, update) FROM stdin;
-1	1	2024-09-08 15:15:14.413906
-1	3	2024-09-08 15:15:14.413906
-1	4	2024-09-08 15:15:14.413906
-1	5	2024-09-08 15:15:14.413906
-1	6	2024-09-08 15:15:14.413906
-1	7	2024-09-08 15:15:14.413906
-1	8	2024-09-08 15:15:14.413906
-1	9	2024-09-08 15:15:14.413906
-1	10	2024-09-08 15:15:14.413906
-1	11	2024-09-08 15:15:14.413906
-1	12	2024-09-08 15:15:14.413906
-1	13	2024-09-08 15:15:14.413906
-1	14	2024-09-08 15:15:14.413906
-1	15	2024-09-08 15:15:14.413906
-1	65	2024-09-08 15:15:14.413906
-1	98	2024-09-08 15:15:14.413906
-1	16	2024-09-08 15:15:14.413906
-1	17	2024-09-08 15:15:14.413906
-1	18	2024-09-08 15:15:14.413906
-1	19	2024-09-08 15:15:14.413906
-1	20	2024-09-08 15:15:14.413906
-1	21	2024-09-08 15:15:14.413906
-1	22	2024-09-08 15:15:14.413906
-1	23	2024-09-08 15:15:14.413906
-1	24	2024-09-08 15:15:14.413906
-1	25	2024-09-08 15:15:14.413906
-1	26	2024-09-08 15:15:14.413906
-1	27	2024-09-08 15:15:14.413906
-1	28	2024-09-08 15:15:14.413906
-1	29	2024-09-08 15:15:14.413906
-1	30	2024-09-08 15:15:14.413906
-1	31	2024-09-08 15:15:14.413906
-1	32	2024-09-08 15:15:14.413906
-1	33	2024-09-08 15:15:14.413906
-1	34	2024-09-08 15:15:14.413906
-1	35	2024-09-08 15:15:14.413906
-1	36	2024-09-08 15:15:14.413906
-1	37	2024-09-08 15:15:14.413906
-1	38	2024-09-08 15:15:14.413906
-1	39	2024-09-08 15:15:14.413906
-1	40	2024-09-08 15:15:14.413906
-1	41	2024-09-08 15:15:14.413906
-1	42	2024-09-08 15:15:14.413906
-1	43	2024-09-08 15:15:14.413906
-1	44	2024-09-08 15:15:14.413906
-1	45	2024-09-08 15:15:14.413906
-1	46	2024-09-08 15:15:14.413906
-1	47	2024-09-08 15:15:14.413906
-1	48	2024-09-08 15:15:14.413906
-1	49	2024-09-08 15:15:14.413906
-1	50	2024-09-08 15:15:14.413906
-1	51	2024-09-08 15:15:14.413906
-1	52	2024-09-08 15:15:14.413906
-1	53	2024-09-08 15:15:14.413906
-1	54	2024-09-08 15:15:14.413906
-1	55	2024-09-08 15:15:14.413906
-1	56	2024-09-08 15:15:14.413906
-1	57	2024-09-08 15:15:14.413906
-1	58	2024-09-08 15:15:14.413906
-1	59	2024-09-08 15:15:14.413906
-1	60	2024-09-08 15:15:14.413906
-1	61	2024-09-08 15:15:14.413906
-1	62	2024-09-08 15:15:14.413906
-1	63	2024-09-08 15:15:14.413906
-1	66	2024-09-08 15:15:14.413906
-1	67	2024-09-08 15:15:14.413906
-1	68	2024-09-08 15:15:14.413906
-1	69	2024-09-08 15:15:14.413906
-1	70	2024-09-08 15:15:14.413906
-1	71	2024-09-08 15:15:14.413906
-1	72	2024-09-08 15:15:14.413906
-1	73	2024-09-08 15:15:14.413906
-1	74	2024-09-08 15:15:14.413906
-1	75	2024-09-08 15:15:14.413906
-1	76	2024-09-08 15:15:14.413906
-1	77	2024-09-08 15:15:14.413906
-1	78	2024-09-08 15:15:14.413906
-1	79	2024-09-08 15:15:14.413906
-1	93	2024-09-08 15:15:14.413906
-1	80	2024-09-08 15:15:14.413906
-1	81	2024-09-08 15:15:14.413906
-1	82	2024-09-08 15:15:14.413906
-1	83	2024-09-08 15:15:14.413906
-1	84	2024-09-08 15:15:14.413906
-1	85	2024-09-08 15:15:14.413906
-1	86	2024-09-08 15:15:14.413906
-1	87	2024-09-08 15:15:14.413906
-1	88	2024-09-08 15:15:14.413906
-1	89	2024-09-08 15:15:14.413906
-1	90	2024-09-08 15:15:14.413906
-1	92	2024-09-08 15:15:14.413906
-1	94	2024-09-08 15:15:14.413906
-1	95	2024-09-08 15:15:14.413906
-1	96	2024-09-08 15:15:14.413906
-1	97	2024-09-08 15:15:14.413906
-1	91	2024-09-08 15:15:14.413906
-\.
-
-
---
 -- Data for Name: resources; Type: TABLE DATA; Schema: milestone; Owner: milestone
 --
 
@@ -22334,13 +21364,11 @@ COPY milestone.resources (id, name, reference, type, created, updated, section_p
 50	Introduction to Linear and Matrix Algebra	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
 51	Extreme C	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
 53	The Shellcoder's Handbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
-54	Design Patterns in Modern C++20	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
 56	Docker Deep Dive	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
 57	Modern C++ Programming Cookbook	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
 58	Step by Step Learning x64 Assembly Language	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
 60	Practical Binary Analysis	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
 61	Learn Docker in a month of Lunches	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
-63	C++17: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
 66	Kali Linux Penetration Testing Bible	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
 67	Linux Device Driver Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
 68	The C++ Programming Language	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
@@ -22381,6 +21409,7 @@ COPY milestone.resources (id, name, reference, type, created, updated, section_p
 101	C++17 Language New Features Ref Card	\N	slides	2024-09-28 14:30:48.180433	2024-09-28 14:30:48.180433	2	\N
 48	CMake Best Practices	https://subscription.packtpub.com/book/programming/9781835880647	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	Dominik Berner
 103	Advanced C++ Programming Cookbook	https://subscription.packtpub.com/book/programming/9781838559915	book	2024-10-13 09:55:46.597127	2024-10-13 09:55:46.604041	1	\N
+63	C++17: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2025-07-18 23:34:38.278197	1	\N
 104	Black Hat Bash	\N	book	2024-10-13 09:59:13.360502	2024-10-13 09:59:13.384872	1	\N
 105	Cpp Hive	https://www.youtube.com/watch?v=pfrcDZ2ECsQ&list=PLS0ecZsqDIUy-XGKW35qONyRDn1PlNvR5	video	2024-10-13 10:12:00.008513	2024-10-13 10:12:00.014774	4	\N
 106	Mastering Modern CPP Features	https://www.youtube.com/playlist?list=PL2EnPlznFzmhKDBfE0lqMAWyr74LZsFVY	video	2024-10-13 10:12:00.016594	2024-10-13 10:12:00.032792	4	\N
@@ -22392,8 +21421,6 @@ COPY milestone.resources (id, name, reference, type, created, updated, section_p
 102	GoogleTest Documentation	https://google.github.io/googletest	website	2024-10-05 21:49:48.993968	2024-10-30 21:41:01.822841	2	\N
 36	C++20: The Complete Guide	\N	book	2024-07-28 09:44:55.224368	2024-11-03 16:19:44.063814	1	\N
 100	Yocto Project and OpenEmbedded Training Course	https://bootlin.com/training/yocto	video	2024-09-27 08:13:12.835493	2024-11-10 14:03:34.330867	1	Bootlin
-43	Linux Kernel Programming	\N	book	2024-07-28 09:44:55.224368	2024-11-17 16:33:28.654627	1	\N
-26	Learn PostgreSQL	\N	book	2024-07-28 09:44:55.224368	2024-11-21 23:59:46.642383	1	\N
 1	YouTube	https://youtube.com	video	2024-07-28 09:44:46.086413	2024-11-27 21:53:14.163735	4	\N
 6	GDB Tips by Greg Law	\N	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	5	\N
 10	https://en.cppreference.com	https://www.cppstories.com	website	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	2	\N
@@ -22409,19 +21436,32 @@ COPY milestone.resources (id, name, reference, type, created, updated, section_p
 109	Asynchronous Programming with C++		book	2024-12-05 16:21:03.593753	2025-01-30 22:03:26.360568	1	\N
 115	Advanced Linux: The Linux Kernel	https://www.linkedin.com/learning/advanced-linux-the-linux-kernel-25075769/discover-and-control-hardware?autoSkip=true&resume=false	video	2025-02-04 23:38:07.850623	2025-02-04 23:38:08.006489	1	\N
 12	LinkedIn Course: C++ Design Patterns: Creational	https://www.linkedin.com	video	2024-07-28 09:44:46.086413	2024-07-28 09:44:46.086413	1	Olivia Chiu Stone
-111	Minimal CMake	https://subscription.packtpub.com/book/programming/9781835087312	book	2025-01-07 20:26:11.766237	2025-02-23 23:06:51.433314	1	\N
 116	Deciphering C++ Coroutines Part 1	https://www.youtube.com/watch?v=J7fYddslH0Q	video	2025-04-06 18:26:50.480431	2025-04-06 18:26:50.520131	4	\N
 117	MuttGuide	https://gitlab.com/muttmua/mutt/-/wikis/MuttGuide	website	2025-05-03 22:26:42.979764	2025-05-03 22:26:43.02011	1	\N
-18	Mastering Embedded Linux Development	\N	book	2024-07-28 09:44:55.224368	2024-07-28 09:44:55.224368	1	\N
-118	Algorithms and Data Structures Made Easy	https://youtube.com/playlist?list=PL2EF13wm-hWBZxHel48KrVo-R-fG_rpm7	video	2025-07-14 20:36:31.814802	2025-07-14 20:37:01.798552	4	\N
-\.
-
-
---
--- Data for Name: section_editing; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.section_editing (id, user_id, section_id, action, updated) FROM stdin;
+123	Deciphering C++ Coroutines Part 2	https://www.youtube.com/watch?v=qfKFfQSxvA8	video	2025-07-18 23:25:55.834891	2025-07-18 23:25:55.834891	4	\N
+124	Language Features of C++17 Ref Card	https://www.bfilipek.com	slides	2025-07-18 23:34:05.229443	2025-07-18 23:34:05.229443	2	Bartłomiej Filipek
+125	C++ Memory Management	https://subscription.packtpub.com/book/programming/9781805129806	book	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	1	\N
+126	Template Metaprogramming with C++	https://subscription.packtpub.com/book/programming/9781803243450	book	2025-07-18 23:36:49.170308	2025-07-18 23:36:49.170308	1	\N
+118	Algorithms and Data Structures Made Easy	https://youtube.com/playlist?list=PL2EF13wm-hWBZxHel48KrVo-R-fG_rpm7	video	2025-07-14 20:36:31.814802	2025-07-16 14:02:30.642871	4	\N
+132	NeoMutt Guide	https://neomutt.org/guide/index	manual	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.042397	1	\N
+133	Real-time Linux with PREEMPT_RT Training Course	https://bootlin.com/training/preempt-rt	course	2025-07-18 23:43:21.396307	2025-07-18 23:43:21.396307	3	Bootlin
+54	Design Patterns in Modern C++20	\N	book	2024-07-28 09:44:55.224368	2025-07-16 20:32:27.138319	1	\N
+120	Mastering Embedded Linux Development	https://subscription.packtpub.com/book/iot-and-hardware/9781803232591	book	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	1	\N
+18	Mastering Embedded Linux Development	\N	book	2024-07-28 09:44:55.224368	2025-07-16 20:36:30.837888	1	\N
+43	Linux Kernel Programming	\N	book	2024-07-28 09:44:55.224368	2025-07-18 23:40:48.378758	1	\N
+128	LinkedIn Course: C++ Design Patterns: Behavioral	https://www.linkedin.com/learning/c-plus-plus-design-patterns-behavioral/behavioral-patterns-improve-software-design	video	2025-07-18 23:39:44.424036	2025-07-18 23:39:44.436944	1	\N
+129	LinkedIn Course: C++ Design Patterns: Structural	https://www.linkedin.com/learning/c-plus-plus-design-patterns-structural-22183029/structural-design-patterns-in-c-plus-plus	video	2025-07-18 23:40:14.196843	2025-07-18 23:40:14.196843	1	\N
+127	GitHub Actions in Action	https://www.manning.com/books/github-actions-in-action	book	2025-07-18 23:37:25.731365	2025-07-18 23:37:25.773264	1	\N
+130	Linux Security Techniques	https://subscription.packtpub.com/video/security/9781835887042	course	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	4	\N
+121	Behavioral Design Patterns in C++	https://subscription.packtpub.com/video/programming/9781804615652	video	2025-07-18 23:22:41.325436	2025-07-18 23:22:41.347225	1	\N
+122	Computer Graphics Programming in OpenGL with C++	https://www.packtpub.com/en-de/product/computer-graphics-programming-in-opengl-with-c-edition-3-9781836641186	book	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	1	\N
+131	Mastering C++ Multithreading	https://subscription.packtpub.com/book/programming/9781787121706/pref	book	2025-07-18 23:41:38.875661	2025-07-18 23:41:38.875661	1	\N
+134	Structural Design Patterns in C++	https://subscription.packtpub.com/video/programming/9781801073073	video	2025-07-18 23:43:56.281019	2025-07-18 23:43:56.308045	1	\N
+111	Minimal CMake	https://subscription.packtpub.com/book/programming/9781835087312	book	2025-01-07 20:26:11.766237	2025-07-18 23:42:15.158694	1	\N
+135	System Programming in Linux	https://nostarch.com/system-programming-linux	book	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.481364	1	\N
+26	Learn PostgreSQL	\N	book	2024-07-28 09:44:55.224368	2025-07-18 23:38:35.291291	1	\N
+136	The C++ Standard Library by Rainer Grimm	https://leanpub.com/cpplibrary	book	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.832514	1	\N
+137	The Modern Vulkan Cookbook	https://subscription.packtpub.com/book/game-development/9781803239989	book	2025-07-18 23:45:35.714876	2025-07-18 23:45:35.714876	1	\N
 \.
 
 
@@ -22528,7 +21568,6 @@ COPY milestone.sections (id, resource_id, state, reference, created, updated, nu
 1431	97	open	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	14
 1372	90	open	\N	2024-07-28 09:45:10.032627	2024-07-28 09:45:10.032627	11
 120	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	8
-627	50	writing	\N	2024-07-28 09:45:02.070445	2024-07-28 09:45:02.070445	1
 886	65	writing	\N	2024-07-28 09:45:04.811441	2024-07-28 09:45:04.811441	1
 652	51	writing	\N	2024-07-28 09:45:02.294764	2024-07-28 09:45:02.294764	15
 273	31	writing	\N	2024-07-28 09:44:58.31114	2024-07-28 09:44:58.31114	1
@@ -22737,7 +21776,6 @@ COPY milestone.sections (id, resource_id, state, reference, created, updated, nu
 683	53	open	\N	2024-07-28 09:45:02.724565	2024-07-28 09:45:02.724565	9
 317	34	open	\N	2024-07-28 09:44:58.73201	2024-07-28 09:44:58.73201	6
 1265	84	open	\N	2024-07-28 09:45:08.962478	2024-07-28 09:45:08.962478	5
-702	54	open	\N	2024-07-28 09:45:02.987548	2024-07-28 09:45:02.987548	1
 488	44	writing	\N	2024-07-28 09:45:00.748766	2024-07-28 09:45:00.748766	18
 126	22	writing	\N	2024-07-28 09:44:56.635259	2024-07-28 09:44:56.635259	14
 1101	76	open	\N	2024-07-28 09:45:07.275524	2024-07-28 09:45:07.275524	1
@@ -22934,7 +21972,6 @@ COPY milestone.sections (id, resource_id, state, reference, created, updated, nu
 994	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	17
 987	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	10
 1099	75	open	\N	2024-07-28 09:45:07.046276	2024-07-28 09:45:07.046276	17
-852	63	open	\N	2024-07-28 09:45:04.614571	2024-07-28 09:45:04.614571	9
 250	28	writing	\N	2024-07-28 09:44:57.873227	2024-07-28 09:44:57.873227	10
 611	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	4
 621	48	open	\N	2024-07-28 09:45:01.882235	2024-07-28 09:45:01.882235	14
@@ -23409,7 +22446,6 @@ COPY milestone.sections (id, resource_id, state, reference, created, updated, nu
 1073	74	open	\N	2024-07-28 09:45:06.849374	2024-07-28 09:45:06.849374	27
 588	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	45
 1019	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	42
-46	18	writing	\N	2024-07-28 09:44:55.916674	2024-07-28 09:44:55.916674	1
 439	42	open	\N	2024-07-28 09:45:00.186006	2024-07-28 09:45:00.186006	3
 1389	92	open	\N	2024-07-28 09:45:10.290381	2024-07-28 09:45:10.290381	7
 586	47	open	\N	2024-07-28 09:45:01.69487	2024-07-28 09:45:01.69487	43
@@ -23816,7 +22852,6 @@ COPY milestone.sections (id, resource_id, state, reference, created, updated, nu
 923	68	open	\N	2024-07-28 09:45:05.579846	2024-07-28 09:45:05.579846	6
 995	70	open	\N	2024-07-28 09:45:06.229684	2024-07-28 09:45:06.229684	18
 434	41	open	\N	2024-07-28 09:44:59.970291	2024-07-28 09:44:59.970291	5
-211	26	open	\N	2024-07-28 09:44:57.573652	2024-07-28 09:44:57.573652	7
 1420	97	writing	\N	2024-07-28 09:45:10.892813	2024-07-28 09:45:10.892813	3
 1320	87	open	\N	2024-07-28 09:45:09.480176	2024-07-28 09:45:09.480176	11
 901	67	writing	\N	2024-07-28 09:45:05.152752	2024-07-28 09:45:05.152752	1
@@ -23902,7 +22937,6 @@ COPY milestone.sections (id, resource_id, state, reference, created, updated, nu
 1413	95	completed	\N	2024-07-28 09:45:10.562906	2024-10-27 21:24:06.804056	4
 1415	95	completed	\N	2024-07-28 09:45:10.562906	2024-10-27 21:24:06.808926	6
 1416	95	completed	\N	2024-07-28 09:45:10.562906	2024-10-27 21:24:06.810017	7
-217	26	writing	\N	2024-07-28 09:44:57.573652	2024-10-27 23:27:17.054564	13
 1466	99	completed	\N	2024-09-23 20:32:01.286448	2024-11-02 10:31:32.7885	3
 1488	102	open	http://google.github.io/googletest/advanced.html	2024-10-05 21:49:48.993968	2024-10-05 21:49:48.993968	2
 1489	102	completed	http://google.github.io/googletest/gmock_for_dummies.html	2024-10-05 21:49:48.993968	2024-10-05 21:49:48.993968	3
@@ -23950,7 +22984,6 @@ COPY milestone.sections (id, resource_id, state, reference, created, updated, nu
 1554	100	completed	\N	2024-11-07 22:07:28.651539	2024-11-10 14:03:34.332721	4
 458	43	completed	\N	2024-07-28 09:45:00.334809	2024-11-16 23:53:47.317912	1
 1553	100	completed	\N	2024-11-07 22:07:28.651539	2024-11-10 14:03:34.331915	3
-459	43	completed	\N	2024-07-28 09:45:00.334809	2024-11-17 16:33:28.656464	2
 209	26	writing	\N	2024-07-28 09:44:57.573652	2024-11-21 23:59:46.642383	5
 1352	89	completed	\N	2024-07-28 09:45:09.867651	2024-11-23 14:11:23.087911	6
 1571	1	writing	https://youtu.be/xmqkRcAslw8	2024-11-27 20:58:50.907296	2024-11-27 21:53:14.163735	1
@@ -23996,6 +23029,7 @@ COPY milestone.sections (id, resource_id, state, reference, created, updated, nu
 794	59	completed	\N	2024-07-28 09:45:03.853918	2024-12-25 21:59:50.294658	9
 1586	109	writing	\N	2024-12-05 16:21:03.593753	2025-01-30 22:03:26.360568	3
 795	59	completed	\N	2024-07-28 09:45:03.853918	2024-12-26 10:13:56.272168	10
+459	43	writing	\N	2024-07-28 09:45:00.334809	2025-07-18 23:40:48.378758	2
 796	59	completed	\N	2024-07-28 09:45:03.853918	2024-12-28 12:14:27.167271	11
 797	59	completed	\N	2024-07-28 09:45:03.853918	2024-12-28 19:21:57.509366	12
 798	59	completed	\N	2024-07-28 09:45:03.853918	2024-12-29 13:02:11.391609	13
@@ -24012,7 +23046,6 @@ COPY milestone.sections (id, resource_id, state, reference, created, updated, nu
 1601	110	completed	\N	2025-01-03 20:38:12.197376	2025-01-05 16:23:18.622986	3
 1602	110	completed	\N	2025-01-03 20:38:12.197376	2025-01-05 16:23:18.627091	4
 1603	110	ignored	\N	2025-01-03 20:38:12.197376	2025-01-05 16:44:03.30081	5
-1611	111	open	\N	2025-01-07 20:26:11.766237	2025-01-07 20:26:11.766237	6
 1612	111	open	\N	2025-01-07 20:26:11.766237	2025-01-07 20:26:11.766237	7
 1613	111	open	\N	2025-01-07 20:26:11.766237	2025-01-07 20:26:11.766237	8
 1614	111	open	\N	2025-01-07 20:26:11.766237	2025-01-07 20:26:11.766237	9
@@ -24104,18 +23137,17 @@ COPY milestone.sections (id, resource_id, state, reference, created, updated, nu
 1694	117	open	\N	2025-05-03 22:26:42.979764	2025-05-03 22:26:42.979764	24
 1695	117	open	\N	2025-05-03 22:26:42.979764	2025-05-03 22:26:42.979764	25
 1674	117	completed	\N	2025-05-03 22:26:42.979764	2025-05-03 22:26:43.021042	4
-1698	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	3
-1699	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	4
-1700	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	5
-1701	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	6
-1702	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	7
-1703	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	8
 1704	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	9
 1705	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	10
 1706	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	11
 1707	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	12
 1708	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	13
 1709	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	14
+1699	118	completed	\N	2025-07-14 20:36:31.814802	2025-07-16 14:02:30.629205	4
+1701	118	completed	\N	2025-07-14 20:36:31.814802	2025-07-16 14:02:30.636803	6
+1702	118	completed	\N	2025-07-14 20:36:31.814802	2025-07-16 14:02:30.640862	7
+1703	118	completed	\N	2025-07-14 20:36:31.814802	2025-07-16 14:02:30.644692	8
+1611	111	writing	\N	2025-01-07 20:26:11.766237	2025-07-18 23:42:15.158694	6
 1710	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	15
 1711	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	16
 1712	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	17
@@ -24172,1658 +23204,256 @@ COPY milestone.sections (id, resource_id, state, reference, created, updated, nu
 1763	118	open	\N	2025-07-14 20:36:31.814802	2025-07-14 20:36:31.814802	68
 1696	118	writing	\N	2025-07-14 20:36:31.814802	2025-07-14 20:37:01.793634	1
 1697	118	writing	\N	2025-07-14 20:36:31.814802	2025-07-14 20:37:01.798552	2
-\.
-
-
---
--- Data for Name: studies; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.studies (user_id, section_id, updated) FROM stdin;
-1	6	2024-08-07 22:44:43.138201
-1	3	2024-08-07 22:44:43.138201
-1	49	2024-08-07 22:44:43.138201
-1	48	2024-08-07 22:44:43.138201
-1	47	2024-08-07 22:44:43.138201
-1	67	2024-08-07 22:44:43.138201
-1	65	2024-08-07 22:44:43.138201
-1	66	2024-08-07 22:44:43.138201
-1	96	2024-08-07 22:44:43.138201
-1	125	2024-08-07 22:44:43.138201
-1	117	2024-08-07 22:44:43.138201
-1	128	2024-08-07 22:44:43.138201
-1	122	2024-08-07 22:44:43.138201
-1	115	2024-08-07 22:44:43.138201
-1	127	2024-08-07 22:44:43.138201
-1	121	2024-08-07 22:44:43.138201
-1	118	2024-08-07 22:44:43.138201
-1	124	2024-08-07 22:44:43.138201
-1	126	2024-08-07 22:44:43.138201
-1	120	2024-08-07 22:44:43.138201
-1	116	2024-08-07 22:44:43.138201
-1	114	2024-08-07 22:44:43.138201
-1	150	2024-08-07 22:44:43.138201
-1	149	2024-08-07 22:44:43.138201
-1	250	2024-08-07 22:44:43.138201
-1	254	2024-08-07 22:44:43.138201
-1	258	2024-08-07 22:44:43.138201
-1	252	2024-08-07 22:44:43.138201
-1	253	2024-08-07 22:44:43.138201
-1	255	2024-08-07 22:44:43.138201
-1	256	2024-08-07 22:44:43.138201
-1	267	2024-08-07 22:44:43.138201
-1	257	2024-08-07 22:44:43.138201
-1	268	2024-08-07 22:44:43.138201
-1	273	2024-08-07 22:44:43.138201
-1	295	2024-08-07 22:44:43.138201
-1	296	2024-08-07 22:44:43.138201
-1	293	2024-08-07 22:44:43.138201
-1	289	2024-08-07 22:44:43.138201
-1	291	2024-08-07 22:44:43.138201
-1	290	2024-08-07 22:44:43.138201
-1	299	2024-08-07 22:44:43.138201
-1	307	2024-08-07 22:44:43.138201
-1	306	2024-08-07 22:44:43.138201
-1	311	2024-08-07 22:44:43.138201
-1	310	2024-08-07 22:44:43.138201
-1	309	2024-08-07 22:44:43.138201
-1	305	2024-08-07 22:44:43.138201
-1	300	2024-08-07 22:44:43.138201
-1	302	2024-08-07 22:44:43.138201
-1	304	2024-08-07 22:44:43.138201
-1	303	2024-08-07 22:44:43.138201
-1	308	2024-08-07 22:44:43.138201
-1	301	2024-08-07 22:44:43.138201
-1	340	2024-08-07 22:44:43.138201
-1	337	2024-08-07 22:44:43.138201
-1	338	2024-08-07 22:44:43.138201
-1	358	2024-08-07 22:44:43.138201
-1	376	2024-08-07 22:44:43.138201
-1	359	2024-08-07 22:44:43.138201
-1	368	2024-08-07 22:44:43.138201
-1	361	2024-08-07 22:44:43.138201
-1	379	2024-08-07 22:44:43.138201
-1	370	2024-08-07 22:44:43.138201
-1	378	2024-08-07 22:44:43.138201
-1	355	2024-08-07 22:44:43.138201
-1	377	2024-08-07 22:44:43.138201
-1	356	2024-08-07 22:44:43.138201
-1	362	2024-08-07 22:44:43.138201
-1	357	2024-08-07 22:44:43.138201
-1	363	2024-08-07 22:44:43.138201
-1	369	2024-08-07 22:44:43.138201
-1	419	2024-08-07 22:44:43.138201
-1	420	2024-08-07 22:44:43.138201
-1	437	2024-08-07 22:44:43.138201
-1	470	2024-08-07 22:44:43.138201
-1	474	2024-08-07 22:44:43.138201
-1	487	2024-08-07 22:44:43.138201
-1	496	2024-08-07 22:44:43.138201
-1	481	2024-08-07 22:44:43.138201
-1	483	2024-08-07 22:44:43.138201
-1	494	2024-08-07 22:44:43.138201
-1	488	2024-08-07 22:44:43.138201
-1	479	2024-08-07 22:44:43.138201
-1	495	2024-08-07 22:44:43.138201
-1	491	2024-08-07 22:44:43.138201
-1	478	2024-08-07 22:44:43.138201
-1	497	2024-08-07 22:44:43.138201
-1	490	2024-08-07 22:44:43.138201
-1	480	2024-08-07 22:44:43.138201
-1	492	2024-08-07 22:44:43.138201
-1	477	2024-08-07 22:44:43.138201
-1	485	2024-08-07 22:44:43.138201
-1	473	2024-08-07 22:44:43.138201
-1	484	2024-08-07 22:44:43.138201
-1	486	2024-08-07 22:44:43.138201
-1	493	2024-08-07 22:44:43.138201
-1	482	2024-08-07 22:44:43.138201
-1	489	2024-08-07 22:44:43.138201
-1	516	2024-08-07 22:44:43.138201
-1	515	2024-08-07 22:44:43.138201
-1	529	2024-08-07 22:44:43.138201
-1	528	2024-08-07 22:44:43.138201
-1	624	2024-08-07 22:44:43.138201
-1	625	2024-08-07 22:44:43.138201
-1	627	2024-08-07 22:44:43.138201
-1	629	2024-08-07 22:44:43.138201
-1	626	2024-08-07 22:44:43.138201
-1	652	2024-08-07 22:44:43.138201
-1	676	2024-08-07 22:44:43.138201
-1	675	2024-08-07 22:44:43.138201
-1	744	2024-08-07 22:44:43.138201
-1	729	2024-08-07 22:44:43.138201
-1	731	2024-08-07 22:44:43.138201
-1	728	2024-08-07 22:44:43.138201
-1	730	2024-08-07 22:44:43.138201
-1	755	2024-08-07 22:44:43.138201
-1	749	2024-08-07 22:44:43.138201
-1	758	2024-08-07 22:44:43.138201
-1	753	2024-08-07 22:44:43.138201
-1	751	2024-08-07 22:44:43.138201
-1	752	2024-08-07 22:44:43.138201
-1	760	2024-08-07 22:44:43.138201
-1	773	2024-08-07 22:44:43.138201
-1	763	2024-08-07 22:44:43.138201
-1	764	2024-08-07 22:44:43.138201
-1	762	2024-08-07 22:44:43.138201
-1	768	2024-08-07 22:44:43.138201
-1	765	2024-08-07 22:44:43.138201
-1	803	2024-08-07 22:44:43.138201
-1	863	2024-08-07 22:44:43.138201
-1	858	2024-08-07 22:44:43.138201
-1	853	2024-08-07 22:44:43.138201
-1	886	2024-08-07 22:44:43.138201
-1	902	2024-08-07 22:44:43.138201
-1	903	2024-08-07 22:44:43.138201
-1	901	2024-08-07 22:44:43.138201
-1	963	2024-08-07 22:44:43.138201
-1	962	2024-08-07 22:44:43.138201
-1	964	2024-08-07 22:44:43.138201
-1	965	2024-08-07 22:44:43.138201
-1	1031	2024-08-07 22:44:43.138201
-1	1037	2024-08-07 22:44:43.138201
-1	1038	2024-08-07 22:44:43.138201
-1	1036	2024-08-07 22:44:43.138201
-1	1135	2024-08-07 22:44:43.138201
-1	1141	2024-08-07 22:44:43.138201
-1	1134	2024-08-07 22:44:43.138201
-1	1148	2024-08-07 22:44:43.138201
-1	1250	2024-08-07 22:44:43.138201
-1	1252	2024-08-07 22:44:43.138201
-1	1260	2024-08-07 22:44:43.138201
-1	1255	2024-08-07 22:44:43.138201
-1	1251	2024-08-07 22:44:43.138201
-1	1259	2024-08-07 22:44:43.138201
-1	1256	2024-08-07 22:44:43.138201
-1	1254	2024-08-07 22:44:43.138201
-1	1253	2024-08-07 22:44:43.138201
-1	1248	2024-08-07 22:44:43.138201
-1	1249	2024-08-07 22:44:43.138201
-1	1257	2024-08-07 22:44:43.138201
-1	1261	2024-08-07 22:44:43.138201
-1	1284	2024-08-07 22:44:43.138201
-1	1281	2024-08-07 22:44:43.138201
-1	1330	2024-08-07 22:44:43.138201
-1	1331	2024-08-07 22:44:43.138201
-1	1332	2024-08-07 22:44:43.138201
-1	472	2024-10-07 22:18:13.969178
-1	1359	2024-08-07 22:44:43.138201
-1	1360	2024-08-07 22:44:43.138201
-1	1355	2024-08-07 22:44:43.138201
-1	206	2024-10-19 21:40:06.252299
-1	1353	2024-08-07 22:44:43.138201
-1	1362	2024-08-07 22:44:43.138201
-1	1377	2024-08-07 22:44:43.138201
-1	1350	2024-11-18 19:50:29.193856
-1	1351	2024-11-18 20:22:07.140222
-1	1398	2024-08-07 22:44:43.138201
-1	1415	2024-08-07 22:44:43.138201
-1	1414	2024-08-07 22:44:43.138201
-1	1294	2025-01-26 00:02:47.692485
-1	430	2025-01-28 00:14:28.423385
-1	1416	2024-08-07 22:44:43.138201
-1	1419	2024-08-07 22:44:43.138201
-1	1418	2024-08-07 22:44:43.138201
-1	1420	2024-08-07 22:44:43.138201
-1	1461	2024-08-18 17:15:29.113219
-1	37	2024-09-23 20:36:18.228435
-1	38	2024-09-23 20:36:18.228435
-1	39	2024-09-23 20:36:18.228435
-1	40	2024-09-23 20:36:18.228435
-1	41	2024-09-23 20:36:18.228435
-1	42	2024-09-23 20:36:18.228435
-1	43	2024-09-23 20:36:18.228435
-1	44	2024-09-23 20:36:18.228435
-1	45	2024-09-23 20:36:18.228435
-1	51	2024-09-23 20:36:18.228435
-1	70	2024-09-23 20:36:18.228435
-1	22	2024-09-23 20:36:18.228435
-1	57	2024-09-23 20:36:18.228435
-1	19	2024-09-23 20:36:18.228435
-1	91	2024-09-23 20:36:18.228435
-1	176	2024-09-23 20:36:18.228435
-1	173	2024-09-23 20:36:18.228435
-1	189	2024-09-23 20:36:18.228435
-1	161	2024-09-23 20:36:18.228435
-1	350	2024-09-23 20:36:18.228435
-1	278	2024-09-23 20:36:18.228435
-1	292	2024-09-23 20:36:18.228435
-1	271	2024-09-23 20:36:18.228435
-1	266	2024-09-23 20:36:18.228435
-1	315	2024-09-23 20:36:18.228435
-1	417	2024-09-23 20:36:18.228435
-1	390	2024-09-23 20:36:18.228435
-1	440	2024-09-23 20:36:18.228435
-1	366	2024-09-23 20:36:18.228435
-1	400	2024-09-23 20:36:18.228435
-1	391	2024-09-23 20:36:18.228435
-1	428	2024-09-23 20:36:18.228435
-1	453	2024-09-23 20:36:18.228435
-1	539	2024-09-23 20:36:18.228435
-1	576	2024-09-23 20:36:18.228435
-1	556	2024-09-23 20:36:18.228435
-1	578	2024-09-23 20:36:18.228435
-1	508	2024-09-23 20:36:18.228435
-1	534	2024-09-23 20:36:18.228435
-1	501	2024-09-23 20:36:18.228435
-1	545	2024-09-23 20:36:18.228435
-1	563	2024-09-23 20:36:18.228435
-1	555	2024-09-23 20:36:18.228435
-1	567	2024-09-23 20:36:18.228435
-1	507	2024-09-23 20:36:18.228435
-1	551	2024-09-23 20:36:18.228435
-1	532	2024-09-23 20:36:18.228435
-1	519	2024-09-23 20:36:18.228435
-1	663	2024-09-23 20:36:18.228435
-1	770	2024-09-23 20:36:18.228435
-1	791	2024-09-23 20:36:18.228435
-1	775	2024-09-23 20:36:18.228435
-1	695	2024-09-23 20:36:18.228435
-1	794	2024-09-23 20:36:18.228435
-1	769	2024-09-23 20:36:18.228435
-1	839	2024-09-23 20:36:18.228435
-1	802	2024-09-23 20:36:18.228435
-1	815	2024-09-23 20:36:18.228435
-1	824	2024-09-23 20:36:18.228435
-1	841	2024-09-23 20:36:18.228435
-1	823	2024-09-23 20:36:18.228435
-1	822	2024-09-23 20:36:18.228435
-1	906	2024-09-23 20:36:18.228435
-1	909	2024-09-23 20:36:18.228435
-1	811	2024-09-23 20:36:18.228435
-1	814	2024-09-23 20:36:18.228435
-1	850	2024-09-23 20:36:18.228435
-1	1091	2024-09-23 20:36:18.228435
-1	1075	2024-09-23 20:36:18.228435
-1	1108	2024-09-23 20:36:18.228435
-1	1269	2024-09-23 20:36:18.228435
-1	1307	2024-09-23 20:36:18.228435
-1	1268	2024-09-23 20:36:18.228435
-1	1263	2024-09-23 20:36:18.228435
-1	1289	2024-09-23 20:36:18.228435
-1	1313	2024-09-23 20:36:18.228435
-1	1262	2024-09-23 20:36:18.228435
-1	1287	2024-09-23 20:36:18.228435
-1	1312	2024-09-23 20:36:18.228435
-1	1373	2024-09-23 20:36:18.228435
-1	1431	2024-09-23 20:36:18.228435
-1	1372	2024-09-23 20:36:18.228435
-1	951	2024-09-23 20:36:18.228435
-1	1128	2024-09-23 20:36:18.228435
-1	1136	2024-09-23 20:36:18.228435
-1	946	2024-09-23 20:36:18.228435
-1	1003	2024-09-23 20:36:18.228435
-1	1045	2024-09-23 20:36:18.228435
-1	929	2024-09-23 20:36:18.228435
-1	1175	2024-09-23 20:36:18.228435
-1	638	2024-09-23 20:36:18.228435
-1	940	2024-09-23 20:36:18.228435
-1	1018	2024-09-23 20:36:18.228435
-1	632	2024-09-23 20:36:18.228435
-1	658	2024-09-23 20:36:18.228435
-1	1422	2024-09-23 20:36:18.228435
-1	1004	2024-09-23 20:36:18.228435
-1	160	2024-09-23 20:36:18.228435
-1	644	2024-09-23 20:36:18.228435
-1	1368	2024-09-23 20:36:18.228435
-1	1194	2024-09-23 20:36:18.228435
-1	1143	2024-09-23 20:36:18.228435
-1	1463	2024-09-23 20:36:18.228435
-1	1162	2024-09-23 20:36:18.228435
-1	1030	2024-09-23 20:36:18.228435
-1	1239	2024-09-23 20:36:18.228435
-1	54	2024-09-23 20:36:18.228435
-1	181	2024-09-23 20:36:18.228435
-1	743	2024-09-23 20:36:18.228435
-1	10	2024-09-23 20:36:18.228435
-1	35	2024-09-23 20:36:18.228435
-1	220	2024-09-23 20:36:18.228435
-1	1278	2024-09-23 20:36:18.228435
-1	1118	2024-09-23 20:36:18.228435
-1	1025	2024-09-23 20:36:18.228435
-1	241	2024-09-23 20:36:18.228435
-1	175	2024-09-23 20:36:18.228435
-1	1007	2024-09-23 20:36:18.228435
-1	596	2024-09-23 20:36:18.228435
-1	285	2024-09-23 20:36:18.228435
-1	50	2024-09-23 20:36:18.228435
-1	13	2024-09-23 20:36:18.228435
-1	1319	2024-09-23 20:36:18.228435
-1	1266	2024-09-23 20:36:18.228435
-1	1104	2024-09-23 20:36:18.228435
-1	2	2024-09-23 20:36:18.228435
-1	699	2024-09-23 20:36:18.228435
-1	246	2024-09-23 20:36:18.228435
-1	75	2024-09-23 20:36:18.228435
-1	1190	2024-09-23 20:36:18.228435
-1	714	2024-09-23 20:36:18.228435
-1	344	2024-09-23 20:36:18.228435
-1	1321	2024-09-23 20:36:18.228435
-1	745	2024-09-23 20:36:18.228435
-1	1078	2024-09-23 20:36:18.228435
-1	152	2024-09-23 20:36:18.228435
-1	1216	2024-09-23 20:36:18.228435
-1	1049	2024-09-23 20:36:18.228435
-1	637	2024-09-23 20:36:18.228435
-1	1279	2024-09-23 20:36:18.228435
-1	1403	2024-09-23 20:36:18.228435
-1	747	2024-09-23 20:36:18.228435
-1	222	2024-09-23 20:36:18.228435
-1	1006	2024-09-23 20:36:18.228435
-1	1324	2024-09-23 20:36:18.228435
-1	1008	2024-09-23 20:36:18.228435
-1	777	2024-09-23 20:36:18.228435
-1	164	2024-09-23 20:36:18.228435
-1	1098	2024-09-23 20:36:18.228435
-1	1325	2024-09-23 20:36:18.228435
-1	922	2024-09-23 20:36:18.228435
-1	186	2024-09-23 20:36:18.228435
-1	750	2024-09-23 20:36:18.228435
-1	182	2024-09-23 20:36:18.228435
-1	977	2024-09-23 20:36:18.228435
-1	18	2024-09-23 20:36:18.228435
-1	27	2024-09-23 20:36:18.228435
-1	143	2024-09-23 20:36:18.228435
-1	58	2024-09-23 20:36:18.228435
-1	228	2024-09-23 20:36:18.228435
-1	667	2024-09-23 20:36:18.228435
-1	668	2024-09-23 20:36:18.228435
-1	294	2024-09-23 20:36:18.228435
-1	926	2024-09-23 20:36:18.228435
-1	645	2024-09-23 20:36:18.228435
-1	1009	2024-09-23 20:36:18.228435
-1	1460	2024-09-23 20:36:18.228435
-1	607	2024-09-23 20:36:18.228435
-1	438	2024-09-23 20:36:18.228435
-1	382	2024-09-23 20:36:18.228435
-1	1050	2024-09-23 20:36:18.228435
-1	84	2024-09-23 20:36:18.228435
-1	799	2024-09-23 20:36:18.228435
-1	276	2024-09-23 20:36:18.228435
-1	646	2024-09-23 20:36:18.228435
-1	1044	2024-09-23 20:36:18.228435
-1	320	2024-09-23 20:36:18.228435
-1	1062	2024-09-23 20:36:18.228435
-1	942	2024-09-23 20:36:18.228435
-1	1458	2024-09-23 20:36:18.228435
-1	97	2024-09-23 20:36:18.228435
-1	108	2024-09-23 20:36:18.228435
-1	59	2024-09-23 20:36:18.228435
-1	589	2024-09-23 20:36:18.228435
-1	1285	2024-09-23 20:36:18.228435
-1	1167	2024-09-23 20:36:18.228435
-1	682	2024-09-23 20:36:18.228435
-1	329	2024-09-23 20:36:18.228435
-1	1144	2024-09-23 20:36:18.228435
-1	816	2024-09-23 20:36:18.228435
-1	153	2024-09-23 20:36:18.228435
-1	1022	2024-09-23 20:36:18.228435
-1	778	2024-09-23 20:36:18.228435
-1	944	2024-09-23 20:36:18.228435
-1	214	2024-09-23 20:36:18.228435
-1	847	2024-09-23 20:36:18.228435
-1	1336	2024-09-23 20:36:18.228435
-1	664	2024-09-23 20:36:18.228435
-1	1170	2024-09-23 20:36:18.228435
-1	945	2024-09-23 20:36:18.228435
-1	1371	2024-09-23 20:36:18.228435
-1	948	2024-09-23 20:36:18.228435
-1	95	2024-09-23 20:36:18.228435
-1	1434	2024-09-23 20:36:18.228435
-1	259	2024-09-23 20:36:18.228435
-1	1203	2024-09-23 20:36:18.228435
-1	172	2024-09-23 20:36:18.228435
-1	409	2024-09-23 20:36:18.228435
-1	840	2024-09-23 20:36:18.228435
-1	30	2024-09-23 20:36:18.228435
-1	521	2024-09-23 20:36:18.228435
-1	936	2024-09-23 20:36:18.228435
-1	324	2024-09-23 20:36:18.228435
-1	981	2024-09-23 20:36:18.228435
-1	921	2024-09-23 20:36:18.228435
-1	1334	2024-09-23 20:36:18.228435
-1	1221	2024-09-23 20:36:18.228435
-1	1227	2024-09-23 20:36:18.228435
-1	249	2024-09-23 20:36:18.228435
-1	1295	2024-09-23 20:36:18.228435
-1	1126	2024-09-23 20:36:18.228435
-1	1217	2024-09-23 20:36:18.228435
-1	984	2024-09-23 20:36:18.228435
-1	639	2024-09-23 20:36:18.228435
-1	209	2024-09-23 20:36:18.228435
-1	74	2024-09-23 20:36:18.228435
-1	937	2024-09-23 20:36:18.228435
-1	868	2024-09-23 20:36:18.228435
-1	138	2024-09-23 20:36:18.228435
-1	34	2024-09-23 20:36:18.228435
-1	418	2024-09-23 20:36:18.228435
-1	947	2024-09-23 20:36:18.228435
-1	1411	2024-09-23 20:36:18.228435
-1	1229	2024-09-23 20:36:18.228435
-1	978	2024-09-23 20:36:18.228435
-1	972	2024-09-23 20:36:18.228435
-1	761	2024-09-23 20:36:18.228435
-1	407	2024-09-23 20:36:18.228435
-1	1084	2024-09-23 20:36:18.228435
-1	90	2024-09-23 20:36:18.228435
-1	904	2024-09-23 20:36:18.228435
-1	443	2024-09-23 20:36:18.228435
-1	387	2024-09-23 20:36:18.228435
-1	1337	2024-09-23 20:36:18.228435
-1	690	2024-09-23 20:36:18.228435
-1	526	2024-09-23 20:36:18.228435
-1	1209	2024-09-23 20:36:18.228435
-1	1428	2024-09-23 20:36:18.228435
-1	393	2024-09-23 20:36:18.228435
-1	524	2024-09-23 20:36:18.228435
-1	312	2024-09-23 20:36:18.228435
-1	1151	2024-09-23 20:36:18.228435
-1	498	2024-09-23 20:36:18.228435
-1	862	2024-09-23 20:36:18.228435
-1	1185	2024-09-23 20:36:18.228435
-1	469	2024-09-23 20:36:18.228435
-1	683	2024-09-23 20:36:18.228435
-1	793	2024-09-23 20:36:18.228435
-1	317	2024-09-23 20:36:18.228435
-1	1265	2024-09-23 20:36:18.228435
-1	702	2024-09-23 20:36:18.228435
-1	1101	2024-09-23 20:36:18.228435
-1	1048	2024-09-23 20:36:18.228435
-1	194	2024-09-23 20:36:18.228435
-1	360	2024-09-23 20:36:18.228435
-1	463	2024-09-23 20:36:18.228435
-1	476	2024-09-23 20:36:18.228435
-1	99	2024-09-23 20:36:18.228435
-1	726	2024-09-23 20:36:18.228435
-1	374	2024-09-23 20:36:18.228435
-1	1146	2024-09-23 20:36:18.228435
-1	1215	2024-09-23 20:36:18.228435
-1	1210	2024-09-23 20:36:18.228435
-1	224	2024-09-23 20:36:18.228435
-1	719	2024-09-23 20:36:18.228435
-1	756	2024-09-23 20:36:18.228435
-1	318	2024-09-23 20:36:18.228435
-1	933	2024-09-23 20:36:18.228435
-1	647	2024-09-23 20:36:18.228435
-1	442	2024-09-23 20:36:18.228435
-1	354	2024-09-23 20:36:18.228435
-1	1296	2024-09-23 20:36:18.228435
-1	1238	2024-09-23 20:36:18.228435
-1	593	2024-09-23 20:36:18.228435
-1	12	2024-09-23 20:36:18.228435
-1	1120	2024-09-23 20:36:18.228435
-1	154	2024-09-23 20:36:18.228435
-1	1283	2024-09-23 20:36:18.228435
-1	657	2024-09-23 20:36:18.228435
-1	234	2024-09-23 20:36:18.228435
-1	1306	2024-09-23 20:36:18.228435
-1	899	2024-09-23 20:36:18.228435
-1	935	2024-09-23 20:36:18.228435
-1	748	2024-09-23 20:36:18.228435
-1	696	2024-09-23 20:36:18.228435
-1	969	2024-09-23 20:36:18.228435
-1	1179	2024-09-23 20:36:18.228435
-1	264	2024-09-23 20:36:18.228435
-1	270	2024-09-23 20:36:18.228435
-1	898	2024-09-23 20:36:18.228435
-1	435	2024-09-23 20:36:18.228435
-1	384	2024-09-23 20:36:18.228435
-1	1145	2024-09-23 20:36:18.228435
-1	351	2024-09-23 20:36:18.228435
-1	970	2024-09-23 20:36:18.228435
-1	732	2024-09-23 20:36:18.228435
-1	837	2024-09-23 20:36:18.228435
-1	826	2024-09-23 20:36:18.228435
-1	431	2024-09-23 20:36:18.228435
-1	1226	2024-09-23 20:36:18.228435
-1	911	2024-09-23 20:36:18.228435
-1	462	2024-09-23 20:36:18.228435
-1	734	2024-09-23 20:36:18.228435
-1	855	2024-09-23 20:36:18.228435
-1	1272	2024-09-23 20:36:18.228435
-1	436	2024-09-23 20:36:18.228435
-1	180	2024-09-23 20:36:18.228435
-1	1219	2024-09-23 20:36:18.228435
-1	967	2024-09-23 20:36:18.228435
-1	870	2024-09-23 20:36:18.228435
-1	1397	2024-09-23 20:36:18.228435
-1	263	2024-09-23 20:36:18.228435
-1	836	2024-09-23 20:36:18.228435
-1	784	2024-09-23 20:36:18.228435
-1	711	2024-09-23 20:36:18.228435
-1	780	2024-09-23 20:36:18.228435
-1	1301	2024-09-23 20:36:18.228435
-1	577	2024-09-23 20:36:18.228435
-1	505	2024-09-23 20:36:18.228435
-1	280	2024-09-23 20:36:18.228435
-1	88	2024-09-23 20:36:18.228435
-1	188	2024-09-23 20:36:18.228435
-1	461	2024-09-23 20:36:18.228435
-1	240	2024-09-23 20:36:18.228435
-1	1057	2024-09-23 20:36:18.228435
-1	328	2024-09-23 20:36:18.228435
-1	717	2024-09-23 20:36:18.228435
-1	525	2024-09-23 20:36:18.228435
-1	634	2024-09-23 20:36:18.228435
-1	1046	2024-09-23 20:36:18.228435
-1	1328	2024-09-23 20:36:18.228435
-1	650	2024-09-23 20:36:18.228435
-1	703	2024-09-23 20:36:18.228435
-1	226	2024-09-23 20:36:18.228435
-1	1161	2024-09-23 20:36:18.228435
-1	843	2024-09-23 20:36:18.228435
-1	710	2024-09-23 20:36:18.228435
-1	1016	2024-09-23 20:36:18.228435
-1	447	2024-09-23 20:36:18.228435
-1	298	2024-09-23 20:36:18.228435
-1	81	2024-09-23 20:36:18.228435
-1	1015	2024-09-23 20:36:18.228435
-1	954	2024-09-23 20:36:18.228435
-1	1218	2024-09-23 20:36:18.228435
-1	800	2024-09-23 20:36:18.228435
-1	204	2024-09-23 20:36:18.228435
-1	1021	2024-09-23 20:36:18.228435
-1	5	2024-09-23 20:36:18.228435
-1	1165	2024-09-23 20:36:18.228435
-1	1077	2024-09-23 20:36:18.228435
-1	456	2024-09-23 20:36:18.228435
-1	1247	2024-09-23 20:36:18.228435
-1	531	2024-09-23 20:36:18.228435
-1	1429	2024-09-23 20:36:18.228435
-1	283	2024-09-23 20:36:18.228435
-1	1409	2024-09-23 20:36:18.228435
-1	807	2024-09-23 20:36:18.228435
-1	546	2024-09-23 20:36:18.228435
-1	1427	2024-09-23 20:36:18.228435
-1	686	2024-09-23 20:36:18.228435
-1	297	2024-09-23 20:36:18.228435
-1	681	2024-09-23 20:36:18.228435
-1	1173	2024-09-23 20:36:18.228435
-1	974	2024-09-23 20:36:18.228435
-1	829	2024-09-23 20:36:18.228435
-1	785	2024-09-23 20:36:18.228435
-1	1406	2024-09-23 20:36:18.228435
-1	643	2024-09-23 20:36:18.228435
-1	444	2024-09-23 20:36:18.228435
-1	537	2024-09-23 20:36:18.228435
-1	233	2024-09-23 20:36:18.228435
-1	1149	2024-09-23 20:36:18.228435
-1	1370	2024-09-23 20:36:18.228435
-1	1115	2024-09-23 20:36:18.228435
-1	1401	2024-09-23 20:36:18.228435
-1	93	2024-09-23 20:36:18.228435
-1	89	2024-09-23 20:36:18.228435
-1	373	2024-09-23 20:36:18.228435
-1	343	2024-09-23 20:36:18.228435
-1	31	2024-09-23 20:36:18.228435
-1	1383	2024-09-23 20:36:18.228435
-1	1199	2024-09-23 20:36:18.228435
-1	1345	2024-09-23 20:36:18.228435
-1	1316	2024-09-23 20:36:18.228435
-1	723	2024-09-23 20:36:18.228435
-1	1086	2024-09-23 20:36:18.228435
-1	155	2024-09-23 20:36:18.228435
-1	722	2024-09-23 20:36:18.228435
-1	953	2024-09-23 20:36:18.228435
-1	609	2024-09-23 20:36:18.228435
-1	416	2024-09-23 20:36:18.228435
-1	1286	2024-09-23 20:36:18.228435
-1	195	2024-09-23 20:36:18.228435
-1	1153	2024-09-23 20:36:18.228435
-1	1137	2024-09-23 20:36:18.228435
-1	1097	2024-09-23 20:36:18.228435
-1	199	2024-09-23 20:36:18.228435
-1	1374	2024-09-23 20:36:18.228435
-1	441	2024-09-23 20:36:18.228435
-1	243	2024-09-23 20:36:18.228435
-1	1264	2024-09-23 20:36:18.228435
-1	1309	2024-09-23 20:36:18.228435
-1	1142	2024-09-23 20:36:18.228435
-1	1047	2024-09-23 20:36:18.228435
-1	740	2024-09-23 20:36:18.228435
-1	1178	2024-09-23 20:36:18.228435
-1	892	2024-09-23 20:36:18.228435
-1	856	2024-09-23 20:36:18.228435
-1	1083	2024-09-23 20:36:18.228435
-1	230	2024-09-23 20:36:18.228435
-1	503	2024-09-23 20:36:18.228435
-1	1154	2024-09-23 20:36:18.228435
-1	78	2024-09-23 20:36:18.228435
-1	573	2024-09-23 20:36:18.228435
-1	1356	2024-09-23 20:36:18.228435
-1	1451	2024-09-23 20:36:18.228435
-1	994	2024-09-23 20:36:18.228435
-1	987	2024-09-23 20:36:18.228435
-1	1099	2024-09-23 20:36:18.228435
-1	852	2024-09-23 20:36:18.228435
-1	611	2024-09-23 20:36:18.228435
-1	621	2024-09-23 20:36:18.228435
-1	865	2024-09-23 20:36:18.228435
-1	1246	2024-09-23 20:36:18.228435
-1	1206	2024-09-23 20:36:18.228435
-1	106	2024-09-23 20:36:18.228435
-1	1200	2024-09-23 20:36:18.228435
-1	1010	2024-09-23 20:36:18.228435
-1	178	2024-09-23 20:36:18.228435
-1	795	2024-09-23 20:36:18.228435
-1	809	2024-09-23 20:36:18.228435
-1	585	2024-09-23 20:36:18.228435
-1	8	2024-09-23 20:36:18.228435
-1	934	2024-09-23 20:36:18.228435
-1	908	2024-09-23 20:36:18.228435
-1	708	2024-09-23 20:36:18.228435
-1	455	2024-09-23 20:36:18.228435
-1	684	2024-09-23 20:36:18.228435
-1	713	2024-09-23 20:36:18.228435
-1	1205	2024-09-23 20:36:18.228435
-1	1156	2024-09-23 20:36:18.228435
-1	448	2024-09-23 20:36:18.228435
-1	930	2024-09-23 20:36:18.228435
-1	396	2024-09-23 20:36:18.228435
-1	1395	2024-09-23 20:36:18.228435
-1	701	2024-09-23 20:36:18.228435
-1	1092	2024-09-23 20:36:18.228435
-1	132	2024-09-23 20:36:18.228435
-1	514	2024-09-23 20:36:18.228435
-1	322	2024-09-23 20:36:18.228435
-1	1234	2024-09-23 20:36:18.228435
-1	854	2024-09-23 20:36:18.228435
-1	389	2024-09-23 20:36:18.228435
-1	1056	2024-09-23 20:36:18.228435
-1	916	2024-09-23 20:36:18.228435
-1	60	2024-09-23 20:36:18.228435
-1	1106	2024-09-23 20:36:18.228435
-1	1052	2024-09-23 20:36:18.228435
-1	754	2024-09-23 20:36:18.228435
-1	518	2024-09-23 20:36:18.228435
-1	1299	2024-09-23 20:36:18.228435
-1	583	2024-09-23 20:36:18.228435
-1	1202	2024-09-23 20:36:18.228435
-1	693	2024-09-23 20:36:18.228435
-1	1400	2024-09-23 20:36:18.228435
-1	98	2024-09-23 20:36:18.228435
-1	715	2024-09-23 20:36:18.228435
-1	1462	2024-09-23 20:36:18.228435
-1	527	2024-09-23 20:36:18.228435
-1	235	2024-09-23 20:36:18.228435
-1	1132	2024-09-23 20:36:18.228435
-1	119	2024-09-23 20:36:18.228435
-1	286	2024-09-23 20:36:18.228435
-1	147	2024-09-23 20:36:18.228435
-1	860	2024-09-23 20:36:18.228435
-1	1066	2024-09-23 20:36:18.228435
-1	412	2024-09-23 20:36:18.228435
-1	989	2024-09-23 20:36:18.228435
-1	26	2024-09-23 20:36:18.228435
-1	950	2024-09-23 20:36:18.228435
-1	564	2024-09-23 20:36:18.228435
-1	535	2024-09-23 20:36:18.228435
-1	72	2024-09-23 20:36:18.228435
-1	1168	2024-09-23 20:36:18.228435
-1	1159	2024-09-23 20:36:18.228435
-1	642	2024-09-23 20:36:18.228435
-1	232	2024-09-23 20:36:18.228435
-1	77	2024-09-23 20:36:18.228435
-1	725	2024-09-23 20:36:18.228435
-1	131	2024-09-23 20:36:18.228435
-1	832	2024-09-23 20:36:18.228435
-1	907	2024-09-23 20:36:18.228435
-1	1001	2024-09-23 20:36:18.228435
-1	584	2024-09-23 20:36:18.228435
-1	746	2024-09-23 20:36:18.228435
-1	806	2024-09-23 20:36:18.228435
-1	353	2024-09-23 20:36:18.228435
-1	939	2024-09-23 20:36:18.228435
-1	834	2024-09-23 20:36:18.228435
-1	831	2024-09-23 20:36:18.228435
-1	813	2024-09-23 20:36:18.228435
-1	1164	2024-09-23 20:36:18.228435
-1	1298	2024-09-23 20:36:18.228435
-1	574	2024-09-23 20:36:18.228435
-1	1335	2024-09-23 20:36:18.228435
-1	1443	2024-09-23 20:36:18.228435
-1	225	2024-09-23 20:36:18.228435
-1	1305	2024-09-23 20:36:18.228435
-1	1344	2024-09-23 20:36:18.228435
-1	333	2024-09-23 20:36:18.228435
-1	174	2024-09-23 20:36:18.228435
-1	1375	2024-09-23 20:36:18.228435
-1	891	2024-09-23 20:36:18.228435
-1	134	2024-09-23 20:36:18.228435
-1	1430	2024-09-23 20:36:18.228435
-1	1297	2024-09-23 20:36:18.228435
-1	918	2024-09-23 20:36:18.228435
-1	1241	2024-09-23 20:36:18.228435
-1	975	2024-09-23 20:36:18.228435
-1	36	2024-09-23 20:36:18.228435
-1	848	2024-09-23 20:36:18.228435
-1	1303	2024-09-23 20:36:18.228435
-1	102	2024-09-23 20:36:18.228435
-1	1292	2024-09-23 20:36:18.228435
-1	158	2024-09-23 20:36:18.228435
-1	533	2024-09-23 20:36:18.228435
-1	915	2024-09-23 20:36:18.228435
-1	979	2024-09-23 20:36:18.228435
-1	123	2024-09-23 20:36:18.228435
-1	1180	2024-09-23 20:36:18.228435
-1	871	2024-09-23 20:36:18.228435
-1	385	2024-09-23 20:36:18.228435
-1	1410	2024-09-23 20:36:18.228435
-1	544	2024-09-23 20:36:18.228435
-1	1442	2024-09-23 20:36:18.228435
-1	365	2024-09-23 20:36:18.228435
-1	704	2024-09-23 20:36:18.228435
-1	157	2024-09-23 20:36:18.228435
-1	606	2024-09-23 20:36:18.228435
-1	618	2024-09-23 20:36:18.228435
-1	1072	2024-09-23 20:36:18.228435
-1	313	2024-09-23 20:36:18.228435
-1	1080	2024-09-23 20:36:18.228435
-1	140	2024-09-23 20:36:18.228435
-1	248	2024-09-23 20:36:18.228435
-1	137	2024-09-23 20:36:18.228435
-1	614	2024-09-23 20:36:18.228435
-1	392	2024-09-23 20:36:18.228435
-1	24	2024-09-23 20:36:18.228435
-1	191	2024-09-23 20:36:18.228435
-1	966	2024-09-23 20:36:18.228435
-1	94	2024-09-23 20:36:18.228435
-1	1055	2024-09-23 20:36:18.228435
-1	218	2024-09-23 20:36:18.228435
-1	1188	2024-09-23 20:36:18.228435
-1	671	2024-09-23 20:36:18.228435
-1	580	2024-09-23 20:36:18.228435
-1	1131	2024-09-23 20:36:18.228435
-1	742	2024-09-23 20:36:18.228435
-1	912	2024-09-23 20:36:18.228435
-1	846	2024-09-23 20:36:18.228435
-1	938	2024-09-23 20:36:18.228435
-1	1158	2024-09-23 20:36:18.228435
-1	184	2024-09-23 20:36:18.228435
-1	87	2024-09-23 20:36:18.228435
-1	1300	2024-09-23 20:36:18.228435
-1	550	2024-09-23 20:36:18.228435
-1	394	2024-09-23 20:36:18.228435
-1	272	2024-09-23 20:36:18.228435
-1	781	2024-09-23 20:36:18.228435
-1	1437	2024-09-23 20:36:18.228435
-1	867	2024-09-23 20:36:18.228435
-1	190	2024-09-23 20:36:18.228435
-1	554	2024-09-23 20:36:18.228435
-1	424	2024-09-23 20:36:18.228435
-1	406	2024-09-23 20:36:18.228435
-1	670	2024-09-23 20:36:18.228435
-1	849	2024-09-23 20:36:18.228435
-1	509	2024-09-23 20:36:18.228435
-1	1366	2024-09-23 20:36:18.228435
-1	919	2024-09-23 20:36:18.228435
-1	1067	2024-09-23 20:36:18.228435
-1	156	2024-09-23 20:36:18.228435
-1	1096	2024-09-23 20:36:18.228435
-1	932	2024-09-23 20:36:18.228435
-1	1273	2024-09-23 20:36:18.228435
-1	1408	2024-09-23 20:36:18.228435
-1	641	2024-09-23 20:36:18.228435
-1	475	2024-09-23 20:36:18.228435
-1	961	2024-09-23 20:36:18.228435
-1	1433	2024-09-23 20:36:18.228435
-1	888	2024-09-23 20:36:18.228435
-1	1235	2024-09-23 20:36:18.228435
-1	282	2024-09-23 20:36:18.228435
-1	733	2024-09-23 20:36:18.228435
-1	269	2024-09-23 20:36:18.228435
-1	261	2024-09-23 20:36:18.228435
-1	502	2024-09-23 20:36:18.228435
-1	1122	2024-09-23 20:36:18.228435
-1	1426	2024-09-23 20:36:18.228435
-1	700	2024-09-23 20:36:18.228435
-1	1308	2024-09-23 20:36:18.228435
-1	1258	2024-09-23 20:36:18.228435
-1	1166	2024-09-23 20:36:18.228435
-1	587	2024-09-23 20:36:18.228435
-1	1444	2024-09-23 20:36:18.228435
-1	1090	2024-09-23 20:36:18.228435
-1	349	2024-09-23 20:36:18.228435
-1	187	2024-09-23 20:36:18.228435
-1	914	2024-09-23 20:36:18.228435
-1	766	2024-09-23 20:36:18.228435
-1	1150	2024-09-23 20:36:18.228435
-1	1119	2024-09-23 20:36:18.228435
-1	506	2024-09-23 20:36:18.228435
-1	242	2024-09-23 20:36:18.228435
-1	331	2024-09-23 20:36:18.228435
-1	1024	2024-09-23 20:36:18.228435
-1	913	2024-09-23 20:36:18.228435
-1	599	2024-09-23 20:36:18.228435
-1	677	2024-09-23 20:36:18.228435
-1	1232	2024-09-23 20:36:18.228435
-1	1028	2024-09-23 20:36:18.228435
-1	29	2024-09-23 20:36:18.228435
-1	4	2024-09-23 20:36:18.228435
-1	698	2024-09-23 20:36:18.228435
-1	466	2024-09-23 20:36:18.228435
-1	201	2024-09-23 20:36:18.228435
-1	980	2024-09-23 20:36:18.228435
-1	1039	2024-09-23 20:36:18.228435
-1	1201	2024-09-23 20:36:18.228435
-1	631	2024-09-23 20:36:18.228435
-1	1314	2024-09-23 20:36:18.228435
-1	1196	2024-09-23 20:36:18.228435
-1	107	2024-09-23 20:36:18.228435
-1	446	2024-09-23 20:36:18.228435
-1	1163	2024-09-23 20:36:18.228435
-1	86	2024-09-23 20:36:18.228435
-1	920	2024-09-23 20:36:18.228435
-1	1058	2024-09-23 20:36:18.228435
-1	219	2024-09-23 20:36:18.228435
-1	1432	2024-09-23 20:36:18.228435
-1	231	2024-09-23 20:36:18.228435
-1	512	2024-09-23 20:36:18.228435
-1	1213	2024-09-23 20:36:18.228435
-1	523	2024-09-23 20:36:18.228435
-1	1311	2024-09-23 20:36:18.228435
-1	414	2024-09-23 20:36:18.228435
-1	640	2024-09-23 20:36:18.228435
-1	1053	2024-09-23 20:36:18.228435
-1	1452	2024-09-23 20:36:18.228435
-1	735	2024-09-23 20:36:18.228435
-1	538	2024-09-23 20:36:18.228435
-1	166	2024-09-23 20:36:18.228435
-1	595	2024-09-23 20:36:18.228435
-1	142	2024-09-23 20:36:18.228435
-1	924	2024-09-23 20:36:18.228435
-1	872	2024-09-23 20:36:18.228435
-1	410	2024-09-23 20:36:18.228435
-1	1140	2024-09-23 20:36:18.228435
-1	1054	2024-09-23 20:36:18.228435
-1	792	2024-09-23 20:36:18.228435
-1	896	2024-09-23 20:36:18.228435
-1	651	2024-09-23 20:36:18.228435
-1	381	2024-09-23 20:36:18.228435
-1	1005	2024-09-23 20:36:18.228435
-1	597	2024-09-23 20:36:18.228435
-1	1291	2024-09-23 20:36:18.228435
-1	193	2024-09-23 20:36:18.228435
-1	1449	2024-09-23 20:36:18.228435
-1	1435	2024-09-23 20:36:18.228435
-1	1012	2024-09-23 20:36:18.228435
-1	548	2024-09-23 20:36:18.228435
-1	1212	2024-09-23 20:36:18.228435
-1	1087	2024-09-23 20:36:18.228435
-1	1457	2024-09-23 20:36:18.228435
-1	709	2024-09-23 20:36:18.228435
-1	1105	2024-09-23 20:36:18.228435
-1	177	2024-09-23 20:36:18.228435
-1	727	2024-09-23 20:36:18.228435
-1	985	2024-09-23 20:36:18.228435
-1	1405	2024-09-23 20:36:18.228435
-1	810	2024-09-23 20:36:18.228435
-1	779	2024-09-23 20:36:18.228435
-1	1231	2024-09-23 20:36:18.228435
-1	1276	2024-09-23 20:36:18.228435
-1	1117	2024-09-23 20:36:18.228435
-1	110	2024-09-23 20:36:18.228435
-1	931	2024-09-23 20:36:18.228435
-1	145	2024-09-23 20:36:18.228435
-1	557	2024-09-23 20:36:18.228435
-1	1189	2024-09-23 20:36:18.228435
-1	718	2024-09-23 20:36:18.228435
-1	623	2024-09-23 20:36:18.228435
-1	1364	2024-09-23 20:36:18.228435
-1	1439	2024-09-23 20:36:18.228435
-1	1388	2024-09-23 20:36:18.228435
-1	1081	2024-09-23 20:36:18.228435
-1	229	2024-09-23 20:36:18.228435
-1	1112	2024-09-23 20:36:18.228435
-1	559	2024-09-23 20:36:18.228435
-1	1315	2024-09-23 20:36:18.228435
-1	1102	2024-09-23 20:36:18.228435
-1	52	2024-09-23 20:36:18.228435
-1	1453	2024-09-23 20:36:18.228435
-1	1198	2024-09-23 20:36:18.228435
-1	633	2024-09-23 20:36:18.228435
-1	341	2024-09-23 20:36:18.228435
-1	450	2024-09-23 20:36:18.228435
-1	900	2024-09-23 20:36:18.228435
-1	405	2024-09-23 20:36:18.228435
-1	1195	2024-09-23 20:36:18.228435
-1	170	2024-09-23 20:36:18.228435
-1	996	2024-09-23 20:36:18.228435
-1	712	2024-09-23 20:36:18.228435
-1	192	2024-09-23 20:36:18.228435
-1	1174	2024-09-23 20:36:18.228435
-1	513	2024-09-23 20:36:18.228435
-1	1197	2024-09-23 20:36:18.228435
-1	101	2024-09-23 20:36:18.228435
-1	1063	2024-09-23 20:36:18.228435
-1	69	2024-09-23 20:36:18.228435
-1	1059	2024-09-23 20:36:18.228435
-1	679	2024-09-23 20:36:18.228435
-1	983	2024-09-23 20:36:18.228435
-1	375	2024-09-23 20:36:18.228435
-1	415	2024-09-23 20:36:18.228435
-1	976	2024-09-23 20:36:18.228435
-1	1242	2024-09-23 20:36:18.228435
-1	680	2024-09-23 20:36:18.228435
-1	408	2024-09-23 20:36:18.228435
-1	1376	2024-09-23 20:36:18.228435
-1	1365	2024-09-23 20:36:18.228435
-1	782	2024-09-23 20:36:18.228435
-1	1160	2024-09-23 20:36:18.228435
-1	689	2024-09-23 20:36:18.228435
-1	1338	2024-09-23 20:36:18.228435
-1	982	2024-09-23 20:36:18.228435
-1	522	2024-09-23 20:36:18.228435
-1	1079	2024-09-23 20:36:18.228435
-1	674	2024-09-23 20:36:18.228435
-1	1445	2024-09-23 20:36:18.228435
-1	630	2024-09-23 20:36:18.228435
-1	11	2024-09-23 20:36:18.228435
-1	1152	2024-09-23 20:36:18.228435
-1	575	2024-09-23 20:36:18.228435
-1	1384	2024-09-23 20:36:18.228435
-1	821	2024-09-23 20:36:18.228435
-1	401	2024-09-23 20:36:18.228435
-1	1456	2024-09-23 20:36:18.228435
-1	1329	2024-09-23 20:36:18.228435
-1	659	2024-09-23 20:36:18.228435
-1	739	2024-09-23 20:36:18.228435
-1	1094	2024-09-23 20:36:18.228435
-1	279	2024-09-23 20:36:18.228435
-1	9	2024-09-23 20:36:18.228435
-1	1110	2024-09-23 20:36:18.228435
-1	741	2024-09-23 20:36:18.228435
-1	716	2024-09-23 20:36:18.228435
-1	897	2024-09-23 20:36:18.228435
-1	543	2024-09-23 20:36:18.228435
-1	736	2024-09-23 20:36:18.228435
-1	565	2024-09-23 20:36:18.228435
-1	566	2024-09-23 20:36:18.228435
-1	1130	2024-09-23 20:36:18.228435
-1	457	2024-09-23 20:36:18.228435
-1	85	2024-09-23 20:36:18.228435
-1	592	2024-09-23 20:36:18.228435
-1	1440	2024-09-23 20:36:18.228435
-1	281	2024-09-23 20:36:18.228435
-1	687	2024-09-23 20:36:18.228435
-1	1041	2024-09-23 20:36:18.228435
-1	553	2024-09-23 20:36:18.228435
-1	288	2024-09-23 20:36:18.228435
-1	21	2024-09-23 20:36:18.228435
-1	622	2024-09-23 20:36:18.228435
-1	927	2024-09-23 20:36:18.228435
-1	1027	2024-09-23 20:36:18.228435
-1	774	2024-09-23 20:36:18.228435
-1	1385	2024-09-23 20:36:18.228435
-1	398	2024-09-23 20:36:18.228435
-1	635	2024-09-23 20:36:18.228435
-1	388	2024-09-23 20:36:18.228435
-1	1233	2024-09-23 20:36:18.228435
-1	165	2024-09-23 20:36:18.228435
-1	56	2024-09-23 20:36:18.228435
-1	151	2024-09-23 20:36:18.228435
-1	1346	2024-09-23 20:36:18.228435
-1	820	2024-09-23 20:36:18.228435
-1	1267	2024-09-23 20:36:18.228435
-1	992	2024-09-23 20:36:18.228435
-1	620	2024-09-23 20:36:18.228435
-1	894	2024-09-23 20:36:18.228435
-1	1357	2024-09-23 20:36:18.228435
-1	245	2024-09-23 20:36:18.228435
-1	1326	2024-09-23 20:36:18.228435
-1	1020	2024-09-23 20:36:18.228435
-1	325	2024-09-23 20:36:18.228435
-1	895	2024-09-23 20:36:18.228435
-1	673	2024-09-23 20:36:18.228435
-1	1127	2024-09-23 20:36:18.228435
-1	1060	2024-09-23 20:36:18.228435
-1	1017	2024-09-23 20:36:18.228435
-1	783	2024-09-23 20:36:18.228435
-1	334	2024-09-23 20:36:18.228435
-1	558	2024-09-23 20:36:18.228435
-1	144	2024-09-23 20:36:18.228435
-1	1071	2024-09-23 20:36:18.228435
-1	540	2024-09-23 20:36:18.228435
-1	1224	2024-09-23 20:36:18.228435
-1	168	2024-09-23 20:36:18.228435
-1	598	2024-09-23 20:36:18.228435
-1	1051	2024-09-23 20:36:18.228435
-1	1424	2024-09-23 20:36:18.228435
-1	287	2024-09-23 20:36:18.228435
-1	464	2024-09-23 20:36:18.228435
-1	1109	2024-09-23 20:36:18.228435
-1	167	2024-09-23 20:36:18.228435
-1	277	2024-09-23 20:36:18.228435
-1	1352	2024-09-23 20:36:18.228435
-1	662	2024-09-23 20:36:18.228435
-1	284	2024-09-23 20:36:18.228435
-1	342	2024-09-23 20:36:18.228435
-1	1133	2024-09-23 20:36:18.228435
-1	1441	2024-09-23 20:36:18.228435
-1	1271	2024-09-23 20:36:18.228435
-1	1035	2024-09-23 20:36:18.228435
-1	367	2024-09-23 20:36:18.228435
-1	1073	2024-09-23 20:36:18.228435
-1	588	2024-09-23 20:36:18.228435
-1	1019	2024-09-23 20:36:18.228435
-1	439	2024-09-23 20:36:18.228435
-1	1389	2024-09-23 20:36:18.228435
-1	586	2024-09-23 20:36:18.228435
-1	572	2024-09-23 20:36:18.228435
-1	53	2024-09-23 20:36:18.228435
-1	32	2024-09-23 20:36:18.228435
-1	275	2024-09-23 20:36:18.228435
-1	247	2024-09-23 20:36:18.228435
-1	1412	2024-09-23 20:36:18.228435
-1	260	2024-09-23 20:36:18.228435
-1	423	2024-09-23 20:36:18.228435
-1	1240	2024-09-23 20:36:18.228435
-1	136	2024-09-23 20:36:18.228435
-1	139	2024-09-23 20:36:18.228435
-1	1182	2024-09-23 20:36:18.228435
-1	411	2024-09-23 20:36:18.228435
-1	869	2024-09-23 20:36:18.228435
-1	1033	2024-09-23 20:36:18.228435
-1	864	2024-09-23 20:36:18.228435
-1	425	2024-09-23 20:36:18.228435
-1	672	2024-09-23 20:36:18.228435
-1	825	2024-09-23 20:36:18.228435
-1	1454	2024-09-23 20:36:18.228435
-1	1040	2024-09-23 20:36:18.228435
-1	316	2024-09-23 20:36:18.228435
-1	403	2024-09-23 20:36:18.228435
-1	1282	2024-09-23 20:36:18.228435
-1	654	2024-09-23 20:36:18.228435
-1	332	2024-09-23 20:36:18.228435
-1	628	2024-09-23 20:36:18.228435
-1	33	2024-09-23 20:36:18.228435
-1	422	2024-09-23 20:36:18.228435
-1	549	2024-09-23 20:36:18.228435
-1	185	2024-09-23 20:36:18.228435
-1	653	2024-09-23 20:36:18.228435
-1	380	2024-09-23 20:36:18.228435
-1	215	2024-09-23 20:36:18.228435
-1	1275	2024-09-23 20:36:18.228435
-1	1107	2024-09-23 20:36:18.228435
-1	1339	2024-09-23 20:36:18.228435
-1	130	2024-09-23 20:36:18.228435
-1	1157	2024-09-23 20:36:18.228435
-1	23	2024-09-23 20:36:18.228435
-1	612	2024-09-23 20:36:18.228435
-1	1155	2024-09-23 20:36:18.228435
-1	617	2024-09-23 20:36:18.228435
-1	1277	2024-09-23 20:36:18.228435
-1	552	2024-09-23 20:36:18.228435
-1	887	2024-09-23 20:36:18.228435
-1	959	2024-09-23 20:36:18.228435
-1	819	2024-09-23 20:36:18.228435
-1	314	2024-09-23 20:36:18.228435
-1	817	2024-09-23 20:36:18.228435
-1	386	2024-09-23 20:36:18.228435
-1	1274	2024-09-23 20:36:18.228435
-1	426	2024-09-23 20:36:18.228435
-1	433	2024-09-23 20:36:18.228435
-1	364	2024-09-23 20:36:18.228435
-1	1187	2024-09-23 20:36:18.228435
-1	169	2024-09-23 20:36:18.228435
-1	1123	2024-09-23 20:36:18.228435
-1	1113	2024-09-23 20:36:18.228435
-1	605	2024-09-23 20:36:18.228435
-1	345	2024-09-23 20:36:18.228435
-1	92	2024-09-23 20:36:18.228435
-1	1317	2024-09-23 20:36:18.228435
-1	541	2024-09-23 20:36:18.228435
-1	971	2024-09-23 20:36:18.228435
-1	660	2024-09-23 20:36:18.228435
-1	910	2024-09-23 20:36:18.228435
-1	236	2024-09-23 20:36:18.228435
-1	941	2024-09-23 20:36:18.228435
-1	957	2024-09-23 20:36:18.228435
-1	1065	2024-09-23 20:36:18.228435
-1	998	2024-09-23 20:36:18.228435
-1	949	2024-09-23 20:36:18.228435
-1	197	2024-09-23 20:36:18.228435
-1	135	2024-09-23 20:36:18.228435
-1	999	2024-09-23 20:36:18.228435
-1	1064	2024-09-23 20:36:18.228435
-1	707	2024-09-23 20:36:18.228435
-1	665	2024-09-23 20:36:18.228435
-1	454	2024-09-23 20:36:18.228435
-1	759	2024-09-23 20:36:18.228435
-1	1193	2024-09-23 20:36:18.228435
-1	227	2024-09-23 20:36:18.228435
-1	500	2024-09-23 20:36:18.228435
-1	1204	2024-09-23 20:36:18.228435
-1	73	2024-09-23 20:36:18.228435
-1	1169	2024-09-23 20:36:18.228435
-1	103	2024-09-23 20:36:18.228435
-1	1171	2024-09-23 20:36:18.228435
-1	1236	2024-09-23 20:36:18.228435
-1	1138	2024-09-23 20:36:18.228435
-1	1085	2024-09-23 20:36:18.228435
-1	239	2024-09-23 20:36:18.228435
-1	1438	2024-09-23 20:36:18.228435
-1	1407	2024-09-23 20:36:18.228435
-1	561	2024-09-23 20:36:18.228435
-1	1322	2024-09-23 20:36:18.228435
-1	845	2024-09-23 20:36:18.228435
-1	1184	2024-09-23 20:36:18.228435
-1	196	2024-09-23 20:36:18.228435
-1	15	2024-09-23 20:36:18.228435
-1	1069	2024-09-23 20:36:18.228435
-1	1129	2024-09-23 20:36:18.228435
-1	859	2024-09-23 20:36:18.228435
-1	842	2024-09-23 20:36:18.228435
-1	767	2024-09-23 20:36:18.228435
-1	1367	2024-09-23 20:36:18.228435
-1	61	2024-09-23 20:36:18.228435
-1	1043	2024-09-23 20:36:18.228435
-1	244	2024-09-23 20:36:18.228435
-1	602	2024-09-23 20:36:18.228435
-1	1192	2024-09-23 20:36:18.228435
-1	1088	2024-09-23 20:36:18.228435
-1	1124	2024-09-23 20:36:18.228435
-1	691	2024-09-23 20:36:18.228435
-1	468	2024-09-23 20:36:18.228435
-1	697	2024-09-23 20:36:18.228435
-1	1243	2024-09-23 20:36:18.228435
-1	721	2024-09-23 20:36:18.228435
-1	251	2024-09-23 20:36:18.228435
-1	1100	2024-09-23 20:36:18.228435
-1	705	2024-09-23 20:36:18.228435
-1	104	2024-09-23 20:36:18.228435
-1	1270	2024-09-23 20:36:18.228435
-1	1436	2024-09-23 20:36:18.228435
-1	1032	2024-09-23 20:36:18.228435
-1	960	2024-09-23 20:36:18.228435
-1	171	2024-09-23 20:36:18.228435
-1	397	2024-09-23 20:36:18.228435
-1	604	2024-09-23 20:36:18.228435
-1	427	2024-09-23 20:36:18.228435
-1	347	2024-09-23 20:36:18.228435
-1	179	2024-09-23 20:36:18.228435
-1	562	2024-09-23 20:36:18.228435
-1	1455	2024-09-23 20:36:18.228435
-1	636	2024-09-23 20:36:18.228435
-1	1228	2024-09-23 20:36:18.228435
-1	321	2024-09-23 20:36:18.228435
-1	1387	2024-09-23 20:36:18.228435
-1	105	2024-09-23 20:36:18.228435
-1	402	2024-09-23 20:36:18.228435
-1	804	2024-09-23 20:36:18.228435
-1	445	2024-09-23 20:36:18.228435
-1	866	2024-09-23 20:36:18.228435
-1	889	2024-09-23 20:36:18.228435
-1	991	2024-09-23 20:36:18.228435
-1	1391	2024-09-23 20:36:18.228435
-1	776	2024-09-23 20:36:18.228435
-1	467	2024-09-23 20:36:18.228435
-1	327	2024-09-23 20:36:18.228435
-1	1369	2024-09-23 20:36:18.228435
-1	692	2024-09-23 20:36:18.228435
-1	581	2024-09-23 20:36:18.228435
-1	14	2024-09-23 20:36:18.228435
-1	1177	2024-09-23 20:36:18.228435
-1	1121	2024-09-23 20:36:18.228435
-1	109	2024-09-23 20:36:18.228435
-1	133	2024-09-23 20:36:18.228435
-1	1343	2024-09-23 20:36:18.228435
-1	724	2024-09-23 20:36:18.228435
-1	1323	2024-09-23 20:36:18.228435
-1	1237	2024-09-23 20:36:18.228435
-1	1222	2024-09-23 20:36:18.228435
-1	372	2024-09-23 20:36:18.228435
-1	1358	2024-09-23 20:36:18.228435
-1	339	2024-09-23 20:36:18.228435
-1	600	2024-09-23 20:36:18.228435
-1	772	2024-09-23 20:36:18.228435
-1	335	2024-09-23 20:36:18.228435
-1	603	2024-09-23 20:36:18.228435
-1	591	2024-09-23 20:36:18.228435
-1	808	2024-09-23 20:36:18.228435
-1	383	2024-09-23 20:36:18.228435
-1	7	2024-09-23 20:36:18.228435
-1	1011	2024-09-23 20:36:18.228435
-1	757	2024-09-23 20:36:18.228435
-1	771	2024-09-23 20:36:18.228435
-1	827	2024-09-23 20:36:18.228435
-1	952	2024-09-23 20:36:18.228435
-1	159	2024-09-23 20:36:18.228435
-1	1402	2024-09-23 20:36:18.228435
-1	1399	2024-09-23 20:36:18.228435
-1	432	2024-09-23 20:36:18.228435
-1	986	2024-09-23 20:36:18.228435
-1	857	2024-09-23 20:36:18.228435
-1	619	2024-09-23 20:36:18.228435
-1	890	2024-09-23 20:36:18.228435
-1	1214	2024-09-23 20:36:18.228435
-1	20	2024-09-23 20:36:18.228435
-1	1394	2024-09-23 20:36:18.228435
-1	1341	2024-09-23 20:36:18.228435
-1	1061	2024-09-23 20:36:18.228435
-1	319	2024-09-23 20:36:18.228435
-1	1	2024-09-23 20:36:18.228435
-1	76	2024-09-23 20:36:18.228435
-1	1074	2024-09-23 20:36:18.228435
-1	517	2024-09-23 20:36:18.228435
-1	1111	2024-09-23 20:36:18.228435
-1	1082	2024-09-23 20:36:18.228435
-1	1392	2024-09-23 20:36:18.228435
-1	129	2024-09-23 20:36:18.228435
-1	203	2024-09-23 20:36:18.228435
-1	1181	2024-09-23 20:36:18.228435
-1	346	2024-09-23 20:36:18.228435
-1	71	2024-09-23 20:36:18.228435
-1	68	2024-09-23 20:36:18.228435
-1	1002	2024-09-23 20:36:18.228435
-1	1023	2024-09-23 20:36:18.228435
-1	146	2024-09-23 20:36:18.228435
-1	80	2024-09-23 20:36:18.228435
-1	1172	2024-09-23 20:36:18.228435
-1	861	2024-09-23 20:36:18.228435
-1	1208	2024-09-23 20:36:18.228435
-1	511	2024-09-23 20:36:18.228435
-1	162	2024-09-23 20:36:18.228435
-1	738	2024-09-23 20:36:18.228435
-1	1183	2024-09-23 20:36:18.228435
-1	797	2024-09-23 20:36:18.228435
-1	582	2024-09-23 20:36:18.228435
-1	1333	2024-09-23 20:36:18.228435
-1	1095	2024-09-23 20:36:18.228435
-1	1034	2024-09-23 20:36:18.228435
-1	943	2024-09-23 20:36:18.228435
-1	1386	2024-09-23 20:36:18.228435
-1	330	2024-09-23 20:36:18.228435
-1	237	2024-09-23 20:36:18.228435
-1	1220	2024-09-23 20:36:18.228435
-1	451	2024-09-23 20:36:18.228435
-1	262	2024-09-23 20:36:18.228435
-1	323	2024-09-23 20:36:18.228435
-1	348	2024-09-23 20:36:18.228435
-1	1363	2024-09-23 20:36:18.228435
-1	504	2024-09-23 20:36:18.228435
-1	399	2024-09-23 20:36:18.228435
-1	238	2024-09-23 20:36:18.228435
-1	112	2024-09-23 20:36:18.228435
-1	560	2024-09-23 20:36:18.228435
-1	547	2024-09-23 20:36:18.228435
-1	818	2024-09-23 20:36:18.228435
-1	1042	2024-09-23 20:36:18.228435
-1	613	2024-09-23 20:36:18.228435
-1	737	2024-09-23 20:36:18.228435
-1	1404	2024-09-23 20:36:18.228435
-1	569	2024-09-23 20:36:18.228435
-1	615	2024-09-23 20:36:18.228435
-1	452	2024-09-23 20:36:18.228435
-1	798	2024-09-23 20:36:18.228435
-1	830	2024-09-23 20:36:18.228435
-1	200	2024-09-23 20:36:18.228435
-1	988	2024-09-23 20:36:18.228435
-1	1340	2024-09-23 20:36:18.228435
-1	601	2024-09-23 20:36:18.228435
-1	590	2024-09-23 20:36:18.228435
-1	82	2024-09-23 20:36:18.228435
-1	990	2024-09-23 20:36:18.228435
-1	1396	2024-09-23 20:36:18.228435
-1	202	2024-09-23 20:36:18.228435
-1	685	2024-09-23 20:36:18.228435
-1	905	2024-09-23 20:36:18.228435
-1	973	2024-09-23 20:36:18.228435
-1	610	2024-09-23 20:36:18.228435
-1	79	2024-09-23 20:36:18.228435
-1	1425	2024-09-23 20:36:18.228435
-1	678	2024-09-23 20:36:18.228435
-1	812	2024-09-23 20:36:18.228435
-1	1390	2024-09-23 20:36:18.228435
-1	579	2024-09-23 20:36:18.228435
-1	510	2024-09-23 20:36:18.228435
-1	1448	2024-09-23 20:36:18.228435
-1	1176	2024-09-23 20:36:18.228435
-1	1186	2024-09-23 20:36:18.228435
-1	198	2024-09-23 20:36:18.228435
-1	17	2024-09-23 20:36:18.228435
-1	212	2024-09-23 20:36:18.228435
-1	28	2024-09-23 20:36:18.228435
-1	1116	2024-09-23 20:36:18.228435
-1	1290	2024-09-23 20:36:18.228435
-1	1089	2024-09-23 20:36:18.228435
-1	1070	2024-09-23 20:36:18.228435
-1	404	2024-09-23 20:36:18.228435
-1	1147	2024-09-23 20:36:18.228435
-1	720	2024-09-23 20:36:18.228435
-1	997	2024-09-23 20:36:18.228435
-1	917	2024-09-23 20:36:18.228435
-1	1280	2024-09-23 20:36:18.228435
-1	1068	2024-09-23 20:36:18.228435
-1	1000	2024-09-23 20:36:18.228435
-1	1245	2024-09-23 20:36:18.228435
-1	616	2024-09-23 20:36:18.228435
-1	1211	2024-09-23 20:36:18.228435
-1	1393	2024-09-23 20:36:18.228435
-1	706	2024-09-23 20:36:18.228435
-1	83	2024-09-23 20:36:18.228435
-1	63	2024-09-23 20:36:18.228435
-1	1230	2024-09-23 20:36:18.228435
-1	571	2024-09-23 20:36:18.228435
-1	1423	2024-09-23 20:36:18.228435
-1	956	2024-09-23 20:36:18.228435
-1	666	2024-09-23 20:36:18.228435
-1	542	2024-09-23 20:36:18.228435
-1	395	2024-09-23 20:36:18.228435
-1	216	2024-09-23 20:36:18.228435
-1	958	2024-09-23 20:36:18.228435
-1	694	2024-09-23 20:36:18.228435
-1	213	2024-09-23 20:36:18.228435
-1	955	2024-09-23 20:36:18.228435
-1	1114	2024-09-23 20:36:18.228435
-1	274	2024-09-23 20:36:18.228435
-1	1304	2024-09-23 20:36:18.228435
-1	801	2024-09-23 20:36:18.228435
-1	163	2024-09-23 20:36:18.228435
-1	1302	2024-09-23 20:36:18.228435
-1	1103	2024-09-23 20:36:18.228435
-1	833	2024-09-23 20:36:18.228435
-1	669	2024-09-23 20:36:18.228435
-1	223	2024-09-23 20:36:18.228435
-1	352	2024-09-23 20:36:18.228435
-1	1244	2024-09-23 20:36:18.228435
-1	221	2024-09-23 20:36:18.228435
-1	1013	2024-09-23 20:36:18.228435
-1	688	2024-09-23 20:36:18.228435
-1	1288	2024-09-23 20:36:18.228435
-1	1207	2024-09-23 20:36:18.228435
-1	594	2024-09-23 20:36:18.228435
-1	460	2024-09-23 20:36:18.228435
-1	499	2024-09-23 20:36:18.228435
-1	265	2024-09-23 20:36:18.228435
-1	111	2024-09-23 20:36:18.228435
-1	1093	2024-09-23 20:36:18.228435
-1	1076	2024-09-23 20:36:18.228435
-1	851	2024-09-23 20:36:18.228435
-1	968	2024-09-23 20:36:18.228435
-1	16	2024-09-23 20:36:18.228435
-1	62	2024-09-23 20:36:18.228435
-1	893	2024-09-23 20:36:18.228435
-1	1318	2024-09-23 20:36:18.228435
-1	993	2024-09-23 20:36:18.228435
-1	326	2024-09-23 20:36:18.228435
-1	568	2024-09-23 20:36:18.228435
-1	371	2024-09-23 20:36:18.228435
-1	805	2024-09-23 20:36:18.228435
-1	655	2024-09-23 20:36:18.228435
-1	1327	2024-09-23 20:36:18.228435
-1	1139	2024-09-23 20:36:18.228435
-1	413	2024-09-23 20:36:18.228435
-1	1450	2024-09-23 20:36:18.228435
-1	649	2024-09-23 20:36:18.228435
-1	183	2024-09-23 20:36:18.228435
-1	100	2024-09-23 20:36:18.228435
-1	1225	2024-09-23 20:36:18.228435
-1	1223	2024-09-23 20:36:18.228435
-1	925	2024-09-23 20:36:18.228435
-1	1342	2024-09-23 20:36:18.228435
-1	656	2024-09-23 20:36:18.228435
-1	421	2024-09-23 20:36:18.228435
-1	429	2024-09-23 20:36:18.228435
-1	835	2024-09-23 20:36:18.228435
-1	25	2024-09-23 20:36:18.228435
-1	141	2024-09-23 20:36:18.228435
-1	648	2024-09-23 20:36:18.228435
-1	570	2024-09-23 20:36:18.228435
-1	1026	2024-09-23 20:36:18.228435
-1	923	2024-09-23 20:36:18.228435
-1	995	2024-09-23 20:36:18.228435
-1	434	2024-09-23 20:36:18.228435
-1	211	2024-09-23 20:36:18.228435
-1	1320	2024-09-23 20:36:18.228435
-1	1191	2024-09-23 20:36:18.228435
-1	1014	2024-09-23 20:36:18.228435
-1	1125	2024-09-23 20:36:18.228435
-1	530	2024-09-23 20:36:18.228435
-1	928	2024-09-23 20:36:18.228435
-1	536	2024-09-23 20:36:18.228435
-1	465	2024-09-23 20:36:18.228435
-1	449	2024-09-23 20:36:18.228435
-1	520	2024-09-23 20:36:18.228435
-1	64	2024-09-23 20:36:18.228435
-1	1421	2024-09-23 20:36:18.228435
-1	55	2024-09-23 20:36:18.228435
-1	148	2024-09-23 20:36:18.228435
-1	790	2024-09-23 20:36:18.228435
-1	828	2024-09-23 20:36:18.228435
-1	1486	2024-10-03 14:27:34.014637
-1	1488	2024-10-05 21:52:28.034683
-1	1491	2024-10-05 21:52:28.034683
-1	471	2024-10-07 22:21:04.764332
-1	608	2024-10-12 15:58:30.232029
-1	1492	2024-10-13 09:59:11.204948
-1	1493	2024-10-13 09:59:11.204948
-1	1494	2024-10-13 09:59:11.204948
-1	1495	2024-10-13 09:59:11.204948
-1	1497	2024-10-13 09:59:11.204948
-1	1498	2024-10-13 09:59:11.204948
-1	1499	2024-10-13 09:59:11.204948
-1	1500	2024-10-13 09:59:11.204948
-1	1501	2024-10-13 09:59:11.204948
-1	1502	2024-10-13 09:59:11.204948
-1	1503	2024-10-13 09:59:11.204948
-1	1504	2024-10-13 09:59:11.204948
-1	1505	2024-10-13 09:59:11.204948
-1	1496	2024-10-13 09:59:11.204948
-1	1361	2024-10-13 10:15:50.870874
-1	1489	2024-10-14 12:16:16.921759
-1	661	2024-10-13 10:29:09.734084
-1	1518	2024-10-13 11:08:13.847027
-1	1519	2024-10-13 11:08:13.847027
-1	1466	2024-11-02 09:57:07.756614
-1	1520	2024-10-13 11:08:13.847027
-1	1522	2024-10-13 11:08:13.847027
-1	1523	2024-10-13 11:08:13.847027
-1	1521	2024-10-13 11:08:13.847027
-1	1525	2024-10-13 11:08:13.847027
-1	1526	2024-10-13 11:08:13.847027
-1	1527	2024-10-13 11:08:13.847027
-1	1528	2024-10-13 11:08:13.847027
-1	1529	2024-10-13 11:08:13.847027
-1	1530	2024-10-13 11:08:13.847027
-1	1531	2024-10-13 11:08:13.847027
-1	1532	2024-10-13 11:08:13.847027
-1	1533	2024-10-13 11:08:13.847027
-1	1534	2024-10-13 11:08:13.847027
-1	1535	2024-10-13 11:08:13.847027
-1	1536	2024-10-13 11:08:13.847027
-1	1524	2024-10-13 11:08:13.847027
-1	1507	2024-10-13 11:08:13.847027
-1	1508	2024-10-13 11:08:13.847027
-1	1468	2024-11-15 16:37:20.781155
-1	1467	2024-11-15 16:37:30.300463
-1	1464	2024-11-15 16:38:32.96557
-1	1509	2024-10-13 11:08:13.847027
-1	1510	2024-10-13 11:08:13.847027
-1	1348	2024-11-18 00:38:59.564436
-1	1511	2024-10-13 11:08:13.847027
-1	1512	2024-10-13 11:08:13.847027
-1	1513	2024-10-13 11:08:13.847027
-1	1514	2024-10-13 11:08:13.847027
-1	1515	2024-10-13 11:08:13.847027
-1	1516	2024-10-13 11:08:13.847027
-1	1517	2024-10-13 11:08:13.847027
-1	1506	2024-10-13 11:08:13.847027
-1	205	2024-10-19 10:04:19.122973
-1	207	2024-10-20 08:52:20.306621
-1	1487	2024-10-14 11:40:11.153339
-1	208	2024-10-20 11:34:26.931404
-1	113	2024-10-25 20:04:18.135342
-1	1293	2024-10-25 23:32:11.847594
-1	210	2024-10-27 21:21:45.392906
-1	217	2024-10-27 22:34:09.138173
-1	1490	2024-10-30 21:51:09.826316
-1	336	2024-11-03 16:05:11.542264
-1	1539	2024-11-02 22:10:33.865746
-1	1541	2024-11-02 22:10:33.865746
-1	1542	2024-11-02 22:10:33.865746
-1	1543	2024-11-02 22:10:33.865746
-1	1544	2024-11-02 22:10:33.865746
-1	1545	2024-11-02 22:10:33.865746
-1	1546	2024-11-02 22:10:33.865746
-1	1540	2024-11-02 22:12:03.344603
-1	1537	2024-11-07 14:15:30.195413
-1	1538	2024-11-07 14:23:59.616237
-1	1547	2024-11-08 15:38:20.65793
-1	1548	2024-11-08 15:38:20.65793
-1	1549	2024-11-08 15:38:20.65793
-1	1550	2024-11-08 15:38:20.65793
-1	1551	2024-11-08 15:38:20.65793
-1	1558	2024-11-08 15:38:20.65793
-1	1559	2024-11-08 15:38:20.65793
-1	1560	2024-11-08 15:38:20.65793
-1	1561	2024-11-08 15:38:20.65793
-1	1562	2024-11-08 15:38:20.65793
-1	1563	2024-11-08 15:38:20.65793
-1	1564	2024-11-08 15:38:20.65793
-1	1565	2024-11-08 15:38:20.65793
-1	1566	2024-11-08 15:38:20.65793
-1	1567	2024-11-08 15:38:20.65793
-1	1568	2024-11-08 15:38:20.65793
-1	1569	2024-11-08 15:38:20.65793
-1	1570	2024-11-08 15:38:20.65793
-1	1382	2024-11-08 21:22:31.325282
-1	1552	2024-11-09 12:19:44.791657
-1	1553	2024-11-09 22:48:19.757666
-1	1555	2024-11-10 12:16:58.993341
-1	1556	2024-11-10 13:43:17.553529
-1	1557	2024-11-10 18:45:16.351022
-1	1465	2024-11-15 16:38:01.84121
-1	1349	2024-11-18 01:22:17.757179
-1	1446	2024-11-20 22:06:19.960944
-1	844	2024-11-27 23:51:18.529806
-1	1571	2024-11-27 23:48:16.054551
-1	1574	2024-12-01 22:07:35.941314
-1	1575	2024-12-01 22:07:35.941314
-1	1576	2024-12-01 22:07:35.941314
-1	1577	2024-12-01 22:07:35.941314
-1	1578	2024-12-01 22:07:35.941314
-1	1579	2024-12-01 22:07:35.941314
-1	1580	2024-12-01 22:07:35.941314
-1	1581	2024-12-01 22:07:35.941314
-1	1582	2024-12-01 22:07:35.941314
-1	1583	2024-12-01 22:07:35.941314
-1	1573	2024-12-01 22:07:35.941314
-1	1572	2024-12-01 22:07:35.941314
-1	1354	2024-12-01 22:09:46.036152
-1	1585	2024-12-05 16:22:22.582675
-1	1586	2024-12-05 16:22:22.582675
-1	1587	2024-12-05 16:22:22.582675
-1	1588	2024-12-05 16:22:22.582675
-1	1589	2024-12-05 16:22:22.582675
-1	1590	2024-12-05 16:22:22.582675
-1	1591	2024-12-05 16:22:22.582675
-1	1592	2024-12-05 16:22:22.582675
-1	1593	2024-12-05 16:22:22.582675
-1	1594	2024-12-05 16:22:22.582675
-1	1595	2024-12-05 16:22:22.582675
-1	1596	2024-12-05 16:22:22.582675
-1	46	2024-12-20 16:01:53.362349
-1	1597	2024-12-21 16:09:27.719514
-1	1598	2024-12-21 16:09:27.719514
-1	1459	2024-12-25 16:09:17.56381
-1	1447	2025-01-01 15:51:43.695438
-1	1603	2025-01-03 20:39:37.103309
-1	1604	2025-01-03 20:39:37.103309
-1	1605	2025-01-03 20:39:37.103309
-1	1554	2025-01-09 23:47:58.124523
-1	1029	2025-01-09 23:48:41.635465
-1	1607	2025-01-07 21:40:45.930833
-1	1608	2025-01-07 21:40:45.930833
-1	1609	2025-01-07 21:40:45.930833
-1	1610	2025-01-07 21:40:45.930833
-1	1611	2025-01-07 21:40:45.930833
-1	1612	2025-01-07 21:40:45.930833
-1	1613	2025-01-07 21:40:45.930833
-1	1614	2025-01-07 21:40:45.930833
-1	1615	2025-01-07 21:40:45.930833
-1	1616	2025-01-07 21:40:45.930833
-1	786	2025-01-15 00:05:23.063618
-1	787	2025-01-15 00:10:38.049485
-1	788	2025-01-15 00:15:21.059191
-1	1413	2025-01-15 15:08:16.223658
-1	838	2025-01-15 21:42:10.615593
-1	1619	2025-01-12 22:45:54.598195
-1	1620	2025-01-12 22:45:54.598195
-1	1621	2025-01-12 22:45:54.598195
-1	1622	2025-01-12 22:45:54.598195
-1	1623	2025-01-12 22:45:54.598195
-1	1624	2025-01-12 22:45:54.598195
-1	1625	2025-01-12 22:45:54.598195
-1	1626	2025-01-12 22:45:54.598195
-1	1627	2025-01-12 22:45:54.598195
-1	1628	2025-01-12 22:45:54.598195
-1	1629	2025-01-12 22:45:54.598195
-1	1630	2025-01-12 22:45:54.598195
-1	1631	2025-01-12 22:45:54.598195
-1	1632	2025-01-12 22:45:54.598195
-1	1617	2025-01-12 22:45:54.598195
-1	1618	2025-01-12 22:45:54.598195
-1	789	2025-01-18 09:53:48.979848
-1	796	2025-01-18 10:08:13.753262
-1	1347	2025-01-18 10:10:20.524073
-1	1584	2025-01-21 14:31:42.90139
-1	1310	2025-01-21 14:33:18.950282
-1	1417	2025-01-28 00:15:07.316404
-1	1599	2025-01-28 23:14:30.28191
-1	1600	2025-01-28 23:33:05.268193
-1	1601	2025-01-29 00:06:42.75806
-1	1634	2025-01-19 14:11:35.02102
-1	1635	2025-01-19 14:11:35.02102
-1	1636	2025-01-19 14:11:35.02102
-1	1637	2025-01-19 14:11:35.02102
-1	1638	2025-01-19 14:11:35.02102
-1	1639	2025-01-19 14:11:35.02102
-1	1640	2025-01-19 14:11:35.02102
-1	1641	2025-01-19 14:11:35.02102
-1	1642	2025-01-19 14:11:35.02102
-1	1643	2025-01-19 14:11:35.02102
-1	1644	2025-01-19 14:11:35.02102
-1	1645	2025-01-19 14:11:35.02102
-1	1633	2025-01-19 14:11:35.02102
-1	1653	2025-01-29 23:14:07.655243
-1	1654	2025-01-29 23:14:07.655243
-1	1655	2025-01-29 23:14:07.655243
-1	1656	2025-01-29 23:14:07.655243
-1	1657	2025-01-29 23:14:07.655243
-1	1658	2025-01-29 23:14:07.655243
-1	1659	2025-01-29 23:14:07.655243
-1	1660	2025-01-29 23:14:07.655243
-1	1661	2025-01-29 23:14:07.655243
-1	1662	2025-01-29 23:14:07.655243
-1	1663	2025-01-29 23:14:07.655243
-1	1664	2025-01-29 23:14:07.655243
-1	1646	2025-01-29 23:14:07.655243
-1	1647	2025-01-29 23:14:07.655243
-1	1648	2025-01-29 23:14:07.655243
-1	1649	2025-01-29 23:14:07.655243
-1	1650	2025-01-29 23:14:07.655243
-1	1651	2025-01-29 23:14:07.655243
-1	1652	2025-01-29 23:14:07.655243
-1	1606	2025-02-09 22:09:52.508555
-1	1668	2025-02-04 23:39:50.169113
-1	1669	2025-02-04 23:39:50.169113
-1	1665	2025-02-06 18:33:16.682551
-1	1666	2025-02-06 19:54:10.409407
-1	1667	2025-02-06 20:37:46.849617
-1	1602	2025-02-22 20:56:43.554574
-1	458	2025-03-07 16:48:01.389522
-1	459	2025-03-07 19:38:21.385269
-1	1670	2025-05-03 19:01:00.811664
-\.
-
-
---
--- Data for Name: subject_editing; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.subject_editing (id, user_id, subject_id, action, updated) FROM stdin;
+1698	118	completed	\N	2025-07-14 20:36:31.814802	2025-07-16 14:02:30.626803	3
+1700	118	completed	\N	2025-07-14 20:36:31.814802	2025-07-16 14:02:30.632099	5
+1857	121	writing	\N	2025-07-18 23:22:41.325436	2025-07-18 23:22:41.347225	5
+1866	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	1
+702	54	writing	\N	2024-07-28 09:45:02.987548	2025-07-16 20:32:27.138319	1
+1832	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	1
+1833	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	2
+1834	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	3
+1835	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	4
+1836	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	5
+1837	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	6
+1838	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	7
+1839	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	8
+1840	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	9
+1841	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	10
+1842	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	11
+1843	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	12
+1844	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	13
+1845	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	14
+1846	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	15
+1847	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	16
+1848	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	17
+1849	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	18
+1850	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	19
+1851	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	20
+1852	120	open	\N	2025-07-16 20:36:30.834427	2025-07-16 20:36:30.834427	21
+46	18	writing	\N	2024-07-28 09:44:55.916674	2025-07-16 20:36:30.837888	1
+1858	121	open	\N	2025-07-18 23:22:41.325436	2025-07-18 23:22:41.325436	6
+1859	121	open	\N	2025-07-18 23:22:41.325436	2025-07-18 23:22:41.325436	7
+1860	121	open	\N	2025-07-18 23:22:41.325436	2025-07-18 23:22:41.325436	8
+1861	121	open	\N	2025-07-18 23:22:41.325436	2025-07-18 23:22:41.325436	9
+1862	121	open	\N	2025-07-18 23:22:41.325436	2025-07-18 23:22:41.325436	10
+1863	121	open	\N	2025-07-18 23:22:41.325436	2025-07-18 23:22:41.325436	11
+1864	121	open	\N	2025-07-18 23:22:41.325436	2025-07-18 23:22:41.325436	12
+1865	121	open	\N	2025-07-18 23:22:41.325436	2025-07-18 23:22:41.325436	13
+1853	121	ignored	\N	2025-07-18 23:22:41.325436	2025-07-18 23:22:41.327608	1
+1854	121	ignored	\N	2025-07-18 23:22:41.325436	2025-07-18 23:22:41.328872	2
+1867	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	2
+1868	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	3
+1869	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	4
+1855	121	completed	\N	2025-07-18 23:22:41.325436	2025-07-18 23:22:41.336033	3
+1870	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	5
+1856	121	completed	\N	2025-07-18 23:22:41.325436	2025-07-18 23:22:41.340188	4
+1871	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	6
+1885	124	open	\N	2025-07-18 23:34:05.229443	2025-07-18 23:34:05.229443	1
+1872	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	7
+1873	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	8
+1874	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	9
+1875	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	10
+1876	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	11
+1877	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	12
+1878	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	13
+1879	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	14
+1880	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	15
+1881	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	16
+1882	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	17
+1883	122	open	\N	2025-07-18 23:24:51.69424	2025-07-18 23:24:51.69424	18
+1884	123	open	\N	2025-07-18 23:25:55.834891	2025-07-18 23:25:55.834891	1
+852	63	writing	\N	2024-07-28 09:45:04.614571	2025-07-18 23:34:38.278197	9
+1886	125	open	\N	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	1
+1887	125	open	\N	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	2
+1888	125	open	\N	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	3
+1889	125	open	\N	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	4
+1890	125	open	\N	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	5
+1891	125	open	\N	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	6
+1892	125	open	\N	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	7
+1893	125	open	\N	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	8
+1894	125	open	\N	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	9
+1895	125	open	\N	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	10
+1896	125	open	\N	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	11
+1897	125	open	\N	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	12
+1898	125	open	\N	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	13
+1899	125	open	\N	2025-07-18 23:36:25.92073	2025-07-18 23:36:25.92073	14
+1900	126	open	\N	2025-07-18 23:36:49.170308	2025-07-18 23:36:49.170308	1
+1901	126	open	\N	2025-07-18 23:36:49.170308	2025-07-18 23:36:49.170308	2
+1902	126	open	\N	2025-07-18 23:36:49.170308	2025-07-18 23:36:49.170308	3
+1903	126	open	\N	2025-07-18 23:36:49.170308	2025-07-18 23:36:49.170308	4
+1904	126	open	\N	2025-07-18 23:36:49.170308	2025-07-18 23:36:49.170308	5
+1905	126	open	\N	2025-07-18 23:36:49.170308	2025-07-18 23:36:49.170308	6
+1906	126	open	\N	2025-07-18 23:36:49.170308	2025-07-18 23:36:49.170308	7
+1907	126	open	\N	2025-07-18 23:36:49.170308	2025-07-18 23:36:49.170308	8
+1908	126	open	\N	2025-07-18 23:36:49.170308	2025-07-18 23:36:49.170308	9
+1912	127	open	\N	2025-07-18 23:37:25.731365	2025-07-18 23:37:25.731365	4
+1913	127	open	\N	2025-07-18 23:37:25.731365	2025-07-18 23:37:25.731365	5
+1914	127	open	\N	2025-07-18 23:37:25.731365	2025-07-18 23:37:25.731365	6
+1915	127	open	\N	2025-07-18 23:37:25.731365	2025-07-18 23:37:25.731365	7
+1916	127	open	\N	2025-07-18 23:37:25.731365	2025-07-18 23:37:25.731365	8
+1917	127	open	\N	2025-07-18 23:37:25.731365	2025-07-18 23:37:25.731365	9
+1918	127	open	\N	2025-07-18 23:37:25.731365	2025-07-18 23:37:25.731365	10
+1919	127	open	\N	2025-07-18 23:37:25.731365	2025-07-18 23:37:25.731365	11
+1920	127	open	\N	2025-07-18 23:37:25.731365	2025-07-18 23:37:25.731365	12
+1909	127	ignored	\N	2025-07-18 23:37:25.731365	2025-07-18 23:37:25.73456	1
+1910	127	ignored	\N	2025-07-18 23:37:25.731365	2025-07-18 23:37:25.735994	2
+1922	128	completed	\N	2025-07-18 23:39:44.424036	2025-07-18 23:39:44.439209	2
+1933	129	open	\N	2025-07-18 23:40:14.196843	2025-07-18 23:40:14.196843	1
+1934	129	open	\N	2025-07-18 23:40:14.196843	2025-07-18 23:40:14.196843	2
+1935	129	open	\N	2025-07-18 23:40:14.196843	2025-07-18 23:40:14.196843	3
+1936	129	open	\N	2025-07-18 23:40:14.196843	2025-07-18 23:40:14.196843	4
+1937	129	open	\N	2025-07-18 23:40:14.196843	2025-07-18 23:40:14.196843	5
+1938	129	open	\N	2025-07-18 23:40:14.196843	2025-07-18 23:40:14.196843	6
+1939	129	open	\N	2025-07-18 23:40:14.196843	2025-07-18 23:40:14.196843	7
+1940	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	1
+1941	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	2
+1942	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	3
+1943	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	4
+1944	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	5
+1945	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	6
+1946	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	7
+1947	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	8
+1948	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	9
+1949	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	10
+1911	127	completed	\N	2025-07-18 23:37:25.731365	2025-07-18 23:37:25.774713	3
+1950	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	11
+1951	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	12
+1952	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	13
+1953	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	14
+1954	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	15
+1955	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	16
+1956	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	17
+1957	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	18
+1958	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	19
+1959	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	20
+1960	130	open	\N	2025-07-18 23:41:20.627294	2025-07-18 23:41:20.627294	21
+1961	131	open	\N	2025-07-18 23:41:38.875661	2025-07-18 23:41:38.875661	1
+1962	131	open	\N	2025-07-18 23:41:38.875661	2025-07-18 23:41:38.875661	2
+1963	131	open	\N	2025-07-18 23:41:38.875661	2025-07-18 23:41:38.875661	3
+1964	131	open	\N	2025-07-18 23:41:38.875661	2025-07-18 23:41:38.875661	4
+1965	131	open	\N	2025-07-18 23:41:38.875661	2025-07-18 23:41:38.875661	5
+1966	131	open	\N	2025-07-18 23:41:38.875661	2025-07-18 23:41:38.875661	6
+1967	131	open	\N	2025-07-18 23:41:38.875661	2025-07-18 23:41:38.875661	7
+1968	131	open	\N	2025-07-18 23:41:38.875661	2025-07-18 23:41:38.875661	8
+1969	131	open	\N	2025-07-18 23:41:38.875661	2025-07-18 23:41:38.875661	9
+211	26	writing	\N	2024-07-28 09:44:57.573652	2025-07-18 23:38:35.260566	7
+1970	131	open	\N	2025-07-18 23:41:38.875661	2025-07-18 23:41:38.875661	10
+1973	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	3
+1974	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	4
+1975	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	5
+1976	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	6
+1977	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	7
+1978	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	8
+1979	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	9
+1980	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	10
+1981	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	11
+1982	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	12
+1983	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	13
+1984	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	14
+217	26	writing	\N	2024-07-28 09:44:57.573652	2025-07-18 23:38:35.291291	13
+1923	128	open	\N	2025-07-18 23:39:44.424036	2025-07-18 23:39:44.424036	3
+1924	128	open	\N	2025-07-18 23:39:44.424036	2025-07-18 23:39:44.424036	4
+1925	128	open	\N	2025-07-18 23:39:44.424036	2025-07-18 23:39:44.424036	5
+1926	128	open	\N	2025-07-18 23:39:44.424036	2025-07-18 23:39:44.424036	6
+1927	128	open	\N	2025-07-18 23:39:44.424036	2025-07-18 23:39:44.424036	7
+1928	128	open	\N	2025-07-18 23:39:44.424036	2025-07-18 23:39:44.424036	8
+1929	128	open	\N	2025-07-18 23:39:44.424036	2025-07-18 23:39:44.424036	9
+1930	128	open	\N	2025-07-18 23:39:44.424036	2025-07-18 23:39:44.424036	10
+1931	128	open	\N	2025-07-18 23:39:44.424036	2025-07-18 23:39:44.424036	11
+1932	128	open	\N	2025-07-18 23:39:44.424036	2025-07-18 23:39:44.424036	12
+1985	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	15
+1986	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	16
+1921	128	completed	\N	2025-07-18 23:39:44.424036	2025-07-18 23:39:44.431366	1
+1987	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	17
+1971	132	completed	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.024115	1
+1988	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	18
+1989	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	19
+1990	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	20
+1991	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	21
+1992	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	22
+1993	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	23
+1994	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	24
+1995	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	25
+1996	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	26
+1997	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	27
+1998	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	28
+1999	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	29
+2000	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	30
+2001	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	31
+2002	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	32
+2003	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	33
+2004	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	34
+1972	132	completed	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.043431	2
+2005	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	35
+2006	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	36
+2007	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	37
+2008	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	38
+2009	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	39
+2010	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	40
+2011	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	41
+2012	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	42
+2013	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	43
+2014	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	44
+2015	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	45
+2016	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	46
+2017	132	open	\N	2025-07-18 23:42:51.021086	2025-07-18 23:42:51.021086	47
+2018	133	open	\N	2025-07-18 23:43:21.396307	2025-07-18 23:43:21.396307	1
+2021	134	open	\N	2025-07-18 23:43:56.281019	2025-07-18 23:43:56.281019	3
+2022	134	open	\N	2025-07-18 23:43:56.281019	2025-07-18 23:43:56.281019	4
+2023	134	open	\N	2025-07-18 23:43:56.281019	2025-07-18 23:43:56.281019	5
+2024	134	open	\N	2025-07-18 23:43:56.281019	2025-07-18 23:43:56.281019	6
+2025	134	open	\N	2025-07-18 23:43:56.281019	2025-07-18 23:43:56.281019	7
+2026	134	open	\N	2025-07-18 23:43:56.281019	2025-07-18 23:43:56.281019	8
+2019	134	completed	\N	2025-07-18 23:43:56.281019	2025-07-18 23:43:56.302362	1
+2020	134	writing	\N	2025-07-18 23:43:56.281019	2025-07-18 23:43:56.308045	2
+2028	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	2
+2029	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	3
+2030	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	4
+2031	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	5
+2032	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	6
+2033	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	7
+2034	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	8
+2035	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	9
+2036	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	10
+2037	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	11
+2038	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	12
+2039	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	13
+2040	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	14
+2041	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	15
+2042	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	16
+2043	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	17
+2044	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	18
+2045	135	open	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.478401	19
+2027	135	writing	\N	2025-07-18 23:44:32.478401	2025-07-18 23:44:32.481364	1
+2047	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	2
+2048	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	3
+2049	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	4
+2050	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	5
+2051	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	6
+2052	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	7
+2053	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	8
+2054	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	9
+2055	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	10
+2056	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	11
+2057	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	12
+2058	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	13
+2059	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	14
+2060	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	15
+2061	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	16
+2062	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	17
+2063	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	18
+2064	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	19
+2065	136	open	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.798048	20
+2046	136	writing	\N	2025-07-18 23:45:13.798048	2025-07-18 23:45:13.832514	1
+2066	137	open	\N	2025-07-18 23:45:35.714876	2025-07-18 23:45:35.714876	1
+2067	137	open	\N	2025-07-18 23:45:35.714876	2025-07-18 23:45:35.714876	2
+2068	137	open	\N	2025-07-18 23:45:35.714876	2025-07-18 23:45:35.714876	3
+2069	137	open	\N	2025-07-18 23:45:35.714876	2025-07-18 23:45:35.714876	4
+2070	137	open	\N	2025-07-18 23:45:35.714876	2025-07-18 23:45:35.714876	5
+2071	137	open	\N	2025-07-18 23:45:35.714876	2025-07-18 23:45:35.714876	6
+2072	137	open	\N	2025-07-18 23:45:35.714876	2025-07-18 23:45:35.714876	7
+2073	137	open	\N	2025-07-18 23:45:35.714876	2025-07-18 23:45:35.714876	8
+2074	137	open	\N	2025-07-18 23:45:35.714876	2025-07-18 23:45:35.714876	9
 \.
 
 
@@ -25948,37 +23578,24 @@ COPY milestone.subject_resources (subject_id, resource_id) FROM stdin;
 6	116
 29	117
 1	118
-\.
-
-
---
--- Data for Name: subject_watching; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.subject_watching (user_id, subject_id, update) FROM stdin;
-1	1	2024-09-08 15:15:39.858664
-1	2	2024-09-08 15:15:39.858664
-1	3	2024-09-08 15:15:39.858664
-1	4	2024-09-08 15:15:39.858664
-1	5	2024-09-08 15:15:39.858664
-1	6	2024-09-08 15:15:39.858664
-1	7	2024-09-08 15:15:39.858664
-1	8	2024-09-08 15:15:39.858664
-1	9	2024-09-08 15:15:39.858664
-1	10	2024-09-08 15:15:39.858664
-1	11	2024-09-08 15:15:39.858664
-1	12	2024-09-08 15:15:39.858664
-1	13	2024-09-08 15:15:39.858664
-1	14	2024-09-08 15:15:39.858664
-1	15	2024-09-08 15:15:39.858664
-1	16	2024-09-08 15:15:39.858664
-1	17	2024-09-08 15:15:39.858664
-1	18	2024-09-08 15:15:39.858664
-1	19	2024-09-08 15:15:39.858664
-1	20	2024-09-08 15:15:39.858664
-1	21	2024-09-08 15:15:39.858664
-1	22	2024-09-08 15:15:39.858664
-1	23	2024-09-08 15:15:39.858664
+8	120
+6	121
+25	122
+6	123
+6	124
+18	125
+6	126
+27	127
+6	128
+6	129
+13	130
+6	131
+29	132
+11	133
+6	134
+4	135
+6	136
+28	137
 \.
 
 
@@ -26016,30 +23633,6 @@ COPY milestone.subjects (id, name, creation, updated) FROM stdin;
 27	GitHub	2025-01-03 19:08:32.573019	2025-01-03 19:08:32.573019
 28	Vulkan	2025-01-11 23:05:47.863592	2025-01-11 23:05:47.863592
 29	Mutt	2025-05-03 19:02:51.097675	2025-05-03 19:02:51.097675
-\.
-
-
---
--- Data for Name: task_blocks; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.task_blocks (id, task_id, solution, type, language, creation, updated) FROM stdin;
-\.
-
-
---
--- Data for Name: tasks; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.tasks (id, topic_id, heading, creation, updated) FROM stdin;
-\.
-
-
---
--- Data for Name: topic_editing; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.topic_editing (id, user_id, topic_id, action, updated) FROM stdin;
 \.
 
 
@@ -26501,54 +24094,10 @@ COPY milestone.topics (id, subject_id, name, creation, update, "position") FROM 
 
 
 --
--- Data for Name: users; Type: TABLE DATA; Schema: milestone; Owner: milestone
---
-
-COPY milestone.users (id, username, first_name, last_name, state, email, is_author) FROM stdin;
-1	briansalehi	Brian	Salehi	active	briansalehi@proton.me	t
-\.
-
-
---
--- Name: container_templates_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.container_templates_id_seq', 1, true);
-
-
---
--- Name: containers_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.containers_id_seq', 1, false);
-
-
---
--- Name: credentials_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.credentials_id_seq', 1, true);
-
-
---
--- Name: logins_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.logins_id_seq', 3, true);
-
-
---
 -- Name: note_blocks_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
 --
 
-SELECT pg_catalog.setval('milestone.note_blocks_id_seq', 10369, true);
-
-
---
--- Name: note_editing_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.note_editing_id_seq', 1, false);
+SELECT pg_catalog.setval('milestone.note_blocks_id_seq', 10604, true);
 
 
 --
@@ -26559,31 +24108,17 @@ SELECT pg_catalog.setval('milestone.note_references_id_seq', 204, true);
 
 
 --
--- Name: note_usage_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.note_usage_id_seq', 1, false);
-
-
---
 -- Name: notes_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
 --
 
-SELECT pg_catalog.setval('milestone.notes_id_seq', 3968, true);
+SELECT pg_catalog.setval('milestone.notes_id_seq', 4090, true);
 
 
 --
 -- Name: practice_blocks_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
 --
 
-SELECT pg_catalog.setval('milestone.practice_blocks_id_seq', 3849, true);
-
-
---
--- Name: practice_editing_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.practice_editing_id_seq', 1, false);
+SELECT pg_catalog.setval('milestone.practice_blocks_id_seq', 4765, true);
 
 
 --
@@ -26591,13 +24126,6 @@ SELECT pg_catalog.setval('milestone.practice_editing_id_seq', 1, false);
 --
 
 SELECT pg_catalog.setval('milestone.practice_resources_id_seq', 819, true);
-
-
---
--- Name: practice_usage_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.practice_usage_id_seq', 1, false);
 
 
 --
@@ -26615,24 +24143,10 @@ SELECT pg_catalog.setval('milestone.references_id_seq', 191, true);
 
 
 --
--- Name: resource_editing_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.resource_editing_id_seq', 1, false);
-
-
---
 -- Name: resources_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
 --
 
-SELECT pg_catalog.setval('milestone.resources_id_seq', 119, true);
-
-
---
--- Name: section_editing_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.section_editing_id_seq', 1, false);
+SELECT pg_catalog.setval('milestone.resources_id_seq', 137, true);
 
 
 --
@@ -26646,14 +24160,7 @@ SELECT pg_catalog.setval('milestone.section_types_id_seq', 5, true);
 -- Name: sections_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
 --
 
-SELECT pg_catalog.setval('milestone.sections_id_seq', 1831, true);
-
-
---
--- Name: subject_editing_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.subject_editing_id_seq', 1, false);
+SELECT pg_catalog.setval('milestone.sections_id_seq', 2074, true);
 
 
 --
@@ -26664,86 +24171,10 @@ SELECT pg_catalog.setval('milestone.subjects_id_seq', 29, true);
 
 
 --
--- Name: task_blocks_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.task_blocks_id_seq', 1, false);
-
-
---
--- Name: tasks_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.tasks_id_seq', 1, false);
-
-
---
--- Name: topic_editing_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.topic_editing_id_seq', 1, false);
-
-
---
 -- Name: topics_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
 --
 
 SELECT pg_catalog.setval('milestone.topics_id_seq', 449, true);
-
-
---
--- Name: users_id_seq; Type: SEQUENCE SET; Schema: milestone; Owner: milestone
---
-
-SELECT pg_catalog.setval('milestone.users_id_seq', 1, true);
-
-
---
--- Name: container_templates container_templates_name_key; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.container_templates
-    ADD CONSTRAINT container_templates_name_key UNIQUE (name);
-
-
---
--- Name: container_templates container_templates_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.container_templates
-    ADD CONSTRAINT container_templates_pkey PRIMARY KEY (id);
-
-
---
--- Name: containers containers_name_key; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.containers
-    ADD CONSTRAINT containers_name_key UNIQUE (name);
-
-
---
--- Name: containers containers_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.containers
-    ADD CONSTRAINT containers_pkey PRIMARY KEY (id);
-
-
---
--- Name: credentials credentials_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.credentials
-    ADD CONSTRAINT credentials_pkey PRIMARY KEY (id);
-
-
---
--- Name: logins logins_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.logins
-    ADD CONSTRAINT logins_pkey PRIMARY KEY (id);
 
 
 --
@@ -26755,27 +24186,11 @@ ALTER TABLE ONLY milestone.note_blocks
 
 
 --
--- Name: note_editing note_editing_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.note_editing
-    ADD CONSTRAINT note_editing_pkey PRIMARY KEY (id);
-
-
---
 -- Name: note_references note_references_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
 --
 
 ALTER TABLE ONLY milestone.note_references
     ADD CONSTRAINT note_references_pkey PRIMARY KEY (id);
-
-
---
--- Name: note_usage note_usage_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.note_usage
-    ADD CONSTRAINT note_usage_pkey PRIMARY KEY (id);
 
 
 --
@@ -26795,27 +24210,11 @@ ALTER TABLE ONLY milestone.practice_blocks
 
 
 --
--- Name: practice_editing practice_editing_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.practice_editing
-    ADD CONSTRAINT practice_editing_pkey PRIMARY KEY (id);
-
-
---
 -- Name: practice_resources practice_resources_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
 --
 
 ALTER TABLE ONLY milestone.practice_resources
     ADD CONSTRAINT practice_resources_pkey PRIMARY KEY (id);
-
-
---
--- Name: practice_usage practice_usage_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.practice_usage
-    ADD CONSTRAINT practice_usage_pkey PRIMARY KEY (id);
 
 
 --
@@ -26835,35 +24234,11 @@ ALTER TABLE ONLY milestone."references"
 
 
 --
--- Name: resource_editing resource_editing_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.resource_editing
-    ADD CONSTRAINT resource_editing_pkey PRIMARY KEY (id);
-
-
---
--- Name: resource_watching resource_watching_user_id_resource_id_pk; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.resource_watching
-    ADD CONSTRAINT resource_watching_user_id_resource_id_pk PRIMARY KEY (user_id, resource_id);
-
-
---
 -- Name: resources resources_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
 --
 
 ALTER TABLE ONLY milestone.resources
     ADD CONSTRAINT resources_pkey PRIMARY KEY (id);
-
-
---
--- Name: section_editing section_editing_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.section_editing
-    ADD CONSTRAINT section_editing_pkey PRIMARY KEY (id);
 
 
 --
@@ -26891,35 +24266,11 @@ ALTER TABLE ONLY milestone.sections
 
 
 --
--- Name: studies studies_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.studies
-    ADD CONSTRAINT studies_pkey PRIMARY KEY (user_id, section_id);
-
-
---
--- Name: subject_editing subject_editing_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.subject_editing
-    ADD CONSTRAINT subject_editing_pkey PRIMARY KEY (id);
-
-
---
 -- Name: subject_resources subject_resources_pk; Type: CONSTRAINT; Schema: milestone; Owner: milestone
 --
 
 ALTER TABLE ONLY milestone.subject_resources
     ADD CONSTRAINT subject_resources_pk PRIMARY KEY (subject_id, resource_id);
-
-
---
--- Name: subject_watching subject_watching_user_id_subject_id_pk; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.subject_watching
-    ADD CONSTRAINT subject_watching_user_id_subject_id_pk PRIMARY KEY (user_id, subject_id);
 
 
 --
@@ -26939,75 +24290,11 @@ ALTER TABLE ONLY milestone.subjects
 
 
 --
--- Name: task_blocks task_blocks_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.task_blocks
-    ADD CONSTRAINT task_blocks_pkey PRIMARY KEY (id);
-
-
---
--- Name: tasks tasks_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.tasks
-    ADD CONSTRAINT tasks_pkey PRIMARY KEY (id);
-
-
---
--- Name: topic_editing topic_editing_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.topic_editing
-    ADD CONSTRAINT topic_editing_pkey PRIMARY KEY (id);
-
-
---
 -- Name: topics topics_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
 --
 
 ALTER TABLE ONLY milestone.topics
     ADD CONSTRAINT topics_pkey PRIMARY KEY (id);
-
-
---
--- Name: progress user_progress_pk; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.progress
-    ADD CONSTRAINT user_progress_pk PRIMARY KEY (user_id, topic_id);
-
-
---
--- Name: users users_email_key; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.users
-    ADD CONSTRAINT users_email_key UNIQUE (email);
-
-
---
--- Name: users users_pkey; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.users
-    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
-
-
---
--- Name: users users_username_key; Type: CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.users
-    ADD CONSTRAINT users_username_key UNIQUE (username);
-
-
---
--- Name: containers containers_container_template_id; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.containers
-    ADD CONSTRAINT containers_container_template_id FOREIGN KEY (template_id) REFERENCES milestone.container_templates(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -27091,171 +24378,11 @@ ALTER TABLE ONLY milestone.practices
 
 
 --
--- Name: credentials fk_user_credential_id; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.credentials
-    ADD CONSTRAINT fk_user_credential_id FOREIGN KEY (user_id) REFERENCES milestone.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: progress fk_user_progress_id; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.progress
-    ADD CONSTRAINT fk_user_progress_id FOREIGN KEY (user_id) REFERENCES milestone.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: studies fk_user_section_id; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.studies
-    ADD CONSTRAINT fk_user_section_id FOREIGN KEY (section_id) REFERENCES milestone.sections(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: studies fk_user_studies_id; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.studies
-    ADD CONSTRAINT fk_user_studies_id FOREIGN KEY (user_id) REFERENCES milestone.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: progress fk_user_topic_id; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.progress
-    ADD CONSTRAINT fk_user_topic_id FOREIGN KEY (topic_id) REFERENCES milestone.topics(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: logins logins_user_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.logins
-    ADD CONSTRAINT logins_user_fk FOREIGN KEY (user_id) REFERENCES milestone.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: note_editing note_editing_note_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.note_editing
-    ADD CONSTRAINT note_editing_note_id_fk FOREIGN KEY (note_id) REFERENCES milestone.notes(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: note_editing note_editing_user_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.note_editing
-    ADD CONSTRAINT note_editing_user_id_fk FOREIGN KEY (user_id) REFERENCES milestone.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: note_usage note_note_usage_id; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.note_usage
-    ADD CONSTRAINT note_note_usage_id FOREIGN KEY (note_id) REFERENCES milestone.notes(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: practice_editing practice_editing_practice_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.practice_editing
-    ADD CONSTRAINT practice_editing_practice_id_fk FOREIGN KEY (practice_id) REFERENCES milestone.practices(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: practice_editing practice_editing_user_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.practice_editing
-    ADD CONSTRAINT practice_editing_user_id_fk FOREIGN KEY (user_id) REFERENCES milestone.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: practice_usage practice_practice_usage_id; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.practice_usage
-    ADD CONSTRAINT practice_practice_usage_id FOREIGN KEY (practice_id) REFERENCES milestone.practices(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: resource_editing resource_editing_resource_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.resource_editing
-    ADD CONSTRAINT resource_editing_resource_id_fk FOREIGN KEY (resource_id) REFERENCES milestone.resources(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: resource_editing resource_editing_user_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.resource_editing
-    ADD CONSTRAINT resource_editing_user_id_fk FOREIGN KEY (user_id) REFERENCES milestone.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
 -- Name: resources resource_section_pattern_id; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
 --
 
 ALTER TABLE ONLY milestone.resources
     ADD CONSTRAINT resource_section_pattern_id FOREIGN KEY (section_pattern_id) REFERENCES milestone.section_name_patterns(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: resource_watching resource_watching_resource_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.resource_watching
-    ADD CONSTRAINT resource_watching_resource_id_fk FOREIGN KEY (resource_id) REFERENCES milestone.resources(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: resource_watching resource_watching_user_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.resource_watching
-    ADD CONSTRAINT resource_watching_user_id_fk FOREIGN KEY (user_id) REFERENCES milestone.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: section_editing section_editing_section_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.section_editing
-    ADD CONSTRAINT section_editing_section_id_fk FOREIGN KEY (section_id) REFERENCES milestone.sections(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: section_editing section_editing_user_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.section_editing
-    ADD CONSTRAINT section_editing_user_id_fk FOREIGN KEY (user_id) REFERENCES milestone.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: subject_editing subject_editing_subject_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.subject_editing
-    ADD CONSTRAINT subject_editing_subject_id_fk FOREIGN KEY (subject_id) REFERENCES milestone.subjects(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: subject_editing subject_editing_user_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.subject_editing
-    ADD CONSTRAINT subject_editing_user_id_fk FOREIGN KEY (user_id) REFERENCES milestone.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -27272,70 +24399,6 @@ ALTER TABLE ONLY milestone.subject_resources
 
 ALTER TABLE ONLY milestone.subject_resources
     ADD CONSTRAINT subject_resources_subject_id_fk FOREIGN KEY (subject_id) REFERENCES milestone.subjects(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: subject_watching subject_watching_subject_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.subject_watching
-    ADD CONSTRAINT subject_watching_subject_id_fk FOREIGN KEY (subject_id) REFERENCES milestone.subjects(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: subject_watching subject_watching_user_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.subject_watching
-    ADD CONSTRAINT subject_watching_user_id_fk FOREIGN KEY (user_id) REFERENCES milestone.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: task_blocks task_block_task_id; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.task_blocks
-    ADD CONSTRAINT task_block_task_id FOREIGN KEY (task_id) REFERENCES milestone.tasks(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: tasks task_topic_id; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.tasks
-    ADD CONSTRAINT task_topic_id FOREIGN KEY (topic_id) REFERENCES milestone.topics(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: topic_editing topic_editing_topic_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.topic_editing
-    ADD CONSTRAINT topic_editing_topic_id_fk FOREIGN KEY (topic_id) REFERENCES milestone.topics(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: topic_editing topic_editing_user_id_fk; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.topic_editing
-    ADD CONSTRAINT topic_editing_user_id_fk FOREIGN KEY (user_id) REFERENCES milestone.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: note_usage user_note_usage_id; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.note_usage
-    ADD CONSTRAINT user_note_usage_id FOREIGN KEY (user_id) REFERENCES milestone.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: practice_usage user_note_usage_id; Type: FK CONSTRAINT; Schema: milestone; Owner: milestone
---
-
-ALTER TABLE ONLY milestone.practice_usage
-    ADD CONSTRAINT user_note_usage_id FOREIGN KEY (user_id) REFERENCES milestone.users(id) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
