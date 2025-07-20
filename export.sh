@@ -105,21 +105,25 @@ export_subjects()
 
         show_progress 0 0 1 0 0 0
 
+        backup_topic_position=0
+
         while IFS="|" read -r m_topic topic_position topic_name
         do
+            backup_topic_position=$((backup_topic_position + 1))
+            [ $topic_position -eq 0 ] && topic_position=$backup_topic_position
             result=$(psql -U flashback -d flashback -c "select create_topic(${f_subject//\'/\'\'}, 'surface'::expertise_level, ${topic_position//\'/\'\'}, '$topic_name')" -At) || break
 
             show_progress 0 0 0 1 0 0
 
-            backup_position=0
+            backup_practice_position=0
 
             while IFS="|" read -r practice practice_position heading
             do
                 card_state="draft"
                 card_position=$practice_position
-                backup_position=$((backup_position + 1))
+                backup_practice_position=$((backup_practice_position + 1))
 
-                [ $card_position -eq 0 ] && card_position=$backup_position
+                [ $card_position -eq 0 ] && card_position=$backup_practice_position
 
                 card=$(psql -U flashback -d flashback -c "select create_card('${card_state}', '${heading//\'/\'\'}')" -At) || break
                 result=$(psql -U flashback -d flashback -c "select add_card_to_topic(${f_subject}, 'surface'::expertise_level, ${topic_position}, ${card}, ${card_position})" -At)
