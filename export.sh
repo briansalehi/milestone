@@ -33,7 +33,14 @@ do
         *) f_resource_type="$m_resource_type" ;;
     esac
 
-    f_resource_pattern="${m_resource_pattern,,}"
+    case "$m_resource_pattern" in
+        1) f_resource_pattern="chapter";;
+        2) f_resource_pattern="page";;
+        3) f_resource_pattern="course";;
+        4) f_resource_pattern="video";;
+        5) f_resource_pattern="post";;
+        *) f_resource_pattern="chapter";;
+    esac
 
     f_resource=$(psql -U flashback -d flashback -c "select create_resource('$resource_name', '$f_resource_type'::resource_type, '$f_resource_pattern'::section_pattern, '$author', '')" -At)
 
