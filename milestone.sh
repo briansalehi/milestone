@@ -7,10 +7,6 @@ echo
 echo
 
 last_line=$(($(tput lines) - 2))
-declare -A subjects
-declare -A topics
-declare -A resources
-declare -A sections
 margin=4
 
 dense_column()
@@ -87,17 +83,39 @@ dense_column()
     rm "$buffer"
 }
 
+show_blocks()
+{
+    local card="$1"
+
+    while IFS="|" read -r block type extension
+    do
+        content="$(psql -U flashback -d flashback -c "select content from blocks where card = $card and position = $block" -At)"
+
+        printf "\e[2;37m%*s\e[0m" $(tput cols) "$type $extension $block"
+        case "$type" in
+            text) echo "$content" | bat --paging never --squeeze-blank --language "md" --style "plain" ;;
+            code) echo "$content" | bat --paging never --squeeze-blank --language "$extension" --style "grid,numbers" ;;
+            *) echo -e "\e[1;31mInvalid block type and extension $type / $extension" ;;
+        esac
+        echo
+    done < <(psql -U flashback -d flashback -c "select position, type, extension from blocks where card = $card order by position" -At)
+}
+
 start_practice()
 {
+    local -A subjects
+    local -A topics
+
     while IFS='|' read -r id name
     do
         subjects[$id]="$name"
-    done < <(psql -U milestone -d milestone -c "select id, name from subjects order by id" -At)
+    done < <(psql -U flashback -d flashback -c "select id, name from subjects order by id" -At)
 
+    clear
     while IFS='|' read -r id name topic_count
     do
         echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m \e[2;37m($topic_count)\e[0m"
-    done < <(psql -U milestone -d milestone -c "select s.id, s.name, count(t.id) from subjects s left join topics t on t.subject_id = s.id group by s.id, s.name order by id" -At) | dense_column
+    done < <(psql -U flashback -d flashback -c "select s.id, s.name, count(t.position) from subjects s left join topics t on t.subject = s.id group by s.id, s.name order by id" -At) | dense_column
 
     while true
     do
@@ -106,15 +124,19 @@ start_practice()
         [[ -n "${subjects[$subject]}" ]] && break
     done
 
-    while IFS="|" read -r id name
-    do
-        topics[$id]="$name"
-    done < <(psql -U milestone -d milestone -c "select id, name from topics where subject_id = $subject order by position, creation" -At)
+    subject_name="${subjects[$subject]}"
 
     while IFS="|" read -r id name
     do
+        topics[$id]="$name"
+    done < <(psql -U flashback -d flashback -c "select position, name from topics where subject = $subject order by position" -At)
+
+    clear
+    printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m\n\n" "${subject_name}" ${subject}
+    while IFS="|" read -r id name
+    do
         echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m"
-    done < <(psql -U milestone -d milestone -c "select id, name from topics where subject_id = $subject order by position, creation" -At) | dense_column
+    done < <(psql -U flashback -d flashback -c "select position, name from topics where subject = $subject order by position" -At) | dense_column
 
     while true
     do
@@ -134,33 +156,18 @@ start_practice()
 
     [ ${#selected_topics[*]} -eq 0 ] && return
 
-    practice_count="$(psql -U milestone -d milestone -c "select count(id) from practices where topic_id in ( $(tr ' ' ',' <<< "${selected_topics[*]}") )" -At)"
-    practice_number=0
-
-    while IFS="|" read -r topic topic_name
+    while IFS="|" read -r topic level topic_name
     do
-        while IFS="|" read -r practice heading
+        while IFS="|" read -r card state position heading
         do
-            practice_number=$((practice_number + 1))
-            practices[$practice]="$parent"
             heading="$(pandoc -f markdown -t plain <<< "$heading" | xargs)"
+            practice_count="$(psql -U flashback -d flashback -c "select count(card) from topics_cards where subject = $subject and topic = $topic" -At)"
 
             clear
-            printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m \e[1;33m>>\e[0m \e[1;36m%s\e[0m \e[2;37m%d\e[0m\n\n" "${subjects[$subject]}" ${subject} "$topic_name" ${topic}
-            printf "\e[1;35m%d/%d\e[0m \e[1;33m%s\e[0m \e[2;37m%s\e[0m\n" $practice_number $practice_count "$heading" $practice
+            printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m \e[1;33m>>\e[0m \e[1;36m%s\e[0m \e[2;37m%d / %d\e[0m\n\n" "${subject_name}" ${subject} "$topic_name" ${topic} ${#topics[*]}
+            printf "\e[1;35m%d/%d\e[0m \e[1;33m%s\e[0m \e[2;37m(%s)\e[0m \e[2;37m%s\e[0m\n" $position $practice_count "$heading" "$state" $card
 
-            while IFS="|" read -r block type language
-            do
-                content="$(psql -U milestone -d milestone -c "select content from practice_blocks where id = $block" -At)"
-
-                printf "\e[2;37m%*s\e[0m" $(tput cols) "$type $language $block"
-                case "$type" in
-                    text) echo "$content" | bat --paging never --squeeze-blank --language "md" --style "plain" ;;
-                    code) echo "$content" | bat --paging never --squeeze-blank --language "$language" --style "grid,numbers" ;;
-                    *) echo -e "\e[1;31mInvalid block type and language $type / $language" ;;
-                esac
-                echo
-            done < <(psql -U milestone -d milestone -c "select id, type, language from practice_blocks where practice_id = $practice order by position" -At)
+            show_blocks $card
 
             while true
             do
@@ -171,22 +178,26 @@ start_practice()
                 tput cnorm
                 [[ "${response,,}" == "n" ]] && break
             done
-        done < <(psql -U milestone -d milestone -c "select id, heading from practices where topic_id = $topic" -At)
-    done < <(psql -U milestone -d milestone -c "select id, name from topics where id in ( $(tr ' ' ',' <<< "${selected_topics[*]}") ) order by position, creation" -At)
+        done < <(psql -U flashback -d flashback -c "select c.id, c.state, t.position, c.heading from topics_cards t join cards c on c.id = t.card where t.subject = $subject and t.level = '$level' and t.topic = $topic" -At)
+    done < <(psql -U flashback -d flashback -c "select position, level, name from topics where subject = $subject and position in ( $(tr ' ' ',' <<< "${selected_topics[*]}") ) order by position" -At)
     echo
 }
 
 start_study()
 {
+    local -A resources
+    local -A sections
+
     while IFS='|' read -r id name
     do
         resources[$id]="$name"
-    done < <(psql -U milestone -d milestone -c "select id, name from resources order by name" -At)
+    done < <(psql -U flashback -d flashback -c "select id, name from resources order by name" -At)
 
+    clear
     while IFS='|' read -r id name section_count
     do
         echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m \e[2;37m($section_count)\e[0m"
-    done < <(psql -U milestone -d milestone -c "select r.id, r.name, count(s.id) from resources r left join sections s on s.resource_id = r.id group by r.id, r.name order by name" -At) | dense_column
+    done < <(psql -U flashback -d flashback -c "select r.id, r.name, count(s.position) from resources r left join sections s on s.resource = r.id group by r.id, r.name order by name" -At) | dense_column
 
     while true
     do
@@ -194,15 +205,17 @@ start_study()
         [[ -n "${resources[$resource]}" ]] && break
     done
 
-    while IFS="|" read -r id name
+    clear
+    printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m\n\n" "${resources[$resource]}" ${resource}
+    while IFS="|" read -r position name pattern
     do
-        sections[$id]="$name"
-    done < <(psql -U milestone -d milestone -c "select id, number from sections where resource_id = $resource order by number, created" -At)
+        sections[$position]="${pattern^} ${name:-$position}"
+    done < <(psql -U flashback -d flashback -c "select s.position, s.name, r.pattern from resources r join sections s on s.resource = r.id where r.id = $resource order by s.position" -At)
 
-    while IFS="|" read -r id name state
+    while IFS="|" read -r position name pattern
     do
-        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m \e[2;37m($state)\e[0m"
-    done < <(psql -U milestone -d milestone -c "select id, number, state from sections where resource_id = $resource order by number, created" -At) | dense_column
+        echo -e "\e[1;35m$position\e[0m \e[1;36m${pattern^} ${name:-$position}\e[0m"
+    done < <(psql -U flashback -d flashback -c "select s.position, s.name, r.pattern from resources r join sections s on r.id = s.resource where r.id = $resource order by s.position" -At) | dense_column
 
     local selected_sections=()
 
@@ -222,46 +235,37 @@ start_study()
 
     [ ${#selected_sections[*]} -eq 0 ] && return
 
-    note_count="$(psql -U milestone -d milestone -c "select count(id) from notes where section_id in ( $(tr ' ' ',' <<< "${selected_sections[*]}") )" -At)"
     note_number=0
 
-    while IFS="|" read -r section section_name section_state
+    while IFS="|" read -r resource_name resource_type pattern condition author publisher
     do
-        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m \e[2;37m($state)\e[0m"
-        while IFS="|" read -r note state heading
+        while IFS="|" read -r section section_position
         do
-            note_number=$((note_number + 1))
-            notes[$note]="$parent"
-            heading="$(pandoc -f markdown -t plain <<< "$heading" | xargs)"
-
-            clear
-            printf "\e[1;36m%s\e[0m \e[2;37m%d\e[0m \e[1;33m>>\e[0m \e[1;36m%s\e[0m \e[2;37m%d (%s)\e[0m\n\n" "${resources[$resource]}" ${resource} "$section_name" ${section} "$section_state"
-            printf "\e[1;35m%d/%d\e[0m \e[1;33m%s\e[0m \e[2;37m%s (%s)\e[0m\n" $note_number $note_count "$heading" $note "$state"
-
-            while IFS="|" read -r block type language
+            echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m \e[2;37m($state)\e[0m"
+            while IFS="|" read -r card state position heading
             do
-                content="$(psql -U milestone -d milestone -c "select content from note_blocks where id = $block" -At)"
+                note_number=$((note_number + 1))
+                heading="$(pandoc -f markdown -t plain <<< "$heading" | xargs)"
+                note_count="$(psql -U flashback -d flashback -c "select count(card) from sections_cards where resource = $resource and section = $section" -At)"
 
-                printf "\e[2;37m%*s\e[0m" $(tput cols) "$type $language $block"
-                case "$type" in
-                    text) echo "$content" | bat --paging never --squeeze-blank --language "md" --style "plain" ;;
-                    code) echo "$content" | bat --paging never --squeeze-blank --language "$language" --style "grid,numbers" ;;
-                    *) echo -e "\e[1;31mInvalid block type and language $type / $language" ;;
-                esac
-                echo
-            done < <(psql -U milestone -d milestone -c "select id, type, language from note_blocks where note_id = $note order by position" -At)
+                clear
+                printf "\e[1;36m%s\e[0m presented by \e[1;36m«%s»\e[0m published by \e[1;36m«%s»\e[0m \e[2;37m(%s) %d\e[0m \e[1;33m>>\e[0m \e[1;36m%s\e[0m \e[2;37m%d / %d\e[0m\n\n" "${resource_name}" "${author}" "${publisher}" "${condition}" ${resource} "${pattern^} $section_position" ${section} ${#sections[*]}
+                printf "\e[1;35m%d/%d\e[0m \e[1;33m%s\e[0m \e[2;37m%s (%s)\e[0m\n" $note_number $note_count "$heading" $card "$state"
 
-            while true
-            do
-                tput cup $last_line $(($(tput cols) - 28))
-                tput civis
-                echo -ne "\e[1;31mPress [N]ext to move forward\e[0m"
-                read -n 1 -s response </dev/tty
-                tput cnorm
-                [[ "${response,,}" == "n" ]] && break
-            done
-        done < <(psql -U milestone -d milestone -c "select id, state, heading from notes where section_id = $section" -At)
-    done < <(psql -U milestone -d milestone -c "select id, number, state from sections where id in ( $(tr ' ' ',' <<< "${selected_sections[*]}") ) order by number, created" -At)
+                show_blocks $card
+
+                while true
+                do
+                    tput cup $last_line $(($(tput cols) - 28))
+                    tput civis
+                    echo -ne "\e[1;31mPress [N]ext to move forward\e[0m"
+                    read -n 1 -s response </dev/tty
+                    tput cnorm
+                    [[ "${response,,}" == "n" ]] && break
+                done
+            done < <(psql -U flashback -d flashback -c "select c.id, c.state, t.position, c.heading from sections_cards t join cards c on c.id = t.card where resource = $resource and section = $section" -At)
+        done < <(psql -U flashback -d flashback -c "select position, name from sections where resource = $resource and position in ( $(tr ' ' ',' <<< "${selected_sections[*]}") ) order by position" -At)
+    done < <(psql -U flashback -d flashback -c "select name, type, pattern, condition, leading_author, publisher from resources where id = $resource" -At)
     echo
 }
 
