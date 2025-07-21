@@ -114,7 +114,7 @@ start_practice()
     clear
     while IFS='|' read -r id name topic_count
     do
-        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m \e[2;37m($topic_count)\e[0m"
+        printf "\e[1;35m%5d\e[0m \e[1;36m%s\e[0m \e[2;37m(%d)\e[0m\n" $id "$name" $topic_count
     done < <(psql -U flashback -d flashback -c "select s.id, s.name, count(t.position) from subjects s left join topics t on t.subject = s.id group by s.id, s.name order by id" -At) | dense_column
 
     while true
@@ -196,7 +196,7 @@ start_study()
     clear
     while IFS='|' read -r id name section_count
     do
-        echo -e "\e[1;35m$id\e[0m \e[1;36m$name\e[0m \e[2;37m($section_count)\e[0m"
+        printf "\e[1;35m%5d\e[0m \e[1;36m%s\e[0m \e[2;37m(%d)\e[0m\n" $id "$name" $section_count
     done < <(psql -U flashback -d flashback -c "select r.id, r.name, count(s.position) from resources r left join sections s on s.resource = r.id group by r.id, r.name order by name" -At) | dense_column
 
     while true
